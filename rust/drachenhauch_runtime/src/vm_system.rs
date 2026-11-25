@@ -16,18 +16,14 @@ impl<'p> Vm<'p> {
         if !name.starts_with("zeit_") { return Ok(None); }
         use crate::zeit;
 
+        // Zeitwerte, Sekunden und Teile sind INTEGER. Eine Kommazahl mit
+        // Nachkommastellen ist ein Fehler -- bis 2026.53 wurde sie still
+        // abgeschnitten (`ZEIT_PLUS(t, 1.7)` zaehlte eine Sekunde).
         fn z_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
-            match a.get(i) {
-                Some(Value::Int(n)) => Ok(*n),
-                Some(Value::Float(f)) => Ok(*f as i64),
-                _ => Err(format!("{}: erwartet einen Zeitwert (INTEGER, Arg {})", fn_, i + 1)),
-            }
+            crate::argument::a_int(a, i, fn_)
         }
         fn z_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-            match a.get(i) {
-                Some(Value::Str(s)) => Ok(s),
-                _ => Err(format!("{}: erwartet STRING (Arg {})", fn_, i + 1)),
-            }
+            crate::argument::a_text(a, i, fn_)
         }
 
         let v = match name {
@@ -90,12 +86,13 @@ impl<'p> Vm<'p> {
                 }
             }
             "zeit_aus_teilen" => {
-                Value::Int(zeit::aus_teilen(
-                    z_int(a, 0, "ZEIT_AUS_TEILEN")?, z_int(a, 1, "ZEIT_AUS_TEILEN")?,
-                    z_int(a, 2, "ZEIT_AUS_TEILEN")?,
-                    if a.len() > 3 { z_int(a, 3, "ZEIT_AUS_TEILEN")? } else { 0 },
-                    if a.len() > 4 { z_int(a, 4, "ZEIT_AUS_TEILEN")? } else { 0 },
-                    if a.len() > 5 { z_int(a, 5, "ZEIT_AUS_TEILEN")? } else { 0 }))
+                const F: &str = "ZEIT_AUS_TEILEN";
+                let (j, mo, t) = (z_int(a, 0, F)?, z_int(a, 1, F)?, z_int(a, 2, F)?);
+                let h = if a.len() > 3 { z_int(a, 3, F)? } else { 0 };
+                let mi = if a.len() > 4 { z_int(a, 4, F)? } else { 0 };
+                let s = if a.len() > 5 { z_int(a, 5, F)? } else { 0 };
+                zeit::teile_pruefen(j, mo, t, h, mi, s).map_err(|e| format!("{}: {}", F, e))?;
+                Value::Int(zeit::aus_teilen(j, mo, t, h, mi, s))
             }
             "zeit_plus" => Value::Int(
                 z_int(a, 0, "ZEIT_PLUS")?.saturating_add(z_int(a, 1, "ZEIT_PLUS")?)),
@@ -152,7 +149,7 @@ impl<'p> Vm<'p> {
         }
         if !matches!(name, "exit" | "eprint" | "shell" | "shell_out$" | "shell_out") { return Ok(None); }
         fn o_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-            match a.get(i) { Some(Value::Str(s)) => Ok(s), _ => Err(format!("{}: erwartet STRING (Arg {})", fn_, i + 1)) }
+            crate::argument::a_text(a, i, fn_)
         }
         let v = match name {
             "exit" => {
@@ -587,7 +584,7 @@ impl<'p> Vm<'p> {
                 Value::Int(self.task_auftraege.start(&was,
                     move || crate::hintergrund::task_arbeit(exe, datei, funktion, args)))
             }
-            "task_ready" => Value::Bool(self.task_auftraege.fertig(bi_int(a, 0, "TASK_READY")?)?),
+            "task_ready" => Value::Bool(self.task_auftraege.fertig(bi_int(a, 0, "TASK_READY")?, "TASK_READY")?),
             // Einmal abholbar, wie bei SHELL_RESULT$: `abholen` nimmt das
             // Ergebnis aus der Verwaltung. Darum gibt es KEIN zweites
             // TASK_OUTPUT$ daneben -- zwei Abholer wuerden sich gegenseitig
@@ -596,7 +593,7 @@ impl<'p> Vm<'p> {
             // er redet nicht.
             "task_result$" | "task_result" => {
                 let id = bi_int(a, 0, "TASK_RESULT$")?;
-                match self.task_auftraege.abholen(id)? {
+                match self.task_auftraege.abholen(id, "TASK_RESULT$")? {
                     Some(Ok(e)) => Value::str_rc(&e.ergebnis),
                     Some(Err(e)) => return Err(e),
                     None => return Err(format!(
@@ -607,10 +604,10 @@ impl<'p> Vm<'p> {
             "task_cancel" => { self.task_auftraege.abbrechen(bi_int(a, 0, "TASK_CANCEL")?); Value::Nil }
             "task_pending" => Value::Int(self.task_auftraege.offen()),
 
-            "shell_ready" => Value::Bool(self.shell_auftraege.fertig(bi_int(a, 0, "SHELL_READY")?)?),
+            "shell_ready" => Value::Bool(self.shell_auftraege.fertig(bi_int(a, 0, "SHELL_READY")?, "SHELL_READY")?),
             "shell_result$" | "shell_result" => {
                 let id = bi_int(a, 0, "SHELL_RESULT$")?;
-                match self.shell_auftraege.abholen(id)? {
+                match self.shell_auftraege.abholen(id, "SHELL_RESULT$")? {
                     Some(Ok(e)) => {
                         self.shell_letzter_code = e.code;
                         self.shell_letzter_fehler = e.stderr;
@@ -668,10 +665,10 @@ impl<'p> Vm<'p> {
                     conn.query(&sql, &params, "DB_QUERY_START")
                 }))
             }
-            "db_query_ready" => Value::Bool(self.db_auftraege.fertig(bi_int(a, 0, "DB_QUERY_READY")?)?),
+            "db_query_ready" => Value::Bool(self.db_auftraege.fertig(bi_int(a, 0, "DB_QUERY_READY")?, "DB_QUERY_READY")?),
             "db_query_result" => {
                 let id = bi_int(a, 0, "DB_QUERY_RESULT")?;
-                match self.db_auftraege.abholen(id)? {
+                match self.db_auftraege.abholen(id, "DB_QUERY_RESULT")? {
                     Some(Ok(res)) => {
                         self.db_results.push(res);
                         Value::Int((self.db_results.len() - 1) as i64)
@@ -857,10 +854,10 @@ impl<'p> Vm<'p> {
     pub(super) fn try_timer(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("timer_") || name == "cooldown") { return Ok(None); }
         fn t_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
-            match a.get(i) { Some(Value::Int(n)) => Ok(*n), _ => Err(format!("{}: erwartet INTEGER (Arg {})", fn_, i + 1)) }
+            crate::argument::a_int(a, i, fn_)
         }
         fn t_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-            match a.get(i) { Some(Value::Str(s)) => Ok(s), _ => Err(format!("{}: erwartet STRING (Arg {})", fn_, i + 1)) }
+            crate::argument::a_text(a, i, fn_)
         }
         fn t_func(a: &[Value], i: usize, fn_: &str) -> R<crate::value::Rueckruf> {
             match a.get(i).and_then(crate::value::Rueckruf::aus_wert) {
@@ -906,7 +903,7 @@ impl<'p> Vm<'p> {
     pub(super) fn try_scene(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("scene_")) { return Ok(None); }
         fn sa<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-            match a.get(i) { Some(Value::Str(s)) => Ok(s), _ => Err(format!("{}: erwartet STRING", fn_)) }
+            crate::argument::a_text(a, i, fn_)
         }
         let r = match name {
             "scene_push" => { self.scene_stack.push((sa(a, 0, "SCENE_PUSH")?.to_string(), HashMap::new())); Value::Nil }

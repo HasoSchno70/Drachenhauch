@@ -1038,7 +1038,7 @@ PRINT a[0]; " "; b[0]; " "; c[0]
 IMPORT "gui"
 GUI_THEME("glas_hell")
 --- fehler
-GUI_THEME: erwartet INTEGER (Arg 1) -- ein ganzes Thema setzt GUI_THEME_PRESET("glas_hell"); GUI_THEME nimmt nur die Akzentfarbe
+GUI_THEME: erwartet INTEGER (Arg 1), erhalten STRING -- ein ganzes Thema setzt GUI_THEME_PRESET("glas_hell"); GUI_THEME nimmt nur die Akzentfarbe
 
 === dim hinter then sagt wie es geht
 ' Texteditor-Runde, 2026-10-14: vorher nur "Unerwartetes Token DIM".

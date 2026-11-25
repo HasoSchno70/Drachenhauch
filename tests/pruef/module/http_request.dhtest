@@ -1071,3 +1071,42 @@ PRINT "status "; HTTP_STATUS()
 hinweis TRUE
 url einmal TRUE
 status 0
+
+=== download nimmt kopfzeile und leert http_bytes
+' Bis 2026.53 baute HTTP_DOWNLOAD seine eigene Anfrage: HTTP_SET_HEADER und
+' HTTP_TIMEOUT galten nicht (eine Datei hinter Authorization liess sich nicht
+' laden), und HTTP_BYTES lieferte danach den Rumpf der VORIGEN Anfrage.
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("echo", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+HTTP_SET_HEADER("X-Eigen", "ja")
+PRINT LEN(HTTP_REQUEST("GET", basis + "/vorher")) > 0; " "; BUFFER_LEN(HTTP_BYTES()) > 0
+PRINT HTTP_DOWNLOAD(basis + "/x", "dl.txt") > 0
+PRINT INSTR(FILE_READ$("dl.txt"), CHR$(34) + "eigen" + CHR$(34) + ":" + CHR$(34) + "ja" + CHR$(34)) >= 0
+PRINT BUFFER_LEN(HTTP_BYTES())
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/../_hilfen/gegenserver.dh
+--- erwartet
+TRUE TRUE
+TRUE
+TRUE
+0

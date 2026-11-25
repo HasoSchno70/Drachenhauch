@@ -29,7 +29,7 @@ FALSE
 DIM m AS MAP OF INTEGER
 m = {x: x FOR x IN (1, 2, 3)}
 --- fehler
-MAP-Schluessel erwartet STRING, erhalten INTEGER
+MAP-Schluessel: erwartet STRING, erhalten INTEGER
 
 === dict comp vm matches tw (1)
 DIM m AS MAP OF INTEGER

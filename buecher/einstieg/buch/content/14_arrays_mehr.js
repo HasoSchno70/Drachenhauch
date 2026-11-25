@@ -194,7 +194,7 @@ module.exports = (H) => [
 
   H.table([
     [{ text: "Index ausserhalb", mono: true }, "Ein Fach jenseits der Anzahl. Bei DIM a[10] ist 9 das letzte."],
-    [{ text: "ARRAY_PUSH erwartet ARRAY", mono: true }, "Das Array wurde nicht mit eckigen Klammern angelegt. Für eine wachsende Liste: DIM a[0] AS INTEGER."],
+    [{ text: "ARRAY_PUSH: erwartet ARRAY", mono: true }, "Das Array wurde nicht mit eckigen Klammern angelegt. Für eine wachsende Liste: DIM a[0] AS INTEGER."],
     ["Alle Funken sitzen aufeinander", "Der Zufall steht außerhalb der Schleife und wird einmal statt fünfhundertmal gewürfelt."],
     ["Das Spiel des Lebens erstarrt sofort", "Es wird direkt in feld geschrieben statt in neu. Die Zellen sehen dann bereits die neuen Werte ihrer Nachbarn."],
     ["Die Namen passen nicht mehr zu den Punkten", "SORT hat nur eines von zwei parallelen Arrays sortiert."],

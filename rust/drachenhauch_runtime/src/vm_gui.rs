@@ -101,21 +101,19 @@ impl<'p> Vm<'p> {
 
     #[cfg(feature = "graphics")]
     pub(super) fn try_gui_innen(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        // Die Regeln stehen in argument.rs (INTEGER: auch eine glatte Kommazahl).
         fn gi(a: &[Value], i: usize, f: &str) -> R<i64> {
-            match a.get(i) { Some(Value::Int(n)) => Ok(*n),
-                Some(Value::Float(x)) => crate::builtins::glatt_int(*x).ok_or_else(|| format!("{}: erwartet INTEGER (Arg {}), erhalten {}{}",
-                    f, i + 1, crate::value::fmt_float(*x), crate::builtins::KEIN_GANZ_HINWEIS)),
-                Some(Value::Str(t)) => Err(format!("{}: erwartet INTEGER (Arg {}){}", f, i + 1,
-                    crate::umstieg::text_statt_zahl(f, t))),
-                // Ein Feld AS GUI_WIDGET, dem noch nichts zugewiesen wurde --
-                // typisch: ein Fenster aus dem Studio, das noch nicht
-                // gezeigt wurde, hat seine Controls noch nicht angelegt.
-                Some(Value::Nil) => Err(format!("{}: erwartet INTEGER (Arg {}), erhalten NIL -- das Widget oder Fenster gibt es noch nicht (ein Fenster aus dem Studio legt seine Controls erst mit Zeigen an)", f, i + 1)),
-                _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
+            // Ein Feld AS GUI_WIDGET, dem noch nichts zugewiesen wurde --
+            // typisch: ein Fenster aus dem Studio, das noch nicht
+            // gezeigt wurde, hat seine Controls noch nicht angelegt.
+            if let Some(v @ Value::Nil) = a.get(i) {
+                return Err(format!("{} -- das Widget oder Fenster gibt es noch nicht (ein Fenster aus dem Studio legt seine Controls erst mit Zeigen an)",
+                    crate::argument::erwartet(f, "INTEGER", Some(i + 1), v)));
+            }
+            crate::argument::a_int(a, i, f)
         }
         fn gs(a: &[Value], i: usize, f: &str) -> R<String> {
-            match a.get(i) { Some(Value::Str(s)) => Ok(s.to_string()),
-                _ => Err(format!("{}: erwartet STRING (Arg {})", f, i + 1)) }
+            crate::argument::a_text(a, i, f).map(|s| s.to_string())
         }
         /// Ein Sinnbild: der Name eines eingebauten (STRING) oder ein Bild
         /// (Textur-Handle, -1 = keins).
@@ -126,13 +124,12 @@ impl<'p> Vm<'p> {
                 _ => Err(format!("{}: erwartet den Namen eines Sinnbilds (STRING) oder ein Bild (Arg {})", f, i + 1)),
             }
         }
+        // Ein Schalter: TRUE/FALSE oder 1/0.
         fn gbool(a: &[Value], i: usize, f: &str) -> R<bool> {
-            match a.get(i) { Some(Value::Bool(b)) => Ok(*b),
-                _ => Err(format!("{}: erwartet BOOLEAN (Arg {})", f, i + 1)) }
+            crate::argument::a_schalter(a, i, f)
         }
         fn gnum(a: &[Value], i: usize, f: &str) -> R<f64> {
-            match a.get(i) { Some(Value::Int(n)) => Ok(*n as f64), Some(Value::Float(x)) => Ok(*x),
-                _ => Err(format!("{}: erwartet Zahl (Arg {})", f, i + 1)) }
+            crate::argument::a_num(a, i, f)
         }
         // Ein ARRAY OF INTEGER als Vec -- Marken, Faltbereiche, Spans.
         fn ganze(v: &Value, fn_: &str) -> R<Vec<i64>> {
@@ -2116,10 +2113,7 @@ impl<'p> Vm<'p> {
         const HDR: i32 = 22; const ROW: i32 = 20; const SCR: i32 = 12; const PAD: i32 = 6;
         // --- Arg-Extraktion (lokal) ---
         fn gi(a: &[Value], i: usize, f: &str) -> R<i64> {
-            match a.get(i) { Some(Value::Int(n)) => Ok(*n),
-                Some(Value::Float(x)) => crate::builtins::glatt_int(*x).ok_or_else(|| format!("{}: erwartet INTEGER (Arg {}), erhalten {}{}",
-                    f, i + 1, crate::value::fmt_float(*x), crate::builtins::KEIN_GANZ_HINWEIS)),
-                _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
+            crate::argument::a_int(a, i, f)
         }
         fn gid(a: &[Value], f: &str) -> R<String> {
             match a.first() { Some(Value::Str(s)) => Ok(s.to_string()), _ => Err(format!("{}: id muss STRING sein", f)) }

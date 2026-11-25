@@ -321,10 +321,7 @@ pub(crate) fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
 }
 
 fn need_str<'a>(v: &'a Value, fn_: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Str(s) => Ok(s),
-        _ => Err(format!("{} erwartet STRING, erhalten {}", fn_, v.type_name())),
-    }
+    crate::argument::text(v, fn_, None)
 }
 
 /// Byte-Stelle des Zeichens Nummer `n` (ab 0); hinter dem Ende das Ende.
@@ -412,15 +409,9 @@ fn zeichen_stelle_genau(s: &str, n: usize) -> Option<usize> {
 }
 
 fn need_int(v: &Value, fn_: &str) -> Result<i64, String> {
-    match v {
-        Value::Int(i) => Ok(*i),
-        Value::Float(f) => glatt_int(*f).ok_or_else(|| format!("{} erwartet INTEGER, erhalten FLOAT {}{}", fn_, crate::value::fmt_float(*f), KEIN_GANZ_HINWEIS)),
-        // Ein Text, wo eine Zahl steht, ist fast immer einer von drei Faellen
-        // (Dateiname, Taste, Hex-Farbe) -- der Satz dazu steht in umstieg.rs.
-        Value::Str(s) => Err(format!("{} erwartet INTEGER, erhalten STRING{}",
-                                     fn_, crate::umstieg::text_statt_zahl(fn_, s))),
-        _ => Err(format!("{} erwartet INTEGER, erhalten {}", fn_, v.type_name())),
-    }
+    // Ein Text, wo eine Zahl steht, ist fast immer einer von drei Faellen
+    // (Dateiname, Taste, Hex-Farbe) -- der Satz dazu steht in umstieg.rs.
+    crate::argument::int(v, fn_, None)
 }
 
 /// Eine Kommazahl ohne Nachkommastellen als INTEGER -- dieselbe Regel wie
@@ -456,20 +447,11 @@ fn dt_ms(v: &Value, fn_: &str) -> Result<i64, String> {
 }
 
 fn need_int_gerundet(v: &Value, fn_: &str) -> Result<i64, String> {
-    match v {
-        Value::Int(i) => Ok(*i),
-        Value::Float(f) if f.is_finite() => Ok(f.round() as i64),
-        Value::Float(_) => Err(format!("{} erwartet eine endliche Zahl", fn_)),
-        _ => Err(format!("{} erwartet eine Zahl, erhalten {}", fn_, v.type_name())),
-    }
+    crate::argument::int_gerundet(v, fn_, None)
 }
 
 fn need_num(v: &Value, fn_: &str) -> Result<f64, String> {
-    match v {
-        Value::Int(i) => Ok(*i as f64),
-        Value::Float(f) => Ok(*f),
-        _ => Err(format!("{} erwartet Zahl, erhalten {}", fn_, v.type_name())),
-    }
+    crate::argument::num(v, fn_, None)
 }
 
 /// NUMFMT$: grosse Zahlen kurz+lesbar formatieren (Idle-/Incremental-Game-
@@ -515,7 +497,7 @@ pub(crate) fn numfmt(n: f64, decimals: i64) -> String {
 fn numeric_1d_array<'a>(v: &'a Value, fn_: &str) -> Result<std::cell::Ref<'a, DhArray>, String> {
     let arr = match v {
         Value::Array(arr) => arr.borrow(),
-        _ => return Err(format!("{} erwartet ARRAY", fn_)),
+        _ => return Err(format!("{}: erwartet ARRAY", fn_)),
     };
     if arr.dims.len() != 1 { return Err(format!("{}: nur 1D-Arrays", fn_)); }
     // Ein leeres Feld ohne Elementtyp -- etwa aus einer Comprehension, deren
@@ -987,7 +969,20 @@ fn euro_text(cent: i64, symbol: &str) -> String {
     out
 }
 
-fn round_half_even(x: f64) -> i64 {
+/// Eine gerundete Kommazahl als INTEGER -- oder ein Ueberlauf-Fehler.
+/// `f as i64` saettigt (seit Rust 1.45): FLOOR(1e19) lieferte bis 2026.53
+/// still i64::MAX, waehrend INT(1e19) schon meldete. NaN ebenso.
+fn ganz_aus(f: f64, fn_: &str) -> Result<i64, String> {
+    // 2^63 ist genau darstellbar, i64::MAX als f64 dagegen schon 2^63.
+    const GRENZE: f64 = 9_223_372_036_854_775_808.0;
+    if f >= -GRENZE && f < GRENZE {
+        Ok(f as i64)
+    } else {
+        Err(format!("{}: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)", fn_))
+    }
+}
+
+fn round_half_even(x: f64) -> f64 {
     let f = x.floor();
     let diff = x - f;
     let r = if diff < 0.5 {
@@ -996,9 +991,9 @@ fn round_half_even(x: f64) -> i64 {
         f + 1.0
     } else {
         // exakt .5 -> zur geraden Zahl
-        if (f as i64).rem_euclid(2) == 0 { f } else { f + 1.0 }
+        if f.rem_euclid(2.0) == 0.0 { f } else { f + 1.0 }
     };
-    r as i64
+    r
 }
 
 /// Minimaler printf fuer FORMAT$ / f-String-Specs: %[-][0][width][.prec](d|i|f|s|x|X).
@@ -1133,7 +1128,7 @@ fn format_one(mask: &str, v: &Value) -> R {
 fn tiled_h(v: &Value, fn_: &str) -> Result<Rc<RefCell<TiledMap>>, String> {
     match v {
         Value::Tiled(m) => Ok(m.clone()),
-        _ => Err(format!("{} erwartet TILED_MAP", fn_)),
+        _ => Err(format!("{}: erwartet TILED_MAP", fn_)),
     }
 }
 
@@ -1184,27 +1179,21 @@ fn get_obj<'a>(m: &'a TiledMap, name: &str, idx: i64, fn_: &str) -> Result<&'a T
     Ok(&layer.objects[idx as usize])
 }
 
+/// Ein Wahrheitswert, der als solcher gespeichert wird (JSON_SET_BOOL,
+/// SAVE_SET_BOOL, ECS_ADD_BOOL): nur BOOLEAN.
 fn need_bool(v: &Value, fn_: &str) -> Result<bool, String> {
-    match v {
-        Value::Bool(b) => Ok(*b),
-        _ => Err(format!("{} erwartet BOOLEAN, erhalten {}", fn_, v.type_name())),
-    }
+    crate::argument::boolean(v, fn_, None)
 }
 
-/// Ja/Nein-Flag, das BOOLEAN UND Zahl akzeptiert (`TRUE`/`FALSE` oder `1`/`0`).
+/// Ein Schalter (an/aus-Option): BOOLEAN oder Zahl (`TRUE`/`FALSE` oder `1`/`0`).
 fn need_flag(v: &Value, fn_: &str) -> Result<bool, String> {
-    match v {
-        Value::Bool(b) => Ok(*b),
-        Value::Int(i) => Ok(*i != 0),
-        Value::Float(f) => Ok(*f != 0.0),
-        _ => Err(format!("{} erwartet BOOLEAN oder Zahl (Flag), erhalten {}", fn_, v.type_name())),
-    }
+    crate::argument::schalter(v, fn_, None)
 }
 
 fn char_h(v: &Value, fn_: &str) -> Result<Rc<RefCell<crate::controller::CharController>>, String> {
     match v {
         Value::CharController(c) => Ok(c.clone()),
-        _ => Err(format!("{} erwartet CHAR_CONTROLLER", fn_)),
+        _ => Err(format!("{}: erwartet CHAR_CONTROLLER", fn_)),
     }
 }
 
@@ -1272,15 +1261,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "int" => {
             arity!(1);
-            let f = need_num(&a[0], "INT")?.floor();
-            // Review-Fund: `f as i64` saettigt (Rust seit 1.45) statt zu
-            // ueberlaufen -- INT(1e19) lieferte bisher stillschweigend
-            // i64::MAX statt eines Fehlers.
-            if f >= i64::MIN as f64 && f <= i64::MAX as f64 {
-                Ok(Value::Int(f as i64))
-            } else {
-                err("INT: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)".to_string())
-            }
+            Ok(Value::Int(ganz_aus(need_num(&a[0], "INT")?.floor(), "INT")?))
         }
         // FLT(x): Int/Float -> Float (Gegenstueck zu INT). Im Tree-Walker laengst
         // vorhanden; hier nachgezogen, damit `FLT(...)` auch nativ laeuft.
@@ -1303,7 +1284,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Value::Int(i) => i.checked_abs().map(Value::Int).ok_or_else(||
                     "ABS: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)".to_string()),
                 Value::Float(f) => Ok(Value::Float(f.abs())),
-                v => err(format!("ABS erwartet Zahl, erhalten {}", v.type_name())),
+                v => err(format!("ABS: erwartet Zahl, erhalten {}", v.type_name())),
             }
         }
         "is_nil" => { arity!(1); Ok(Value::Bool(matches!(a[0], Value::Nil))) }
@@ -1313,7 +1294,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Ok(Value::Float((next_rand() >> 11) as f64 / (1u64 << 53) as f64))
             } else {
                 let n = need_int(&a[0], "RND")?;
-                if n <= 0 { return err("RND erwartet positives INTEGER"); }
+                if n <= 0 { return err("RND: erwartet positives INTEGER"); }
                 Ok(Value::Int((next_rand() % n as u64) as i64))
             }
         }
@@ -1350,7 +1331,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let n = arr.cells.len();
                 if n == 0 { return err("CHOICE: Array ist leer".to_string()); }
                 Ok(arr.cells.get((next_rand() % n as u64) as usize))
-            } else { err("CHOICE erwartet ARRAY".to_string()) }
+            } else { err("CHOICE: erwartet ARRAY".to_string()) }
         }
         "shuffle" => {
             arity!(1);
@@ -1364,7 +1345,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     arr.cells.swap(i, j);
                 }
                 Ok(Value::Nil)
-            } else { err("SHUFFLE erwartet ARRAY".to_string()) }
+            } else { err("SHUFFLE: erwartet ARRAY".to_string()) }
         }
         "weighted_choice" => {
             // WEIGHTED_CHOICE(werte, gewichte) -> Element aus `werte`, gewaehlt
@@ -1373,7 +1354,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(2);
             let (vals, wts) = match (&a[0], &a[1]) {
                 (Value::Array(v), Value::Array(w)) => (v.borrow(), w.borrow()),
-                _ => return err("WEIGHTED_CHOICE erwartet zwei ARRAYs".to_string()),
+                _ => return err("WEIGHTED_CHOICE: erwartet zwei ARRAYs".to_string()),
             };
             if vals.dims.len() != 1 || wts.dims.len() != 1 { return err("WEIGHTED_CHOICE: nur 1D-Arrays".to_string()); }
             if vals.cells.len() != wts.cells.len() { return err("WEIGHTED_CHOICE: werte und gewichte muessen gleich lang sein".to_string()); }
@@ -1532,9 +1513,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 // Die Zahl der Eintraege, wie MAPSIZE -- LEN(m) schreibt jeder zuerst.
                 Value::Map(m) => Ok(Value::Int(m.borrow().len() as i64)),
                 Value::Int(_) | Value::Float(_) => err(
-                    "LEN erwartet STRING, TUPLE, ARRAY oder MAP -- die Stellen einer Zahl: LEN(STR$(zahl))".to_string()),
+                    "LEN: erwartet STRING, TUPLE, ARRAY oder MAP -- die Stellen einer Zahl: LEN(STR$(zahl))".to_string()),
                 Value::Nil => err("LEN auf NIL -- die Variable hat noch keinen Wert".to_string()),
-                _ => err("LEN erwartet STRING, TUPLE, ARRAY oder MAP".to_string()),
+                _ => err("LEN: erwartet STRING, TUPLE, ARRAY oder MAP".to_string()),
             }
         }
         "dimsize" => {
@@ -1546,12 +1527,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     return err(format!("DIMSIZE: Dimension {} ausserhalb", n));
                 }
                 Ok(Value::Int(arr.dims[n as usize]))
-            } else { err("DIMSIZE erwartet ARRAY".to_string()) }
+            } else { err("DIMSIZE: erwartet ARRAY".to_string()) }
         }
         "dimcount" => {
             arity!(1);
             if let Value::Array(arr) = &a[0] { Ok(Value::Int(arr.borrow().dims.len() as i64)) }
-            else { err("DIMCOUNT erwartet ARRAY".to_string()) }
+            else { err("DIMCOUNT: erwartet ARRAY".to_string()) }
         }
         "chr$" | "chr" => {
             arity!(1);
@@ -1563,7 +1544,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "asc" => {
             arity!(1);
             let s = need_str(&a[0], "ASC")?;
-            let c = s.chars().next().ok_or("ASC erwartet nicht-leeren STRING")?;
+            let c = s.chars().next().ok_or("ASC: erwartet nicht-leeren STRING")?;
             Ok(Value::Int(c as i64))
         }
         "sqr" | "sqrt" => {   // SQRT = BASIC-Alias fuer SQR
@@ -1657,11 +1638,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "tan" => { arity!(1); Ok(Value::Float(need_num(&a[0], "TAN")?.tan())) }
         "atan" => { arity!(1); Ok(Value::Float(need_num(&a[0], "ATAN")?.atan())) }
         "atan2" => { arity!(2); Ok(Value::Float(need_num(&a[0], "ATAN2")?.atan2(need_num(&a[1], "ATAN2")?))) }
-        "floor" => { arity!(1); Ok(Value::Int(need_num(&a[0], "FLOOR")?.floor() as i64)) }
-        "ceil" => { arity!(1); Ok(Value::Int(need_num(&a[0], "CEIL")?.ceil() as i64)) }
+        "floor" => { arity!(1); Ok(Value::Int(ganz_aus(need_num(&a[0], "FLOOR")?.floor(), "FLOOR")?)) }
+        "ceil" => { arity!(1); Ok(Value::Int(ganz_aus(need_num(&a[0], "CEIL")?.ceil(), "CEIL")?)) }
         "round" => {
             if a.len() == 1 {
-                Ok(Value::Int(round_half_even(need_num(&a[0], "ROUND")?)))
+                Ok(Value::Int(ganz_aus(round_half_even(need_num(&a[0], "ROUND")?), "ROUND")?))
             } else if a.len() == 2 {
                 let x = need_num(&a[0], "ROUND")?;
                 let n = need_int(&a[1], "ROUND")?;
@@ -1794,7 +1775,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "min" | "max" => {
             if a.is_empty() { return err(format!("{}: mind. 1 Argument", name.to_uppercase())); }
-            for v in a { if !is_num(v) { return err(format!("{} erwartet Zahl", name.to_uppercase())); } }
+            for v in a { if !is_num(v) { return err(format!("{}: erwartet Zahl", name.to_uppercase())); } }
             let want_min = name == "min";
             let mut best = a[0].clone();
             for v in &a[1..] {
@@ -1806,7 +1787,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "clamp" => {
             arity!(3);
             let (v, lo, hi) = (as_f64(&a[0]), as_f64(&a[1]), as_f64(&a[2]));
-            for x in &a[..3] { if !is_num(x) { return err("CLAMP erwartet Zahlen".to_string()); } }
+            for x in &a[..3] { if !is_num(x) { return err("CLAMP: erwartet Zahlen".to_string()); } }
             if v < lo { Ok(a[1].clone()) } else if v > hi { Ok(a[2].clone()) } else { Ok(a[0].clone()) }
         }
         "sign" | "sgn" => {   // SGN = BASIC-Alias fuer SIGN
@@ -2117,49 +2098,49 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let v = coerce_map_value(&a[2], &m.borrow().value_type)?;
                 m.borrow_mut().put_str(k, v);
                 Ok(Value::Nil)
-            } else { err("MAPPUT erwartet MAP".to_string()) }
+            } else { err("MAPPUT: erwartet MAP".to_string()) }
         }
         "mapget" => {
             arity!(2);
             if let Value::Map(m) = &a[0] {
                 let k = need_str(&a[1], "MAPGET")?;
                 m.borrow().get(k).cloned().ok_or_else(|| format!("MAPGET: Schluessel '{}' nicht in Map", k))
-            } else { err("MAPGET erwartet MAP".to_string()) }
+            } else { err("MAPGET: erwartet MAP".to_string()) }
         }
         "mapgetor" => {
             arity!(3);
             if let Value::Map(m) = &a[0] {
                 let k = need_str(&a[1], "MAPGETOR")?;
                 Ok(m.borrow().get(k).cloned().unwrap_or_else(|| a[2].clone()))
-            } else { err("MAPGETOR erwartet MAP".to_string()) }
+            } else { err("MAPGETOR: erwartet MAP".to_string()) }
         }
         "maphas" => {
             arity!(2);
             if let Value::Map(m) = &a[0] {
                 Ok(Value::Bool(m.borrow().get(need_str(&a[1], "MAPHAS")?).is_some()))
-            } else { err("MAPHAS erwartet MAP".to_string()) }
+            } else { err("MAPHAS: erwartet MAP".to_string()) }
         }
         "mapremove" => {
             arity!(2);
             if let Value::Map(m) = &a[0] {
                 Ok(Value::Bool(m.borrow_mut().remove(need_str(&a[1], "MAPREMOVE")?)))
-            } else { err("MAPREMOVE erwartet MAP".to_string()) }
+            } else { err("MAPREMOVE: erwartet MAP".to_string()) }
         }
         "mapsize" => {
             arity!(1);
             if let Value::Map(m) = &a[0] { Ok(Value::Int(m.borrow().len() as i64)) }
-            else { err("MAPSIZE erwartet MAP".to_string()) }
+            else { err("MAPSIZE: erwartet MAP".to_string()) }
         }
         "mapkeys" => {
             arity!(1);
             if let Value::Map(m) = &a[0] {
                 Ok(new_str_array(m.borrow().entries().iter().map(|(k, _)| k.clone()).collect()))
-            } else { err("MAPKEYS erwartet MAP".to_string()) }
+            } else { err("MAPKEYS: erwartet MAP".to_string()) }
         }
         "mapclear" => {
             arity!(1);
             if let Value::Map(m) = &a[0] { m.borrow_mut().clear(); Ok(Value::Nil) }
-            else { err("MAPCLEAR erwartet MAP".to_string()) }
+            else { err("MAPCLEAR: erwartet MAP".to_string()) }
         }
         "mapvalues" => {
             arity!(1);
@@ -2170,7 +2151,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let mut arr = DhArray::new(m.value_type.clone(), vec![n], || type_default(&m.value_type));
                 for (i, v) in vals.into_iter().enumerate() { arr.cells.set(i, v); }
                 Ok(Value::Array(Rc::new(RefCell::new(arr))))
-            } else { err("MAPVALUES erwartet MAP".to_string()) }
+            } else { err("MAPVALUES: erwartet MAP".to_string()) }
         }
         // `FOR EACH k, v IN x`: der Compiler schiebt den Behaelter hier durch.
         // Eine MAP liefert ihre PAARE (nicht die Schluessel wie bei einer
@@ -2200,7 +2181,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let mut arr = DhArray::new("tuple".to_string(), vec![n], || Value::Tuple(Rc::new(vec![])));
                 for (i, v) in items.into_iter().enumerate() { arr.cells.set(i, v); }
                 Ok(Value::Array(Rc::new(RefCell::new(arr))))
-            } else { err("MAPITEMS erwartet MAP".to_string()) }
+            } else { err("MAPITEMS: erwartet MAP".to_string()) }
         }
         // --- Array ---
         "sort" => {
@@ -2213,6 +2194,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let desc = match a.get(1) {
                 None => false,
                 Some(Value::Bool(b)) => *b,
+                Some(v @ (Value::Int(_) | Value::Float(_))) => need_flag(v, "SORT")?,
                 Some(_) => return err("SORT: 2. Argument muss BOOLEAN (absteigend) oder FUNCREF (Comparator) sein".to_string()),
             };
             if let Value::Array(arr) = &a[0] {
@@ -2228,7 +2210,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 }
                 if desc { arr.cells.reverse(); }
                 Ok(Value::Nil)
-            } else { err("SORT erwartet ARRAY".to_string()) }
+            } else { err("SORT: erwartet ARRAY".to_string()) }
         }
         "reverse" => {
             arity!(1);
@@ -2237,7 +2219,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 if arr.dims.len() != 1 { return err("REVERSE: nur 1D-Arrays".to_string()); }
                 arr.cells.reverse();
                 Ok(Value::Nil)
-            } else { err("REVERSE erwartet ARRAY".to_string()) }
+            } else { err("REVERSE: erwartet ARRAY".to_string()) }
         }
         "array_indexof" => {
             arity!(2);
@@ -2251,7 +2233,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     if value_eq(&v, &a[1]) { return Ok(Value::Int(lo + i as i64)); }
                 }
                 Ok(Value::Int(lo - 1))
-            } else { err("ARRAY_INDEXOF erwartet ARRAY".to_string()) }
+            } else { err("ARRAY_INDEXOF: erwartet ARRAY".to_string()) }
         }
         // --- Array-Aggregate (1D) ---
         "array_sum" => {
@@ -2311,7 +2293,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     (cells, _) => { let n = cells.len(); for i in 0..n { cells.set(i, v.clone()); } }
                 }
                 Ok(Value::Nil)
-            } else { err("ARRAY_FILL erwartet ARRAY".to_string()) }
+            } else { err("ARRAY_FILL: erwartet ARRAY".to_string()) }
         }
         "array_copy" => {
             arity!(1);
@@ -2325,7 +2307,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     unten: arr.unten.clone(),
                 };
                 Ok(Value::Array(Rc::new(RefCell::new(new))))
-            } else { err("ARRAY_COPY erwartet ARRAY".to_string()) }
+            } else { err("ARRAY_COPY: erwartet ARRAY".to_string()) }
         }
         // --- Dynamische 1D-Arrays (wachsen/schrumpfen) ---
         // Mutieren das Array IN PLACE: values + dims=[len] + strides=[1].
@@ -2339,7 +2321,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let v = coerce_elem(a[1].clone(), &b.element_type, "ARRAY_PUSH")?;
                 b.cells.push(v);
                 Ok(Value::Int(laenge_setzen(&mut b)))
-            } else { err("ARRAY_PUSH erwartet ARRAY".to_string()) }
+            } else { err("ARRAY_PUSH: erwartet ARRAY".to_string()) }
         }
         "array_pop" => {
             arity!(1);
@@ -2350,7 +2332,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     Some(v) => { laenge_setzen(&mut b); Ok(v) }
                     None => err("ARRAY_POP: Array ist leer".to_string()),
                 }
-            } else { err("ARRAY_POP erwartet ARRAY".to_string()) }
+            } else { err("ARRAY_POP: erwartet ARRAY".to_string()) }
         }
         "array_insert" => {
             arity!(3);
@@ -2365,7 +2347,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 if rel < 0 || rel > n { return err(format!("ARRAY_INSERT: Index {} ausserhalb [{}..{}]", idx, lo, lo + n)); }
                 b.cells.insert(rel as usize, v);
                 Ok(Value::Int(laenge_setzen(&mut b)))
-            } else { err("ARRAY_INSERT erwartet ARRAY".to_string()) }
+            } else { err("ARRAY_INSERT: erwartet ARRAY".to_string()) }
         }
         "array_remove_at" => {
             arity!(2);
@@ -2380,7 +2362,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let v = b.cells.remove(rel as usize);
                 laenge_setzen(&mut b);
                 Ok(v)
-            } else { err("ARRAY_REMOVE_AT erwartet ARRAY".to_string()) }
+            } else { err("ARRAY_REMOVE_AT: erwartet ARRAY".to_string()) }
         }
         "redim" => {
             // REDIM(arr, neue_laenge): 1D-Array vergroessern (mit Typ-Default
@@ -2399,7 +2381,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 }
                 laenge_setzen(&mut b);
                 Ok(Value::Nil)
-            } else { err("REDIM erwartet ARRAY".to_string()) }
+            } else { err("REDIM: erwartet ARRAY".to_string()) }
         }
         "collides" => {
             arity!(8);
@@ -2516,7 +2498,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let delim = need_str(&a[1], "JOIN$")?;
                 let parts: Vec<String> = arr.cells.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect();
                 Ok(Value::str_rc(&parts.join(delim)))
-            } else { err("JOIN$ erwartet ein Feld".to_string()) }
+            } else { err("JOIN$: erwartet ein Feld".to_string()) }
         }
         // --- String-Erweiterungen (WP3) ---
         "ltrim$" | "ltrim" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "LTRIM$")?.trim_start())) }
@@ -3014,22 +2996,28 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys3d_body_x" | "phys3d_body_y" | "phys3d_body_z" => {
             arity!(2);
-            let p = phys3d_h(&a[0], "PHYS3D_BODY")?.borrow().pos(need_int(&a[1], "PHYS3D_BODY")?);
+            let f = name.to_uppercase();
+            let w = phys3d_h(&a[0], &f)?.borrow();
+            let p = w.pos(phys3d_koerper(&w, &a[1], &f)?);
             let v = match name { "phys3d_body_x" => p.0, "phys3d_body_y" => p.1, _ => p.2 };
             Ok(Value::Float(v as f64))
         }
         #[cfg(feature = "physik")]
         "phys3d_body_qx" | "phys3d_body_qy" | "phys3d_body_qz" | "phys3d_body_qw" => {
             arity!(2);
-            let q = phys3d_h(&a[0], "PHYS3D_BODY")?.borrow().rot(need_int(&a[1], "PHYS3D_BODY")?);
+            let f = name.to_uppercase();
+            let w = phys3d_h(&a[0], &f)?.borrow();
+            let q = w.rot(phys3d_koerper(&w, &a[1], &f)?);
             let v = match name { "phys3d_body_qx" => q.0, "phys3d_body_qy" => q.1, "phys3d_body_qz" => q.2, _ => q.3 };
             Ok(Value::Float(v as f64))
         }
         #[cfg(feature = "physik")]
         "phys3d_set_vel" => {
             arity!(5);
-            phys3d_h(&a[0], "PHYS3D_SET_VEL")?.borrow_mut().set_vel(
-                need_int(&a[1], "PHYS3D_SET_VEL")?,
+            let mut w = phys3d_h(&a[0], "PHYS3D_SET_VEL")?.borrow_mut();
+            let k = phys3d_koerper(&w, &a[1], "PHYS3D_SET_VEL")?;
+            w.set_vel(
+                k,
                 need_num(&a[2], "PHYS3D_SET_VEL")? as f32, need_num(&a[3], "PHYS3D_SET_VEL")? as f32,
                 need_num(&a[4], "PHYS3D_SET_VEL")? as f32);
             Ok(Value::Nil)
@@ -3037,8 +3025,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys3d_apply_impulse" => {
             arity!(5);
-            phys3d_h(&a[0], "PHYS3D_APPLY_IMPULSE")?.borrow_mut().apply_impulse(
-                need_int(&a[1], "PHYS3D_APPLY_IMPULSE")?,
+            let mut w = phys3d_h(&a[0], "PHYS3D_APPLY_IMPULSE")?.borrow_mut();
+            let k = phys3d_koerper(&w, &a[1], "PHYS3D_APPLY_IMPULSE")?;
+            w.apply_impulse(
+                k,
                 need_num(&a[2], "PHYS3D_APPLY_IMPULSE")? as f32, need_num(&a[3], "PHYS3D_APPLY_IMPULSE")? as f32,
                 need_num(&a[4], "PHYS3D_APPLY_IMPULSE")? as f32);
             Ok(Value::Nil)
@@ -3046,8 +3036,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys3d_set_pos" => {
             arity!(5);
-            phys3d_h(&a[0], "PHYS3D_SET_POS")?.borrow_mut().set_pos(
-                need_int(&a[1], "PHYS3D_SET_POS")?,
+            let mut w = phys3d_h(&a[0], "PHYS3D_SET_POS")?.borrow_mut();
+            let k = phys3d_koerper(&w, &a[1], "PHYS3D_SET_POS")?;
+            w.set_pos(
+                k,
                 need_num(&a[2], "PHYS3D_SET_POS")? as f32, need_num(&a[3], "PHYS3D_SET_POS")? as f32,
                 need_num(&a[4], "PHYS3D_SET_POS")? as f32);
             Ok(Value::Nil)
@@ -3064,14 +3056,16 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 return Err("PHYS3D_SLEEP: erwartet 2 oder 3 Argumente (welt, koerper [, schlafen])".into());
             }
             let an = if a.len() == 3 { need_flag(&a[2], "PHYS3D_SLEEP")? } else { true };
-            phys3d_h(&a[0], "PHYS3D_SLEEP")?.borrow_mut().sleep(need_int(&a[1], "PHYS3D_SLEEP")?, an);
+            let mut w = phys3d_h(&a[0], "PHYS3D_SLEEP")?.borrow_mut();
+            let k = phys3d_koerper(&w, &a[1], "PHYS3D_SLEEP")?;
+            w.sleep(k, an);
             Ok(Value::Nil)
         }
         #[cfg(feature = "physik")]
         "phys3d_sleeping" => {
             arity!(2);
-            Ok(Value::Bool(phys3d_h(&a[0], "PHYS3D_SLEEPING")?.borrow()
-                .is_sleeping(need_int(&a[1], "PHYS3D_SLEEPING")?)))
+            let w = phys3d_h(&a[0], "PHYS3D_SLEEPING")?.borrow();
+            Ok(Value::Bool(w.is_sleeping(phys3d_koerper(&w, &a[1], "PHYS3D_SLEEPING")?)))
         }
         #[cfg(feature = "physik")]
         "phys3d_count" => {
@@ -3271,7 +3265,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "sprite_get_height" => { arity!(1); Ok(Value::Int(spr(&a[0], "SPRITE_GET_HEIGHT")?.borrow().frame_h as i64)) }
         "sprite_set_flip" => {
             arity!(3); let s = spr(&a[0], "SPRITE_SET_FLIP")?; let mut s = s.borrow_mut();
-            s.flip_x = matches!(a[1], Value::Bool(true)); s.flip_y = matches!(a[2], Value::Bool(true)); Ok(Value::Nil)
+            s.flip_x = need_flag(&a[1], "SPRITE_SET_FLIP")?; s.flip_y = need_flag(&a[2], "SPRITE_SET_FLIP")?; Ok(Value::Nil)
         }
         "sprite_set_scale" => {
             arity!(3); let sx = need_num(&a[1], "SPRITE_SET_SCALE")?; let sy = need_num(&a[2], "SPRITE_SET_SCALE")?;
@@ -3572,7 +3566,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 // Schleife `WHILE NOT ENDOFFILE(f)` auch an der
                 // Standardeingabe.
                 Some(r) => Ok(Value::Bool(r.fill_buf().map_err(|e| format!("ENDOFFILE: {}", e))?.is_empty())),
-                None => err("ENDOFFILE erwartet Lese-FILE"),
+                None => err("ENDOFFILE: erwartet Lese-FILE"),
             }
         }
         "writeline" | "write" => {
@@ -3618,7 +3612,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // zum Startordner, immer mit `/` getrennt.
             arity!(1, 2);
             let path = need_str(&a[0], "DIRLIST_REC")?;
-            let muster = if a.len() > 1 { Some(need_str(&a[1], "DIRLIST_REC")?) } else { None };
+            // Ein leeres Muster heisst "alles" wie bei DIRLIST -- bis 2026.53
+            // passte es hier auf nichts (eine leere Filtervariable lieferte
+            // still ein leeres Feld).
+            let muster = if a.len() > 1 { Some(need_str(&a[1], "DIRLIST_REC")?).filter(|m| !m.is_empty()) } else { None };
             let mut raus: Vec<String> = Vec::new();
             baum_lesen(std::path::Path::new(path), "", muster, &mut raus, "DIRLIST_REC")?;
             Ok(new_str_array(raus))
@@ -3632,6 +3629,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let path = need_str(&a[0], "RMDIR")?;
             let alles = match a.get(1) {
                 None => false,
+                // Bewusst streng, anders als jeder andere Schalter: das
+                // Mitloeschen muss man mit TRUE hinschreiben.
                 Some(Value::Bool(b)) => *b,
                 Some(_) => return err("RMDIR: 2. Argument muss BOOLEAN sein (Inhalt mitloeschen?)"),
             };
@@ -3659,7 +3658,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 // Vor 1970 geaenderte Dateien gibt es (falsch gestellte Uhr) --
                 // dann der negative Abstand statt eines Fehlers.
                 .unwrap_or_else(|e| -(e.duration().as_secs() as i64));
-            Ok(Value::Int(utc + ortszeit_versatz()))
+            // Ortszeit mit dem Versatz vom TAG DER DATEI (Sommer- oder
+            // Winterzeit), wie ZEIT_AUS_UNIX. Bis 2026.53 galt der Versatz
+            // von heute: eine Datei vom Juli stand im Winter eine Stunde frueh.
+            Ok(Value::Int(crate::zeit::aus_unix_mit(utc, lokaler_versatz)))
         }
         "tempdir$" | "tempdir" => {
             arity!(0);
@@ -4642,9 +4644,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(json_wert(v))
         }
         "json_load" => {
-            arity!(1);
+            // Lesen wie READALL$/INI_LOAD/XML_LOAD/CSV_LOAD (text_lesen): eine
+            // BOM faellt weg, die Kodierung ist waehlbar, die Meldung nennt
+            // den Pfad. Bis 2026.53 las JSON_LOAD selbst und scheiterte an
+            // einer Datei mit BOM ("expected value at line 1 column 1").
+            arity!(1, 2);
             let path = need_str(&a[0], "JSON_LOAD")?;
-            let text = std::fs::read_to_string(resolve_asset_path(path)).map_err(|e| format!("JSON_LOAD: {}", e))?;
+            let kod = match a.get(1) { Some(v) => Some(need_str(v, "JSON_LOAD")?), None => None };
+            let text = text_lesen(path, kod, "JSON_LOAD")?;
             let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("JSON_LOAD: {}: {}", path, e))?;
             Ok(json_wert(v))
         }
@@ -4812,11 +4819,16 @@ fn call_inner(name: &str, a: &[Value]) -> R {
 
         // ===== Modul: save =====
         "save_new" => { arity!(0); Ok(Value::Save(Rc::new(RefCell::new(SaveHandle { version: 1, data: Vec::new() })))) }
-        "save_exists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(need_str(&a[0], "SAVE_EXISTS")?).is_file())) }
+        // SAVE_EXISTS und SAVE_LOAD_OR_NEW suchen wie SAVE_LOAD (resolve_asset_path):
+        // ein mitgelieferter Stand `../daten/stand.json` im exportierten Spiel.
+        // Bis 2026.53 prueften beide den Pfad wortlich -- SAVE_EXISTS sagte
+        // FALSE, SAVE_LOAD lud trotzdem, und SAVE_LOAD_OR_NEW legte still einen
+        // neuen Stand an.
+        "save_exists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(&resolve_asset_path(need_str(&a[0], "SAVE_EXISTS")?)).is_file())) }
         "save_load" => { arity!(1); save_load(need_str(&a[0], "SAVE_LOAD")?) }
         "save_load_or_new" => {
             arity!(1); let p = need_str(&a[0], "SAVE_LOAD_OR_NEW")?;
-            if !std::path::Path::new(p).exists() { Ok(Value::Save(Rc::new(RefCell::new(SaveHandle { version: 1, data: Vec::new() })))) }
+            if !std::path::Path::new(&resolve_asset_path(p)).exists() { Ok(Value::Save(Rc::new(RefCell::new(SaveHandle { version: 1, data: Vec::new() })))) }
             else { save_load(p) }
         }
         "save_write" => {
@@ -4845,10 +4857,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "save_get_float" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_FLOAT")?.borrow(); let k = need_str(&a[1], "SAVE_GET_FLOAT")?; match s.get(k) { Some(v) if is_num(v) => Ok(Value::Float(as_f64(v))), Some(_) => err("SAVE_GET_FLOAT: keine Zahl"), None => err(format!("SAVE_GET_FLOAT: Key '{}' nicht im Save", k)) } }
         "save_get_string" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_STRING")?.borrow(); let k = need_str(&a[1], "SAVE_GET_STRING")?; match s.get(k) { Some(Value::Str(st)) => Ok(Value::Str(st.clone())), Some(_) => err("SAVE_GET_STRING: kein STRING"), None => err(format!("SAVE_GET_STRING: Key '{}' nicht im Save", k)) } }
         "save_get_bool" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_BOOL")?.borrow(); let k = need_str(&a[1], "SAVE_GET_BOOL")?; match s.get(k) { Some(Value::Bool(b)) => Ok(Value::Bool(*b)), Some(_) => err("SAVE_GET_BOOL: kein BOOLEAN"), None => err(format!("SAVE_GET_BOOL: Key '{}' nicht im Save", k)) } }
-        "save_get_int_or" => { arity!(3); let s = save_h(&a[0], "SAVE_GET_INT_OR")?.borrow(); match s.get(need_str(&a[1], "S")?) { Some(Value::Int(i)) => Ok(Value::Int(*i)), Some(Value::Float(f)) if f.fract() == 0.0 => Ok(Value::Int(*f as i64)), _ => Ok(a[2].clone()) } }
-        "save_get_float_or" => { arity!(3); let s = save_h(&a[0], "SAVE_GET_FLOAT_OR")?.borrow(); match s.get(need_str(&a[1], "S")?) { Some(v) if is_num(v) => Ok(Value::Float(as_f64(v))), _ => Ok(Value::Float(need_num(&a[2], "S")?)) } }
-        "save_get_string_or" => { arity!(3); let s = save_h(&a[0], "SAVE_GET_STRING_OR")?.borrow(); match s.get(need_str(&a[1], "S")?) { Some(Value::Str(st)) => Ok(Value::Str(st.clone())), _ => Ok(a[2].clone()) } }
-        "save_get_bool_or" => { arity!(3); let s = save_h(&a[0], "SAVE_GET_BOOL_OR")?.borrow(); match s.get(need_str(&a[1], "S")?) { Some(Value::Bool(b)) => Ok(Value::Bool(*b)), _ => Ok(a[2].clone()) } }
+        // Die Vorgabe hat den Typ des Getters -- bis 2026.53 pruefte das nur
+        // FLOAT_OR; SAVE_GET_INT_OR(s, k, "kein int") lieferte den Text aus
+        // einem INT-Getter. Dazu nannten die Meldungen "S" statt des Befehls.
+        "save_get_int_or" => { arity!(3); const F: &str = "SAVE_GET_INT_OR"; let vorgabe = need_int(&a[2], F)?; let s = save_h(&a[0], F)?.borrow(); match s.get(need_str(&a[1], F)?) { Some(Value::Int(i)) => Ok(Value::Int(*i)), Some(Value::Float(f)) if f.fract() == 0.0 => Ok(Value::Int(*f as i64)), _ => Ok(Value::Int(vorgabe)) } }
+        "save_get_float_or" => { arity!(3); const F: &str = "SAVE_GET_FLOAT_OR"; let vorgabe = need_num(&a[2], F)?; let s = save_h(&a[0], F)?.borrow(); match s.get(need_str(&a[1], F)?) { Some(v) if is_num(v) => Ok(Value::Float(as_f64(v))), _ => Ok(Value::Float(vorgabe)) } }
+        "save_get_string_or" => { arity!(3); const F: &str = "SAVE_GET_STRING_OR"; let vorgabe = need_str(&a[2], F)?.to_string(); let s = save_h(&a[0], F)?.borrow(); match s.get(need_str(&a[1], F)?) { Some(Value::Str(st)) => Ok(Value::Str(st.clone())), _ => Ok(Value::str_rc(&vorgabe)) } }
+        "save_get_bool_or" => { arity!(3); const F: &str = "SAVE_GET_BOOL_OR"; let vorgabe = need_bool(&a[2], F)?; let s = save_h(&a[0], F)?.borrow(); match s.get(need_str(&a[1], F)?) { Some(Value::Bool(b)) => Ok(Value::Bool(*b)), _ => Ok(Value::Bool(vorgabe)) } }
         "save_has" => { arity!(2); Ok(Value::Bool(save_h(&a[0], "SAVE_HAS")?.borrow().get(need_str(&a[1], "SAVE_HAS")?).is_some())) }
         "save_delete" => { arity!(2); let k = need_str(&a[1], "SAVE_DELETE")?.to_string(); save_h(&a[0], "SAVE_DELETE")?.borrow_mut().remove(&k); Ok(Value::Nil) }
         "save_clear" => { arity!(1); save_h(&a[0], "SAVE_CLEAR")?.borrow_mut().data.clear(); Ok(Value::Nil) }
@@ -4882,7 +4897,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "astar_set_wall" => { arity!(3); let g = astar_h(&a[0], "ASTAR_SET_WALL")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_SET_WALL")?; let (x, y) = (need_int(&a[1], "S")? as i32, need_int(&a[2], "S")? as i32); g.borrow_mut().set_wall(x, y); Ok(Value::Nil) }
         "astar_set_passable" => { arity!(3); let g = astar_h(&a[0], "ASTAR_SET_PASSABLE")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_SET_PASSABLE")?; let (x, y) = (need_int(&a[1], "S")? as i32, need_int(&a[2], "S")? as i32); g.borrow_mut().set_passable(x, y); Ok(Value::Nil) }
         "astar_is_wall" => { arity!(3); let g = astar_h(&a[0], "ASTAR_IS_WALL")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_IS_WALL")?; Ok(Value::Bool(g.borrow().is_wall(need_int(&a[1], "S")? as i32, need_int(&a[2], "S")? as i32))) }
-        "astar_set_diagonal" => { arity!(2); let allow = matches!(a[1], Value::Bool(true)); astar_h(&a[0], "ASTAR_SET_DIAGONAL")?.borrow_mut().set_diagonal(allow); Ok(Value::Nil) }
+        "astar_set_diagonal" => { arity!(2); let allow = need_flag(&a[1], "ASTAR_SET_DIAGONAL")?; astar_h(&a[0], "ASTAR_SET_DIAGONAL")?.borrow_mut().set_diagonal(allow); Ok(Value::Nil) }
         "astar_set_heuristic" => {
             arity!(2); let key = need_str(&a[1], "ASTAR_SET_HEURISTIC")?.to_lowercase();
             if !matches!(key.as_str(), "manhattan" | "euclid" | "chebyshev") { return err(format!("ASTAR_SET_HEURISTIC: unbekannte Heuristik '{}' (erlaubt: chebyshev, euclid, manhattan)", key)); }
@@ -5133,7 +5148,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if mi < 1 || ma < mi { return err("PARTICLE_SET_SIZE: min >= 1 und max >= min noetig"); }
             let s = psys(&a[0], "PARTICLE_SET_SIZE")?; let mut s = s.borrow_mut(); s.size_min = mi; s.size_max = ma; Ok(Value::Nil)
         }
-        "particle_set_fade" => { arity!(2); psys(&a[0], "PARTICLE_SET_FADE")?.borrow_mut().fade = matches!(a[1], Value::Bool(true)); Ok(Value::Nil) }
+        "particle_set_fade" => { arity!(2); let an = need_flag(&a[1], "PARTICLE_SET_FADE")?; psys(&a[0], "PARTICLE_SET_FADE")?.borrow_mut().fade = an; Ok(Value::Nil) }
         "particle_set_mode" => {
             arity!(2); let m = need_str(&a[1], "PARTICLE_SET_MODE")?.to_lowercase();
             if !matches!(m.as_str(), "circle" | "pixel" | "square" | "streak" | "glow") { return err(format!("PARTICLE_SET_MODE: unbekannter Modus '{}'", m)); }
@@ -5163,7 +5178,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "ecs_destroy" => { arity!(2); Ok(Value::Bool(ecs_h(&a[0], "ECS_DESTROY")?.borrow_mut().destroy(need_int(&a[1], "ECS_DESTROY")?))) }
         "ecs_alive" => { arity!(2); Ok(Value::Bool(ecs_h(&a[0], "ECS_ALIVE")?.borrow().alive(need_int(&a[1], "ECS_ALIVE")?))) }
         "ecs_count" => { arity!(1); Ok(Value::Int(ecs_h(&a[0], "ECS_COUNT")?.borrow().count() as i64)) }
-        "ecs_add_int" => { arity!(4); let v = match &a[3] { Value::Int(i) => Value::Int(*i), _ => return err("ECS_ADD_INT erwartet value (INTEGER)") }; ecs_set(&a[0], &a[1], &a[2], v, "ECS_ADD_INT") }
+        "ecs_add_int" => { arity!(4); let v = match &a[3] { Value::Int(i) => Value::Int(*i), _ => return err("ECS_ADD_INT: erwartet value (INTEGER)") }; ecs_set(&a[0], &a[1], &a[2], v, "ECS_ADD_INT") }
         "ecs_add_float" => { arity!(4); let v = Value::Float(need_num(&a[3], "ECS_ADD_FLOAT")?); ecs_set(&a[0], &a[1], &a[2], v, "ECS_ADD_FLOAT") }
         "ecs_add_string" => { arity!(4); let v = Value::str_rc(need_str(&a[3], "ECS_ADD_STRING")?); ecs_set(&a[0], &a[1], &a[2], v, "ECS_ADD_STRING") }
         "ecs_add_bool" => { arity!(4); let v = Value::Bool(need_bool(&a[3], "ECS_ADD_BOOL")?); ecs_set(&a[0], &a[1], &a[2], v, "ECS_ADD_BOOL") }
@@ -5832,7 +5847,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
 }
 
 fn ecs_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::ecs::World>>, String> {
-    match v { Value::Ecs(w) => Ok(w), _ => Err(format!("{} erwartet ECS_WORLD", fn_)) }
+    match v { Value::Ecs(w) => Ok(w), _ => Err(format!("{}: erwartet ECS_WORLD", fn_)) }
 }
 fn ecs_set(w: &Value, ent: &Value, name: &Value, value: Value, fn_: &str) -> R {
     let ent = need_int(ent, fn_)?;
@@ -5967,11 +5982,11 @@ fn fnv1a64(data: &[u8]) -> u64 {
 }
 
 fn psys<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<ParticleSys>>, String> {
-    match v { Value::Particles(p) => Ok(p), _ => Err(format!("{} erwartet PARTICLE_SYSTEM", fn_)) }
+    match v { Value::Particles(p) => Ok(p), _ => Err(format!("{}: erwartet PARTICLE_SYSTEM", fn_)) }
 }
 
 pub(crate) fn chart_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::chart::ChartObj>>, String> {
-    match v { Value::Chart(c) => Ok(c), _ => Err(format!("{} erwartet CHART", fn_)) }
+    match v { Value::Chart(c) => Ok(c), _ => Err(format!("{}: erwartet CHART", fn_)) }
 }
 
 pub(crate) fn rng_uniform(a: f64, b: f64) -> f64 {
@@ -5985,21 +6000,31 @@ fn rng_randint(a: i32, b: i32) -> i32 {
 }
 
 fn astar_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::astar::AStarGrid>>, String> {
-    match v { Value::AStar(g) => Ok(g), _ => Err(format!("{} erwartet ASTAR_GRID", fn_)) }
+    match v { Value::AStar(g) => Ok(g), _ => Err(format!("{}: erwartet ASTAR_GRID", fn_)) }
 }
 
 fn broad_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics::BroadPhase>>, String> {
-    match v { Value::PhysicsBroad(b) => Ok(b), _ => Err(format!("{} erwartet PHYSICS_BROAD", fn_)) }
+    match v { Value::PhysicsBroad(b) => Ok(b), _ => Err(format!("{}: erwartet PHYSICS_BROAD", fn_)) }
 }
 
 #[cfg(feature = "physik")]
 fn phys3d_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics3d::Phys3dWorld>>, String> {
-    match v { Value::Phys3d(w) => Ok(w), _ => Err(format!("{} erwartet PHYS_WORLD", fn_)) }
+    match v { Value::Phys3d(w) => Ok(w), _ => Err(format!("{}: erwartet PHYS_WORLD", fn_)) }
 }
 
 #[cfg(feature = "physik")]
 fn phys2d_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics2d::Phys2dWorld>>, String> {
-    match v { Value::Phys2d(w) => Ok(w), _ => Err(format!("{} erwartet PHYS2D_WORLD", fn_)) }
+    match v { Value::Phys2d(w) => Ok(w), _ => Err(format!("{}: erwartet PHYS2D_WORLD", fn_)) }
+}
+
+/// Wie `phys2d_koerper`: eine Koerpernummer, die es nicht gibt, ist ein
+/// Fehler. Bis 2026.53 lieferte physics3d dafuer still (0, 0, 0) und
+/// schluckte SET_POS/SET_VEL/APPLY_IMPULSE.
+#[cfg(feature = "physik")]
+fn phys3d_koerper(w: &crate::physics3d::Phys3dWorld, v: &Value, fn_: &str) -> Result<i64, String> {
+    let idx = need_int(v, fn_)?;
+    if w.gibt_es(idx) { return Ok(idx); }
+    Err(format!("{}: einen Koerper {} gibt es nicht -- nie angelegt oder mit PHYS3D_REMOVE entfernt", fn_, idx))
 }
 
 /// Die Nummer eines Koerpers, den es gibt -- sonst eine Meldung statt der
@@ -6020,7 +6045,7 @@ fn astar_xy(g: &crate::astar::AStarGrid, x: &Value, y: &Value, fn_: &str) -> Res
 }
 
 fn save_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<SaveHandle>>, String> {
-    match v { Value::Save(s) => Ok(s), _ => Err(format!("{} erwartet SAVE_HANDLE (aus SAVE_NEW/SAVE_LOAD)", fn_)) }
+    match v { Value::Save(s) => Ok(s), _ => Err(format!("{}: erwartet SAVE_HANDLE (aus SAVE_NEW/SAVE_LOAD)", fn_)) }
 }
 
 fn val_to_json(v: &Value) -> serde_json::Value {
@@ -6061,7 +6086,7 @@ fn save_load(path: &str) -> R {
 }
 
 fn json_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<serde_json::Value>>, String> {
-    match v { Value::Json(j) => Ok(j), _ => Err(format!("{} erwartet JSON-Handle (aus JSON_PARSE)", fn_)) }
+    match v { Value::Json(j) => Ok(j), _ => Err(format!("{}: erwartet JSON-Handle (aus JSON_PARSE)", fn_)) }
 }
 
 /// Navigiert den Pfad ("user.name" / "items.0"); Fehler wenn nicht gefunden.
@@ -6112,9 +6137,6 @@ fn json_try_resolve<'a>(root: &'a serde_json::Value, path: &str) -> Option<&'a s
     Some(cur)
 }
 
-/// Wie weit geht die Uhr dieses Rechners der Weltzeit voraus (in Sekunden)?
-///
-/// Gebraucht fuer `FILETIME`: das Dateisystem liefert die Aenderungszeit in
 /// Wo Programme die Daten ihres Benutzers ablegen (DIR_USER_DATA$): Windows
 /// %APPDATA%, macOS ~/Library/Application Support, sonst $XDG_DATA_HOME
 /// bzw. ~/.local/share. `None`, wenn die Umgebung keinen nennt.
@@ -6127,24 +6149,6 @@ fn benutzer_datenordner() -> Option<std::path::PathBuf> {
         return env("HOME").map(|h| h.join("Library").join("Application Support"));
     }
     env("XDG_DATA_HOME").or_else(|| env("HOME").map(|h| h.join(".local").join("share")))
-}
-
-/// Weltzeit, das Modul `zeit` (und `ZEIT_JETZT`) rechnet in Ortszeit. Ohne
-/// diese Umrechnung waere `ZEIT_DIFF(FILETIME(f), ZEIT_JETZT())` um den
-/// Zeitzonenversatz daneben -- und genau diese Rechnung ist der Grund, warum
-/// es FILETIME gibt ("wie alt ist die Datei?").
-///
-/// Auf Volle Minuten gerundet: echte Zeitzonen sind Vielfache von 15 Minuten,
-/// und die beiden Uhrenabfragen darunter liegen Sekundenbruchteile
-/// auseinander -- ohne das Runden erschiene diese Luecke als Versatz.
-fn ortszeit_versatz() -> i64 {
-    let (j, mo, d, h, mi, s) = local_datetime();
-    let lokal = crate::zeit::aus_teilen(j, mo, d, h, mi, s);
-    let utc = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|x| x.as_secs() as i64)
-        .unwrap_or(0);
-    ((lokal - utc) as f64 / 60.0).round() as i64 * 60
 }
 
 /// Passt `name` auf das Muster? Erlaubt sind `*` (beliebig viele Zeichen,
@@ -6233,7 +6237,7 @@ fn baum_lesen(wurzel: &std::path::Path, unter: &str, muster: Option<&str>,
 
 fn xml_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a std::rc::Rc<crate::xml::Knoten>, String> {
     match v { Value::Xml(k) => Ok(k),
-              _ => Err(format!("{} erwartet ein XML_HANDLE (aus XML_PARSE/XML_LOAD/XML_FIND)", fn_)) }
+              _ => Err(format!("{}: erwartet ein XML_HANDLE (aus XML_PARSE/XML_LOAD/XML_FIND)", fn_)) }
 }
 
 /// Einem Pfad folgen -- mit einer Meldung, die den Pfad nennt.
@@ -6259,7 +6263,7 @@ fn ini_map(paare: Vec<(String, String)>) -> Value {
 /// koennen.
 fn ini_paare(v: &Value, fn_: &str) -> Result<Vec<(String, String)>, String> {
     let Value::Map(m) = v else {
-        return Err(format!("{} erwartet eine MAP (INI ist eine MAP OF STRING mit Punkt-Schluesseln)", fn_));
+        return Err(format!("{}: erwartet eine MAP (INI ist eine MAP OF STRING mit Punkt-Schluesseln)", fn_));
     };
     Ok(m.borrow().entries().iter()
         .map(|(k, w)| (k.clone(), match w {
@@ -6489,7 +6493,7 @@ fn file_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<DhFile>>, String
 const MAX_BUFFER: i64 = 1 << 30;
 
 pub(crate) fn buf_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<Vec<u8>>>, String> {
-    match v { Value::Buffer(b) => Ok(b), _ => Err(format!("{} erwartet BUFFER", fn_)) }
+    match v { Value::Buffer(b) => Ok(b), _ => Err(format!("{}: erwartet BUFFER", fn_)) }
 }
 
 pub(crate) fn neuer_buffer(bytes: Vec<u8>) -> Value {
@@ -6599,7 +6603,7 @@ fn zahl_breite(name: &str) -> usize {
 }
 
 fn tween_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<TweenObj>>, String> {
-    match v { Value::Tween(t) => Ok(t), _ => Err(format!("{} erwartet TWEEN", fn_)) }
+    match v { Value::Tween(t) => Ok(t), _ => Err(format!("{}: erwartet TWEEN", fn_)) }
 }
 
 /// Zeitbasis der Tweens -- dieselbe monotone Uhr wie MILLIS. Mit der
@@ -6681,14 +6685,14 @@ pub(crate) fn ease(name: &str, t: f64) -> f64 {
 fn spr<'a>(v: &'a Value, fn_: &str) -> Result<&'a std::rc::Rc<std::cell::RefCell<SpriteObj>>, String> {
     match v {
         Value::Sprite(s) => Ok(s),
-        _ => Err(format!("{} erwartet SPRITE, erhalten {}", fn_, v.type_name())),
+        _ => Err(format!("{}: erwartet SPRITE, erhalten {}", fn_, v.type_name())),
     }
 }
 
 fn fsm_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a std::rc::Rc<std::cell::RefCell<crate::animfsm::AnimFsmObj>>, String> {
     match v {
         Value::AnimFsm(f) => Ok(f),
-        _ => Err(format!("{} erwartet ANIM_FSM, erhalten {}", fn_, v.type_name())),
+        _ => Err(format!("{}: erwartet ANIM_FSM, erhalten {}", fn_, v.type_name())),
     }
 }
 
@@ -7137,7 +7141,7 @@ pub fn is_graphics_builtin(name: &str) -> bool {
         "screen" | "cls" | "flip" | "text" | "text_bold" | "text_size" | "circle"
         | "box" | "line" | "plot" | "rect" | "drawimage" | "loadimage" | "loadsound"
         | "playsound" | "keypressed" | "keydown" | "mousex" | "mousey" | "mousebutton"
-        | "quitrequested" | "sleep" | "imagewidth" | "imageheight" | "image_width" | "image_height"
+        | "quitrequested" | "sleep" | "imagewidth" | "imageheight"
         | "color" | "fill"
     )
 }

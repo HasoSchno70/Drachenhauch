@@ -732,7 +732,7 @@
    "name": "AUDIO_MUSIC_SET_VOLUME",
    "kind": "core",
    "signature": "AUDIO_MUSIC_SET_VOLUME(v)",
-   "module": "dhrt"
+   "module": "audio"
   },
   {
    "name": "AUDIO_MUSIC_STOP",
@@ -864,7 +864,7 @@
    "name": "AUDIO_SET_VOLUME",
    "kind": "core",
    "signature": "AUDIO_SET_VOLUME(ch, v)",
-   "module": "dhrt"
+   "module": "audio"
   },
   {
    "name": "AUDIO_SFX",
@@ -9203,7 +9203,7 @@
   {
    "name": "JSON_LOAD",
    "kind": "core",
-   "signature": "JSON_LOAD(path: STRING)",
+   "signature": "JSON_LOAD(path: STRING [, encoding$])",
    "module": "json"
   },
   {

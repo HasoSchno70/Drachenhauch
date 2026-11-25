@@ -1312,11 +1312,7 @@ mod anhaengen_tests {
 /// Font-Masse (FONT_BASELINE, FONT_GLYPH_BOX).
 #[cfg(feature = "graphics")]
 pub(super) fn zahl_arg(a: &[Value], i: usize, f: &str) -> R<f64> {
-    match a.get(i) {
-        Some(Value::Int(n)) => Ok(*n as f64),
-        Some(Value::Float(x)) => Ok(*x),
-        _ => Err(format!("{}: erwartet eine Zahl (Arg {})", f, i + 1)),
-    }
+    crate::argument::a_num(a, i, f)
 }
 
 /// `obj.name(...)` ohne Methode dieses Namens, aber mit einem Feld, das

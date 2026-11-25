@@ -221,6 +221,28 @@ pub fn ohne_bom(s: String) -> String {
     }
 }
 
+/// `%XX` in einer URL zurueckuebersetzen -- auf BYTES, damit ein `%` vor
+/// einem Mehrbyte-Zeichen nicht mitten in ihm schneidet. `plus_ist_leer`:
+/// Formular-Kodierung (`a+b` = `a b`, httpd); URL_DECODE laesst `+` stehen.
+/// Ein `%` ohne zwei Hexziffern bleibt, wie es ist.
+pub fn prozent_auf(s: &str, plus_ist_leer: bool) -> String {
+    fn hex(b: u8) -> Option<u8> { (b as char).to_digit(16).map(|d| d as u8) }
+    let b = s.as_bytes();
+    let mut raus: Vec<u8> = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        match b[i] {
+            b'%' if i + 2 < b.len() => match (hex(b[i + 1]), hex(b[i + 2])) {
+                (Some(h), Some(l)) => { raus.push(h * 16 + l); i += 3; }
+                _ => { raus.push(b'%'); i += 1; }
+            },
+            b'+' if plus_ist_leer => { raus.push(b' '); i += 1; }
+            c => { raus.push(c); i += 1; }
+        }
+    }
+    String::from_utf8_lossy(&raus).into_owned()
+}
+
 #[cfg(test)]
 mod auto_tests {
     use super::*;

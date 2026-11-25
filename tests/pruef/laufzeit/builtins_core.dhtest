@@ -132,12 +132,12 @@ RGB-Werte muessen 0..255 sein
 === sin string raises
 PRINT SIN("nope")
 --- fehler
-SIN erwartet Zahl, erhalten STRING
+SIN: erwartet Zahl, erhalten STRING
 
 === sin bool raises as not number
 PRINT SIN(TRUE)
 --- fehler
-SIN erwartet Zahl, erhalten BOOLEAN
+SIN: erwartet Zahl, erhalten BOOLEAN
 
 === arity error message includes received count
 PRINT SIN(1.0, 2.0)

@@ -258,3 +258,21 @@ c = ohne_yield()
 nil geht
 --- fehler
 Zuweisung an 'c': Erwartet COROUTINE, erhalten FLOAT -- eine Koroutine liefert nur der Aufruf einer FUNCTION oder SUB, die YIELD enthaelt
+
+=== comprehension erst ueber ein feld, dann ueber eine koroutine
+' Dieselbe Comprehension-Stelle: die Aufrufstelle merkte sich beim Feld die
+' reine Familie und fragte beim zweiten Mal nur noch sie -- die kennt keine
+' Koroutine ("nicht iterierbar (COROUTINE)"). Umgekehrt lief es. Jetzt ist
+' __comp_iter vom Merken ausgenommen wie SORT (CLAUDE.md, Regel 6).
+FUNCTION zahlen() AS INTEGER
+    YIELD 1
+    YIELD 2
+END FUNCTION
+DIM feld AS ARRAY OF INTEGER = [5, 6]
+DIM t AS TUPLE = (feld, zahlen())
+FOR EACH q IN t
+    PRINT [x * 10 FOR x IN q]
+NEXT
+--- erwartet
+(50, 60)
+(10, 20)

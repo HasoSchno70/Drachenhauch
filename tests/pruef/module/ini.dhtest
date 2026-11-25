@@ -143,5 +143,5 @@ x=42
 IMPORT "ini"
 PRINT INI_TEXT$("kein Map")
 --- fehler
-INI_TEXT$ erwartet eine MAP (INI ist eine MAP OF STRING mit Punkt-Schluesseln)
+INI_TEXT$: erwartet eine MAP (INI ist eine MAP OF STRING mit Punkt-Schluesseln)
 

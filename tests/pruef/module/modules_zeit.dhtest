@@ -338,3 +338,37 @@ END TRY
 --- erwartet
 ZEIT_UNIX: erwartet keine Argumente
 ZEIT_AUS_UNIX: erwartet Unix-Sekunden (eine Zahl)
+
+=== aus teilen prueft monat tag und uhrzeit
+' Bis 2026.53 rechnete ZEIT_AUS_TEILEN(2026, 13, 1) still den 2027-01-01 und
+' (2026, 2, 31) den 3. Maerz aus, waehrend ZEIT_PARSE("2026-13-01") ablehnte.
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_AUS_TEILEN(2024, 2, 29, 23, 59, 59))
+TRY
+    PRINT ZEIT_TEXT$(ZEIT_AUS_TEILEN(2026, 13, 1))
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT ZEIT_TEXT$(ZEIT_AUS_TEILEN(2026, 2, 29))
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT ZEIT_TEXT$(ZEIT_AUS_TEILEN(2026, 1, 1, 24, 0, 0))
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+2024-02-29 23:59:59
+ZEIT_AUS_TEILEN: Monat 13 gibt es nicht (1..12) -- weiterzaehlen geht mit ZEIT_PLUS
+ZEIT_AUS_TEILEN: Tag 29 gibt es im Monat 2 nicht (1..28) -- weiterzaehlen geht mit ZEIT_PLUS
+ZEIT_AUS_TEILEN: Uhrzeit 24:00:00 gibt es nicht (0..23, 0..59, 0..59)
+
+=== aus teilen meldet auf englisch
+IMPORT "zeit"
+PRINT ZEIT_AUS_TEILEN(2026, 13, 1)
+--- umgebung
+DHRT_LANG=en
+--- fehler
+ZEIT_AUS_TEILEN: month 13 does not exist (1..12) -- to count on, use ZEIT_PLUS

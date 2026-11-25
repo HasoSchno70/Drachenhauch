@@ -15,8 +15,8 @@ module.exports = (H) => [
 
   H.h2("Einlesen: JSON_PARSE und JSON_LOAD"),
   H.p("JSON_PARSE liest einen String, JSON_LOAD eine Datei. Beide liefern ein JSON_HANDLE – den Griff, über den alle weiteren Befehle das Dokument ansprechen. Innerhalb eines Drachenhauch-String-Literals müssen Anführungszeichen verdoppelt werden (\"\" steht für ein \")."),
-  H.cmd("JSON_PARSE · JSON_LOAD", 'JSON_PARSE(text$)   JSON_LOAD(pfad$)',
-    "Wandelt JSON-Text bzw. eine JSON-Datei in ein JSON_HANDLE um. Bei ungültigem JSON (fehlende Klammer, Komma am Ende …) bricht der Befehl mit einem Fehler ab – am besten mit TRY/CATCH absichern.",
+  H.cmd("JSON_PARSE · JSON_LOAD", 'JSON_PARSE(text$)   JSON_LOAD(pfad$[, kodierung$])',
+    "Wandelt JSON-Text bzw. eine JSON-Datei in ein JSON_HANDLE um. JSON_LOAD liest wie INI_LOAD: eine BOM am Anfang stört nicht, und eine andere Kodierung als UTF-8 steht hinten (etwa cp1252). Bei ungültigem JSON (fehlende Klammer, Komma am Ende …) bricht der Befehl mit einem Fehler ab – am besten mit TRY/CATCH absichern.",
     [
       'IMPORT "json"',
       'DIM j AS JSON_HANDLE',

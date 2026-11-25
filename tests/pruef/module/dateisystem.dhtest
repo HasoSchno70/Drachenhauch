@@ -87,6 +87,22 @@ PRINT LEN(d)
 --- erwartet
 4
 
+=== rekursiv mit leerem muster liefert alles wie dirlist
+' Ein leeres Muster heisst "alles" -- bei DIRLIST schon immer, bei
+' DIRLIST_REC passte es bis 2026.53 auf nichts: eine leere Filtervariable
+' lieferte still ein leeres Feld.
+DIM filter AS STRING
+DIM d AS ARRAY OF STRING
+d = DIRLIST_REC("baum", filter)
+SORT(d)
+PRINT JOIN$(d, ",")
+--- datei baum/a.csv
+1
+--- datei baum/unter/tief.txt
+2
+--- erwartet
+a.csv,unter/tief.txt
+
 === rekursiv findet auch tiefer und trennt mit schraegstrich
 ' Auch unter Windows -- ein Programm, das die Liste speichert, soll auf beiden
 ' Systemen dieselben Zeichenketten sehen.
@@ -207,6 +223,41 @@ alter = ZEIT_JETZT() - FILETIME("neu.txt")
 PRINT alter >= 0 AND alter < 120
 --- erwartet
 TRUE
+
+=== filetime nimmt die sommerzeit vom tag der datei
+' Bis 2026.53 rechnete FILETIME mit dem Zeitzonenversatz von HEUTE: eine
+' Datei vom Juli stand im Winter eine Stunde zu frueh da (und umgekehrt).
+' Zwei Dateien, eine im Winter, eine im Sommer -- eine liegt immer in der
+' anderen Jahreshaelfte als der Tag des Laufs.
+IMPORT "zeit"
+DIM r AS INTEGER
+r = SHELL("powershell", "-NoProfile", "-Command", "(Get-Item 'winter.txt').LastWriteTime = [datetime]'2026-01-15 12:00:00'; (Get-Item 'sommer.txt').LastWriteTime = [datetime]'2026-07-15 12:00:00'")
+PRINT TIME_TEXT$(FILETIME("winter.txt"))
+PRINT TIME_TEXT$(FILETIME("sommer.txt"))
+--- datei winter.txt
+w
+--- datei sommer.txt
+s
+--- system windows
+--- erwartet
+2026-01-15 12:00:00
+2026-07-15 12:00:00
+
+=== filetime nimmt die sommerzeit vom tag der datei (posix)
+IMPORT "zeit"
+DIM r AS INTEGER
+r = SHELL("touch", "-t", "202601151200", "winter.txt")
+r = SHELL("touch", "-t", "202607151200", "sommer.txt")
+PRINT TIME_TEXT$(FILETIME("winter.txt"))
+PRINT TIME_TEXT$(FILETIME("sommer.txt"))
+--- datei winter.txt
+w
+--- datei sommer.txt
+s
+--- system posix
+--- erwartet
+2026-01-15 12:00:00
+2026-07-15 12:00:00
 
 === filetime unterscheidet alt und neu
 ' Die Grundlage jeder Sicherung: welche Datei ist neuer? Die alte Datei legt

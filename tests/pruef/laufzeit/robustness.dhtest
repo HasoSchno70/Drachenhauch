@@ -122,7 +122,7 @@ ARRAY_SUM: Ganzzahl-Ueberlauf (INTEGER ist 64-bit)
 IMPORT "curves"
 PRINT CURVE_BEZIER2(0.5,"x",0,0,0,0,0,0,0)
 --- fehler
-CURVE_BEZIER2 erwartet Zahl, erhalten STRING
+CURVE_BEZIER2: erwartet Zahl, erhalten STRING
 
 === unterminated if is clean parse error[IF 1 = 1 THEN\nPRINT "hi"]
 IF 1 = 1 THEN

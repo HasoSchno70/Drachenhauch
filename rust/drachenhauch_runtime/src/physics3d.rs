@@ -120,6 +120,12 @@ impl Phys3dWorld {
         self.handles[i]
     }
 
+    /// Gibt es den Koerper `idx` (angelegt und nicht entfernt)? Wie
+    /// `Phys2dWorld::gibt_es` -- die Befehle pruefen damit vorher.
+    pub fn gibt_es(&self, idx: i64) -> bool {
+        self.handle(idx).is_some_and(|h| self.bodies.get(h).is_some())
+    }
+
     /// Position (x,y,z) eines Koerpers, oder (0,0,0) bei ungueltigem Index.
     pub fn pos(&self, idx: i64) -> (f32, f32, f32) {
         if let Some(h) = self.handle(idx) {

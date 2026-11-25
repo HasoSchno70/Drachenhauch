@@ -3642,21 +3642,25 @@ fn zahl_rechnen(bau: &mut Bauer, name: &str, args: &[(CWert, Art)]) -> (CWert, A
             bau.b.ins().iabs(x)
         }
         "abs" => bau.b.ins().fabs(f[0]),
-        "int" => {
-            let fl = bau.b.ins().floor(f[0]);
-            let lo = bau.b.ins().f64const(i64::MIN as f64);
-            let hi = bau.b.ins().f64const(i64::MAX as f64);
-            let u = bau.b.ins().fcmp(FloatCC::UnorderedOrLessThan, fl, lo);   // auch NaN
-            let o = bau.b.ins().fcmp(FloatCC::GreaterThan, fl, hi);
+        // INT, FLOOR, CEIL, ROUND: ausserhalb von -2^63 .. 2^63 (und bei NaN)
+        // steigt der Maschinencode aus, und die VM meldet den Ueberlauf
+        // (builtins::ganz_aus). Bis 2026.53 saettigten FLOOR/CEIL/ROUND hier
+        // wie in der VM still auf i64::MAX.
+        "int" | "floor" | "ceil" | "round" => {
+            let r = match name {
+                "int" | "floor" => bau.b.ins().floor(f[0]),
+                "ceil" => bau.b.ins().ceil(f[0]),
+                // round_half_even == IEEE-Runden zur geraden Zahl (`nearest`).
+                _ => bau.b.ins().nearest(f[0]),
+            };
+            let lo = bau.b.ins().f64const(-9_223_372_036_854_775_808.0);
+            let hi = bau.b.ins().f64const(9_223_372_036_854_775_808.0);
+            let u = bau.b.ins().fcmp(FloatCC::UnorderedOrLessThan, r, lo);   // auch NaN
+            let o = bau.b.ins().fcmp(FloatCC::GreaterThanOrEqual, r, hi);
             let aus = bau.b.ins().bor(u, o);
             bau.aussteigen_wenn(aus);
-            bau.b.ins().fcvt_to_sint_sat(types::I64, fl)
+            bau.b.ins().fcvt_to_sint_sat(types::I64, r)
         }
-        // `as i64` in Rust saettigt und macht aus NaN 0 -- wie fcvt_to_sint_sat.
-        "floor" => { let r = bau.b.ins().floor(f[0]); bau.b.ins().fcvt_to_sint_sat(types::I64, r) }
-        "ceil" => { let r = bau.b.ins().ceil(f[0]); bau.b.ins().fcvt_to_sint_sat(types::I64, r) }
-        // round_half_even == IEEE-Runden zur geraden Zahl (`nearest`).
-        "round" => { let r = bau.b.ins().nearest(f[0]); bau.b.ins().fcvt_to_sint_sat(types::I64, r) }
         "sgn" | "sign" => {
             let z = bau.b.ins().f64const(0.0);
             let pos = bau.b.ins().fcmp(FloatCC::GreaterThan, f[0], z);

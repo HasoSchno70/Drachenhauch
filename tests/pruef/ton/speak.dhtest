@@ -86,14 +86,20 @@ dauer 1..8 s TRUE
 spitze ueber 0.1 TRUE
 mitte laut, rand leiser TRUE
 
-=== derselbe satz kommt aus dem vorrat
-' Gleicher Text, Stimme und Tempo = derselbe Klang; ein anderes Tempo nicht.
+=== jeder speak_sound ist ein eigener klang, auch nach 64 weiteren
+' Der Vorrat spart das Neurechnen gleicher Saetze, aber das Programm bekommt
+' je Aufruf einen EIGENEN Klang. Bis 2026.53 lieferte derselbe Text dasselbe
+' Handle aus dem Vorrat -- und nach 64 weiteren Saetzen gab SPEAK es still
+' frei ("wurde bereits mit UNLOADSOUND freigegeben").
 IMPORT "helfer.dh"
 TRY
-    PRINT SPEAK_SOUND("Treffer") = SPEAK_SOUND("Treffer")
     DIM a AS SOUND : a = SPEAK_SOUND("Treffer")
-    SPEAK_RATE(1.5)
     PRINT a = SPEAK_SOUND("Treffer")
+    DIM i AS INTEGER
+    FOR i = 1 TO 70
+        DIM s AS SOUND : s = SPEAK_SOUND("Satz " + STR$(i))
+    NEXT
+    PRINT LEN(AUDIO_SOUND_WAVE(a, 8))
 CATCH e
     fehlerOderSprung(e)
 END TRY
@@ -115,8 +121,8 @@ SUB fehlerOderSprung(e AS STRING)
     PRINT "FEHLER: " + e
 END SUB
 --- erwartet
-TRUE
 FALSE
+8
 
 === ein freigegebener klang wird neu gerechnet
 ' UNLOADSOUND auf den Vorrat darf SPEAK nicht auf einen toten Slot laufen lassen.

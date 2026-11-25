@@ -81,10 +81,11 @@ impl Sprecher {
         Ok(())
     }
 
-    /// SPEAK_SOUND(text$): nur synthetisieren, als SOUND zurueckgeben.
+    /// Der Klang zu einem Satz, als Slot im VORRAT (fuer SPEAK; SPEAK_SOUND
+    /// gibt dem Programm davon eine eigene Kopie, `Audio::sound_kopie`).
     /// Derselbe Text mit derselben Stimme und demselben Tempo kommt aus dem
-    /// Vorrat -- es sei denn, das Programm hat den Slot per UNLOADSOUND
-    /// freigegeben; dann wird neu gerechnet statt einen toten Slot zu liefern.
+    /// Vorrat -- ist sein Slot freigegeben, wird neu gerechnet statt einen
+    /// toten Slot zu liefern.
     pub fn klang(&mut self, au: &mut Audio, text: &str) -> Result<i64, String> {
         let key: Schluessel = (text.to_string(), self.stimme.clone(), (self.tempo * 100.0).round() as i64);
         if let Some(&idx) = self.cache.get(&key) {

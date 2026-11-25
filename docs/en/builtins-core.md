@@ -1677,8 +1677,6 @@ For more complex sprite collision see the [sprite module](module-sprite.md) with
 |---|---|
 | `SGN(number)` | `SIGN(x)` |
 | `SQRT(number)` | `SQR(x)` |
-| `AUDIO_SET_VOLUME(ch, v)` | `AUDIO_VOLUME(ch, v)` |
-| `AUDIO_MUSIC_SET_VOLUME(v)` | `AUDIO_MUSIC_VOLUME(v)` |
 
 Container method `arr.join(trenner)` ≡ `JOIN$(arr, trenner)`.
 

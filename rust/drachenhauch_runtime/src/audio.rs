@@ -1036,6 +1036,14 @@ impl Audio {
         self.push_slot(data, 1.0)
     }
 
+    /// Eine eigene Kopie des Klangs in einem neuen Slot (SPEAK_SOUND). Die
+    /// Abtastwerte teilt Kira (`StaticSoundData` haelt sie in einem Arc).
+    pub fn sound_kopie(&mut self, idx: i64, fn_: &str) -> Result<i64, String> {
+        let data = self.slot(idx, fn_)?.data.clone()
+            .ok_or_else(|| format!("{}: Klang wurde freigegeben (UNLOADSOUND)", fn_))?;
+        Ok(self.push_slot(data, 1.0))
+    }
+
     /// Lebt der Slot noch (nicht per UNLOADSOUND freigegeben)?
     pub fn sound_lebt(&self, idx: i64) -> bool {
         usize::try_from(idx).ok().and_then(|i| self.sounds.get(i)).map_or(false, |s| s.data.is_some())
@@ -1627,9 +1635,12 @@ resonance/reverb/distortion", other)),
     /// Parameter wird beim POP aber ABGELOEST, weil das Zurueckschreiben
     /// denselben Kira-Parameter beschreibt wie `AUDIO_MODULATE` -- der
     /// Modulator laeuft dann weiter, wirkt aber nicht mehr auf diesen Bus.
-    pub fn audio_push(&mut self) {
-        if self.audio_stack.len() >= 64 { return; }   // Fehler soll auffallen, nicht wachsen
+    /// `false` ab 64 Ebenen -- der Befehl meldet das (bis 2026.53 wurde es
+    /// still verschluckt, und erst ein spaeteres AUDIO_POP fiel auf).
+    pub fn audio_push(&mut self) -> bool {
+        if self.audio_stack.len() >= 64 { return false; }
         self.audio_stack.push((self.bus_values, self.speech_bus));
+        true
     }
 
     /// Bus-Einstellungen zurueckholen. `false`, wenn der Stapel leer ist.

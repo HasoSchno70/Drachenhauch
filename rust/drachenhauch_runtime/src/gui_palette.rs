@@ -63,7 +63,7 @@ impl Gui {
     fn pal_sammeln(&self, wi: usize) -> Vec<PalEintrag> {
         let win = &self.windows[wi];
         let mut out: Vec<PalEintrag> = Vec::new();
-        fn sauber(s: &str) -> String { s.replace('&', "").trim().trim_end_matches("...").trim_end_matches('\u{2026}').trim().to_string() }
+        fn sauber(s: &str) -> String { super::bausteine::ohne_marke(s).0.trim().trim_end_matches("...").trim_end_matches('\u{2026}').trim().to_string() }
         fn menue(win: &Window, wi: usize, mi: usize, pfad: &str, tiefe: usize, out: &mut Vec<PalEintrag>) {
             if tiefe > 8 { return; }
             for (ii, it) in win.menus[mi].items.iter().enumerate() {

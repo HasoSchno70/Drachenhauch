@@ -327,23 +327,37 @@ fn vm_top(stack: &[Value]) -> R<&Value> {
         .ok_or_else(|| "VM: Stack underflow (kaputter/inkompatibler Bytecode?)".to_string())
 }
 
-// Arg-Helfer fuer die Modul-Dispatcher (db/net/html/serial/usb/wifi/bt).
+// Arg-Helfer fuer die Modul-Dispatcher (db/net/html/serial/usb/wifi/bt) --
+// die Regeln stehen in `argument.rs`. `allow(dead_code)`: in einem Bau ohne
+// die Module ruft sie niemand.
 #[allow(dead_code)]
-fn bi_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
-    match a.get(i) {
-        Some(Value::Int(n)) => Ok(*n),
-        Some(v) => Err(format!("{}: erwartet INTEGER, erhalten {}", fn_, v.type_name())),
-        None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
-    }
-}
+fn bi_int(a: &[Value], i: usize, fn_: &str) -> R<i64> { crate::argument::a_int(a, i, fn_) }
 #[allow(dead_code)]
-fn bi_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-    match a.get(i) {
-        Some(Value::Str(s)) => Ok(s),
-        Some(v) => Err(format!("{}: erwartet STRING, erhalten {}", fn_, v.type_name())),
-        None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
+fn bi_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> { crate::argument::a_text(a, i, fn_) }
+/// Den Befehlsnamen vorn in einer Meldung (`ALT: ...`, `ALT ...`) und in
+/// Anfuehrungszeichen (`'ALT'`) durch den geschriebenen ersetzen. Die
+/// Laufzeit kennt nur den alten Namen; mit und ohne `$` gilt er als derselbe.
+pub(crate) fn builtin_name_einsetzen(e: String, alt: &str, neu: &str) -> String {
+    let alt_g = alt.to_uppercase();
+    let neu_g = neu.to_uppercase();
+    let ohne = alt_g.trim_end_matches('$').to_string();
+    let formen = [alt_g.clone(), ohne.clone(), format!("{}$", ohne)];
+    let mut aus = e;
+    for f in &formen {
+        if let Some(rest) = aus.strip_prefix(f.as_str()) {
+            if rest.starts_with(':') || rest.starts_with(' ') {
+                aus = format!("{}{}", neu_g, rest);
+                break;
+            }
+        }
     }
+    for f in &formen {
+        let zitat = format!("'{}'", f);
+        if aus.contains(&zitat) { aus = aus.replace(&zitat, &format!("'{}'", neu_g)); break; }
+    }
+    aus
 }
+
 /// Der Ordner, von dem aus ein CODE_*-Befehl IMPORTs aufloest: das Argument
 /// an Stelle `i` -- ohne es None (der Befehl bleibt dann beim Text).
 fn code_basis(a: &[Value], i: usize, fn_: &str) -> R<Option<std::path::PathBuf>> {
@@ -353,22 +367,10 @@ fn code_basis(a: &[Value], i: usize, fn_: &str) -> R<Option<std::path::PathBuf>>
             else { std::path::PathBuf::from(b) }))
 }
 #[allow(dead_code)]
-fn bi_num(a: &[Value], i: usize, fn_: &str) -> R<f64> {
-    match a.get(i) {
-        Some(Value::Int(n)) => Ok(*n as f64),
-        Some(Value::Float(f)) => Ok(*f),
-        Some(v) => Err(format!("{}: erwartet Zahl, erhalten {}", fn_, v.type_name())),
-        None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
-    }
-}
+fn bi_num(a: &[Value], i: usize, fn_: &str) -> R<f64> { crate::argument::a_num(a, i, fn_) }
+/// Ein Schalter: BOOLEAN oder Zahl (`argument::schalter`).
 #[allow(dead_code)]
-fn bi_bool(a: &[Value], i: usize, fn_: &str) -> R<bool> {
-    match a.get(i) {
-        Some(Value::Bool(b)) => Ok(*b),
-        Some(v) => Err(format!("{}: erwartet BOOLEAN, erhalten {}", fn_, v.type_name())),
-        None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
-    }
-}
+fn bi_bool(a: &[Value], i: usize, fn_: &str) -> R<bool> { crate::argument::a_schalter(a, i, fn_) }
 #[cfg(feature = "db")]
 fn db_params(args: &[Value], fn_: &str) -> R<Vec<crate::db::Param>> {
     args.iter().map(|v| crate::db::dh_to_sql(v, fn_)).collect()
@@ -2366,7 +2368,12 @@ impl<'p> Vm<'p> {
         }
         for f in 1..=BUILTIN_FAMILIEN {
             if let Some(v) = self.familie_rufen(f, name, a)? {
-                if name != "sort" { merk.set(f); }
+                // Vom Merken ausgenommen sind die Namen, deren Familie je nach
+                // ARGUMENT antwortet (CLAUDE.md, Regel 6): SORT (FUNCREF in der
+                // VM), __comp_iter (eine Koroutine in try_coro, alles andere rein).
+                // Bis 2026.53 fehlte __comp_iter: lief dieselbe Comprehension erst
+                // ueber ein Feld, dann ueber eine Koroutine, kam "nicht iterierbar".
+                if name != "sort" && name != "__comp_iter" { merk.set(f); }
                 return Ok(v);
             }
         }
@@ -2664,6 +2671,17 @@ impl<'p> Vm<'p> {
     #[inline(never)]
     fn fehler_benennen(&self, e: String, fn_: &Func, i: usize) -> String {
         let Some(ins) = fn_.code.get(i) else { return e };
+        // Ein Befehl, der im Quelltext anders heisst als in der Laufzeit
+        // (neuer Name aus namen.rs, `IMPORT "json" AS j`): die Meldung nennt
+        // den geschriebenen. Bis 2026.53 sagte FILE_EXISTS(5) "FILEEXISTS
+        // erwartet ..." -- ein Name, der im Programm nirgends steht.
+        if ins.op == op::CALL_BUILTIN {
+            if let Arg::Call(name, _, k) = &ins.arg {
+                if let Some(neu) = usize::try_from(*k).ok().and_then(|k| fn_.anzeigen.get(k)) {
+                    return builtin_name_einsetzen(e, name, neu);
+                }
+            }
+        }
         // "Parameter #n: ..." aus bind_params: der aufrufende Befehl nennt die
         // Funktion oder Methode, deren n-ter Parameter gemeint ist.
         if let Some(rest) = e.strip_prefix("Parameter #") {
@@ -2817,7 +2835,7 @@ impl<'p> Vm<'p> {
         }
         let t = match &a[0] {
             Value::Tween(t) => t.clone(),
-            _ => return Err("TWEEN_VALUE erwartet TWEEN".to_string()),
+            _ => return Err("TWEEN_VALUE: erwartet TWEEN".to_string()),
         };
         let (start, ende, p, easing, kurve) = {
             let b = t.borrow();
@@ -2931,7 +2949,7 @@ impl<'p> Vm<'p> {
         use std::cmp::Ordering;
         let arr = match arr_v {
             Value::Array(x) => x.clone(),
-            _ => return Err("SORT erwartet ARRAY".to_string()),
+            _ => return Err("SORT: erwartet ARRAY".to_string()),
         };
         let cb = crate::value::Rueckruf::aus_wert(cmp)
             .ok_or_else(|| "SORT: Comparator muss FUNCREF sein".to_string())?;

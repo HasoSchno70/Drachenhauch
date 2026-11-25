@@ -1981,7 +1981,10 @@ impl Gui {
                 // Rahmen + eingelassener Titel oben-links (ueber dem Rahmen).
                 g.rect(ax, ay + 7, ax + w - 1, ay + h - 1, self.th("widget_border"));
                 if !wdg.text.is_empty() {
-                    let tw = wdg.text.chars().count() as i32 * 8 + 8;
+                    // Gemessen, nicht aus der Zeichenzahl geschaetzt: bis 2026.53
+                    // lief die Rahmenlinie bei breiten Buchstaben oder GUI_SCALE
+                    // mitten durch den Titel.
+                    let tw = self.wtext_width(g, wdg, &wdg.text) + 8;
                     g.box_fill(ax + 8, ay, ax + 8 + tw.min(w - 16), ay + 13, self.th("win_bg"));
                     self.wtext(g, wdg, ax + 12, ay + 1, wdg.text.clone(), self.th("title_fg"));
                 }

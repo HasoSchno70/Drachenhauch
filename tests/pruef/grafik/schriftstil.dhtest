@@ -218,3 +218,22 @@ END FUNCTION
 PRINT "linie tiefer "; (rot(200, 399) > rot(0, 199))
 --- erwartet
 linie tiefer TRUE
+
+=== ein schalter nimmt auch 1 und 0
+' TEXT_BOLD(1) tat bis 2026.53 still nichts: die Grafik-Familie zaehlte
+' nur TRUE als an (argument.rs, Schalter).
+SCREEN(200, 100, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+TEXT_BOLD(1)
+PRINT TEXT_GET_STYLE$()
+TEXT_BOLD(0) : TEXT_ITALIC(1)
+PRINT TEXT_GET_STYLE$()
+TRY
+    TEXT_ITALIC("ja")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+fett
+kursiv
+TEXT_ITALIC: erwartet BOOLEAN oder Zahl (Arg 1), erhalten STRING

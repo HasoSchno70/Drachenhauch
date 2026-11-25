@@ -250,3 +250,35 @@ GUI_SET_SHAPE: nur fuer Knoepfe
 GUI_ANIMATE: 'tanzen' unbekannt
 'form' gilt nur in Regeln ohne :hover
 Dauer 10 ms ausserhalb 50..20000
+
+=== der titel einer gruppe unterbricht die rahmenlinie in seiner ganzen breite
+' Bis 2026.53 schaetzte die GroupBox die Breite ihres Titelgrunds aus der
+' Zeichenzahl (8 Punkte je Zeichen): bei breiten Buchstaben oder GUI_SCALE
+' lief die Rahmenlinie mitten durch den Titel. Gemessen wird in der Zeile der
+' oberen Rahmenlinie: wo beginnt sie rechts vom Titel wieder?
+IMPORT "gui"
+SCREEN(500, 260, "g", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_SCALE(1.5)
+DIM w AS GUI_WINDOW = GUI_WINDOW("G", 0, 0, 330, 170)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM gb AS GUI_WIDGET = GUI_GROUPBOX(w, 10, 20, 300, 100, "WWW MMM Gruppe")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/bild.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("bild.png")
+' Zeile 37: die obere Rahmenlinie (ay 30 + 7); rechts aussen ist sie sicher.
+DIM rahmen AS INTEGER : rahmen = GETPIXEL(b, 440, 37)
+DIM x AS INTEGER : x = 30
+WHILE x < 440 AND GETPIXEL(b, x, 37) <> rahmen
+    x = x + 1
+WEND
+' Der Titel reicht bei Massstab 1.5 bis etwa x = 225.
+PRINT "linie erst hinter dem titel "; x > 230
+--- erwartet
+linie erst hinter dem titel TRUE

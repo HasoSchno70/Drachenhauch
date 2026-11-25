@@ -217,7 +217,7 @@ PRINT TILED_TILESET_FIRSTGID(m, 0)
 IMPORT "tiled"
 PRINT TILED_WIDTH("not a map")
 --- fehler
-TILED_WIDTH erwartet TILED_MAP
+TILED_WIDTH: erwartet TILED_MAP
 
 === tile set changes gid
 IMPORT "tiled"

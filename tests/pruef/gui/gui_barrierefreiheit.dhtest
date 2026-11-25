@@ -367,6 +367,64 @@ kaestchen TRUE
 sinnbild TRUE
 geklickt
 
+=== ein fremder leser hoert die alt-marke nicht mit
+' Mit GUI_MNEMONICS zeigt die gui "&Speichern" als "Speichern" mit
+' unterstrichenem S. Der Baum fuer den Bildschirmleser nahm bis 2026.53 den
+' rohen Text: der Leser sagte "und Speichern".
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Marke-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", "--bilder", "600", CWD$() + "/marke.dh", "--", kennung)
+DIM ps AS INTEGER : ps = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", CWD$() + "/leser.ps1", kennung)
+DIM leser AS STRING : leser = auslesen$(ps, 60000)
+PRINT "leser rueckgabe "; PROCESS_CODE(ps)
+DIM kindAus AS STRING : kindAus = auslesen$(kind, 40000)
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+PRINT "knopf "; (INSTR(leser, "N: ControlType.Button [Speichern]") >= 0)
+PRINT "kaestchen "; (INSTR(leser, "N: ControlType.CheckBox [Merken]") >= 0)
+PRINT "ohne marke "; (INSTR(leser, "&") < 0)
+IF PROCESS_CODE(ps) <> 0 THEN PRINT leser
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/uialeser.dh"
+--- datei marke.dh
+IMPORT "gui"
+SCREEN(320, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_MNEMONICS(TRUE)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 320, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "&Speichern", 10, 10, 120, 30)
+DIM k AS GUI_WIDGET : k = GUI_CHECKBOX(w, "&Merken", 10, 60, FALSE)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- datei leser.ps1
+param([string]$Titel)
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$A = [System.Windows.Automation.AutomationElement]
+$Alle = [System.Windows.Automation.TreeScope]::Descendants
+$Wahr = [System.Windows.Automation.Condition]::TrueCondition
+$win = $null
+$kids = $null
+for ($i = 0; $i -lt 150; $i++) {
+    $p = Get-Process | Where-Object { $_.MainWindowTitle -eq $Titel } | Select-Object -First 1
+    if ($p -and $p.MainWindowHandle -ne 0) {
+        $win = $A::FromHandle($p.MainWindowHandle)
+        $kids = $win.FindAll($Alle, $Wahr)
+        if ($kids.Count -ge 2) { break }
+    }
+    Start-Sleep -Milliseconds 100
+}
+if (-not $win) { "kein Fenster"; exit 2 }
+foreach ($k in $kids) { "N: " + $k.Current.ControlType.ProgrammaticName + " [" + $k.Current.Name + "]" }
+--- system windows
+--- erwartet
+leser rueckgabe 0
+knopf TRUE
+kaestchen TRUE
+ohne marke TRUE
+
 === speak ohne gui spricht ueber den leser
 ' SPEAK fragt zuerst den Bildschirmleser (docs/intern/entwurf-speak.md, Weg C): laeuft
 ' einer, geht der Satz als Ansage in den Baum -- auch in einem Programm OHNE

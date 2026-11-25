@@ -261,3 +261,29 @@ PRINT a = GELD_CENT(b)
 59,97 €
 TRUE
 
+
+=== ohne betrag ein fehler statt einer panik
+' Bis 2026.53 griff try_geld ungeprueft auf das erste Argument zu: GELD_CENT()
+' & Co. beendeten die Laufzeit mit einer Rust-Panik, die kein TRY fing.
+IMPORT "geld"
+TRY
+    PRINT GELD_CENT()
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT GELD_ABS()
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT GELD_TEXT$()
+CATCH e
+    PRINT e
+END TRY
+PRINT "lebt"
+--- erwartet
+GELD_CENT: fehlendes Argument 1
+GELD_ABS: fehlendes Argument 1
+GELD_TEXT$: fehlendes Argument 1
+lebt

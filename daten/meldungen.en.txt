@@ -453,6 +453,11 @@ Zuweisung an '.{}' bei NIL-Referenz{}	Assignment to '.{}' on a NIL reference{}
 Zuweisung an '.{}' bei nicht-Objekt ({})	Assignment to '.{}' on a non-object ({})
 {} ist unveraenderlich: '.{}' laesst sich lesen, aber nicht setzen -- einen neuen Wert bauen, etwa v = {}_NEW(...)	{} is immutable: '.{}' can be read but not set -- build a new value, e.g. v = {}_NEW(...)
 {} hat kein Teil '{}' -- es gibt {}	{} has no component '{}' -- there are {}
+{}: einen Koerper {} gibt es nicht -- nie angelegt oder mit PHYS3D_REMOVE entfernt	{}: there is no body {} -- never created or removed with PHYS3D_REMOVE
+{}: einen Auftrag {} gibt es nicht -- nie gestartet, schon abgeholt oder abgebrochen	{}: there is no task {} -- never started, already collected or cancelled
+GFX_PUSH: mehr als 64 Ebenen -- fehlt ein GFX_POP?	GFX_PUSH: more than 64 levels -- is a GFX_POP missing?
+AUDIO_PUSH: mehr als 64 Ebenen -- fehlt ein AUDIO_POP?	AUDIO_PUSH: more than 64 levels -- is an AUDIO_POP missing?
+{}: Klang wurde freigegeben (UNLOADSOUND)	{}: the sound has been freed (UNLOADSOUND)
 {}: einen Koerper {} gibt es nicht -- nie angelegt oder mit PHYS2D_REMOVE entfernt (PHYS2D_BODY_EXISTS fragt danach)	{}: there is no body {} -- never created or removed with PHYS2D_REMOVE (PHYS2D_BODY_EXISTS asks)
 {}: ein Koerper kann nicht mit sich selbst verbunden werden ({})	{}: a body cannot be joined to itself ({})
 {}: die Laenge muss 0 oder mehr sein, nicht {}	{}: the length must be 0 or more, not {}
@@ -478,19 +483,18 @@ Zugriff auf eine globale Variable, die noch nicht gesetzt ist. [[]]Laeuft das hi
 Im gewoehnlichen Lauf heisst das: das DIM von '{}' ist noch nicht gelaufen -- steht es weiter unten im Programm als die Stelle, die es benutzt?	In a normal run this means: the DIM of '{}' has not run yet -- is it further down in the program than the place that uses it?
 
 # ---------------------------------------------------------------- Laufzeit: Befehle
-{} erwartet STRING, erhalten {}	{} expects STRING, got {}
 {} erwartet INTEGER, erhalten {}	{} expects INTEGER, got {}
-{} erwartet INTEGER, erhalten STRING{}	{} expects INTEGER, got STRING{}
-{} erwartet Zahl, erhalten {}	{} expects a number, got {}
-{} erwartet BOOLEAN, erhalten {}	{} expects BOOLEAN, got {}
-{} erwartet eine Zahl, erhalten {}	{} expects a number, got {}
-{} erwartet eine endliche Zahl	{} expects a finite number
-{} erwartet BOOLEAN oder Zahl (Flag), erhalten {}	{} expects BOOLEAN or a number (flag), got {}
 {}: erwartet INTEGER, erhalten {}	{}: expected INTEGER, got {}
-{}: erwartet STRING, erhalten {}	{}: expected STRING, got {}
-{}: erwartet Zahl, erhalten {}	{}: expected a number, got {}
 {}: erwartet BOOLEAN, erhalten {}	{}: expected BOOLEAN, got {}
 {}: fehlendes Argument {}	{}: missing argument {}
+{}: erwartet {} (Arg {}), erhalten {}	{}: expected {} (argument {}), got {}
+{}: erwartet {}, erhalten {}	{}: expected {}, got {}
+Zahl	a number
+BOOLEAN oder Zahl	BOOLEAN or a number
+eine endliche Zahl	a finite number
+TRUE/FALSE oder 0/1	TRUE/FALSE or 0/1
+keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig	not a whole number; INT(x) cuts off, ROUND(x) rounds, \ divides as integers
+die Variable hat noch keinen Wert (Bild/Klang vorher laden, z.B. b = LOADIMAGE("bild.png"))	the variable has no value yet (load the image/sound first, e.g. b = LOADIMAGE("picture.png"))
 {}: Wert {} liegt ausserhalb {}..{}	{}: value {} is outside {}..{}
 {}: es gibt noch kein Fenster -- vor dem ersten Zeichenbefehl SCREEN(breite, hoehe, "Titel") aufrufen	{}: there is no window yet -- call SCREEN(width, height, "Title") before the first drawing command
 {}: vor SCREEN aufgerufen	{}: called before SCREEN
@@ -569,9 +573,9 @@ TASK_START: dieses Lambda traegt Werte aus seiner Umgebung mit, und ein Auftrag 
 
 # ================================================================ Runde 2
 # ---------------------------------------------------------------- Befehle: Typen der Argumente
-{} erwartet ARRAY	{} expects ARRAY
-{} erwartet MAP	{} expects MAP
-{} erwartet BUFFER	{} expects BUFFER
+{}: erwartet ARRAY	{}: expected ARRAY
+{}: erwartet MAP	{}: expected MAP
+{}: erwartet BUFFER	{}: expected BUFFER
 {} erwartet CHART	{} expects CHART
 {} erwartet TWEEN	{} expects TWEEN
 {} erwartet TILED_MAP	{} expects TILED_MAP
@@ -810,12 +814,8 @@ Ungueltige Regex '{}': {}	Invalid regex '{}': {}
 {}: erwartet ARRAY OF {}	{}: expected ARRAY OF {}
 {}: erwartet ARRAY OF INTEGER oder NIL	{}: expected ARRAY OF INTEGER or NIL
 {}: erwartet BUFFER, erhalten {}	{}: expected BUFFER, got {}
-{}: erwartet BOOLEAN (Arg {})	{}: expected BOOLEAN (argument {})
 {}: erwartet FUNCREF (Arg {})	{}: expected FUNCREF (argument {})
 {}: erwartet INTEGER (Arg {})	{}: expected INTEGER (argument {})
-{}: erwartet INTEGER (Arg {}), erhalten NIL	{}: expected INTEGER (argument {}), got NIL
-{}: erwartet STRING (Arg {})	{}: expected STRING (argument {})
-{}: erwartet Zahl (Arg {})	{}: expected a number (argument {})
 GUI_TEXT_WIDTH: braucht ein Fenster (SCREEN)	GUI_TEXT_WIDTH: needs a window (SCREEN)
 auf die Zeile zeigt noch eine Zeile in {}; erst diese loeschen, oder der Verweis loescht mit (ON DELETE CASCADE)	another row still points to this one in {}; delete it first, or let the reference delete along (ON DELETE CASCADE)
 eine Verweis-Spalte nennt eine id, die es in der Zieltabelle nicht gibt: {}	a reference column names an id that does not exist in the target table: {}
@@ -823,7 +823,6 @@ eine Verweis-Spalte nennt eine id, die es in der Zieltabelle nicht gibt: {}	a re
 keine Verbindung: kein Netz, oder der Server ist nicht erreichbar	no connection: no network, or the server cannot be reached
 keine Antwort in der Zeitgrenze (HTTP_TIMEOUT)	no answer within the time limit (HTTP_TIMEOUT)
 das Widget oder Fenster gibt es noch nicht (ein Fenster aus dem Studio legt seine Controls erst mit Zeigen an)	the widget or window does not exist yet (a window from the Studio only creates its controls when Zeigen shows it)
-{}: erwartet einen Zeitwert (INTEGER, Arg {})	{}: expected a time value (INTEGER, argument {})
 {}: erwartet den Namen eines Sinnbilds (STRING) oder ein Bild (Arg {})	{}: expected the name of a symbol (STRING) or an image (argument {})
 {}: erwartet INTEGER (Rueckgabewert)	{}: expected INTEGER (return value)
 {}: erwartet STRING	{}: expected STRING
@@ -841,7 +840,6 @@ erhalten {}, erwartet {}	got {}, expected {}
 {}: Argument {} muss Zahl sein	{}: argument {} must be a number
 {}: Argument {} muss eine Farbe sein	{}: argument {} must be a color
 {}: Argument {} muss eine endliche Zahl sein, nicht {}	{}: argument {} must be a finite number, not {}
-{}: Argument {} ist NIL -- die Variable hat noch keinen Wert (Bild/Klang vorher laden, z.B. b = LOADIMAGE("bild.png"))	{}: argument {} is NIL -- the variable has no value yet (load the image/sound first, e.g. b = LOADIMAGE("picture.png"))
 {}: Arg 1 muss MAT4 sein	{}: argument 1 must be MAT4
 {}: Arg 2 muss MAT4 sein	{}: argument 2 must be MAT4
 {}: Arg 2 muss ein ARRAY OF MAT4 sein	{}: argument 2 must be an ARRAY OF MAT4
@@ -1786,6 +1784,10 @@ ein Nullzeichen im Text -- PostgreSQL nimmt es nicht	a null character in the tex
 Spalte {} ({}): {}	column {} ({}): {}
 MQTT_WILL: das Topic darf nicht leer sein und keine Platzhalter (# +) enthalten	MQTT_WILL: the topic must not be empty or contain wildcards (# +)
 MQTT_WILL: retain ist TRUE oder FALSE	MQTT_WILL: retain is TRUE or FALSE
+Monat {} gibt es nicht (1..12)	month {} does not exist (1..12)
+Tag {} gibt es im Monat {} nicht (1..{})	day {} does not exist in month {} (1..{})
+weiterzaehlen geht mit ZEIT_PLUS	to count on, use ZEIT_PLUS
+Uhrzeit {}:{}:{} gibt es nicht (0..23, 0..59, 0..59)	time {}:{}:{} does not exist (0..23, 0..59, 0..59)
 ZEIT_FORMAT$: '%{}' kennt das Muster nicht -- %Y %y %m %d %H %M %S %a %A %% oder JJJJ MM TT hh mm ss WT WTAG	ZEIT_FORMAT$: '%{}' is not a known pattern -- %Y %y %m %d %H %M %S %a %A %% or JJJJ MM TT hh mm ss WT WTAG
 CHART_X: {} x-Werte fuer {} Punkte -- erst CHART_DATA, dann CHART_X mit gleich vielen	CHART_X: {} x values for {} points -- first CHART_DATA, then CHART_X with as many
 CHART_X: der x-Wert von Punkt {} ist kleiner als der davor -- die Werte muessen aufsteigen	CHART_X: the x value of point {} is smaller than the one before -- the values must ascend
@@ -1800,7 +1802,6 @@ das Bild ist leer	the image is empty
 {}: das Bild ist leer	{}: the image is empty
 '{}' ist keine eingebaute Schrift	'{}' is not a built-in font
 GENTEX_RADIAL: dichte {} liegt nicht in 0..1 -- sie ist der Anteil des Radius in voller Innenfarbe (0 = weicher Verlauf ab der Mitte, 1 = Scheibe)	GENTEX_RADIAL: dichte {} is not in 0..1 -- it is the share of the radius in full inner colour (0 = soft gradient from the centre, 1 = disc)
-{} erwartet INTEGER, erhalten FLOAT {} -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig	{} expects INTEGER, got FLOAT {} -- not a whole number; INT(x) cuts off, ROUND(x) rounds, \ divides as integers
 {}: erwartet INTEGER (Arg {}), erhalten {} -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig	{}: expects INTEGER (arg {}), got {} -- not a whole number; INT(x) cuts off, ROUND(x) rounds, \ divides as integers
 {}: '{}' ist eine eingebaute Schrift, aber dieser Bau hat keine (Feature "schriften") -- eine .ttf-Datei angeben	{}: '{}' is a built-in font, but this build has none (feature "schriften") -- give a .ttf file
 {} -- {} ist eine Sekunde spaeter noch nicht zurueckgekehrt, darum steht der Fehler schon jetzt hier; Rueckrufe, die scheitern duerfen, mit TRY ... CATCH umgeben	{} -- {} has not returned one second later, so the error is shown here already; wrap callbacks that may fail in TRY ... CATCH
@@ -1809,7 +1810,7 @@ GENTEX_RADIAL: dichte {} liegt nicht in 0..1 -- sie ist der Anteil des Radius in
 {}.{}: die Methode der Klasse {} hat ihre BYREF-Parameter an anderen Stellen als die, nach der der Aufruf uebersetzt ist -- eine Ueberschreibung muss dieselben Parameter BYREF nehmen	{}.{}: the method of class {} has its BYREF parameters in other places than the one the call was compiled for -- an override must take the same parameters BYREF
 {}: eine Coroutine kann keine BYREF-Parameter zurueckschreiben	{}: a coroutine cannot write back BYREF parameters
 JOIN$: Feld aus Texten, Zahlen oder Wahrheitswerten noetig	JOIN$: needs an array of strings, numbers or booleans
-JOIN$ erwartet ein Feld	JOIN$ expects an array
+JOIN$: erwartet ein Feld	JOIN$: expects an array
 IMAGE_SCALE: erwartet (bild, breite, hoehe [, filter$])	IMAGE_SCALE: expects (image, width, height [, filter$])
 IMAGE_SCALE: unbekannter Filter '{}' -- moeglich sind lanczos, bikubisch, box, hamming, linear	IMAGE_SCALE: unknown filter '{}' -- possible are lanczos, bicubic, box, hamming, linear
 IMAGE_ENHANCE: erwartet (bild, art$, faktor)	IMAGE_ENHANCE: expects (image, kind$, factor)
@@ -1882,7 +1883,6 @@ Modul '{}' gibt es nur unter Linux (etwa auf dem Raspberry Pi) -- Funktionsaufru
 {}: {} Bytes lassen sich auf diesem Bus nicht in einem Auftrag lesen	{}: {} bytes cannot be read in one request on this bus
 {}: hoechstens 65536 Bytes je Auftrag	{}: at most 65536 bytes per request
 {}: Anzahl {} ausserhalb 1..65536	{}: count {} outside 1..65536
-{}: erwartet TRUE/FALSE oder 0/1, erhalten {}	{}: expects TRUE/FALSE or 0/1, got {}
 {}: erwartet eine Nummer oder einen Namen, nicht {}	{}: expects a number or a name, not {}
 Entprellzeit (ms)	debounce time (ms)
 Takt (Hz)	clock (Hz)

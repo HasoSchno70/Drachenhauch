@@ -118,7 +118,7 @@ TWEEN: dauer_ms muss >= 0 sein
 IMPORT "tween"
 PRINT TWEEN_VALUE("nicht ein tween")
 --- fehler
-TWEEN_VALUE erwartet TWEEN
+TWEEN_VALUE: erwartet TWEEN
 
 === loop never done
 ' Loop-Tween ist per Definition nie 'done' (auch sofort nach Erstellung).

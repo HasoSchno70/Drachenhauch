@@ -12,6 +12,7 @@
 //! Meldungen genutzt (`Laufzeitfehler in spiel.dh:Zeile: ...`). `dhrun.py
 //! --native` reicht den Namen der `.dh`-Quelldatei durch.
 
+mod argument;
 mod aehnlich;
 mod animfsm;
 // dhrt als Hauptprogramm eines .app-Bundles (Notarisierung braucht ein echtes

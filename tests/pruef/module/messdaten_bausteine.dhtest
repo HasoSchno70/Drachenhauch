@@ -372,8 +372,8 @@ END TRY
 --- erwartet
 230 330
 Aab
-LEFT$ erwartet INTEGER, erhalten FLOAT 2.5 -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig
-GUI_WINDOW: erwartet INTEGER (Arg 2), erhalten 2.5 -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig
+LEFT$: erwartet INTEGER, erhalten FLOAT 2.5 -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig
+GUI_WINDOW: erwartet INTEGER (Arg 2), erhalten FLOAT 2.5 -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig
 
 === gentex radial prueft die dichte
 ' 1.6 sah nach "dichter" aus und gab still eine harte Scheibe.

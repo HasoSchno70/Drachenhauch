@@ -11,7 +11,7 @@ IMPORT "json"
 | Function | Return value | Meaning |
 |---|---|---|
 | `JSON_PARSE(s$)` | JSON_HANDLE | read JSON from a string |
-| `JSON_LOAD(path$)` | JSON_HANDLE | read JSON from a file |
+| `JSON_LOAD(path$[, encoding$])` | JSON_HANDLE | read JSON from a file (a BOM does no harm; encoding as with `FILE_READ$`) |
 | `JSON_STRINGIFY(h)` | STRING (compact) | back to text -- without line breaks, for saving or sending |
 | `JSON_PRETTY(h)` | STRING (indented) | back to text -- indented, for reading |
 | `JSON_GET_STRING(h, path$)` | STRING | read the value at the path as text (`"nutzer.name"`, `"posten.0"`) |

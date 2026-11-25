@@ -310,7 +310,7 @@ SAVE_LOAD: Save-Datei muss ein JSON-Objekt sein
 IMPORT "save"
 PRINT SAVE_GET_INT("nicht ein handle", "k")
 --- fehler
-SAVE_GET_INT erwartet SAVE_HANDLE (aus SAVE_NEW/SAVE_LOAD)
+SAVE_GET_INT: erwartet SAVE_HANDLE (aus SAVE_NEW/SAVE_LOAD)
 
 === set bool wrong type message
 IMPORT "save"
@@ -318,5 +318,47 @@ DIM s AS SAVE_HANDLE
 s = SAVE_NEW()
 SAVE_SET_BOOL(s, "k", 1)
 --- fehler
-SAVE_SET_BOOL erwartet BOOLEAN, erhalten INTEGER
+SAVE_SET_BOOL: erwartet BOOLEAN, erhalten INTEGER
 
+
+=== exists und load or new finden den mitgelieferten stand wie load
+' Im exportierten Spiel liegt `../daten/stand.json` neben der Exe als
+' `daten/stand.json`; SAVE_LOAD findet ihn (resolve_asset_path). Bis 2026.53
+' sagte SAVE_EXISTS dazu FALSE, und SAVE_LOAD_OR_NEW legte still einen neuen
+' Stand an -- der mitgelieferte war verloren.
+IMPORT "save"
+PRINT SAVE_EXISTS("../daten/stand.json")
+DIM s AS SAVE_HANDLE = SAVE_LOAD_OR_NEW("../daten/stand.json")
+PRINT SAVE_GET_INT(s, "punkte")
+--- datei daten/stand.json
+{"_version": 3, "data": {"punkte": 7}}
+--- erwartet
+TRUE
+7
+
+=== die vorgabe hat den typ des getters
+' Bis 2026.53 pruefte nur SAVE_GET_FLOAT_OR die Vorgabe; SAVE_GET_INT_OR
+' lieferte einen Text aus einem INT-Getter, und die Meldungen nannten "S".
+IMPORT "save"
+DIM s AS SAVE_HANDLE = SAVE_NEW()
+PRINT SAVE_GET_INT_OR(s, "fehlt", 4 / 2)
+TRY
+    PRINT SAVE_GET_INT_OR(s, "fehlt", "kein int")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT SAVE_GET_BOOL_OR(s, "fehlt", "ja")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT SAVE_GET_FLOAT_OR(s, 5, 1.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+2
+SAVE_GET_INT_OR: erwartet INTEGER, erhalten STRING
+SAVE_GET_BOOL_OR: erwartet BOOLEAN, erhalten STRING
+SAVE_GET_FLOAT_OR: erwartet STRING, erhalten INTEGER

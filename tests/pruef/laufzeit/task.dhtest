@@ -166,7 +166,7 @@ WEND
 PRINT TASK_RESULT$(a)
 PRINT TASK_RESULT$(a)
 --- fehler
-TASK_RESULT$: Auftrag 0 ist noch nicht fertig -- erst TASK_READY(0) fragen
+TASK_RESULT$: einen Auftrag 0 gibt es nicht -- nie gestartet, schon abgeholt oder abgebrochen
 
 === abbrechen
 FUNCTION Langsam(x AS INTEGER) AS INTEGER
@@ -377,3 +377,21 @@ WEND
 PRINT TASK_RESULT$(a)
 --- erwartet
 40 Drache
+
+=== eine nummer, die es nicht gibt, ist ein fehler
+' Bis 2026.53 lieferte TASK_READY(7) fuer immer FALSE -- `WHILE NOT
+' TASK_READY(j)` mit einer falschen Nummer lief ewig, und TASK_RESULT$
+' schickte einen mit "erst TASK_READY fragen" genau dorthin.
+TRY
+    PRINT TASK_READY(7)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT SHELL_READY(7)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+TASK_READY: einen Auftrag 7 gibt es nicht -- nie gestartet, schon abgeholt oder abgebrochen
+SHELL_READY: einen Auftrag 7 gibt es nicht -- nie gestartet, schon abgeholt oder abgebrochen

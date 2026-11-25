@@ -18,27 +18,17 @@ impl<'p> Vm<'p> {
 
     #[cfg(feature = "graphics")]
     pub(super) fn try_graphics(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        // Grafik-Koordinaten sind "intish": INTEGER direkt, FLOAT wird zu int
-        // trunkiert (Richtung 0, wie Pythons int()). Der Tree-Walker macht das
-        // gleiche -- seine Zeichenprimitive (PLOT/LINE/BOX/RECT/CIRCLE/GRADIENT*)
-        // pruefen via `_check_int`, das in interpreter.py ein Alias auf
-        // `_check_intish` ist (interpreter.py:3541). So sind F5 (Tree-Walker) und
-        // F6 (dhrt) bei Float-Koordinaten konsistent (z.B. LINE(10.5, ...)).
+        // Grafik-Zahlen (Koordinaten, Groessen, Handles): eine Kommazahl
+        // verliert ihre Nachkommastellen (zur Null hin) -- die Regel der
+        // Zeichenbefehle seit jeher (`BOX(w / 2, ...)`), siehe argument.rs.
         fn gi(a: &[Value], i: usize, fn_: &str) -> R<i64> {
-            match a.get(i) {
-                Some(Value::Int(n)) => Ok(*n),
-                Some(Value::Float(f)) => Ok(*f as i64),
-                // NIL ist hier fast immer ein Bild/Klang/Handle, das nie
-                // geladen wurde -- "erwartet Zahl" fuehrte in die Irre.
-                Some(Value::Nil) => Err(format!(
-                    "{}: Argument {} ist NIL -- die Variable hat noch keinen Wert (Bild/Klang vorher laden, z.B. b = LOADIMAGE(\"bild.png\"))",
-                    fn_, i + 1)),
-                Some(Value::Str(s)) => Err(format!(
-                    "{}: erwartet Zahl, erhalten STRING (Argument {}){}",
-                    fn_, i + 1, crate::umstieg::text_statt_zahl(fn_, s))),
-                Some(v) => Err(format!("{}: erwartet Zahl, erhalten {} (Argument {})", fn_, v.type_name(), i + 1)),
-                None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
+            // NIL ist hier fast immer ein Bild/Klang/Handle, das nie
+            // geladen wurde -- das sagt die Meldung dazu.
+            if let Some(v @ Value::Nil) = a.get(i) {
+                return Err(format!("{} -- die Variable hat noch keinen Wert (Bild/Klang vorher laden, z.B. b = LOADIMAGE(\"bild.png\"))",
+                    crate::argument::erwartet(fn_, "Zahl", Some(i + 1), v)));
             }
+            crate::argument::a_koord(a, i, fn_)
         }
         // Tastenargument von KEYHIT & Co.: eine Zahl ist die LAGE der Taste,
         // ein einzelner Buchstabe (oder eine Ziffer) die Taste, auf der er steht.
@@ -55,29 +45,18 @@ impl<'p> Vm<'p> {
             gi(a, 0, fn_)
         }
         fn gs<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-            match a.get(i) {
-                Some(Value::Str(s)) => Ok(s),
-                _ => Err(format!("{}: erwartet STRING", fn_)),
-            }
+            crate::argument::a_text(a, i, fn_)
         }
-        fn gb(a: &[Value], i: usize) -> bool {
-            matches!(a.get(i), Some(Value::Bool(true)))
-        }
-        // Flag-Argument: akzeptiert TRUE/FALSE UND 1/0 (wie need_flag); fehlend = false.
-        fn gflag(a: &[Value], i: usize) -> bool {
-            match a.get(i) {
-                Some(Value::Bool(b)) => *b,
-                Some(Value::Int(n)) => *n != 0,
-                Some(Value::Float(f)) => *f != 0.0,
-                _ => false,
-            }
+        // Schalter (an/aus): TRUE/FALSE oder 1/0; fehlt er, ist er aus.
+        // Bis 2026.53 galt hier nur TRUE -- `TEXT_BOLD(1)` tat still nichts.
+        // `fn_` ist der Name, unter dem der Arm steht (klein); gross
+        // geschrieben wird erst fuer die Meldung.
+        fn gb(a: &[Value], i: usize, fn_: &str) -> R<bool> {
+            crate::argument::a_schalter_oder(a, i, false, fn_)
+                .map_err(|_| crate::argument::erwartet(&fn_.to_uppercase(), "BOOLEAN oder Zahl", Some(i + 1), &a[i]))
         }
         fn need_f(a: &[Value], i: usize, fn_: &str) -> R<f64> {
-            match a.get(i) {
-                Some(Value::Int(n)) => Ok(*n as f64),
-                Some(Value::Float(f)) => Ok(*f),
-                _ => Err(format!("{}: Argument {} muss Zahl sein", fn_, i + 1)),
-            }
+            crate::argument::a_num(a, i, fn_)
         }
         // Farbe fuer die Leinwand-Befehle (IMAGE_FILL_* & Co.). Ohne Deckkraft
         // gilt die Farbe wie ueberall (oberstes Byte 0 = deckend); mit ihr
@@ -370,7 +349,7 @@ impl<'p> Vm<'p> {
                 gi(a,0,"GENTEX_PERLIN")? as i32, gi(a,1,"GENTEX_PERLIN")? as i32, need_f(a,2,"GENTEX_PERLIN")?)?),
             "gentex_gradient" => Value::Int(g!().gen_tex_gradient(
                 gi(a,0,"GENTEX_GRADIENT")? as i32, gi(a,1,"GENTEX_GRADIENT")? as i32,
-                gi(a,2,"GENTEX_GRADIENT")?, gi(a,3,"GENTEX_GRADIENT")?, gb(a,4))?),
+                gi(a,2,"GENTEX_GRADIENT")?, gi(a,3,"GENTEX_GRADIENT")?, gb(a, 4, name)?)?),
             "gentex_checked" => Value::Int(g!().gen_tex_checked(
                 gi(a,0,"GENTEX_CHECKED")? as i32, gi(a,1,"GENTEX_CHECKED")? as i32,
                 gi(a,2,"GENTEX_CHECKED")? as i32, gi(a,3,"GENTEX_CHECKED")? as i32,
@@ -467,7 +446,7 @@ impl<'p> Vm<'p> {
             // Inhalt ueber das Bild hinaus stehen (Rueckkopplung/Nachzieher).
             "rendertarget_new" => Value::Int(g!().rendertarget_new(
                 gi(a,0,"RENDERTARGET_NEW")? as i32, gi(a,1,"RENDERTARGET_NEW")? as i32,
-                if a.len() >= 3 { gb(a, 2) } else { false })?),
+                if a.len() >= 3 { gb(a, 2, name)? } else { false })?),
             "rendertarget_clear" => {
                 let farbe = if a.len() >= 2 { Some(gi(a,1,"RENDERTARGET_CLEAR")?) } else { None };
                 g!().rendertarget_clear(gi(a,0,"RENDERTARGET_CLEAR")?, farbe)?;
@@ -481,7 +460,7 @@ impl<'p> Vm<'p> {
                 let tint = if a.len() >= 5 { Some(gi(a,4,"RENDERTARGET_DRAW")?) } else { None };
                 // Optionales 6. Argument: flip_v (vertikal spiegeln, fuer Boden-
                 // Reflexionen). RENDERTARGET_DRAW(rt, x, y, scale, tint, TRUE).
-                let flip_v = if a.len() >= 6 { gb(a, 5) } else { false };
+                let flip_v = if a.len() >= 6 { gb(a, 5, name)? } else { false };
                 g!().rendertarget_draw(gi(a,0,"RENDERTARGET_DRAW")?,
                     gi(a,1,"RENDERTARGET_DRAW")? as i32, gi(a,2,"RENDERTARGET_DRAW")? as i32,
                     scale, tint, flip_v)?; Value::Nil
@@ -756,7 +735,7 @@ impl<'p> Vm<'p> {
                         if a.len() > i { gi(a, i, "DRAW_IMAGE") } else { Ok(vorgabe) } };
                     let angle = if a.len() > 5 { need_f(a, 5, "DRAW_IMAGE")? as f32 } else { 0.0 };
                     g!().draw_image_voll(idx, x, y, ganz(3, -1)? as i32, ganz(4, -1)? as i32, angle,
-                        ganz(6, -1)?, gflag(a, 7), gflag(a, 8),
+                        ganz(6, -1)?, gb(a, 7, name)?, gb(a, 8, name)?,
                         ganz(9, 0)? as i32, ganz(10, 0)? as i32, ganz(11, -1)? as i32, ganz(12, -1)? as i32)?;
                 }
                 Value::Nil
@@ -773,8 +752,9 @@ impl<'p> Vm<'p> {
             }
             // IMAGE_WIDTH/IMAGE_HEIGHT: derselbe Befehl im Namensschema der
             // uebrigen IMAGE_*-Befehle (IMAGE_NEW, IMAGE_SAVE ...).
-            "imagewidth" | "image_width" => Value::Int(g!().image_width(gi(a,0,"IMAGE_WIDTH")?)?),
-            "imageheight" | "image_height" => Value::Int(g!().image_height(gi(a,0,"IMAGE_HEIGHT")?)?),
+            // IMAGE_WIDTH/IMAGE_HEIGHT sind die neuen Namen (namen.rs).
+            "imagewidth" => Value::Int(g!().image_width(gi(a,0,"IMAGEWIDTH")?)?),
+            "imageheight" => Value::Int(g!().image_height(gi(a,0,"IMAGEHEIGHT")?)?),
             "flip" => {
                 // Ein RENDERTARGET_BEGIN ohne END vor FLIP: alles seit dem
                 // BEGIN -- auch das RENDERTARGET_DRAW, das das Ziel zeigen
@@ -960,14 +940,14 @@ impl<'p> Vm<'p> {
             // jetzt sucht die Laufzeit sie als Datei oder bildet sie nach).
             "text_bold" | "text_italic" => {
                 let bit = if name == "text_bold" { crate::schnitt::FETT } else { crate::schnitt::KURSIV };
-                let an = gb(a, 0);
+                let an = gb(a, 0, name)?;
                 let st = g!().text_stil();
                 g!().set_text_stil(if an { st | bit } else { st & !bit });
                 Value::Nil
             }
-            "set_fullscreen" => { g!().set_fullscreen(gb(a, 0)); Value::Nil }
-            "mouse_visible" => { g!().mouse_visible(gb(a, 0)); Value::Nil }
-            "mouse_lock" => { g!().mouse_lock(gb(a, 0)); Value::Nil }
+            "set_fullscreen" => { g!().set_fullscreen(gb(a, 0, name)?); Value::Nil }
+            "mouse_visible" => { g!().mouse_visible(gb(a, 0, name)?); Value::Nil }
+            "mouse_lock" => { g!().mouse_lock(gb(a, 0, name)?); Value::Nil }
             "mouse_hidden" => Value::Bool(g!().mouse_hidden()),
             "delta" => Value::Float(g!().delta()),
             "fps" => Value::Int(g!().fps()),
@@ -978,7 +958,12 @@ impl<'p> Vm<'p> {
             // Nebel, Himmel, Schatten, Kamera, Schrift und Post-Effekt sind
             // global -- ohne das muss jede Szene beim Verlassen von Hand
             // aufraeumen, und eine vergessene Zeile faellt erst spaeter auf.
-            "gfx_push" => { g!().gfx_push(); Value::Nil }
+            "gfx_push" => {
+                if !g!().gfx_push() {
+                    return Err("GFX_PUSH: mehr als 64 Ebenen -- fehlt ein GFX_POP?".into());
+                }
+                Value::Nil
+            }
             "gfx_pop" => {
                 if !g!().gfx_pop() {
                     return Err("GFX_POP: der Stapel ist leer -- zu jedem GFX_POP gehoert ein GFX_PUSH".into());
@@ -1009,7 +994,12 @@ impl<'p> Vm<'p> {
             "scissor_depth" => Value::Int(g!().clip_depth()),
             // Dasselbe fuer die Audio-Busse: Effekte, die eine Szene anhaengt,
             // sollen den Rest des Programms nicht mitnehmen.
-            "audio_push" => { self.audio_mut()?.audio_push(); Value::Nil }
+            "audio_push" => {
+                if !self.audio_mut()?.audio_push() {
+                    return Err("AUDIO_PUSH: mehr als 64 Ebenen -- fehlt ein AUDIO_POP?".into());
+                }
+                Value::Nil
+            }
             "audio_pop" => {
                 if !self.audio_mut()?.audio_pop()? {
                     return Err("AUDIO_POP: der Stapel ist leer -- zu jedem AUDIO_POP gehoert ein AUDIO_PUSH".into());
@@ -1018,17 +1008,17 @@ impl<'p> Vm<'p> {
             }
             "audio_depth" => Value::Int(self.audio_mut()?.audio_depth()),
             // Natives OS-Fenster (das SCREEN-Fenster) steuern.
-            "window_resizable" => { g!().window_resizable(gb(a, 0)); Value::Nil }
+            "window_resizable" => { g!().window_resizable(gb(a, 0, name)?); Value::Nil }
             "window_min_size" => { g!().window_min_size(gi(a,0,"WINDOW_MIN_SIZE")? as i32, gi(a,1,"WINDOW_MIN_SIZE")? as i32); Value::Nil }
             "window_max_size" => { g!().window_max_size(gi(a,0,"WINDOW_MAX_SIZE")? as i32, gi(a,1,"WINDOW_MAX_SIZE")? as i32); Value::Nil }
             "window_maximize" => { g!().window_maximize(); Value::Nil }
             "window_minimize" => { g!().window_minimize(); Value::Nil }
             "window_restore" => { g!().window_restore(); Value::Nil }
             "window_resized" => Value::Bool(g!().window_resized()),
-            "window_undecorated" => { g!().window_undecorated(gb(a, 0)); Value::Nil }
-            "window_topmost" => { g!().window_topmost(gb(a, 0)); Value::Nil }
-            "window_esc_quit" => { g!().set_esc_quit(gb(a, 0)); Value::Nil }
-            "window_passthrough" => { g!().window_passthrough(gb(a, 0)); Value::Nil }
+            "window_undecorated" => { g!().window_undecorated(gb(a, 0, name)?); Value::Nil }
+            "window_topmost" => { g!().window_topmost(gb(a, 0, name)?); Value::Nil }
+            "window_esc_quit" => { g!().set_esc_quit(gb(a, 0, name)?); Value::Nil }
+            "window_passthrough" => { g!().window_passthrough(gb(a, 0, name)?); Value::Nil }
 
             // --- Native OS-Datei-/Ordner-Dialoge (rfd; liefern Pfad oder "") ---
             // Eigenes Feature `dialogs`: im Web-Build gibt es keine
@@ -1598,7 +1588,7 @@ impl<'p> Vm<'p> {
                 let intensity = if a.len() >= 2 { need_f(a, 1, "LIGHT_ENV_HDR")? } else { 1.0 };
                 g!().light_env_hdr(&path, intensity)?; Value::Nil
             }
-            "skybox" => { g!().skybox(gb(a, 0)); Value::Nil }
+            "skybox" => { g!().skybox(gb(a, 0, name)?); Value::Nil }
             "skybox_image" => { g!().skybox_image(gi(a, 0, "SKYBOX_IMAGE")?)?; Value::Nil }
             "image_mipmaps" => Value::Int(g!().image_mipmaps(gi(a, 0, "IMAGE_MIPMAPS")?)?),
             "light_directional" => Value::Int(g!().light_add(
@@ -1610,7 +1600,7 @@ impl<'p> Vm<'p> {
             "light_set_pos" => { g!().light_set_pos(gi(a,0,"LIGHT_SET_POS")?,
                 need_f(a,1,"LIGHT_SET_POS")? as f32, need_f(a,2,"LIGHT_SET_POS")? as f32, need_f(a,3,"LIGHT_SET_POS")? as f32)?; Value::Nil }
             "light_set_color" => { g!().light_set_color(gi(a,0,"LIGHT_SET_COLOR")?, gi(a,1,"LIGHT_SET_COLOR")?)?; Value::Nil }
-            "light_set_enabled" => { g!().light_set_enabled(gi(a,0,"LIGHT_SET_ENABLED")?, gb(a,1))?; Value::Nil }
+            "light_set_enabled" => { g!().light_set_enabled(gi(a,0,"LIGHT_SET_ENABLED")?, gb(a, 1, name)?)?; Value::Nil }
             "model_lit" => { g!().model_lit(gi(a,0,"MODEL_LIT")?)?; Value::Nil }
             "shadow_enable" => {
                 let res = if !a.is_empty() { gi(a,0,"SHADOW_ENABLE")? as i32 } else { 1024 };
@@ -1907,7 +1897,8 @@ impl<'p> Vm<'p> {
             "audio_record_stop" => { Value::Int(self.audio_mut()?.record_stop()?) }
             "audio_recording" => { Value::Bool(self.audio_mut()?.recording()) }
             "audio_peak" => { Value::Float(round_audio(self.audio_mut()?.peak())) }
-            "audio_volume" | "audio_set_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
+            // AUDIO_SET_VOLUME ist der neue Name (namen.rs).
+            "audio_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
             "audio_get_volume" => { let i = gi(a, 0, "AUDIO_GET_VOLUME")?; Value::Float(round_audio(self.audio_mut()?.ch_get_volume(i)?)) }
             "audio_pan" => { let i = gi(a, 0, "AUDIO_PAN")?; let l = need_f(a, 1, "AUDIO_PAN")?; let r = need_f(a, 2, "AUDIO_PAN")?; self.audio_mut()?.ch_pan(i, l, r)?; Value::Nil }
             "audio_pitch" => {
@@ -2055,7 +2046,7 @@ impl<'p> Vm<'p> {
             // Systemstimme durch Kira. SPEAK_SOUND ist immer Synthese.
             "speak" => {
                 let text = gs(a, 0, "SPEAK")?.to_string();
-                let unterbrechen = a.len() > 1 && gflag(a, 1);
+                let unterbrechen = a.len() > 1 && gb(a, 1, name)?;
                 if a.len() > 2 { return Err("SPEAK: erwartet (text$[, unterbrechen])".into()); }
                 if self.gfx.as_ref().map_or(false, |g| g.a11y_aktiv()) {
                     self.gui.announce(text.clone(), unterbrechen);
@@ -2096,7 +2087,12 @@ impl<'p> Vm<'p> {
                 if a.len() != 1 { return Err("SPEAK_SOUND: erwartet (text$)".into()); }
                 self.audio_mut()?;
                 let au = self.audio.as_mut().unwrap();
-                Value::Int(self.sprecher.klang(au, &text)?)
+                // Eine eigene Kopie: der Slot im Vorrat gehoert SPEAK und wird
+                // nach 64 weiteren Saetzen verdraengt. Bis 2026.53 bekam das
+                // Programm ihn selbst -- derselbe Text lieferte dasselbe
+                // Handle, und das Handle starb spaeter still.
+                let vorrat = self.sprecher.klang(au, &text)?;
+                Value::Int(au.sound_kopie(vorrat, "SPEAK_SOUND")?)
             }
             "audio_music_load" => { let p = gs(a, 0, "AUDIO_MUSIC_LOAD")?.to_string(); self.audio_mut()?.music_load(&p)?; Value::Nil }
             "audio_music_play" => {
@@ -2116,7 +2112,7 @@ impl<'p> Vm<'p> {
             }
             "audio_music_pause" => { self.audio_mut()?.music_pause(); Value::Nil }
             "audio_music_resume" => { self.audio_mut()?.music_resume(); Value::Nil }
-            "audio_music_volume" | "audio_music_set_volume" => { let v = need_f(a, 0, "AUDIO_MUSIC_VOLUME")?; self.audio_mut()?.music_set_volume(v); Value::Nil }
+            "audio_music_volume" => { let v = need_f(a, 0, "AUDIO_MUSIC_VOLUME")?; self.audio_mut()?.music_set_volume(v); Value::Nil }
             "audio_music_get_volume" => Value::Float(round_audio(self.audio_mut()?.music_get_volume())),
             "audio_music_position" => Value::Float(self.audio_mut()?.music_position()),
             "audio_music_seek" => {
@@ -2328,7 +2324,7 @@ impl<'p> Vm<'p> {
             }
             "drawimageflipped" => {
                 let idx = gi(a,0,"DRAWIMAGEFLIPPED")?;
-                let fh = gb(a, 3); let fv = gb(a, 4);
+                let fh = gb(a, 3, name)?; let fv = gb(a, 4, name)?;
                 g!().draw_image_flipped(idx, gi(a,1,"DRAWIMAGEFLIPPED")? as i32, gi(a,2,"DRAWIMAGEFLIPPED")? as i32, fh, fv)?; Value::Nil
             }
             "drawtilemap" => {
@@ -2386,8 +2382,8 @@ impl<'p> Vm<'p> {
                 // flip_x/flip_y akzeptieren TRUE/FALSE und 1/0; tint optional (7. Arg).
                 let atlas = gi(a,0,"ATLAS_DRAW_FLIPPED")?;
                 let name = gs(a,1,"ATLAS_DRAW_FLIPPED")?.to_string();
-                let fx = gflag(a, 4);
-                let fy = gflag(a, 5);
+                let fx = gb(a, 4, "ATLAS_DRAW_FLIPPED")?;
+                let fy = gb(a, 5, "ATLAS_DRAW_FLIPPED")?;
                 let tint = if a.len() > 6 { Some(gi(a,6,"ATLAS_DRAW_FLIPPED")?) } else { None };
                 g!().atlas_draw(atlas, &name, gi(a,2,"ATLAS_DRAW_FLIPPED")? as i32, gi(a,3,"ATLAS_DRAW_FLIPPED")? as i32, fx, fy, tint)?; Value::Nil
             }
@@ -2509,7 +2505,7 @@ impl<'p> Vm<'p> {
             "sprite_draw" => {
                 let sp = match a.first() {
                     Some(Value::Sprite(s)) => s.clone(),
-                    _ => return Err("SPRITE_DRAW erwartet SPRITE".into()),
+                    _ => return Err("SPRITE_DRAW: erwartet SPRITE".into()),
                 };
                 let s = sp.borrow();
                 let g = self.gfx.as_mut().ok_or("SPRITE_DRAW vor SCREEN aufgerufen")?;
@@ -2543,7 +2539,7 @@ impl<'p> Vm<'p> {
             "image_rotate" => Value::Int(g!().image_rotate(gi(a,0,"IMAGE_ROTATE")?, need_f(a,1,"IMAGE_ROTATE")? as f32)?),
             "image_rotate_cw" => Value::Int(g!().image_rotate_cw(gi(a,0,"IMAGE_ROTATE_CW")?)?),
             "image_rotate_ccw" => Value::Int(g!().image_rotate_ccw(gi(a,0,"IMAGE_ROTATE_CCW")?)?),
-            "image_flip" => Value::Int(g!().image_flip(gi(a,0,"IMAGE_FLIP")?, gb(a,1), gb(a,2))?),
+            "image_flip" => Value::Int(g!().image_flip(gi(a,0,"IMAGE_FLIP")?, gb(a, 1, name)?, gb(a, 2, name)?)?),
             "image_tint" => { let c = gi(a,1,"IMAGE_TINT")?; if c < 0 || c > 0xFFFFFF { return Err("IMAGE_TINT: Farbe muss 0..0xFFFFFF sein".into()); } Value::Int(g!().image_tint(gi(a,0,"IMAGE_TINT")?, c)?) }
             "image_copy" => Value::Int(g!().image_copy(gi(a,0,"IMAGE_COPY")?)?),
             "image_new" => Value::Int(g!().image_new(
@@ -2689,7 +2685,7 @@ wie viele Plaetze gelten", i + 1)),
                 // `gflag` fehlend = false -- hier ist die Vorgabe aber TRUE
                 // (eine Bewegung, die einmal laeuft und dann steht, ist
                 // selten gemeint), also selbst pruefen.
-                let wdh = if a.len() >= 4 { gflag(a, 3) } else { true };
+                let wdh = if a.len() >= 4 { gb(a, 3, name)? } else { true };
                 g!().image_save_gif(&bilder, gs(a,1,"IMAGE_SAVE_GIF")?, &zeiten, wdh)?;
                 Value::Nil
             }
@@ -2801,7 +2797,7 @@ wie viele Plaetze gelten", i + 1)),
                 let (d1, d2) = if a.len() == 10 { (Some(8), Some(9)) } else { (None, None) };
                 let c1 = lw_farbe(a, 5, d1, F)?;
                 let c2 = lw_farbe(a, 6, d2, F)?;
-                let senkrecht = if a.len() >= 8 { gb(a, 7) } else { true };
+                let senkrecht = if a.len() >= 8 { gb(a, 7, name)? } else { true };
                 g!().image_leinwand(gi(a,0,F)?, F, |l| l.verlauf(x0, y0, x1, y1, c1, c2, senkrecht))?; Value::Nil
             }
             "image_draw_text" => {
@@ -3198,7 +3194,7 @@ wie viele Plaetze gelten", i + 1)),
             }
 
             "particle_draw" => {
-                let sys = match a.first() { Some(Value::Particles(p)) => p.clone(), _ => return Err("PARTICLE_DRAW erwartet PARTICLE_SYSTEM".into()) };
+                let sys = match a.first() { Some(Value::Particles(p)) => p.clone(), _ => return Err("PARTICLE_DRAW: erwartet PARTICLE_SYSTEM".into()) };
                 let s = sys.borrow();
                 let g = self.gfx.as_mut().ok_or("PARTICLE_DRAW vor SCREEN aufgerufen")?;
                 let mode = s.mode.as_str();
