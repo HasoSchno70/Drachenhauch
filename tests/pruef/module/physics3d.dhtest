@@ -102,11 +102,15 @@ PRINT "haengt "; PHYS3D_BODY_Y(w, k)
 PHYS3D_SLEEP(w, k, FALSE)
 FOR i = 1 TO 30 : PHYS3D_STEP(w, 1.0 / 60) : NEXT
 PRINT "faellt "; PHYS3D_BODY_Y(w, k) < 4.0
-PRINT PHYS3D_SLEEPING(w, 99)
+TRY
+    PRINT PHYS3D_SLEEPING(w, 99)
+CATCH e
+    PRINT e
+END TRY
 --- erwartet
 haengt 5.0
 faellt TRUE
-FALSE
+PHYS3D_SLEEPING: einen Koerper 99 gibt es nicht -- nie angelegt oder mit PHYS3D_REMOVE entfernt
 
 === sleep mit falscher argumentzahl
 IMPORT "physics3d"
@@ -115,3 +119,27 @@ w = PHYS3D_NEW()
 PHYS3D_SLEEP(w)
 --- fehler
 PHYS3D_SLEEP: erwartet 2 oder 3 Argumente
+
+=== ein koerper, den es nicht gibt, ist ein fehler wie in 2d
+' Bis 2026.53 lieferte PHYS3D_BODY_X(w, 7) still 0.0, und PHYS3D_SET_POS auf
+' einen entfernten Koerper tat still nichts -- physics2d meldete schon.
+IMPORT "physics3d"
+DIM w AS PHYS_WORLD = PHYS3D_NEW()
+DIM a AS INTEGER = PHYS3D_ADD_SPHERE(w, 0.0, 5.0, 0.0, 0.5, 1, 0.0)
+PRINT PHYS3D_BODY_Y(w, a)
+PHYS3D_REMOVE(w, a)
+PHYS3D_REMOVE(w, a)
+TRY
+    PRINT PHYS3D_BODY_X(w, 7)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PHYS3D_SET_POS(w, a, 1, 2, 3)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+5.0
+PHYS3D_BODY_X: einen Koerper 7 gibt es nicht -- nie angelegt oder mit PHYS3D_REMOVE entfernt
+PHYS3D_SET_POS: einen Koerper 0 gibt es nicht -- nie angelegt oder mit PHYS3D_REMOVE entfernt

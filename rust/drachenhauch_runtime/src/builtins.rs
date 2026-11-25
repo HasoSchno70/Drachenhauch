@@ -2996,22 +2996,28 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys3d_body_x" | "phys3d_body_y" | "phys3d_body_z" => {
             arity!(2);
-            let p = phys3d_h(&a[0], "PHYS3D_BODY")?.borrow().pos(need_int(&a[1], "PHYS3D_BODY")?);
+            let f = name.to_uppercase();
+            let w = phys3d_h(&a[0], &f)?.borrow();
+            let p = w.pos(phys3d_koerper(&w, &a[1], &f)?);
             let v = match name { "phys3d_body_x" => p.0, "phys3d_body_y" => p.1, _ => p.2 };
             Ok(Value::Float(v as f64))
         }
         #[cfg(feature = "physik")]
         "phys3d_body_qx" | "phys3d_body_qy" | "phys3d_body_qz" | "phys3d_body_qw" => {
             arity!(2);
-            let q = phys3d_h(&a[0], "PHYS3D_BODY")?.borrow().rot(need_int(&a[1], "PHYS3D_BODY")?);
+            let f = name.to_uppercase();
+            let w = phys3d_h(&a[0], &f)?.borrow();
+            let q = w.rot(phys3d_koerper(&w, &a[1], &f)?);
             let v = match name { "phys3d_body_qx" => q.0, "phys3d_body_qy" => q.1, "phys3d_body_qz" => q.2, _ => q.3 };
             Ok(Value::Float(v as f64))
         }
         #[cfg(feature = "physik")]
         "phys3d_set_vel" => {
             arity!(5);
-            phys3d_h(&a[0], "PHYS3D_SET_VEL")?.borrow_mut().set_vel(
-                need_int(&a[1], "PHYS3D_SET_VEL")?,
+            let mut w = phys3d_h(&a[0], "PHYS3D_SET_VEL")?.borrow_mut();
+            let k = phys3d_koerper(&w, &a[1], "PHYS3D_SET_VEL")?;
+            w.set_vel(
+                k,
                 need_num(&a[2], "PHYS3D_SET_VEL")? as f32, need_num(&a[3], "PHYS3D_SET_VEL")? as f32,
                 need_num(&a[4], "PHYS3D_SET_VEL")? as f32);
             Ok(Value::Nil)
@@ -3019,8 +3025,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys3d_apply_impulse" => {
             arity!(5);
-            phys3d_h(&a[0], "PHYS3D_APPLY_IMPULSE")?.borrow_mut().apply_impulse(
-                need_int(&a[1], "PHYS3D_APPLY_IMPULSE")?,
+            let mut w = phys3d_h(&a[0], "PHYS3D_APPLY_IMPULSE")?.borrow_mut();
+            let k = phys3d_koerper(&w, &a[1], "PHYS3D_APPLY_IMPULSE")?;
+            w.apply_impulse(
+                k,
                 need_num(&a[2], "PHYS3D_APPLY_IMPULSE")? as f32, need_num(&a[3], "PHYS3D_APPLY_IMPULSE")? as f32,
                 need_num(&a[4], "PHYS3D_APPLY_IMPULSE")? as f32);
             Ok(Value::Nil)
@@ -3028,8 +3036,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys3d_set_pos" => {
             arity!(5);
-            phys3d_h(&a[0], "PHYS3D_SET_POS")?.borrow_mut().set_pos(
-                need_int(&a[1], "PHYS3D_SET_POS")?,
+            let mut w = phys3d_h(&a[0], "PHYS3D_SET_POS")?.borrow_mut();
+            let k = phys3d_koerper(&w, &a[1], "PHYS3D_SET_POS")?;
+            w.set_pos(
+                k,
                 need_num(&a[2], "PHYS3D_SET_POS")? as f32, need_num(&a[3], "PHYS3D_SET_POS")? as f32,
                 need_num(&a[4], "PHYS3D_SET_POS")? as f32);
             Ok(Value::Nil)
@@ -3046,14 +3056,16 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 return Err("PHYS3D_SLEEP: erwartet 2 oder 3 Argumente (welt, koerper [, schlafen])".into());
             }
             let an = if a.len() == 3 { need_flag(&a[2], "PHYS3D_SLEEP")? } else { true };
-            phys3d_h(&a[0], "PHYS3D_SLEEP")?.borrow_mut().sleep(need_int(&a[1], "PHYS3D_SLEEP")?, an);
+            let mut w = phys3d_h(&a[0], "PHYS3D_SLEEP")?.borrow_mut();
+            let k = phys3d_koerper(&w, &a[1], "PHYS3D_SLEEP")?;
+            w.sleep(k, an);
             Ok(Value::Nil)
         }
         #[cfg(feature = "physik")]
         "phys3d_sleeping" => {
             arity!(2);
-            Ok(Value::Bool(phys3d_h(&a[0], "PHYS3D_SLEEPING")?.borrow()
-                .is_sleeping(need_int(&a[1], "PHYS3D_SLEEPING")?)))
+            let w = phys3d_h(&a[0], "PHYS3D_SLEEPING")?.borrow();
+            Ok(Value::Bool(w.is_sleeping(phys3d_koerper(&w, &a[1], "PHYS3D_SLEEPING")?)))
         }
         #[cfg(feature = "physik")]
         "phys3d_count" => {
@@ -6008,6 +6020,16 @@ fn phys2d_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics
 /// Die Nummer eines Koerpers, den es gibt -- sonst eine Meldung statt der
 /// stillen Lage (0, 0), die ein entfernter Koerper frueher lieferte.
 #[cfg(feature = "physik")]
+/// Wie `phys2d_koerper`: eine Koerpernummer, die es nicht gibt, ist ein
+/// Fehler. Bis 2026.53 lieferte physics3d dafuer still (0, 0, 0) und
+/// schluckte SET_POS/SET_VEL/APPLY_IMPULSE.
+#[cfg(feature = "physik")]
+fn phys3d_koerper(w: &crate::physics3d::Phys3dWorld, v: &Value, fn_: &str) -> Result<i64, String> {
+    let idx = need_int(v, fn_)?;
+    if w.gibt_es(idx) { return Ok(idx); }
+    Err(format!("{}: einen Koerper {} gibt es nicht -- nie angelegt oder mit PHYS3D_REMOVE entfernt", fn_, idx))
+}
+
 fn phys2d_koerper(w: &crate::physics2d::Phys2dWorld, v: &Value, fn_: &str) -> Result<i64, String> {
     let idx = need_int(v, fn_)?;
     if w.gibt_es(idx) { return Ok(idx); }
