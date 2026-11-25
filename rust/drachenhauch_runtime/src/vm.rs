@@ -2344,7 +2344,12 @@ impl<'p> Vm<'p> {
         }
         for f in 1..=BUILTIN_FAMILIEN {
             if let Some(v) = self.familie_rufen(f, name, a)? {
-                if name != "sort" { merk.set(f); }
+                // Vom Merken ausgenommen sind die Namen, deren Familie je nach
+                // ARGUMENT antwortet (CLAUDE.md, Regel 6): SORT (FUNCREF in der
+                // VM), __comp_iter (eine Koroutine in try_coro, alles andere rein).
+                // Bis 2026.53 fehlte __comp_iter: lief dieselbe Comprehension erst
+                // ueber ein Feld, dann ueber eine Koroutine, kam "nicht iterierbar".
+                if name != "sort" && name != "__comp_iter" { merk.set(f); }
                 return Ok(v);
             }
         }

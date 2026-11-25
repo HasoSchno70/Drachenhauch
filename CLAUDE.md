@@ -95,7 +95,7 @@ Neuer Builtin:
 6. **Familien:** jede Aufrufstelle merkt sich die Familie, die geantwortet hat
    (`Instr::familie`, `Vm::builtin_rufen`/`familie_rufen`). Eine Familie darf
    nur am NAMEN absagen; sagt sie je nach Argument ab, obwohl eine spätere den
-   Namen kennt, muss der Name vom Merken ausgenommen werden (wie `SORT`). Neue
+   Namen kennt, muss der Name vom Merken ausgenommen werden (wie `SORT` und `__comp_iter`). Neue
    Familie = neue Nummer in `familie_rufen` UND `BUILTIN_FAMILIEN` anpassen.
 7. **Ruft der Befehl Drachenhauch-Code** (Rückrufe, FUNCREF), gehört er in
    `jit::befehl_im_bereich` (verboten) und in die Prüfung `gerufenes_harmlos`
