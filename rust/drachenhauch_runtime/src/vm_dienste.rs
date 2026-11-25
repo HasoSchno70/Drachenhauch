@@ -74,7 +74,10 @@ impl<'p> Vm<'p> {
             "db_col_count" => Value::Int(self.db_res(bi_int(a, 0, "DB_COL_COUNT")?)?.columns.len() as i64),
             "db_col_name" => { let i1 = bi_int(a, 1, "DB_COL_NAME")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_COL_NAME")?)?.col_name(i1)?) }
             "db_close_result" => {
-                let r = self.db_res_mut(bi_int(a, 0, "DB_CLOSE_RESULT")?)?;
+                let k = bi_int(a, 0, "DB_CLOSE_RESULT")?;
+                // Doppelt schliessen ist still (bis 2026.53 ein Fehler).
+                if k >= 0 && self.db_results.get(k as usize).is_some_and(|r| r.closed) { return Ok(Some(Value::Nil)); }
+                let r = self.db_res_mut(k)?;
                 r.closed = true;
                 // rows leert sich NICHT von selbst durch das closed-Flag -- ohne
                 // das hier bleiben eager geladene Zeilen bis Programmende im

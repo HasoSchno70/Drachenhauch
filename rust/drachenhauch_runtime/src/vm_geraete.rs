@@ -199,6 +199,7 @@ impl<'p> Vm<'p> {
             "video_fps" => { let i = self.video_z(a, "VIDEO_FPS")?; Value::Float(self.videos[i].as_ref().unwrap().video.fps) }
             "video_image" => { let i = self.video_z(a, "VIDEO_IMAGE")?; Value::Int(self.videos[i].as_ref().unwrap().bild) }
             "video_free" => {
+                if Self::schon_frei(&self.videos, bi_int(a, 0, "VIDEO_FREE")?) { return Ok(Some(Value::Nil)); }
                 let i = self.video_z(a, "VIDEO_FREE")?;
                 let z = self.videos[i].take().unwrap();
                 if let Some(g) = self.gfx.as_mut() { let _ = g.image_free(z.bild); }
@@ -1039,6 +1040,7 @@ impl<'p> Vm<'p> {
                 Value::Int((self.webcams.len() - 1) as i64)
             }
             "webcam_close" => {
+                if Self::schon_frei(&self.webcams, bi_int(a, 0, "WEBCAM_CLOSE")?) { return Ok(Some(Value::Nil)); }
                 let i = self.webcam_z(a, "WEBCAM_CLOSE")?;
                 if let Some(z) = self.webcams[i].take() {
                     if let Some(g) = self.gfx.as_mut() { let _ = g.image_free(z.bild); }
@@ -1577,7 +1579,7 @@ impl<'p> Vm<'p> {
         let v = match name {
             "bt_scan" => Value::str_rc(bt::scan(bi_num(a, 0, "BT_SCAN")?)?),
             "bt_connect" => { let p = bt::connect(bi_str(a, 0, "BT_CONNECT")?)?; self.bt_periphs.push(Some(p)); Value::Int((self.bt_periphs.len() - 1) as i64) }
-            "bt_disconnect" => { let i = bi_int(a, 0, "BT_DISCONNECT")?; bt::disconnect(self.bt_periph(i, name)?)?; if let Some(s) = self.bt_periphs.get_mut(i as usize) { *s = None; } Value::Nil }
+            "bt_disconnect" => { let i = bi_int(a, 0, "BT_DISCONNECT")?; if Self::schon_frei(&self.bt_periphs, i) { return Ok(Some(Value::Nil)); } bt::disconnect(self.bt_periph(i, name)?)?; if let Some(s) = self.bt_periphs.get_mut(i as usize) { *s = None; } Value::Nil }
             "bt_is_connected" => { let i = bi_int(a, 0, "BT_IS_CONNECTED")?; Value::Bool(match self.bt_periphs.get(i as usize).and_then(|o| o.as_ref()) { Some(p) => bt::is_connected(p), None => false }) }
             "bt_services" => { let i = bi_int(a, 0, "BT_SERVICES")?; Value::str_rc(bt::services(self.bt_periph(i, name)?)?) }
             "bt_characteristics" => { let i = bi_int(a, 0, "BT_CHARACTERISTICS")?; let s = bi_str(a, 1, "BT_CHARACTERISTICS")?.to_string(); Value::str_rc(bt::characteristics(self.bt_periph(i, name)?, &s)?) }

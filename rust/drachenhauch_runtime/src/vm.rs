@@ -4617,6 +4617,13 @@ impl<'p> Vm<'p> {
         vec.get(idx as usize).and_then(|o| o.as_ref())
             .ok_or_else(|| format!("{}: {} {}", modul, was, idx))
     }
+    /// Ist der Platz schon freigegeben (es gab ihn, jetzt ist er leer)? Dann
+    /// ist ein weiteres Freigeben still (die Handle-Regel, CLAUDE.md) -- ein
+    /// Platz, den es nie gab, bleibt ein Fehler beim Getter.
+    #[allow(dead_code)]
+    pub(super) fn schon_frei<T>(vec: &[Option<T>], idx: i64) -> bool {
+        idx >= 0 && vec.get(idx as usize).is_some_and(|o| o.is_none())
+    }
     // Ohne Feature-Gate: `pdf` und `xlsx` brauchen denselben Helfer und
     // haengen an keinem Feature -- ein Konsolenprogramm soll eine Rechnung
     // schreiben koennen, ohne dass das Netz mit eingebaut ist.
