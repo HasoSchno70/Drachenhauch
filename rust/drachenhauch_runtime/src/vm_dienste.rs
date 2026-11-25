@@ -222,11 +222,15 @@ impl<'p> Vm<'p> {
     pub(super) fn try_geld(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("geld_") { return Ok(None); }
         use crate::geld;
-        let wert = |v: &Value, fn_: &str| -> R<i64> {
-            match v {
-                Value::Geld(w) => Ok(*w),
-                other => Err(format!("{}: erwartet GELD, erhalten {} -- mit GELD_NEU() \
+        // Der Betrag an Stelle i. Fehlt er, ist das ein Fehler -- bis 2026.53
+        // griff `&a[0]` ins Leere, und GELD_CENT() beendete die Laufzeit
+        // mit einer Panik, die kein TRY fing.
+        let wert = |i: usize, fn_: &str| -> R<i64> {
+            match a.get(i) {
+                Some(Value::Geld(w)) => Ok(*w),
+                Some(other) => Err(format!("{}: erwartet GELD, erhalten {} -- mit GELD_NEU() \
                                       einen Betrag daraus machen", fn_, other.type_name())),
+                None => Err(crate::argument::fehlt(fn_, i + 1)),
             }
         };
         let v = match name {
@@ -242,10 +246,10 @@ impl<'p> Vm<'p> {
             }
             "geld_aus_cent" => { Value::Geld(bi_int(a, 0, "GELD_AUS_CENT")?
                 .checked_mul(100).ok_or_else(|| "GELD_AUS_CENT: Betrag zu gross".to_string())?) }
-            "geld_cent" => Value::Int(geld::runden(wert(&a[0], "GELD_CENT")?, 2) / 100),
-            "geld_zahl" => Value::Float(wert(&a[0], "GELD_ZAHL")? as f64 / geld::SKALA as f64),
+            "geld_cent" => Value::Int(geld::runden(wert(0, "GELD_CENT")?, 2) / 100),
+            "geld_zahl" => Value::Float(wert(0, "GELD_ZAHL")? as f64 / geld::SKALA as f64),
             "geld_runden" => {
-                let w = wert(&a[0], "GELD_RUNDEN")?;
+                let w = wert(0, "GELD_RUNDEN")?;
                 let stellen = match a.get(1) {
                     None => 2,
                     Some(v) => {
@@ -261,7 +265,7 @@ impl<'p> Vm<'p> {
                 Value::Geld(geld::runden(w, stellen))
             }
             "geld_text$" => {
-                let w = wert(&a[0], "GELD_TEXT$")?;
+                let w = wert(0, "GELD_TEXT$")?;
                 let symbol = match a.get(1) {
                     Some(Value::Str(s)) => s.to_string(),
                     None => "\u{20ac}".to_string(),
@@ -271,12 +275,12 @@ impl<'p> Vm<'p> {
                 Value::str_rc(geld::text(w, &symbol, 2))
             }
             "geld_teilen" => {
-                let w = wert(&a[0], "GELD_TEILEN")?;
+                let w = wert(0, "GELD_TEILEN")?;
                 let n = bi_int(a, 1, "GELD_TEILEN")?;
                 let teile = geld::teilen(w, n)?;
                 crate::builtins::new_geld_array(teile)
             }
-            "geld_abs" => Value::Geld(wert(&a[0], "GELD_ABS")?.abs()),
+            "geld_abs" => Value::Geld(wert(0, "GELD_ABS")?.abs()),
             _ => return Ok(None),
         };
         Ok(Some(v))
