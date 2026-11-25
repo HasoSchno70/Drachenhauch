@@ -103,6 +103,12 @@ pub const NEU: &[(&str, &str)] = &[
     ("music_play", "playmusic"),
     ("music_stop", "stopmusic"),
     ("model_load", "loadmodel"),
+    // Bis 2026.53 als zweiter Name im Match-Arm (vm_grafik.rs) -- ohne
+    // Hover-Hinweis, und Meldungen nannten je nach Arm den einen oder anderen.
+    ("image_width", "imagewidth"),
+    ("image_height", "imageheight"),
+    ("audio_set_volume", "audio_volume"),
+    ("audio_music_set_volume", "audio_music_volume"),
     // ---- Dateien (mit Pfad), Dateien (mit Handle), Ordner, Pfade
     ("file_exists", "fileexists"),
     ("file_size", "filesize"),

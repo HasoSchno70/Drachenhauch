@@ -752,8 +752,9 @@ impl<'p> Vm<'p> {
             }
             // IMAGE_WIDTH/IMAGE_HEIGHT: derselbe Befehl im Namensschema der
             // uebrigen IMAGE_*-Befehle (IMAGE_NEW, IMAGE_SAVE ...).
-            "imagewidth" | "image_width" => Value::Int(g!().image_width(gi(a,0,"IMAGE_WIDTH")?)?),
-            "imageheight" | "image_height" => Value::Int(g!().image_height(gi(a,0,"IMAGE_HEIGHT")?)?),
+            // IMAGE_WIDTH/IMAGE_HEIGHT sind die neuen Namen (namen.rs).
+            "imagewidth" => Value::Int(g!().image_width(gi(a,0,"IMAGEWIDTH")?)?),
+            "imageheight" => Value::Int(g!().image_height(gi(a,0,"IMAGEHEIGHT")?)?),
             "flip" => {
                 // Ein RENDERTARGET_BEGIN ohne END vor FLIP: alles seit dem
                 // BEGIN -- auch das RENDERTARGET_DRAW, das das Ziel zeigen
@@ -1896,7 +1897,8 @@ impl<'p> Vm<'p> {
             "audio_record_stop" => { Value::Int(self.audio_mut()?.record_stop()?) }
             "audio_recording" => { Value::Bool(self.audio_mut()?.recording()) }
             "audio_peak" => { Value::Float(round_audio(self.audio_mut()?.peak())) }
-            "audio_volume" | "audio_set_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
+            // AUDIO_SET_VOLUME ist der neue Name (namen.rs).
+            "audio_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
             "audio_get_volume" => { let i = gi(a, 0, "AUDIO_GET_VOLUME")?; Value::Float(round_audio(self.audio_mut()?.ch_get_volume(i)?)) }
             "audio_pan" => { let i = gi(a, 0, "AUDIO_PAN")?; let l = need_f(a, 1, "AUDIO_PAN")?; let r = need_f(a, 2, "AUDIO_PAN")?; self.audio_mut()?.ch_pan(i, l, r)?; Value::Nil }
             "audio_pitch" => {
@@ -2110,7 +2112,7 @@ impl<'p> Vm<'p> {
             }
             "audio_music_pause" => { self.audio_mut()?.music_pause(); Value::Nil }
             "audio_music_resume" => { self.audio_mut()?.music_resume(); Value::Nil }
-            "audio_music_volume" | "audio_music_set_volume" => { let v = need_f(a, 0, "AUDIO_MUSIC_VOLUME")?; self.audio_mut()?.music_set_volume(v); Value::Nil }
+            "audio_music_volume" => { let v = need_f(a, 0, "AUDIO_MUSIC_VOLUME")?; self.audio_mut()?.music_set_volume(v); Value::Nil }
             "audio_music_get_volume" => Value::Float(round_audio(self.audio_mut()?.music_get_volume())),
             "audio_music_position" => Value::Float(self.audio_mut()?.music_position()),
             "audio_music_seek" => {

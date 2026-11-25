@@ -7141,7 +7141,7 @@ pub fn is_graphics_builtin(name: &str) -> bool {
         "screen" | "cls" | "flip" | "text" | "text_bold" | "text_size" | "circle"
         | "box" | "line" | "plot" | "rect" | "drawimage" | "loadimage" | "loadsound"
         | "playsound" | "keypressed" | "keydown" | "mousex" | "mousey" | "mousebutton"
-        | "quitrequested" | "sleep" | "imagewidth" | "imageheight" | "image_width" | "image_height"
+        | "quitrequested" | "sleep" | "imagewidth" | "imageheight"
         | "color" | "fill"
     )
 }

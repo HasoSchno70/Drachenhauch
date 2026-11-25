@@ -1679,8 +1679,6 @@ Für komplexere Sprite-Kollision siehe [Sprite-Modul](module-sprite.md) mit `SPR
 |---|---|
 | `SGN(number)` | `SIGN(x)` |
 | `SQRT(number)` | `SQR(x)` |
-| `AUDIO_SET_VOLUME(ch, v)` | `AUDIO_VOLUME(ch, v)` |
-| `AUDIO_MUSIC_SET_VOLUME(v)` | `AUDIO_MUSIC_VOLUME(v)` |
 
 Container-Methode `arr.join(trenner)` ≡ `JOIN$(arr, trenner)`.
 

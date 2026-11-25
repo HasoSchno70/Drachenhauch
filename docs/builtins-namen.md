@@ -178,6 +178,10 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `MUSIC_PLAY(path$[, loops[, volume]])` | längere Datei streamen (.ogg/.mp3/.qoa + Tracker-Module .mod/.xm — echter Amiga-Sound), default loops=-1 … — bisher `PLAYMUSIC` |
 | `MUSIC_STOP()` | ein Stream gleichzeitig. Nachgefüllt wird auf dem Audio-Thread, nicht im Game-Loop: einen … — bisher `STOPMUSIC` |
 | `MODEL_LOAD(path$: STRING)` | INTEGER — Modell aus einer Datei laden (OBJ, GLTF, IQM …) — bisher `LOADMODEL` |
+| `IMAGE_WIDTH(image)` | Breite eines Bildes in Pixeln — bisher `IMAGEWIDTH` |
+| `IMAGE_HEIGHT(image)` | Höhe eines Bildes in Pixeln — bisher `IMAGEHEIGHT` |
+| `AUDIO_SET_VOLUME(ch, v)` | Lautstärke eines Kanals 0..1 — bisher `AUDIO_VOLUME` |
+| `AUDIO_MUSIC_SET_VOLUME(v)` | Lautstärke der Musik 0..1 — bisher `AUDIO_MUSIC_VOLUME` |
 
 ### Dateien (mit Pfad), Dateien (mit Handle), Ordner, Pfade
 
