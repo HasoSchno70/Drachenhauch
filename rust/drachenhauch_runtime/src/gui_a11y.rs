@@ -213,7 +213,9 @@ impl Gui {
         let mut n = match w.kind {
             Kind::Button => {
                 let mut n = Node::new(if self.windows[wi].default_btn == i as i32 { Role::DefaultButton } else { Role::Button });
-                n.set_label(w.text.clone());
+                // Der Anzeigetext, ohne Alt-Marke: bis 2026.53 las der
+                // Bildschirmleser "&Speichern" ("und Speichern").
+                n.set_label(self.anzeige_text(w).into_owned());
                 n.add_action(Action::Click);
                 n
             }
@@ -251,10 +253,10 @@ impl Gui {
                 n.add_action(Action::Click);
                 n
             }
-            Kind::Label => { let mut n = Node::new(Role::Label); n.set_label(w.text.clone()); n.set_value(w.text.clone()); n }
+            Kind::Label => { let t = self.anzeige_text(w).into_owned(); let mut n = Node::new(Role::Label); n.set_label(t.clone()); n.set_value(t); n }
             Kind::Checkbox | Kind::Toggle | Kind::Radio => {
                 let mut n = Node::new(match w.kind { Kind::Checkbox => Role::CheckBox, Kind::Toggle => Role::Switch, _ => Role::RadioButton });
-                n.set_label(w.text.clone());
+                n.set_label(self.anzeige_text(w).into_owned());
                 n.set_toggled(if w.checked { Toggled::True } else { Toggled::False });
                 n.add_action(Action::Click);
                 n
