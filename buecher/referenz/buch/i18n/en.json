@@ -86,6 +86,7 @@
  "Rechnen mit PRINT": "Calculating with PRINT",
  "PRINT kann nicht nur Text, sondern auch Zahlen und Rechnungen ausgeben. Steht hinter PRINT kein Text in Anführungszeichen, sondern eine Rechnung, dann rechnet Drachenhauch sie zuerst aus und druckt das Ergebnis:": "PRINT can output not only text but numbers and sums as well. If what follows PRINT is not quoted text but a calculation, Drachenhauch works it out first and prints the result:",
  "Beachte: ": "Note: ",
+ " ergibt ": " gives ",
  " – Drachenhauch rechnet bei Bedarf mit Kommazahlen weiter und rundet nicht einfach ab. Mehr dazu im Kapitel über Zahlen.": " — where needed, Drachenhauch carries on with decimal numbers instead of simply rounding down. More on that in the chapter on numbers.",
  "Text und Zahl zusammen": "Text and number together",
  "Oft willst du Text und einen Wert in einer Zeile mischen. Mit einem Komma trennst du mehrere Dinge, die PRINT nacheinander ausgibt – mit einem Leerzeichen dazwischen:": "Often you want to mix text and a value on one line. A comma separates several things for PRINT to output one after another — with a space in between:",

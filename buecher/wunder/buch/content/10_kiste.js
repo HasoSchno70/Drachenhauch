@@ -22,7 +22,7 @@ module.exports = (H) => [
 
   H.code(stueck("kap10/1_kiste.dh", "DIM welt AS PHYS2D_WORLD", "PHYS2D_ADD_BOX(welt, BREITE - 10")),
 
-  H.pmix(["Die Zahlen sind Mitte x und y, dann die ", ["halbe", false], " Breite und die halbe Höhe, dann ob der Körper sich bewegt (FALSE: fest wie eine Wand), und zuletzt die Sprungkraft von 0 bis 1. Der Boden ist also 800 breit und 20 hoch, seine Mitte 10 über dem unteren Rand. Halbe Maße sind ungewohnt, aber in der Physik üblich; was passiert, wenn man sie vergisst, zeigt „Was schiefgehen kann“."]),
+  H.pmix(["Die Zahlen sind Mitte x und y, dann die ", ["halbe Breite", false], " und die halbe Höhe, dann ob der Körper sich bewegt (FALSE: fest wie eine Wand), und zuletzt die Sprungkraft von 0 bis 1. Der Boden ist also 800 breit und 20 hoch, seine Mitte 10 über dem unteren Rand. Halbe Maße sind ungewohnt, aber in der Physik üblich; was passiert, wenn man sie vergisst, zeigt „Was schiefgehen kann“."]),
 
   H.p("Jeder Körper, den die Welt anlegt, bekommt eine Nummer. Was sie nicht kennt, ist sein Aussehen — ob er rund ist, wie groß, welche Farbe. Das merkt sich das Programm in eigenen Feldern, Platz für Platz neben der Nummer:"),
 

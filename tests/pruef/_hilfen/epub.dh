@@ -7,7 +7,13 @@ IMPORT "xml"
 IMPORT "regex"
 
 FUNCTION epubBauen$(wurzel AS STRING) AS STRING
-    DIM buch AS STRING : buch = wurzel + "/buecher/referenz/buch"
+    RETURN epubBauenVon$(wurzel, "referenz", "de")
+END FUNCTION
+
+' Dasselbe fuer ein beliebiges Buch unter buecher/ und eine Sprache ("de"
+' = ohne --lang). Jede Sprache bekommt ihre eigene Probedatei.
+FUNCTION epubBauenVon$(wurzel AS STRING, name AS STRING, sprache AS STRING) AS STRING
+    DIM buch AS STRING : buch = wurzel + "/buecher/" + name + "/buch"
     IF NOT nodeDa() THEN
         PRINT "UEBERSPRINGEN: node fehlt"
         EXIT(0)
@@ -16,9 +22,15 @@ FUNCTION epubBauen$(wurzel AS STRING) AS STRING
         PRINT "UEBERSPRINGEN: node_modules fehlt (npm install im buch-Verzeichnis)"
         EXIT(0)
     END IF
-    DIM ziel AS STRING : ziel = CWD$() + "/probe.epub"
+    DIM ziel AS STRING : ziel = CWD$() + "/probe_" + name + "_" + sprache + ".epub"
+    DIM zurueck AS STRING : zurueck = CWD$()
     CHDIR(buch)
-    nlWarten(PROCESS_START("node", "build_epub.js", ziel), 300000)
+    IF sprache = "de" THEN
+        nlWarten(PROCESS_START("node", "build_epub.js", ziel), 300000)
+    ELSE
+        nlWarten(PROCESS_START("node", "build_epub.js", ziel, "--lang", sprache), 300000)
+    END IF
+    CHDIR(zurueck)
     IF nlCode <> 0 THEN
         PRINT "Build fehlgeschlagen: "; nlErr
         EXIT(1)

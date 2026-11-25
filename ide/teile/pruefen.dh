@@ -285,7 +285,7 @@ SUB pruefen()
         IF art = "hinweis" THEN hinweise = hinweise + 1
         ARRAY_PUSH(problemHinweis, art = "hinweis")
         IF problemModus = 0 THEN
-            GUI_LISTBOX_ADD(lstProbleme, "Zeile " + STR$(zeilen[i]) + ": " + JSON_GET_STRING(j, p + ".meldung"))
+            GUI_LISTBOX_ADD(lstProbleme, tr$("Zeile ") + STR$(zeilen[i]) + ": " + JSON_GET_STRING(j, p + ".meldung"))
             IF art = "fehler" THEN
                 GUI_LISTBOX_COLOR(lstProbleme, i, &HE06060)
             ELSEIF art = "hinweis" THEN

@@ -267,6 +267,154 @@ alles true
 debugger und lauf eine zeile 11, 12
 studio Probleme, Probleme, Statuszeile
 
+=== die uebersetzungsschicht nimmt h3, kommentare und tabellenkoepfe
+' buecher/_i18n/i18n.js schickt die Texte eines Kapitels durch den
+' Katalog. Das Referenzbuch hat keine dritte Ueberschriftenebene,
+' "Kleine Wunder" 326 -- ohne h3 in FELDER blieben sie im englischen Buch
+' still deutsch. Ein Ausgabe-Block ({ out: true }) ging bis 2026-11-23 wie
+' Code durch die Kommentar-Uebersetzung: "'CIRLCE' -- dhrt kennt ihn nicht"
+' landete als Kommentar im Katalog.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0) + "/buecher/referenz/buch")
+WRITEALL("_i18n_probe.js", READALL(ARG$(1)))
+nlWarten(PROCESS_START("node", "_i18n_probe.js"), 60000)
+DELETEFILE("_i18n_probe.js")
+PRINT nlAus;
+IF nlCode <> 0 THEN PRINT nlErr
+--- argumente
+{sammlung}/../../..
+{fall}/probe.js
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
+--- datei probe.js
+const { wrap, sammle } = require("../../_i18n/i18n");
+const { mitZahlen } = require("../../_i18n/vorlage");
+const roh = { h2: (t) => t, h3: (t) => t, code: (z) => z, table: (r, o) => o.headers, pmix: (t) => t, p: (t) => t };
+const H = wrap(roh, {
+  "Drehen nach der Uhr": "Turning by the clock",
+  "ein Kommentar": "a comment",
+  "Taste": "Key",
+  "von unten nach oben": "from bottom to top",
+  " und ": " and ",
+  "Es fliegen {0} Funken, {1} davon rot.": "{0} sparks fly, {1} of them red.",
+  "ein Kommentar' -- dhrt": "FALSCH UEBERSETZT",
+});
+console.log("h3 " + H.h3("Drehen nach der Uhr"));
+console.log("code " + H.code(["x = 1  ' ein Kommentar"])[0]);
+console.log("kopf " + H.table([], { headers: ["Taste", "PRINT"] }).join(", "));
+// Ein reiner Ausgabe-Block bleibt woertlich, auch wenn eine Zeile mit ' beginnt;
+// Code mit Ausgabe darunter (Lehrbuch: { out: [...] }) bleibt Code.
+console.log("ausgabe " + H.code(["'ein Kommentar' -- dhrt"], { out: true })[0]);
+console.log("mit ausgabe " + H.code(["x = 1  ' ein Kommentar"], { out: ["1"] })[0]);
+// ["wort", false] in pmix ist ein betontes Wort und wird uebersetzt,
+// ["CODE", true] bleibt. "Ein Schritt, " und " mit " fehlen im Probekatalog (2).
+console.log("betont " + JSON.stringify(H.pmix(["Ein Schritt, ", ["von unten nach oben", false], " mit ", ["DELTA()", true]])));
+// Ein kleines Wort zwischen zwei Codestuecken ist in pmix Prosa, auch wenn
+// es ausserhalb wie ein Bezeichner aussaehe (bis 2026-11-24 blieb es deutsch).
+console.log("bindewort " + JSON.stringify(H.pmix([["COS", true], " und ", ["SIN", true]])));
+// Ein Satz mit eingesetzten Zahlen: im Katalog steht die Vorlage, die
+// Zahlen kommen nach dem Uebersetzen hinein; eingesammelt wird die Vorlage.
+console.log("vorlage " + H.p(mitZahlen("Es fliegen {0} Funken, {1} davon rot.", [500, 12])));
+const [S, texte] = sammle({ p: (t) => t });
+S.p(mitZahlen("Es fliegen {0} Funken, {1} davon rot.", [7, 1]));
+console.log("gesammelt " + texte.join(" | "));
+console.log("fehlt " + [...H.__fehlend].length);
+--- erwartet
+h3 Turning by the clock
+code x = 1  ' a comment
+kopf Key, PRINT
+ausgabe 'ein Kommentar' -- dhrt
+mit ausgabe x = 1  ' a comment
+betont ["Ein Schritt, ",["from bottom to top",false]," mit ",["DELTA()",true]]
+bindewort [["COS",true]," and ",["SIN",true]]
+vorlage 500 sparks fly, 12 of them red.
+gesammelt Es fliegen {0} Funken, {1} davon rot.
+fehlt 2
+
+=== kein doppeltes leerzeichen im fliesstext
+' Ein Rueckstrich vor einem Leerzeichen ist in JavaScript kein Zeichen: "wie
+' \ nach unten" stand in Anhang A von Kleine Wunder als "wie  nach unten" im
+' Buch (gefunden 2026-11-24 beim Uebersetzen). Was so verloren geht, hinterlaesst
+' ein doppeltes Leerzeichen -- in diesen beiden Buechern ist keines gewollt.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0) + "/buecher")
+WRITEALL("_doppelt_probe.js", READALL(ARG$(1)))
+nlWarten(PROCESS_START("node", "_doppelt_probe.js"), 60000)
+DELETEFILE("_doppelt_probe.js")
+PRINT nlAus;
+IF nlCode <> 0 THEN PRINT nlErr
+--- argumente
+{sammlung}/../../..
+{fall}/probe.js
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
+--- datei probe.js
+const fs = require("fs");
+const path = require("path");
+let datei = "";
+let texte = 0;
+const funde = [];
+const pruefe = (t) => {
+  if (typeof t !== "string") return;
+  texte++;
+  if (/\S  +\S/.test(t)) funde.push(datei + ": " + t.slice(Math.max(0, t.search(/\S  +\S/) - 30), t.search(/\S  +\S/) + 30));
+};
+const H = new Proxy({
+  p: pruefe, h2: pruefe, h3: pruefe, bullet: pruefe, note: pruefe, tip: pruefe, warn: pruefe,
+  bulletRich: (a, b) => { pruefe(a); pruefe(b); },
+  figure: (n, c) => pruefe(c),
+  pmix: (teile) => teile.forEach((x) => { if (typeof x === "string") pruefe(x); else if (Array.isArray(x) && x[1] === false) pruefe(x[0]); }),
+  table: (r) => r.forEach((z) => Array.isArray(z) && z.forEach((c) => { if (typeof c === "string") pruefe(c); else if (c && !c.mono) pruefe(c.text); })),
+}, { get: (t, k) => (k in t ? t[k] : () => null) });
+for (const buch of ["wunder", "anwendungen"]) {
+  const dir = path.resolve(buch, "buch", "content");
+  for (const f of fs.readdirSync(dir).filter((f) => f.endsWith(".js")).sort()) {
+    datei = buch + "/" + f;
+    require(path.join(dir, f))(H);
+  }
+}
+console.log(funde.join("\n"));
+console.log("genug texte " + (texte > 3000) + ", funde " + funde.length);
+--- erwartet
+
+genug texte true, funde 0
+
+=== anhang d nimmt die seiten der sprache, in der gebaut wird
+' Anhang D von Kleine Wunder nennt zu jeder Meldung die Seite ihres
+' Kapitels. Bis 2026-11-24 las er immer toc_pages.de.json -- im englischen
+' Buch haetten die deutschen Seiten gestanden. Jetzt die Datei der Sprache
+' (--lang), nachgeschlagen ueber die Kapitelnummer.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0) + "/buecher/wunder/buch")
+WRITEALL("_seiten_probe.js", READALL(ARG$(1)))
+nlWarten(PROCESS_START("node", "_seiten_probe.js"), 60000)
+DELETEFILE("_seiten_probe.js")
+PRINT nlAus;
+IF nlCode <> 0 THEN PRINT nlErr
+--- argumente
+{sammlung}/../../..
+{fall}/probe.js
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
+--- datei probe.js
+const path = require("path");
+const zeilen = (sprache) => {
+  process.argv = ["node", "probe", "--lang", sprache];
+  delete require.cache[require.resolve(path.resolve("content/93_anhang_d.js"))];
+  const tabellen = [];
+  const H = new Proxy({ table: (r) => { tabellen.push(...r); return null; } },
+                      { get: (t, k) => (k in t ? t[k] : () => null) });
+  require(path.resolve("content/93_anhang_d.js"))(H);
+  return tabellen;
+};
+const de = zeilen("de");
+const xx = zeilen("xx");
+console.log("deutsch mit seiten " + (de.filter((z) => z[2] !== "").length === de.length));
+console.log("ohne messung keine seiten " + (xx.length === de.length && xx.every((z) => z[2] === "")));
+--- erwartet
+deutsch mit seiten true
+ohne messung keine seiten true
+
 === mediathek kapitel 1: leer abgewiesen, ein titel aufgenommen
 ' Tippen kann eine Aufnahme nicht (sie spielt Tasten, keine Zeichen) --
 ' die Faelle danach setzen darum statt des Felds einen festen Titel ein.

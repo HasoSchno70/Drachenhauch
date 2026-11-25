@@ -37,7 +37,7 @@ module.exports = (H) => [
 
   H.code(stueck("kap19/2_zuhoeren.dh", "' Der Mittelwert der", "END FUNCTION", 2)),
 
-  H.pmix(["Eine Funktion gibt einen Wert zurück — will man drei, gibt sie ein ", ["Tupel", true], " zurück: ", ["RETURN (a, b, c)", true], " packt drei Werte in einen. Wer sie aufruft, packt sie gleich wieder aus:"]),
+  H.pmix(["Eine Funktion gibt einen Wert zurück — will man drei, gibt sie ein ", ["Tupel", false], " zurück: ", ["RETURN (a, b, c)", true], " packt drei Werte in einen. Wer sie aufruft, packt sie gleich wieder aus:"]),
 
   H.code(stueck("kap19/2_zuhoeren.dh", "AUDIO_FFT(spektrum)", "(bass, mitte, hoehen)")),
 

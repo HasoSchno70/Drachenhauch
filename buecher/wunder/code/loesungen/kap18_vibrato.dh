@@ -181,8 +181,8 @@ WHILE NOT QUITREQUESTED() AND NOT KEY_DOWN(KEY_ESCAPE)
             tremolo = AUDIO_LFO_NEW("sine", 6)
             AUDIO_MODULATE("sfx", "volume", tremolo, 0.4, 1.0)
         ELSE
-            ' Ohne Modulator kehrt der Bus zu seiner festen Lautstaerke
-            ' zurueck.
+            ' Ohne Modulator kehrt der Bus zu seiner
+            ' festen Lautstaerke zurueck.
             AUDIO_MOD_REMOVE(tremolo)
         END IF
     END IF

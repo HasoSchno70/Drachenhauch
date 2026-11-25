@@ -36,23 +36,34 @@ const FREI = _li >= 0 ? ARGS.filter((_, i) => i !== _li && i !== _li + 1) : ARGS
 // darum auch nicht durch den Katalog. "Merke"/"Achtung" sind Vorgabewerte
 // von note()/warn(), die der Kapiteltext gar nicht mitgibt.
 const UI = {
-  titel: "Drachenhauch – Kleine Wunder", untertitel: "Kleine Wunder",
-  zeile: "Die Sprache lernen mit Programmen, die staunen lassen", von: "von",
-  merke: "Merke", achtung: "Achtung", beispiel: "Beispiel",
-  ausgabe: "Ausgabe", datei: "Drachenhauch-Wunder.epub",
-};
+  de: {
+    titel: "Drachenhauch – Kleine Wunder", untertitel: "Kleine Wunder",
+    zeile: "Die Sprache lernen mit Programmen, die staunen lassen", von: "von",
+    merke: "Merke", achtung: "Achtung", beispiel: "Beispiel",
+    ausgabe: "Ausgabe", datei: "Drachenhauch-Wunder.epub", inhalt: "Inhalt",
+  },
+  en: {
+    titel: "Drachenhauch – Little Wonders", untertitel: "Little Wonders",
+    zeile: "Learn the language with programs that make you marvel", von: "by",
+    merke: "Remember", achtung: "Careful", beispiel: "Example",
+    ausgabe: "Output", datei: "Drachenhauch-Wonders.epub", inhalt: "Contents",
+  },
+}[LANG];
+if (!UI) { console.error(`Unbekannte Sprache: ${LANG} (de|en)`); process.exit(2); }
 
 const TITEL = UI.titel;
 
 // Katalog laden. Fehlt ein Eintrag, bleibt der deutsche Satz stehen -- das
 // Buch baut also auch halb uebersetzt, statt mitten im Kapitel abzubrechen.
-const KATALOG = null;
+const KATALOG = LANG === "de" ? null
+  : JSON.parse(fs.readFileSync(path.join(HERE, "i18n", `${LANG}.json`), "utf8"));
 // Feste Kennung: bei jedem Bau dieselbe, damit ein Lesegeraet eine neue
 // Fassung als DASSELBE Buch erkennt (Lesezeichen/Fortschritt bleiben).
 // Der Name darin ist Geschichte, kein Etikett: die Kennung darf sich beim
 // Umbenennen NICHT aendern, sonst gilt das Buch als ein anderes und jeder
 // Leser verliert Lesezeichen und Fortschritt.
-const UUID = "urn:uuid:3c9a7e21-5d40-4b8f-9e16-drachenhauch-wunder";
+// Die englische Fassung ist ein ANDERES Buch und bekommt eine eigene.
+const UUID = "urn:uuid:3c9a7e21-5d40-4b8f-9e16-drachenhauch-wunder" + (LANG === "de" ? "" : "-" + LANG);
 
 // ---------------------------------------------------------------- Werkzeug
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
@@ -62,8 +73,14 @@ const escAttr = (s) => esc(s).replace(/"/g, "&quot;");
 // ---------------------------------------------------------------- Bausteine
 const bilder = new Set();          // welche PNGs wirklich gebraucht werden
 
+// Ein Bild gibt es je Sprache: images/<sprache>/<name>, wenn es dort liegt
+// (etwa die IDE mit englischer Oberflaeche), sonst das gemeinsame aus images/.
+function bildDatei(name) {
+  const eigen = path.join(IMG, LANG, name);
+  return LANG !== "de" && fs.existsSync(eigen) ? eigen : path.join(IMG, name);
+}
 function figure(name, caption) {
-  const file = path.join(IMG, name);
+  const file = bildDatei(name);
   if (!fs.existsSync(file)) {
     return `<p class="fehlt">[Bild: ${esc(name)}]</p>`;
   }
@@ -73,9 +90,11 @@ function figure(name, caption) {
 }
 
 const p = (text) => `<p>${esc(text)}</p>`;
-// parts = ["text", ["code", true], ...] -- Array-Eintrag = Inline-Code
+// parts = ["text", ["code", true], ["betont", false], ...] -- Array-Eintrag =
+// Inline-Code, mit `false` an zweiter Stelle ein betontes Wort (kursiv).
 const pmix = (parts) => "<p>" + parts.map((x) =>
-  Array.isArray(x) ? `<code>${esc(x[0])}</code>` : esc(x)).join("") + "</p>";
+  Array.isArray(x) ? (x[1] === false ? `<em>${esc(x[0])}</em>` : `<code>${esc(x[0])}</code>`)
+    : esc(x)).join("") + "</p>";
 
 // Aufzaehlungen kommen als einzelne Aufrufe herein, nicht als Gruppe. Sie
 // werden hier als <li> erzeugt und spaeter von huelleListen() zu <ul>
@@ -404,7 +423,7 @@ function opf(datum) {
     <dc:title>${esc(TITEL)}</dc:title>
     <dc:creator>${esc(AUTOR)}</dc:creator>
     <dc:language>${LANG}</dc:language>
-    <dc:description>Programmieren lernen und alle Befehle von Drachenhauch verstehen.</dc:description>
+    <dc:description>${esc(UI.zeile)}</dc:description>
     <meta property="dcterms:modified">${datum}</meta>
   </metadata>
   <manifest>
@@ -435,7 +454,7 @@ for (const d of dateien) o.file("text/" + d.name, seite(d.titel, huelleListen(d.
 // relativ, und von einer Ebene hoeher zeigten alle 84 ins Leere.
 o.file("text/nav.xhtml", navXhtml());
 o.file("toc.ncx", ncx());
-for (const b of bilder) o.file("images/" + b, fs.readFileSync(path.join(IMG, b)));
+for (const b of bilder) o.file("images/" + b, fs.readFileSync(bildDatei(b)));
 o.file("content.opf", opf(new Date().toISOString().replace(/\.\d+Z$/, "Z")));
 
 // Ziel ueberschreibbar (erstes Argument). Der Test baut damit in ein
