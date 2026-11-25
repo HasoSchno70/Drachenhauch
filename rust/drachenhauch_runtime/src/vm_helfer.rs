@@ -72,6 +72,98 @@ pub(super) fn vektor_teil(name: &str, typ: &str, teile: &[f64]) -> Result<Value,
     }
 }
 
+// ---------------------------------------------------------------------------
+// Eine Panik in einem Befehl ist ein Laufzeitfehler, kein Programmende
+// ---------------------------------------------------------------------------
+
+thread_local! {
+    /// Wie viele VMs auf diesem Faden leben. Nur dann schweigt der
+    /// Panik-Haken und merkt sich die Panik: gefangen wird sie zum
+    /// Laufzeitfehler (`panik_fangen`), sonst meldet sie das `Drop` der VM
+    /// (`panik_nachtragen`). Ein Zaehler je Aufruf kostete messbar (bis +19 %
+    /// in builtins.dh), darum wird hier nur beim Anlegen gezaehlt.
+    static VM_LEBT: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    /// Die letzte Panik auf diesem Faden: (Text, `src\vm_dienste.rs:245`).
+    static LETZTE_PANIK: std::cell::RefCell<Option<(String, Option<String>)>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Den Haken einmal je Prozess einrichten (`Vm::new`).
+pub(crate) fn panik_haken_einrichten() {
+    static EINMAL: std::sync::Once = std::sync::Once::new();
+    EINMAL.call_once(|| {
+        let alt = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            if VM_LEBT.with(|t| t.get()) > 0 {
+                let text = nutzlast_text(info.payload());
+                let ort = info.location().map(|l| format!("{}:{}", l.file(), l.line()));
+                LETZTE_PANIK.with(|o| *o.borrow_mut() = Some((text, ort)));
+            } else {
+                alt(info);
+            }
+        }));
+    });
+}
+
+/// `Vm::new`: ab jetzt schweigt der Haken auf diesem Faden.
+pub(crate) fn vm_angelegt() {
+    panik_haken_einrichten();
+    VM_LEBT.with(|t| t.set(t.get() + 1));
+}
+
+/// `Drop for Vm`: lief eine Panik an allen Faengen vorbei aus der VM heraus,
+/// meldet sie sich hier -- so, wie es der Haken sonst getan haette.
+pub(crate) fn vm_abgeraeumt() {
+    VM_LEBT.with(|t| t.set(t.get().saturating_sub(1)));
+    if std::thread::panicking() {
+        if let Some((text, ort)) = LETZTE_PANIK.with(|o| o.borrow_mut().take()) {
+            eprintln!("thread '{}' panicked at {}:\n{}",
+                      std::thread::current().name().unwrap_or("?"), ort.unwrap_or_default(), text);
+        }
+    }
+}
+
+fn nutzlast_text(nutzlast: &(dyn std::any::Any + Send)) -> String {
+    nutzlast.downcast_ref::<String>().cloned()
+        .or_else(|| nutzlast.downcast_ref::<&str>().map(|s| s.to_string()))
+        .unwrap_or_else(|| "ohne Text".to_string())
+}
+
+/// Einen Befehl so rufen, dass eine Panik darin ein abfangbarer Fehler wird.
+/// Bis 2026.53 lief nur die reine Familie (`builtins.rs`) so; eine Panik in
+/// einer der 33 anderen (`GELD_CENT()`) beendete das Programm mit Exit 101,
+/// und TRY fing sie nicht. Ohne Panik kostet das nichts als den Rahmen.
+#[inline(always)]
+pub(crate) fn panik_fangen<T>(name: &str, argc: usize, f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
+        Ok(r) => r,
+        Err(nutzlast) => Err(panik_gefangen(name, argc, nutzlast)),
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn panik_gefangen(name: &str, argc: usize, nutzlast: Box<dyn std::any::Any + Send>) -> String {
+    let ort = LETZTE_PANIK.with(|o| o.borrow_mut().take()).and_then(|(_, ort)| ort);
+    panik_meldung(name, argc, nutzlast.as_ref(), ort.as_deref())
+}
+
+/// Der Wortlaut fuer eine gefangene Panik. Ein Index hinter dem letzten
+/// Argument ist fast immer ein fehlendes Argument -- das sagt die Meldung;
+/// alles andere ist ein Fehler in dhrt, und so heisst es auch.
+pub(crate) fn panik_meldung(name: &str, argc: usize, nutzlast: &(dyn std::any::Any + Send), ort: Option<&str>) -> String {
+    let text = nutzlast_text(nutzlast);
+    // "index out of bounds: the len is 0 but the index is 0"
+    let laenge = text.strip_prefix("index out of bounds: the len is ")
+        .and_then(|r| r.split(' ').next())
+        .and_then(|z| z.parse::<usize>().ok());
+    if laenge == Some(argc) {
+        return format!("{}: zu wenige Argumente", name.to_uppercase());
+    }
+    let wo = ort.map(|o| format!(", {}", o)).unwrap_or_default();
+    format!("{}: interner Fehler der Laufzeit ({}{}) -- bitte als Fehler in dhrt melden",
+            name.to_uppercase(), text, wo)
+}
+
 /// Sagt diese Meldung "den Befehl hat dieser Bau nicht" (statt "falsche
 /// Argumente")? Fuer `dhrt --fehlende`, das die kleinen Laufzeiten fragt.
 /// Muss jede Form von `unknown_builtin_msg` und der Feature-Huellen treffen.
@@ -1345,4 +1437,43 @@ pub(super) fn tupel_fuer_feldbefehl(name: &str, a: &[Value]) -> Option<Vec<Value
     let mut neu = a.to_vec();
     neu[0] = array_literal(t.as_ref().clone());
     Some(neu)
+}
+
+#[cfg(test)]
+mod panik_tests {
+    use super::*;
+
+    fn programm() -> crate::model::Program {
+        let toks = crate::lexer::Lexer::new("PRINT 1").tokenize().unwrap_or_else(|e| panic!("{}", e.msg));
+        let ast = crate::parser::Parser::new(toks).parse().unwrap_or_else(|e| panic!("{}", e.msg));
+        let leer = std::collections::HashSet::new();
+        crate::compiler::compile_to_program(&ast, &leer, &[], &leer, &[], "probe.dh")
+            .unwrap_or_else(|e| panic!("{}", e.1)).0
+    }
+
+    /// Eine Panik in irgendeiner Familie ist ein Laufzeitfehler mit dem
+    /// Befehlsnamen -- bis 2026.53 fing nur die reine Familie sie, und
+    /// `GELD_CENT()` beendete das Programm mit Exit 101, an TRY vorbei.
+    #[test]
+    fn panik_in_einem_befehl_ist_ein_fehler() {
+        let prog = programm();
+        let mut vm = Vm::new(&prog);
+        let merk = std::cell::Cell::new(0u8);
+        let e = vm.builtin_rufen("__panik_probe", &[Value::Int(1)], &merk).err().expect("ein Fehler");
+        assert!(e.starts_with("__PANIK_PROBE: interner Fehler der Laufzeit (index out of bounds"), "{}", e);
+        assert!(e.contains("vm.rs:"), "der Ort fehlt: {}", e);
+        // Danach geht es weiter wie sonst.
+        assert!(matches!(vm.builtin_rufen("abs", &[Value::Int(-2)], &merk), Ok(Value::Int(2))));
+    }
+
+    #[test]
+    fn ein_index_hinter_dem_letzten_argument_heisst_zu_wenige() {
+        let nutzlast: Box<dyn std::any::Any + Send> =
+            Box::new("index out of bounds: the len is 1 but the index is 1".to_string());
+        assert_eq!(panik_meldung("geld_cent", 1, nutzlast.as_ref(), None), "GELD_CENT: zu wenige Argumente");
+        // Ein anderer Index ist kein fehlendes Argument.
+        let nutzlast: Box<dyn std::any::Any + Send> =
+            Box::new("index out of bounds: the len is 4 but the index is 9".to_string());
+        assert!(panik_meldung("x", 1, nutzlast.as_ref(), Some("a.rs:3")).contains("interner Fehler der Laufzeit"));
+    }
 }

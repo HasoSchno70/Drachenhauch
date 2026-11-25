@@ -487,6 +487,8 @@ Im gewoehnlichen Lauf heisst das: das DIM von '{}' ist noch nicht gelaufen -- st
 {}: erwartet INTEGER, erhalten {}	{}: expected INTEGER, got {}
 {}: erwartet BOOLEAN, erhalten {}	{}: expected BOOLEAN, got {}
 {}: fehlendes Argument {}	{}: missing argument {}
+{}: zu wenige Argumente	{}: too few arguments
+{}: interner Fehler der Laufzeit ({}{}) -- bitte als Fehler in dhrt melden	{}: internal runtime error ({}{}) -- please report it as a bug in dhrt
 {}: erwartet {} (Arg {}), erhalten {}	{}: expected {} (argument {}), got {}
 {}: erwartet {}, erhalten {}	{}: expected {}, got {}
 Zahl	a number
