@@ -281,7 +281,12 @@ const H = { figure, p, pmix, bullet, bulletRich, tip, note, warn, code: codeBloc
             cmd, table, h1, h2, h3, chapter, part, smallLabel, sig, PageBreak };
 
 // Uebersetzendes H -- die 75 Kapiteldateien bleiben unangetastet.
-const HX = KATALOG ? require("./i18n").wrap(H, KATALOG) : H;
+// Was dhrt selbst sagt (Meldungen, Werkzeug-Ausgaben), in der Sprache des
+// Baus -- geholt von ausgaben.js, nicht von Hand uebersetzt.
+const AUSGABEN_DATEI = path.join(__dirname, "i18n", `ausgaben.${LANG}.json`);
+const AUSGABEN = KATALOG && fs.existsSync(AUSGABEN_DATEI)
+  ? JSON.parse(fs.readFileSync(AUSGABEN_DATEI, "utf8")) : {};
+const HX = KATALOG ? require("./i18n").wrap(H, KATALOG, AUSGABEN) : H;
 
 // ===================== Inhalt zusammenstellen =====================
 const children = [];

@@ -1099,8 +1099,8 @@ asked** (`dhrt-konsole --fehlende name …`: every name is called with
 deliberately nonsensical arguments; a command that exists fails on them, a
 missing one says that it is missing), not a list -- a list would be silently
 wrong with the next new command, and the program would only break at the
-customer's. The export says which one it took (`Schlank: dhrt-mini (16,4 MB
-statt 45,3 MB)`), and if none fits, why (`dhrt-konsole fehlt PDF_NEW`). The
+customer's. The export says which one it took (`Slim: dhrt-mini (16.4 MB
+instead of 45.3 MB)`), and if none fits, why (`dhrt-konsole lacks the built-ins PDF_NEW`). The
 machine code stays in all of them: without it programs would compute up to a hundred
 times slower. The small ones are built with `python rust/build_runtime.py
 --laufzeiten`; the installer and the packages for macOS and Linux ship them.

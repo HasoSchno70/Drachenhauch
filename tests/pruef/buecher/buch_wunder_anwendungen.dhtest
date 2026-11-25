@@ -331,6 +331,78 @@ vorlage 500 sparks fly, 12 of them red.
 gesammelt Es fliegen {0} Funken, {1} davon rot.
 fehlt 2
 
+=== ausgabe-bloecke: was dhrt sagt, in der zielsprache
+' Seit 2026-11-24 nimmt wrap() eine dritte Tafel: was dhrt in der
+' Zielsprache sagt (i18n/ausgaben.<sprache>.json, von ausgaben.js geholt).
+' Eine umbrochene Meldung steht dort unter ihrem ganzen Text und wird in der
+' Breite der deutschen Zeilen neu umbrochen, eine Werkzeug-Ausgabe Zeile fuer
+' Zeile. Was ein Programm ausgibt, bleibt; eine Dateiliste mit
+' { uebersetzen: true } schickt ihre Beschreibungen durch den Katalog; eine
+' Tabellenzelle mit roh: true (Anhang D) geht nicht durch den Katalog.
+' Eigener Dateiname: die Faelle einer Sammlung laufen nebeneinander, und
+' mit dem Namen des Falls davor loeschten sie sich gegenseitig die Datei.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0) + "/buecher/referenz/buch")
+WRITEALL("_i18n_probe_ausgaben.js", READALL(ARG$(1)))
+nlWarten(PROCESS_START("node", "_i18n_probe_ausgaben.js"), 60000)
+DELETEFILE("_i18n_probe_ausgaben.js")
+PRINT nlAus;
+IF nlCode <> 0 THEN PRINT nlErr
+--- argumente
+{sammlung}/../../..
+{fall}/probe.js
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
+--- datei probe.js
+const { wrap } = require("../../_i18n/i18n");
+const roh = { code: (z) => z, table: (r) => r };
+const H = wrap(roh, { "der Taktgeber": "the clock", "Division durch 0": "FALSCH" }, {
+  "Laufzeitfehler in x.dh:3: Zuweisung an 'g': FLOAT passt nicht verlustfrei in INTEGER":
+    "Runtime error in x.dh:3: assignment to 'g': FLOAT does not fit into INTEGER without loss",
+  "mitzahlen: uebersetzt": "mitzahlen: compiled",
+});
+const zeig = (z) => z.map((x) => "[" + x + "]").join(" ");
+console.log("meldung " + zeig(H.code(["Laufzeitfehler in x.dh:3: Zuweisung an 'g': FLOAT",
+                                       "passt nicht verlustfrei in INTEGER"], { out: true })));
+console.log("werkzeug " + zeig(H.code(["mitzahlen: uebersetzt", "bild: VM: unbekannt"], { out: true })));
+console.log("programm " + zeig(H.code(["Ergebnis: 4"], { out: true })));
+console.log("liste " + zeig(H.code(["kap26/", "  demo.dh        der Taktgeber"], { out: true, uebersetzen: true })));
+console.log("ohne liste " + zeig(H.code(["  demo.dh        der Taktgeber"], { out: true })));
+console.log("zelle " + H.table([[{ text: "Division durch 0", roh: true }]])[0][0].text);
+--- erwartet
+meldung [Runtime error in x.dh:3: assignment to 'g': FLOAT] [does not fit into INTEGER without loss]
+werkzeug [mitzahlen: compiled] [bild: VM: unbekannt]
+programm [Ergebnis: 4]
+liste [kap26/] [  demo.dh        the clock]
+ohne liste [  demo.dh        der Taktgeber]
+zelle Division durch 0
+
+=== die englischen meldungen im buch sind die von dhrt
+' ausgaben.js laesst jedes Programm, dessen Meldung oder Werkzeug-Ausgabe
+' Kleine Wunder abdruckt, mit DHRT_LANG=de und =en laufen. --pruefen meldet,
+' wo i18n/ausgaben.en.json nicht mehr zu dhrt passt: eine Meldung, deren
+' Wortlaut sich geaendert hat, oder eine neue, die noch fehlt. Ohne
+' Bildschirm fallen die Fensterprogramme weg; mindestens die auf der
+' Konsole laufen.
+IMPORT "helfer.dh"
+IF NOT nodeDa() THEN
+    PRINT "UEBERSPRINGEN: node fehlt"
+    EXIT(0)
+END IF
+CHDIR(ARG$(0) + "/buecher/wunder/buch")
+nlWarten(PROCESS_START("node", "ausgaben.js", "en", "--pruefen", "--dhrt", EXEPATH$()), 600000)
+' Im Fehlerfall stehen die Befunde in DIESER Zeile -- die CI zeigt nur die
+' erste abweichende Zeile eines Falls.
+PRINT "rueckgabe "; nlCode; " "; (zahlVor(nlAus, "Programme") >= 5);
+IF nlCode <> 0 THEN PRINT " "; REPLACE$(REPLACE$(nlAus + nlErr, CHR$(13), ""), CHR$(10), " | ");
+PRINT
+--- argumente
+{sammlung}/../../..
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/nodelauf.dh"
+--- erwartet
+rueckgabe 0 TRUE
+
 === kein doppeltes leerzeichen im fliesstext
 ' Ein Rueckstrich vor einem Leerzeichen ist in JavaScript kein Zeichen: "wie
 ' \ nach unten" stand in Anhang A von Kleine Wunder als "wie  nach unten" im

@@ -10,7 +10,7 @@
 // englischer Satz Kapiteldateien waere binnen eines Monats vom deutschen
 // abgedriftet, genau wie es ein dritter Renderer getan haette.
 //
-//   wrap(H, katalog)   -> H', das uebersetzt
+//   wrap(H, katalog, ausgaben) -> H', das uebersetzt
 //   sammle(H)          -> [H', strings] zum Einsammeln aller Texte
 //
 // Fehlt ein Eintrag, bleibt der deutsche Text stehen. Das Buch baut also
@@ -100,6 +100,9 @@ function uebersetzeTabelle(zeilen, tr) {
   return zeilen.map((zeile) => Array.isArray(zeile)
     ? zeile.map((zelle) => {
         if (istText(zelle)) return tr(zelle);
+        // `roh`: steht schon in der Zielsprache (Anhang D holt die
+        // Meldungen von dhrt selbst) -- nicht noch einmal durch den Katalog.
+        if (zelle && typeof zelle === "object" && zelle.roh) return zelle;
         if (zelle && typeof zelle === "object" && istText(zelle.text)) {
           return { ...zelle, text: tr(zelle.text) };
         }
@@ -148,7 +151,42 @@ function tr2(roh, tr) {
   return rest ? vorn + tr(rest) : roh;
 }
 
-function baue(H, tr) {
+// Ausgabe-Bloecke (`{ out: true }`). Was ein Programm ausgibt, folgt dem
+// Code und bleibt. Was DHRT sagt -- Meldungen, Werkzeug-Ausgaben --, steht
+// in `ausgaben` (i18n/ausgaben.<sprache>.json, von ausgaben.js bei dhrt
+// selbst geholt): eine umbrochene Meldung unter ihrem ganzen Text, sonst
+// Zeile fuer Zeile. Die Meldung wird in der Breite der deutschen Zeilen neu
+// umbrochen. `{ out: true, uebersetzen: true }` ist ein Block, den das Buch
+// selbst schreibt (eine Dateiliste): hinter dem Namen und mindestens zwei
+// Leerzeichen steht ein Text, der durch den Katalog geht.
+function umbrechen(text, breite) {
+  const zeilen = [];
+  let z = "";
+  for (const w of text.split(" ")) {
+    if (z && (z + " " + w).length > breite) { zeilen.push(z); z = w; }
+    else z = z ? z + " " + w : w;
+  }
+  if (z) zeilen.push(z);
+  return zeilen;
+}
+function uebersetzeAusgabe(zeilen, opts, ausgaben, tr) {
+  const arr = (Array.isArray(zeilen) ? zeilen : [zeilen]).map(String);
+  const ganz = arr.map((z) => z.trim()).filter((z) => z !== "").join(" ");
+  if (arr.length > 1 && ausgaben[ganz] !== undefined) {
+    const breite = Math.max(...arr.map((z) => z.trimEnd().length));
+    return umbrechen(ausgaben[ganz], breite);
+  }
+  return arr.map((z) => {
+    const vorn = z.match(/^\s*/)[0];
+    const t = z.trim();
+    if (ausgaben[t] !== undefined) return vorn + ausgaben[t];
+    const m = opts.uebersetzen && z.match(/^(\s*\S+\s{2,})(.*\S)\s*$/);
+    if (m && istProsa(m[2])) return m[1] + tr(m[2]);
+    return z;
+  });
+}
+
+function baue(H, tr, ausgaben = {}) {
   const neu = {};
   for (const [name, fn] of Object.entries(H)) {
     if (typeof fn !== "function") { neu[name] = fn; continue; }
@@ -173,7 +211,9 @@ function baue(H, tr) {
         // nicht" sah sonst wie ein Kommentar aus und ging in den Katalog.
         // `{ out: [...] }` (Code MIT Ausgabe darunter, im Lehrbuch) bleibt
         // Code; nur `{ out: true }` ist ein reiner Ausgabe-Block.
-        if (args[1] && args[1].out === true) return fn(...args);
+        if (args[1] && args[1].out === true) {
+          return fn(uebersetzeAusgabe(args[0], args[1], ausgaben, tr), ...args.slice(1));
+        }
         return fn(uebersetzeCode(args[0], tr), ...args.slice(1));
       }
       if (name === "cmd") {
@@ -193,8 +233,9 @@ function baue(H, tr) {
   return neu;
 }
 
-/** H, das uebersetzt. `katalog` = { "deutscher text": "english text" }. */
-function wrap(H, katalog) {
+/** H, das uebersetzt. `katalog` = { "deutscher text": "english text" };
+ *  `ausgaben` = was dhrt in der Zielsprache sagt (siehe uebersetzeAusgabe). */
+function wrap(H, katalog, ausgaben = {}) {
   const fehlend = new Set();
   const tr = (s) => {
     // Ein Satz mit eingesetzten Zahlen (vorlage.js): uebersetzt wird die
@@ -205,7 +246,7 @@ function wrap(H, katalog) {
     if (t === undefined || t === "") { fehlend.add(schluessel); return s; }
     return v ? fuellen(t, v.werte) : t;
   };
-  const H2 = baue(H, tr);
+  const H2 = baue(H, tr, ausgaben);
   H2.__fehlend = fehlend;
   return H2;
 }

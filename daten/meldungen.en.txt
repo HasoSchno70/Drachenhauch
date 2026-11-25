@@ -2035,3 +2035,136 @@ GUI_MENU_ENABLED: erwartet einen Menue-Eintrag	GUI_MENU_ENABLED: expects a menu 
 GUI_MENU_ENABLED: ungueltiges Eintrags-Handle	GUI_MENU_ENABLED: invalid item handle
 DIR_USER_DATA$: erwartet den Namen des Programms (ohne / und \)	DIR_USER_DATA$: expects the name of the program (without / and \)
 DIR_USER_DATA$: kein Benutzerordner (APPDATA bzw. HOME ist nicht gesetzt)	DIR_USER_DATA$: no user folder (APPDATA or HOME is not set)
+
+# ---------------------------------------------------------------- dhrt --export (2026-11-24)
+Schlank: {} ({} MB statt {} MB)	Slim: {} ({} MB instead of {} MB)
+Schlank: keine kleinen Laufzeiten gefunden (erwartet in {}) -- die volle wird genommen	Slim: no small runtimes found (expected in {}) -- the full one is used
+Schlank: keine kleine Laufzeit passt ({}) -- die volle wird genommen	Slim: no small runtime fits ({}) -- the full one is used
+{} ist Fassung {} statt {}	{} is version {} instead of {}
+{} nennt keine Fassung	{} names no version
+{} fehlen die Befehle {}	{} lacks the built-ins {}
+{} liess sich nicht fragen	{} could not be queried
+Warnung: '{}' nicht geraeumt: {}	Warning: '{}' not cleared: {}
+Warnung: '{}' enthaelt eine fremde Datei gleichen Namens und wurde nicht geraeumt.	Warning: '{}' contains an unrelated file of the same name and was not cleared.
+Hinweis: '{}' wird nicht geraeumt (selbst angegeben), Dateien aus frueheren Laeufen bleiben liegen.	Note: '{}' is not cleared (given explicitly), files from earlier runs stay there.
+Kann Ausgabeverzeichnis '{}' nicht anlegen: {}	Cannot create output folder '{}': {}
+Kann '{}' nicht schreiben: {}	Cannot write '{}': {}
+Kann .dhc nicht serialisieren: {}	Cannot serialise .dhc: {}
+Kann Runtime '{}' nicht lesen: {}	Cannot read runtime '{}': {}
+Warnung: assets/ nicht vollstaendig kopiert: {}	Warning: assets/ not completely copied: {}
+Bibliothek "{}" mitkopiert: {}	Library "{}" copied along: {}
+Hinweis: Bibliothek "{}" liegt nicht neben dem Programm -- der Zielrechner muss sie haben (eine Systembibliothek wie kernel32 hat er)	Note: library "{}" is not next to the program -- the target computer must have it (a system library such as kernel32 it has)
+Warnung: Bibliothek "{}" nicht kopiert: {}	Warning: library "{}" not copied: {}
+{} referenzierte Datei(en) mitkopiert:	{} referenced file(s) copied along:
+{} Datenbank(en) NICHT mitkopiert -- das Programm legt sie selbst an:	{} database(s) NOT copied -- the program creates them itself:
+(mit --mit-daten trotzdem mitnehmen)	(take them along anyway with --mit-daten)
+Exportiert: {}	Exported: {}
+
+# ---------------------------------------------------------------- dhrt --jit: warum eine Funktion in der VM bleibt (2026-11-24)
+FEHLER beim Erzeugen: {}	ERROR while generating: {}
+PROPERTY {} in einer Unterklasse von {}	PROPERTY {} in a subclass of {}
+Feld {} liegt in den Klassen der Familie {} verschieden	field {} lies differently in the classes of the family {}
+Feld {} vom Typ '{}'	field {} of type '{}'
+Methode {} (keine Klasse hat sie)	method {} (no class has it)
+Funktion {} ist eine Coroutine	function {} is a coroutine
+Funktion {} hat BYREF-Parameter	function {} has BYREF parameters
+{}: {} vergibt einen Rueckruf an eine Bibliothek	{}: {} hands a callback to a library
+{}: {} beruehrt die Globale '{}' des Bereichs	{}: {} touches the region's global '{}'
+{}: {} ruft {}	{}: {} calls {}
+Platz {} hat den Typ '{}'	slot {} has the type '{}'
+Coroutine	coroutine
+variadisch	variadic
+Vorgabe als Ausdruck	default given as an expression
+mehr als 16 Parameter	more than 16 parameters
+Vorgabe von Platz {}	default of slot {}
+Sprung ins Leere	jump into nowhere
+Ausgang {} mit Werten auf dem Stapel	exit {} with values on the stack
+zwei Wege treffen sich an Stelle {} mit verschiedenen Arten	two paths meet at position {} with different kinds
+Konstante {} ist keine Zahl	constant {} is not a number
+Feldname	field name
+NIL in ein Feld	NIL into a field
+Feld bekommt NIL	field gets NIL
+Index, der kein Wert ist	index that is not a value
+Index auf etwas, das kein Wert ist	index on something that is not a value
+Mitglied von etwas, das kein Objekt ist	member of something that is not an object
+{} in ein Feld {}	{} into a field {}
+globales Feld mit mehr als drei Dimensionen	global array with more than three dimensions
+Feld-Index, der kein INTEGER ist	array index that is not an INTEGER
+Index auf etwas, das kein Feld von Zahlen ist	index on something that is not an array of numbers
+Feld mit anderer Zahl von Indizes	array with a different number of indices
+Methode ohne Namen	method without a name
+Methode {} auf etwas, das kein Objekt ist	method {} on something that is not an object
+Methode {} ist eine Coroutine	method {} is a coroutine
+Methode {} mit {} statt {} Argumenten	method {} with {} instead of {} arguments
+Argument {} an {} passt nicht	argument {} to {} does not fit
+Methode {} liefert in der Familie {} Verschiedenes	method {} returns different things in the family {}
+Methode {}: Parameter verschieden in der Familie {}	method {}: parameters differ in the family {}
+Argument NIL	argument NIL
+Methode auf etwas, das kein Wert ist	method on something that is not a value
+Signatur fehlt	signature missing
+{}: andere Zahl von Argumenten	{}: different number of arguments
+{}: Argument {} fuer {}	{}: argument {} for {}
+Tupel auspacken	unpacking a tuple
+Auspacken von etwas, das kein Wert ist	unpacking something that is not a value
+leeres Tupel	empty tuple
+Tupel mit NIL	tuple with NIL
+PRINT eines Feldes	PRINT of an array
+Befehl ohne Namen	built-in without a name
+eingebauter Befehl {} (ruft Drachenhauch-Code oder braucht die Zeile)	built-in {} (calls Drachenhauch code or needs the line)
+Feld bekommt einen Nicht-Zahl-Wert	array gets a non-number value
+Schreiben in ein Feld von Werten	writing into an array of values
+Zuweisung an eine Konstante	assignment to a constant
++ mit einem Nicht-Zahl-Wert	+ with a non-number value
+{} in eine globale {}	{} into a global {}
+NIL gespeichert	NIL stored
+Signatur einer Bibliothek gespeichert	signature of a library stored
+Feld in einem Local einer Funktion	array in a local of a function
+Feld in Platz vom Typ '{}'	array in a slot of type '{}'
+Objekt {} in Platz vom Typ '{}'	object {} in a slot of type '{}'
+{} in Platz {}	{} in slot {}
+Feld oder MAP	array or MAP
+DECLARE-Vorgabe	DECLARE default
+DECLARE-Vorgabe passt nicht	DECLARE default does not fit
+legt eine globale Variable an	creates a global variable
+Rechnen mit NIL	arithmetic with NIL
+Vergleich mit NIL	comparison with NIL
+Rechnen mit einem Nicht-Zahl-Wert	arithmetic with a non-number value
+/ mit einem Nicht-Zahl-Wert	/ with a non-number value
+^ mit einem Nicht-Zahl-Wert	^ with a non-number value
+^ mit zwei INTEGER (Typ haengt am Exponenten)	^ with two INTEGERs (the type depends on the exponent)
+\ ohne zwei INTEGER	\ without two INTEGERs
+Bit-Operator mit NIL	bit operator with NIL
+Bit-Operator ohne zwei INTEGER	bit operator without two INTEGERs
+BNOT ohne INTEGER	BNOT without an INTEGER
+Vorzeichen eines Nicht-Zahl-Werts	sign of a non-number value
+Vergleich mit einem Nicht-Zahl-Wert	comparison with a non-number value
+= zwischen verschiedenen Arten	= between different kinds
+NOT auf NIL oder ein Feld	NOT on NIL or an array
+Sprung auf NIL oder ein Feld	jump on NIL or an array
+Aufruf von {} mit {} statt {} Argumenten	call of {} with {} instead of {} arguments
+Aufruf ohne Index	call without an index
+RETURN in der Schleife	RETURN inside the loop
+RETURN passt nicht zum Rueckgabetyp	RETURN does not fit the return type
+FOR ueber eine Konstante	FOR over a constant
+FOR nicht ueber INTEGER	FOR not over an INTEGER
+Vorgabe	default
+unerwarteter Befehl	unexpected instruction
+mehr als 64 Werte auf dem Stapel	more than 64 values on the stack
+Sprung mitten in die Schleife	jump into the middle of the loop
+ruft eine Funktion, die in der VM bleibt	calls a function that stays in the VM
+{}; mit Werten: {}	{}; with values: {}
+mit Werten: Mitglieder in der inneren Schleife {}..{}	with values: members in the inner loop {}..{}
+schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt	writes into an array (or calculates with values) and calls a function that writes global variables
+
+# ---------------------------------------------------------------- Nachtrag aus Kleine Wunder (2026-11-24)
+MODEL_LIT: zuerst LIGHT_ENABLE() / ein Licht hinzufuegen	MODEL_LIT: first LIGHT_ENABLE() / add a light
+
+# ---------------------------------------------------------------- DHRT_JIT_BILANZ (2026-11-24)
+jit: Schleife an {} bleibt in der VM: {}	jit: loop at {} stays in the VM: {}
+jit: Schleife an Stelle {} in {} bleibt in der VM: {} Ausstiege mitten drin bei {} eigenen Runden	jit: loop at position {} in {} stays in the VM: {} exits midway in {} rounds of its own
+Stelle {} in {}	position {} in {}
+(Hauptprogramm)	(main program)
+jit: {} Funktionen, {} Schleifen, {} Schleifenlaeufe	jit: {} functions, {} loops, {} loop runs
+jit: {} mal mitten in einer Schleife ausgestiegen	jit: left a loop midway {} times
+jit: {} mal neu gebaut, weil eine globale Variable dazukam	jit: rebuilt {} times because a global variable was added
+jit: {} Runden in der VM -- {}	jit: {} rounds in the VM -- {}

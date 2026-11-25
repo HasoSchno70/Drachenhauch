@@ -1061,7 +1061,7 @@ unsinnigen Argumenten gerufen; ein vorhandener Befehl scheitert an ihnen, ein
 fehlender sagt, dass er fehlt), nicht eine Liste -- eine Liste wäre beim
 nächsten neuen Befehl still falsch, und das Programm bräche erst beim Kunden ab.
 Der Export sagt, welche er genommen hat (`Schlank: dhrt-mini (16,4 MB statt
-45,3 MB)`), und wenn keine passt, warum (`dhrt-konsole fehlt PDF_NEW`). Der
+45,3 MB)`), und wenn keine passt, warum (`dhrt-konsole fehlen die Befehle PDF_NEW`). Der
 Maschinencode bleibt in allen: ohne ihn rechneten Programme bis zu hundertmal
 langsamer. Gebaut werden die kleinen mit `python rust/build_runtime.py
 --laufzeiten`; der Installer und die Pakete für macOS und Linux bringen sie mit.

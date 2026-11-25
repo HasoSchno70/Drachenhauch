@@ -136,7 +136,7 @@ IMPORT "lauf.dh"
 pruefen()
 DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "beleg.dh", "ziel", "--schlank"])
 DIM z AS STRING : z = zeile$(aus, "Schlank:")
-PRINT INSTR(z, "keine kleine Laufzeit passt") >= 0; " "; INSTR(z, "dhrt-konsole fehlt PDF_NEW") >= 0; " "; INSTR(z, "dhrt-spiel fehlt") >= 0
+PRINT INSTR(z, "keine kleine Laufzeit passt") >= 0; " "; INSTR(z, "dhrt-konsole fehlen die Befehle PDF_NEW") >= 0; " "; INSTR(z, "dhrt-spiel fehlen die Befehle") >= 0
 DIM exe AS STRING : exe = PATHJOIN(CWD$(), "ziel/beleg" + endung)
 PRINT "voll "; FILESIZE(exe) > FILESIZE(EXEPATH$())
 PRINT TRIM$(lauf$(exe, [""]))

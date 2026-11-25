@@ -12,7 +12,12 @@ text strings; code is never translated.
 - Kommazahl -> decimal number, ganze Zahl -> whole number; 400 000 -> 400,000.
 - Strahlensatz -> intercept theorem; Handgriffe -> moves; Leisten -> bars.
 - Further-reading labels follow the headings of docs/en ("Manual, Language → Arrays: ").
-- dhrt messages and output blocks stay German (they are not in the catalogue).
+- Output blocks: what a PROGRAM prints stays as it is (the code is German).
+  What DHRT says -- messages, the output of `dhrt --jit`/`--export` -- is not
+  translated by hand: `node ausgaben.js en` runs every such program with
+  DHRT_LANG=de and =en and writes i18n/ausgaben.en.json; the build puts
+  dhrt's own English in (2026-11-24). A message dhrt does not translate yet
+  is a finding for daten/meldungen.en.txt, not for this catalogue.
 - A single lowercase word is taken for a code identifier and NOT translated
   (i18n.js, NICHT_PROSA) -- write table cells as a phrase ("das Programm
   starten", not "starten").
@@ -49,8 +54,10 @@ punctuation/space exactly.
   they are, since the code is German.
 - Numbers, units, formulas, inline code. But: German decimal comma becomes a
   decimal point in prose (0,017 -> 0.017; 2,5 -> 2.5).
-- Error messages quoted from dhrt stay German (they are printed as dhrt
-  prints them on a German system).
+- A dhrt message quoted in prose is written as dhrt says it in English
+  (DHRT_LANG=en, see i18n/ausgaben.en.json or daten/meldungen.en.txt). A
+  message from an OLDER version that no longer exists stays German, with an
+  English gloss in brackets: “bei nicht-Objekt” (“on non-object”).
 - Names of other books stay as titles in curly quotes: „Der Einstieg“ ->
   “Der Einstieg” (German beginners' book; you may add "(German)" once where
   it first appears). The Handbook = "Das Lehrbuch" -> "the Handbook".

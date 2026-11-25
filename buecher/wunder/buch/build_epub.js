@@ -200,7 +200,12 @@ const H = { figure, p, pmix, bullet, bulletRich, tip, note, warn, code: codeBloc
 
 // Uebersetzendes H -- schiebt jede Zeichenkette durch den Katalog, bevor
 // sie beim Renderer ankommt. Die 75 Kapiteldateien merken davon nichts.
-const HX = KATALOG ? require("./i18n").wrap(H, KATALOG) : H;
+// Was dhrt selbst sagt (Meldungen, Werkzeug-Ausgaben), in der Sprache des
+// Baus -- geholt von ausgaben.js, nicht von Hand uebersetzt.
+const AUSGABEN_DATEI = path.join(HERE, "i18n", `ausgaben.${LANG}.json`);
+const AUSGABEN = KATALOG && fs.existsSync(AUSGABEN_DATEI)
+  ? JSON.parse(fs.readFileSync(AUSGABEN_DATEI, "utf8")) : {};
+const HX = KATALOG ? require("./i18n").wrap(H, KATALOG, AUSGABEN) : H;
 
 // ---------------------------------------------------------------- Inhalt laden
 const contentDir = path.join(HERE, "content");

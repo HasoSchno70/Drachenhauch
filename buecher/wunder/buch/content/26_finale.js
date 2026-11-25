@@ -28,7 +28,7 @@ module.exports = (H) => [
           "  flug.dh        Szene 2: Flug ueber die Berge",
           "  abspann.dh     Szene 3: der Abspann",
           "  assets/",
-          "    glanz.fs     das Leuchten aus Kapitel 15"], { out: true }),
+          "    glanz.fs     das Leuchten aus Kapitel 15"], { out: true, uebersetzen: true }),
 
   H.pmix(["Mit ", ["IMPORT \"titel.dh\"", true], " haben wir schon in Kapitel 21 eine Datei eingebunden: Ihr Text wird an dieser Stelle eingefügt, als stünde er da. Für eine Demo aus fünf Teilen ist das zu wenig — jede Szene hat ihre eigenen Variablen, und schnell hießen zwei davon gleich. Darum bindet die Demo jede Datei mit ", ["AS", true], " ein: ", ["IMPORT \"titel.dh\" AS titel", true], ". Dann ist die Datei ein ", ["Namensraum", false], ". Was in ihr steht, heißt von außen ", ["titel.zeichnen", true], " oder ", ["titel.FUNKEN", true], ", innen aber weiter schlicht zeichnen. Zwei Szenen dürfen so beide ein zeichnen haben, ein BREITE, ein sx."]),
 
