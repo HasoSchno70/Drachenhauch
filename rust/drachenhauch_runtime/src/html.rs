@@ -203,12 +203,25 @@ pub struct HttpDownloadResult {
 /// unbegrenzt Speicher belegen, bevor ueberhaupt geschrieben wird). Bricht
 /// der Transfer mitten im Body ab, wird die unvollstaendige Datei geloescht
 /// statt einen abgeschnittenen Rest liegen zu lassen.
-pub fn http_download(url: &str, path: &str) -> Result<HttpDownloadResult, HttpErr> {
-    let resp = ureq::get(url)
-        .set("User-Agent", USER_AGENT)
-        .timeout(Duration::from_secs(TIMEOUT_SECS))
-        .call()
-        .map_err(|e| map_err(e, url))?;
+///
+/// Die Anfrage baut die VM wie fuer HTTP_GET (`Anfrage`): mit den Kopfzeilen
+/// aus HTTP_SET_HEADER und der Zeitgrenze aus HTTP_TIMEOUT. Bis 2026.53 baute
+/// HTTP_DOWNLOAD seine eigene und liess beides weg -- eine Datei hinter
+/// `Authorization: Bearer ...` liess sich so nicht laden.
+pub fn http_download(anfrage: &Anfrage, path: &str) -> Result<HttpDownloadResult, HttpErr> {
+    for (k, v) in &anfrage.header {
+        if let Err(msg) = pruefe_header(k, v) {
+            return Err(HttpErr { msg, status: 0, headers: vec![] });
+        }
+    }
+    let url = anfrage.url.as_str();
+    let mut r = ureq::get(url)
+        .timeout(Duration::from_secs(anfrage.timeout))
+        .set("User-Agent", USER_AGENT);
+    for (k, v) in &anfrage.header {
+        r = r.set(k, v);
+    }
+    let resp = r.call().map_err(|e| map_err(e, url))?;
     let status = resp.status() as i64;
     let headers = collect_headers(&resp);
     let file = std::fs::File::create(path).map_err(|e| HttpErr {

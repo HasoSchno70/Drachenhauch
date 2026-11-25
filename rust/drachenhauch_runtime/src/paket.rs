@@ -171,7 +171,7 @@ fn oberordner_weg(dir: &Path) -> Result<(), String> {
 fn laden(url: &str, datei: &Path) -> Result<(), String> {
     #[cfg(feature = "http")]
     {
-        crate::html::http_download(url, &datei.to_string_lossy())
+        crate::html::http_download(&crate::html::Anfrage::neu("GET", url), &datei.to_string_lossy())
             .map(|_| ()).map_err(|e| format!("{}: {}", url, e.msg))
     }
     #[cfg(not(feature = "http"))]

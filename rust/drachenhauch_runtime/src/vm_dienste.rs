@@ -1205,9 +1205,14 @@ impl<'p> Vm<'p> {
             }
             "http_clear_headers" => { self.http_default_header.clear(); Value::Nil }
             "http_download" => {
-                let url = bi_str(a, 0, "HTTP_DOWNLOAD")?.to_string();
+                let mut anfrage = html::Anfrage::neu("GET", bi_str(a, 0, "HTTP_DOWNLOAD")?);
+                anfrage.timeout = self.http_timeout;
+                anfrage.header = self.http_default_header.clone();
                 let path = bi_str(a, 1, "HTTP_DOWNLOAD")?.to_string();
-                match html::http_download(&url, &path) {
+                // Der Rumpf liegt in der Datei, nicht im Speicher: HTTP_BYTES
+                // ist danach leer statt der Rumpf der VORIGEN Anfrage.
+                self.http_body.clear();
+                match html::http_download(&anfrage, &path) {
                     Ok(r) => { self.http_status = r.status; self.http_headers = r.headers; Value::Int(r.bytes) }
                     // Ohne Antwort Status 0 (siehe http_antwort).
                     Err(e) => { self.http_status = e.status; self.http_headers = e.headers; return Err(e.msg); }
