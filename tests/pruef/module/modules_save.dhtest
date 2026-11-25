@@ -320,3 +320,18 @@ SAVE_SET_BOOL(s, "k", 1)
 --- fehler
 SAVE_SET_BOOL: erwartet BOOLEAN, erhalten INTEGER
 
+
+=== exists und load or new finden den mitgelieferten stand wie load
+' Im exportierten Spiel liegt `../daten/stand.json` neben der Exe als
+' `daten/stand.json`; SAVE_LOAD findet ihn (resolve_asset_path). Bis 2026.53
+' sagte SAVE_EXISTS dazu FALSE, und SAVE_LOAD_OR_NEW legte still einen neuen
+' Stand an -- der mitgelieferte war verloren.
+IMPORT "save"
+PRINT SAVE_EXISTS("../daten/stand.json")
+DIM s AS SAVE_HANDLE = SAVE_LOAD_OR_NEW("../daten/stand.json")
+PRINT SAVE_GET_INT(s, "punkte")
+--- datei daten/stand.json
+{"_version": 3, "data": {"punkte": 7}}
+--- erwartet
+TRUE
+7

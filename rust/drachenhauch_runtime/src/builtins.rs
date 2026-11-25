@@ -4804,11 +4804,16 @@ fn call_inner(name: &str, a: &[Value]) -> R {
 
         // ===== Modul: save =====
         "save_new" => { arity!(0); Ok(Value::Save(Rc::new(RefCell::new(SaveHandle { version: 1, data: Vec::new() })))) }
-        "save_exists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(need_str(&a[0], "SAVE_EXISTS")?).is_file())) }
+        // SAVE_EXISTS und SAVE_LOAD_OR_NEW suchen wie SAVE_LOAD (resolve_asset_path):
+        // ein mitgelieferter Stand `../daten/stand.json` im exportierten Spiel.
+        // Bis 2026.53 prueften beide den Pfad wortlich -- SAVE_EXISTS sagte
+        // FALSE, SAVE_LOAD lud trotzdem, und SAVE_LOAD_OR_NEW legte still einen
+        // neuen Stand an.
+        "save_exists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(&resolve_asset_path(need_str(&a[0], "SAVE_EXISTS")?)).is_file())) }
         "save_load" => { arity!(1); save_load(need_str(&a[0], "SAVE_LOAD")?) }
         "save_load_or_new" => {
             arity!(1); let p = need_str(&a[0], "SAVE_LOAD_OR_NEW")?;
-            if !std::path::Path::new(p).exists() { Ok(Value::Save(Rc::new(RefCell::new(SaveHandle { version: 1, data: Vec::new() })))) }
+            if !std::path::Path::new(&resolve_asset_path(p)).exists() { Ok(Value::Save(Rc::new(RefCell::new(SaveHandle { version: 1, data: Vec::new() })))) }
             else { save_load(p) }
         }
         "save_write" => {
