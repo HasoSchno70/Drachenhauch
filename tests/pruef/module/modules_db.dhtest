@@ -7,7 +7,7 @@ c = DB_OPEN(":memory:")
 DB_CLOSE(c)
 DB_EXEC(c, "SELECT 1")
 --- fehler
-DB: ungueltiges/geschlossenes DB_CONN-Handle 0
+DB_EXEC: ungueltiges/geschlossenes DB_CONN-Handle 0
 
 === exec insert returns rowcount
 IMPORT "db"

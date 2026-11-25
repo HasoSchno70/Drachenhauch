@@ -84,7 +84,7 @@ m = SMTP_NEW()
 SMTP_CLOSE(m)
 SMTP_SUBJECT(m, "x")
 --- fehler
-SMTP: ungueltiges/geschlossenes SMTP-Handle 0
+SMTP_SUBJECT: ungueltiges/geschlossenes SMTP-Handle 0
 
 === eine einfache nachricht
 IMPORT "smtp"

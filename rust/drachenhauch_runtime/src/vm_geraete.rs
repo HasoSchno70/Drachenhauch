@@ -210,12 +210,12 @@ impl<'p> Vm<'p> {
     }
 
     #[cfg(feature = "midi")]
-    pub(super) fn midi_in(&mut self, idx: i64) -> R<&mut crate::midi::Eingang> {
-        Self::handle_get_mut(&mut self.midi_ins, idx, "MIDI", "ungueltiges/geschlossenes MIDI_IN")
+    pub(super) fn midi_in(&mut self, idx: i64, fn_: &str) -> R<&mut crate::midi::Eingang> {
+        Self::handle_get_mut(&mut self.midi_ins, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes MIDI_IN")
     }
     #[cfg(feature = "midi")]
-    pub(super) fn midi_out(&mut self, idx: i64) -> R<&mut crate::midi::Ausgang> {
-        Self::handle_get_mut(&mut self.midi_outs, idx, "MIDI", "ungueltiges/geschlossenes MIDI_OUT")
+    pub(super) fn midi_out(&mut self, idx: i64, fn_: &str) -> R<&mut crate::midi::Ausgang> {
+        Self::handle_get_mut(&mut self.midi_outs, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes MIDI_OUT")
     }
 
     /// MIDI-Dateien (in jedem Bau -- nur das Abspielen braucht ein Geraet).
@@ -365,19 +365,19 @@ impl<'p> Vm<'p> {
         use crate::midi;
         let v = match name {
             // --- Die Uhr ---
-            "midi_clock_bpm" => { let i = bi_int(a, 0, "MIDI_CLOCK_BPM")?; Value::Float(midi::takt_bpm(self.midi_in(i)?)) }
-            "midi_clock_running" => { let i = bi_int(a, 0, "MIDI_CLOCK_RUNNING")?; Value::Bool(midi::takt_laeuft(self.midi_in(i)?)) }
-            "midi_clock_ticks" => { let i = bi_int(a, 0, "MIDI_CLOCK_TICKS")?; Value::Int(midi::takt_ticks(self.midi_in(i)?)) }
+            "midi_clock_bpm" => { let i = bi_int(a, 0, "MIDI_CLOCK_BPM")?; Value::Float(midi::takt_bpm(self.midi_in(i, name)?)) }
+            "midi_clock_running" => { let i = bi_int(a, 0, "MIDI_CLOCK_RUNNING")?; Value::Bool(midi::takt_laeuft(self.midi_in(i, name)?)) }
+            "midi_clock_ticks" => { let i = bi_int(a, 0, "MIDI_CLOCK_TICKS")?; Value::Int(midi::takt_ticks(self.midi_in(i, name)?)) }
             "midi_clock_send" => {
                 let i = bi_int(a, 0, "MIDI_CLOCK_SEND")?;
                 let bpm = bi_num(a, 1, "MIDI_CLOCK_SEND")?;
-                midi::uhr_senden(self.midi_out(i)?, bpm)?;
+                midi::uhr_senden(self.midi_out(i, name)?, bpm)?;
                 Value::Nil
             }
             "midi_start" | "midi_stop" | "midi_continue" => {
                 let (b, f) = match name { "midi_start" => (0xFA, "MIDI_START"), "midi_stop" => (0xFC, "MIDI_STOP"), _ => (0xFB, "MIDI_CONTINUE") };
                 let i = bi_int(a, 0, f)?;
-                midi::send(self.midi_out(i)?, &[b])?;
+                midi::send(self.midi_out(i, name)?, &[b])?;
                 Value::Nil
             }
             "midi_song_position" => {
@@ -385,7 +385,7 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, F)?;
                 let p = bi_int(a, 1, F)?;
                 if !(0..=16383).contains(&p) { return Err(format!("{}: {} Sechzehntel ausserhalb 0..16383", F, p)); }
-                midi::send(self.midi_out(i)?, &[0xF2, (p & 0x7F) as u8, (p >> 7) as u8])?;
+                midi::send(self.midi_out(i, name)?, &[0xF2, (p & 0x7F) as u8, (p >> 7) as u8])?;
                 Value::Nil
             }
             // --- Eine Datei abspielen ---
@@ -396,12 +396,12 @@ impl<'p> Vm<'p> {
                 let ab = if a.len() > 2 { bi_num(a, 2, F)? } else { 0.0 };
                 if !ab.is_finite() || ab < 0.0 { return Err(format!("{}: Beginn {} -- erwartet Sekunden ab 0", F, ab)); }
                 let ablauf = Self::handle_get_mut(&mut self.midi_dateien, k, F, "ungueltige/freigegebene MIDI_FILE")?.ablauf();
-                midi::datei_spielen(self.midi_out(i)?, ablauf, ab)?;
+                midi::datei_spielen(self.midi_out(i, name)?, ablauf, ab)?;
                 Value::Nil
             }
-            "midi_file_stop" => { let i = bi_int(a, 0, "MIDI_FILE_STOP")?; midi::datei_halten(self.midi_out(i)?); Value::Nil }
-            "midi_file_playing" => { let i = bi_int(a, 0, "MIDI_FILE_PLAYING")?; Value::Bool(midi::datei_spielt(self.midi_out(i)?)) }
-            "midi_file_position" => { let i = bi_int(a, 0, "MIDI_FILE_POSITION")?; Value::Float(midi::datei_stand(self.midi_out(i)?)) }
+            "midi_file_stop" => { let i = bi_int(a, 0, "MIDI_FILE_STOP")?; midi::datei_halten(self.midi_out(i, name)?); Value::Nil }
+            "midi_file_playing" => { let i = bi_int(a, 0, "MIDI_FILE_PLAYING")?; Value::Bool(midi::datei_spielt(self.midi_out(i, name)?)) }
+            "midi_file_position" => { let i = bi_int(a, 0, "MIDI_FILE_POSITION")?; Value::Float(midi::datei_stand(self.midi_out(i, name)?)) }
             // --- Anschluesse finden ---
             "midi_in_count" => Value::Int(midi::in_count()?),
             "midi_out_count" => Value::Int(midi::out_count()?),
@@ -431,34 +431,34 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             // --- Empfangen (Cursor-Muster wie db/mqtt) ---
-            "midi_next" => { let i = bi_int(a, 0, "MIDI_NEXT")?; Value::Bool(midi::next(self.midi_in(i)?)) }
-            "midi_pending" => { let i = bi_int(a, 0, "MIDI_PENDING")?; Value::Int(midi::wartend(self.midi_in(i)?)) }
-            "midi_status" => { let i = bi_int(a, 0, "MIDI_STATUS")?; Value::Int(midi::status(self.midi_in(i)?)) }
-            "midi_channel" => { let i = bi_int(a, 0, "MIDI_CHANNEL")?; Value::Int(midi::channel(self.midi_in(i)?)) }
-            "midi_data1" => { let i = bi_int(a, 0, "MIDI_DATA1")?; Value::Int(midi::data1(self.midi_in(i)?)) }
-            "midi_data2" => { let i = bi_int(a, 0, "MIDI_DATA2")?; Value::Int(midi::data2(self.midi_in(i)?)) }
-            "midi_is_note_on" => { let i = bi_int(a, 0, "MIDI_IS_NOTE_ON")?; Value::Bool(midi::is_note_on(self.midi_in(i)?)) }
-            "midi_is_note_off" => { let i = bi_int(a, 0, "MIDI_IS_NOTE_OFF")?; Value::Bool(midi::is_note_off(self.midi_in(i)?)) }
-            "midi_is_cc" => { let i = bi_int(a, 0, "MIDI_IS_CC")?; Value::Bool(midi::is_cc(self.midi_in(i)?)) }
+            "midi_next" => { let i = bi_int(a, 0, "MIDI_NEXT")?; Value::Bool(midi::next(self.midi_in(i, name)?)) }
+            "midi_pending" => { let i = bi_int(a, 0, "MIDI_PENDING")?; Value::Int(midi::wartend(self.midi_in(i, name)?)) }
+            "midi_status" => { let i = bi_int(a, 0, "MIDI_STATUS")?; Value::Int(midi::status(self.midi_in(i, name)?)) }
+            "midi_channel" => { let i = bi_int(a, 0, "MIDI_CHANNEL")?; Value::Int(midi::channel(self.midi_in(i, name)?)) }
+            "midi_data1" => { let i = bi_int(a, 0, "MIDI_DATA1")?; Value::Int(midi::data1(self.midi_in(i, name)?)) }
+            "midi_data2" => { let i = bi_int(a, 0, "MIDI_DATA2")?; Value::Int(midi::data2(self.midi_in(i, name)?)) }
+            "midi_is_note_on" => { let i = bi_int(a, 0, "MIDI_IS_NOTE_ON")?; Value::Bool(midi::is_note_on(self.midi_in(i, name)?)) }
+            "midi_is_note_off" => { let i = bi_int(a, 0, "MIDI_IS_NOTE_OFF")?; Value::Bool(midi::is_note_off(self.midi_in(i, name)?)) }
+            "midi_is_cc" => { let i = bi_int(a, 0, "MIDI_IS_CC")?; Value::Bool(midi::is_cc(self.midi_in(i, name)?)) }
             // Note/Anschlag und Regler sind nur sprechende Namen fuer data1/data2.
-            "midi_note" => { let i = bi_int(a, 0, "MIDI_NOTE")?; Value::Int(midi::data1(self.midi_in(i)?)) }
-            "midi_velocity" => { let i = bi_int(a, 0, "MIDI_VELOCITY")?; Value::Int(midi::data2(self.midi_in(i)?)) }
-            "midi_cc_number" => { let i = bi_int(a, 0, "MIDI_CC_NUMBER")?; Value::Int(midi::data1(self.midi_in(i)?)) }
-            "midi_cc_value" => { let i = bi_int(a, 0, "MIDI_CC_VALUE")?; Value::Int(midi::data2(self.midi_in(i)?)) }
+            "midi_note" => { let i = bi_int(a, 0, "MIDI_NOTE")?; Value::Int(midi::data1(self.midi_in(i, name)?)) }
+            "midi_velocity" => { let i = bi_int(a, 0, "MIDI_VELOCITY")?; Value::Int(midi::data2(self.midi_in(i, name)?)) }
+            "midi_cc_number" => { let i = bi_int(a, 0, "MIDI_CC_NUMBER")?; Value::Int(midi::data1(self.midi_in(i, name)?)) }
+            "midi_cc_value" => { let i = bi_int(a, 0, "MIDI_CC_VALUE")?; Value::Int(midi::data2(self.midi_in(i, name)?)) }
             // --- Senden ---
             "midi_note_on" => {
                 let i = bi_int(a, 0, "MIDI_NOTE_ON")?;
                 let k = midi::kanal_byte(bi_int(a, 1, "MIDI_NOTE_ON")?, "MIDI_NOTE_ON")?;
                 let n = midi::sieben_bit(bi_int(a, 2, "MIDI_NOTE_ON")?, "Note", "MIDI_NOTE_ON")?;
                 let v = midi::sieben_bit(bi_int(a, 3, "MIDI_NOTE_ON")?, "Anschlag", "MIDI_NOTE_ON")?;
-                midi::send(self.midi_out(i)?, &[0x90 | k, n, v])?;
+                midi::send(self.midi_out(i, name)?, &[0x90 | k, n, v])?;
                 Value::Nil
             }
             "midi_note_off" => {
                 let i = bi_int(a, 0, "MIDI_NOTE_OFF")?;
                 let k = midi::kanal_byte(bi_int(a, 1, "MIDI_NOTE_OFF")?, "MIDI_NOTE_OFF")?;
                 let n = midi::sieben_bit(bi_int(a, 2, "MIDI_NOTE_OFF")?, "Note", "MIDI_NOTE_OFF")?;
-                midi::send(self.midi_out(i)?, &[0x80 | k, n, 0])?;
+                midi::send(self.midi_out(i, name)?, &[0x80 | k, n, 0])?;
                 Value::Nil
             }
             "midi_cc" => {
@@ -466,7 +466,7 @@ impl<'p> Vm<'p> {
                 let k = midi::kanal_byte(bi_int(a, 1, "MIDI_CC")?, "MIDI_CC")?;
                 let nr = midi::sieben_bit(bi_int(a, 2, "MIDI_CC")?, "Reglernummer", "MIDI_CC")?;
                 let w = midi::sieben_bit(bi_int(a, 3, "MIDI_CC")?, "Reglerwert", "MIDI_CC")?;
-                midi::send(self.midi_out(i)?, &[0xB0 | k, nr, w])?;
+                midi::send(self.midi_out(i, name)?, &[0xB0 | k, nr, w])?;
                 Value::Nil
             }
             // Roher Ausweg fuer alles, wofuer es oben keinen Namen gibt.
@@ -478,7 +478,7 @@ impl<'p> Vm<'p> {
                 }
                 let d1 = midi::sieben_bit(bi_int(a, 2, "MIDI_SEND")?, "Datenbyte 1", "MIDI_SEND")?;
                 let d2 = midi::sieben_bit(bi_int(a, 3, "MIDI_SEND")?, "Datenbyte 2", "MIDI_SEND")?;
-                midi::send(self.midi_out(i)?, &[st as u8, d1, d2])?;
+                midi::send(self.midi_out(i, name)?, &[st as u8, d1, d2])?;
                 Value::Nil
             }
             _ => return Ok(None),
@@ -494,8 +494,8 @@ impl<'p> Vm<'p> {
         { let _ = (name, a); Ok(None) }
     }
     #[cfg(feature = "serial")]
-    pub(super) fn ser_port(&mut self, idx: i64) -> R<&mut crate::serial::Port> {
-        Self::handle_get_mut(&mut self.serial_ports, idx, "SERIAL", "ungueltiges/geschlossenes SERIAL_HANDLE")
+    pub(super) fn ser_port(&mut self, idx: i64, fn_: &str) -> R<&mut crate::serial::Port> {
+        Self::handle_get_mut(&mut self.serial_ports, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes SERIAL_HANDLE")
     }
     #[cfg(feature = "serial")]
     pub(super) fn try_serial_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
@@ -509,12 +509,12 @@ impl<'p> Vm<'p> {
             }
             "serial_close" => { let i = bi_int(a, 0, "SERIAL_CLOSE")? as usize; if let Some(s) = self.serial_ports.get_mut(i) { *s = None; } Value::Nil }
             "serial_is_open" => { let i = bi_int(a, 0, "SERIAL_IS_OPEN")?; Value::Bool(self.serial_ports.get(i as usize).map(|o| o.is_some()).unwrap_or(false)) }
-            "serial_write" => { let i = bi_int(a, 0, "SERIAL_WRITE")?; let s = bi_str(a, 1, "SERIAL_WRITE")?.to_string(); Value::Int(serial::write(self.ser_port(i)?, &s)?) }
-            "serial_read" => { let i = bi_int(a, 0, "SERIAL_READ")?; let n = bi_int(a, 1, "SERIAL_READ")?; Value::str_rc(serial::read(self.ser_port(i)?, n)?) }
-            "serial_readline" => { let i = bi_int(a, 0, "SERIAL_READLINE")?; Value::str_rc(serial::readline(self.ser_port(i)?)?) }
-            "serial_available" => { let i = bi_int(a, 0, "SERIAL_AVAILABLE")?; Value::Int(serial::available(self.ser_port(i)?)?) }
-            "serial_flush" => { let i = bi_int(a, 0, "SERIAL_FLUSH")?; serial::flush(self.ser_port(i)?); Value::Nil }
-            "serial_timeout" => { let i = bi_int(a, 0, "SERIAL_TIMEOUT")?; let s = bi_num(a, 1, "SERIAL_TIMEOUT")?; serial::set_timeout(self.ser_port(i)?, s); Value::Nil }
+            "serial_write" => { let i = bi_int(a, 0, "SERIAL_WRITE")?; let s = bi_str(a, 1, "SERIAL_WRITE")?.to_string(); Value::Int(serial::write(self.ser_port(i, name)?, &s)?) }
+            "serial_read" => { let i = bi_int(a, 0, "SERIAL_READ")?; let n = bi_int(a, 1, "SERIAL_READ")?; Value::str_rc(serial::read(self.ser_port(i, name)?, n)?) }
+            "serial_readline" => { let i = bi_int(a, 0, "SERIAL_READLINE")?; Value::str_rc(serial::readline(self.ser_port(i, name)?)?) }
+            "serial_available" => { let i = bi_int(a, 0, "SERIAL_AVAILABLE")?; Value::Int(serial::available(self.ser_port(i, name)?)?) }
+            "serial_flush" => { let i = bi_int(a, 0, "SERIAL_FLUSH")?; serial::flush(self.ser_port(i, name)?); Value::Nil }
+            "serial_timeout" => { let i = bi_int(a, 0, "SERIAL_TIMEOUT")?; let s = bi_num(a, 1, "SERIAL_TIMEOUT")?; serial::set_timeout(self.ser_port(i, name)?, s); Value::Nil }
             _ => return Ok(None),
         };
         Ok(Some(v))
@@ -1347,8 +1347,8 @@ impl<'p> Vm<'p> {
         if !(name.starts_with("firmata_")) { return Ok(None); }
         self.try_firmata_impl(name, a)
     }
-    pub(super) fn firmata_board(&mut self, idx: i64) -> R<&mut crate::firmata::Board> {
-        Self::handle_get_mut(&mut self.firmata_boards, idx, "FIRMATA", "ungueltiges/geschlossenes FIRMATA_HANDLE")
+    pub(super) fn firmata_board(&mut self, idx: i64, fn_: &str) -> R<&mut crate::firmata::Board> {
+        Self::handle_get_mut(&mut self.firmata_boards, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes FIRMATA_HANDLE")
     }
     pub(super) fn try_firmata_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         use crate::firmata;
@@ -1397,100 +1397,100 @@ impl<'p> Vm<'p> {
             "firmata_is_open" => { let i = bi_int(a, 0, "FIRMATA_IS_OPEN")?; Value::Bool(self.firmata_boards.get(i as usize).map(|o| o.is_some()).unwrap_or(false)) }
             "firmata_pin_mode" => {
                 let i = bi_int(a, 0, "FIRMATA_PIN_MODE")?; let pin = bi_int(a, 1, "FIRMATA_PIN_MODE")?; let mode = bi_int(a, 2, "FIRMATA_PIN_MODE")?;
-                firmata::pin_mode(self.firmata_board(i)?, pin, mode)?; Value::Nil
+                firmata::pin_mode(self.firmata_board(i, name)?, pin, mode)?; Value::Nil
             }
             "firmata_digital_write" => {
                 let i = bi_int(a, 0, "FIRMATA_DIGITAL_WRITE")?; let pin = bi_int(a, 1, "FIRMATA_DIGITAL_WRITE")?; let val = bi_bool(a, 2, "FIRMATA_DIGITAL_WRITE")?;
-                firmata::digital_write(self.firmata_board(i)?, pin, val)?; Value::Nil
+                firmata::digital_write(self.firmata_board(i, name)?, pin, val)?; Value::Nil
             }
             "firmata_digital_read" => {
                 let i = bi_int(a, 0, "FIRMATA_DIGITAL_READ")?; let pin = bi_int(a, 1, "FIRMATA_DIGITAL_READ")?;
-                Value::Bool(firmata::digital_read(self.firmata_board(i)?, pin)?)
+                Value::Bool(firmata::digital_read(self.firmata_board(i, name)?, pin)?)
             }
             "firmata_analog_write" => {
                 let i = bi_int(a, 0, "FIRMATA_ANALOG_WRITE")?; let pin = bi_int(a, 1, "FIRMATA_ANALOG_WRITE")?; let val = bi_int(a, 2, "FIRMATA_ANALOG_WRITE")?;
-                firmata::analog_write(self.firmata_board(i)?, pin, val)?; Value::Nil
+                firmata::analog_write(self.firmata_board(i, name)?, pin, val)?; Value::Nil
             }
             "firmata_analog_read" => {
                 let i = bi_int(a, 0, "FIRMATA_ANALOG_READ")?; let ch = bi_int(a, 1, "FIRMATA_ANALOG_READ")?;
-                Value::Int(firmata::analog_read(self.firmata_board(i)?, ch)?)
+                Value::Int(firmata::analog_read(self.firmata_board(i, name)?, ch)?)
             }
-            "firmata_update" => { let i = bi_int(a, 0, "FIRMATA_UPDATE")?; firmata::update(self.firmata_board(i)?)?; Value::Nil }
-            "firmata_firmware$" => { let i = bi_int(a, 0, "FIRMATA_FIRMWARE$")?; Value::str_rc(firmata::firmware(self.firmata_board(i)?)?) }
+            "firmata_update" => { let i = bi_int(a, 0, "FIRMATA_UPDATE")?; firmata::update(self.firmata_board(i, name)?)?; Value::Nil }
+            "firmata_firmware$" => { let i = bi_int(a, 0, "FIRMATA_FIRMWARE$")?; Value::str_rc(firmata::firmware(self.firmata_board(i, name)?)?) }
             "firmata_servo_attach" => {
                 const F: &str = "FIRMATA_SERVO_ATTACH";
                 let i = bi_int(a, 0, F)?; let pin = bi_int(a, 1, F)?;
                 let lo = int_opt(a, 2, 544, F)?; let hi = int_opt(a, 3, 2400, F)?;
-                firmata::servo_attach(self.firmata_board(i)?, pin, lo, hi)?; Value::Nil
+                firmata::servo_attach(self.firmata_board(i, name)?, pin, lo, hi)?; Value::Nil
             }
             "firmata_servo_write" => {
                 const F: &str = "FIRMATA_SERVO_WRITE";
                 let i = bi_int(a, 0, F)?; let pin = bi_int(a, 1, F)?; let w = bi_int(a, 2, F)?;
-                firmata::servo_write(self.firmata_board(i)?, pin, w)?; Value::Nil
+                firmata::servo_write(self.firmata_board(i, name)?, pin, w)?; Value::Nil
             }
             "firmata_i2c_config" => {
                 let i = bi_int(a, 0, "FIRMATA_I2C_CONFIG")?; let d = int_opt(a, 1, 0, "FIRMATA_I2C_CONFIG")?;
-                firmata::i2c_config(self.firmata_board(i)?, d)?; Value::Nil
+                firmata::i2c_config(self.firmata_board(i, name)?, d)?; Value::Nil
             }
             "firmata_i2c_write" => {
                 const F: &str = "FIRMATA_I2C_WRITE";
                 let i = bi_int(a, 0, F)?; let adr = bi_int(a, 1, F)?; let d = bytes_arg(a, 2, F)?;
-                firmata::i2c_write(self.firmata_board(i)?, adr, &d)?; Value::Nil
+                firmata::i2c_write(self.firmata_board(i, name)?, adr, &d)?; Value::Nil
             }
             "firmata_i2c_read" => {
                 const F: &str = "FIRMATA_I2C_READ";
                 let i = bi_int(a, 0, F)?; let adr = bi_int(a, 1, F)?; let reg = bi_int(a, 2, F)?; let n = bi_int(a, 3, F)?;
-                feld(firmata::i2c_read(self.firmata_board(i)?, adr, reg, n)?)
+                feld(firmata::i2c_read(self.firmata_board(i, name)?, adr, reg, n)?)
             }
             "firmata_i2c_request" => {
                 const F: &str = "FIRMATA_I2C_REQUEST";
                 let i = bi_int(a, 0, F)?; let adr = bi_int(a, 1, F)?; let reg = bi_int(a, 2, F)?; let n = bi_int(a, 3, F)?;
                 let dauernd = if a.len() > 4 { bi_bool(a, 4, F)? } else { false };
-                firmata::i2c_request(self.firmata_board(i)?, F, adr, reg, n, dauernd)?; Value::Nil
+                firmata::i2c_request(self.firmata_board(i, name)?, F, adr, reg, n, dauernd)?; Value::Nil
             }
             "firmata_i2c_data" => {
                 const F: &str = "FIRMATA_I2C_DATA";
                 let i = bi_int(a, 0, F)?; let adr = bi_int(a, 1, F)?; let reg = int_opt(a, 2, -1, F)?;
-                feld(firmata::i2c_data(self.firmata_board(i)?, adr, reg)?)
+                feld(firmata::i2c_data(self.firmata_board(i, name)?, adr, reg)?)
             }
             "firmata_i2c_stop" => {
                 let i = bi_int(a, 0, "FIRMATA_I2C_STOP")?; let adr = bi_int(a, 1, "FIRMATA_I2C_STOP")?;
-                firmata::i2c_stop(self.firmata_board(i)?, adr)?; Value::Nil
+                firmata::i2c_stop(self.firmata_board(i, name)?, adr)?; Value::Nil
             }
             "firmata_stepper_config" => {
                 const F: &str = "FIRMATA_STEPPER_CONFIG";
                 let i = bi_int(a, 0, F)?; let nr = bi_int(a, 1, F)?; let art = bi_str(a, 2, F)?.to_string();
                 let mut pins = Vec::new();
                 for k in 3..a.len() { pins.push(bi_int(a, k, F)?); }
-                firmata::stepper_config(self.firmata_board(i)?, nr, &art, &pins)?; Value::Nil
+                firmata::stepper_config(self.firmata_board(i, name)?, nr, &art, &pins)?; Value::Nil
             }
             "firmata_stepper_move" | "firmata_stepper_to" => {
                 let absolut = name == "firmata_stepper_to";
                 let f = if absolut { "FIRMATA_STEPPER_TO" } else { "FIRMATA_STEPPER_MOVE" };
                 let i = bi_int(a, 0, f)?; let nr = bi_int(a, 1, f)?; let s = bi_int(a, 2, f)?;
-                firmata::stepper_move(self.firmata_board(i)?, nr, s, absolut)?; Value::Nil
+                firmata::stepper_move(self.firmata_board(i, name)?, nr, s, absolut)?; Value::Nil
             }
             "firmata_stepper_zero" => {
                 let i = bi_int(a, 0, "FIRMATA_STEPPER_ZERO")?; let nr = bi_int(a, 1, "FIRMATA_STEPPER_ZERO")?;
-                firmata::stepper_zero(self.firmata_board(i)?, nr)?; Value::Nil
+                firmata::stepper_zero(self.firmata_board(i, name)?, nr)?; Value::Nil
             }
             "firmata_stepper_stop" => {
                 let i = bi_int(a, 0, "FIRMATA_STEPPER_STOP")?; let nr = bi_int(a, 1, "FIRMATA_STEPPER_STOP")?;
-                firmata::stepper_stop(self.firmata_board(i)?, nr)?; Value::Nil
+                firmata::stepper_stop(self.firmata_board(i, name)?, nr)?; Value::Nil
             }
             "firmata_stepper_speed" | "firmata_stepper_accel" => {
                 let besch = name == "firmata_stepper_accel";
                 let f = if besch { "FIRMATA_STEPPER_ACCEL" } else { "FIRMATA_STEPPER_SPEED" };
                 let i = bi_int(a, 0, f)?; let nr = bi_int(a, 1, f)?; let w = bi_num(a, 2, f)?;
-                firmata::stepper_tempo(self.firmata_board(i)?, nr, w, besch)?; Value::Nil
+                firmata::stepper_tempo(self.firmata_board(i, name)?, nr, w, besch)?; Value::Nil
             }
             "firmata_stepper_position" => {
                 let i = bi_int(a, 0, "FIRMATA_STEPPER_POSITION")?; let nr = bi_int(a, 1, "FIRMATA_STEPPER_POSITION")?;
-                Value::Int(firmata::stepper_position(self.firmata_board(i)?, nr)?)
+                Value::Int(firmata::stepper_position(self.firmata_board(i, name)?, nr)?)
             }
             "firmata_stepper_running" => {
                 let i = bi_int(a, 0, "FIRMATA_STEPPER_RUNNING")?; let nr = bi_int(a, 1, "FIRMATA_STEPPER_RUNNING")?;
-                Value::Bool(firmata::stepper_running(self.firmata_board(i)?, nr)?)
+                Value::Bool(firmata::stepper_running(self.firmata_board(i, name)?, nr)?)
             }
             _ => return Ok(None),
         };
@@ -1508,8 +1508,8 @@ impl<'p> Vm<'p> {
         { let _ = (name, a); Ok(None) }
     }
     #[cfg(feature = "usb")]
-    pub(super) fn usb_dev(&self, idx: i64) -> R<&hidapi::HidDevice> {
-        Self::handle_get(&self.usb_devs, idx, "USB", "ungueltiges/geschlossenes USB_HANDLE")
+    pub(super) fn usb_dev(&self, idx: i64, fn_: &str) -> R<&hidapi::HidDevice> {
+        Self::handle_get(&self.usb_devs, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes USB_HANDLE")
     }
     #[cfg(feature = "usb")]
     pub(super) fn try_usb_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
@@ -1519,11 +1519,11 @@ impl<'p> Vm<'p> {
             "usb_open" => { let d = usb::open(bi_int(a, 0, "USB_OPEN")?, bi_int(a, 1, "USB_OPEN")?)?; self.usb_devs.push(Some(d)); Value::Int((self.usb_devs.len() - 1) as i64) }
             "usb_open_path" => { let d = usb::open_path(bi_str(a, 0, "USB_OPEN_PATH")?)?; self.usb_devs.push(Some(d)); Value::Int((self.usb_devs.len() - 1) as i64) }
             "usb_close" => { let i = bi_int(a, 0, "USB_CLOSE")? as usize; if let Some(s) = self.usb_devs.get_mut(i) { *s = None; } Value::Nil }
-            "usb_write" => { let i = bi_int(a, 0, "USB_WRITE")?; let s = bi_str(a, 1, "USB_WRITE")?.to_string(); Value::Int(usb::write(self.usb_dev(i)?, &s)?) }
-            "usb_read" => { let i = bi_int(a, 0, "USB_READ")?; let n = bi_int(a, 1, "USB_READ")?; let t = bi_int(a, 2, "USB_READ")?; Value::str_rc(usb::read(self.usb_dev(i)?, n, t)?) }
-            "usb_product" => Value::str_rc(usb::product(self.usb_dev(bi_int(a, 0, "USB_PRODUCT")?)?)),
-            "usb_manufacturer" => Value::str_rc(usb::manufacturer(self.usb_dev(bi_int(a, 0, "USB_MANUFACTURER")?)?)),
-            "usb_serial" => Value::str_rc(usb::serial(self.usb_dev(bi_int(a, 0, "USB_SERIAL")?)?)),
+            "usb_write" => { let i = bi_int(a, 0, "USB_WRITE")?; let s = bi_str(a, 1, "USB_WRITE")?.to_string(); Value::Int(usb::write(self.usb_dev(i, name)?, &s)?) }
+            "usb_read" => { let i = bi_int(a, 0, "USB_READ")?; let n = bi_int(a, 1, "USB_READ")?; let t = bi_int(a, 2, "USB_READ")?; Value::str_rc(usb::read(self.usb_dev(i, name)?, n, t)?) }
+            "usb_product" => Value::str_rc(usb::product(self.usb_dev(bi_int(a, 0, "USB_PRODUCT")?, name)?)),
+            "usb_manufacturer" => Value::str_rc(usb::manufacturer(self.usb_dev(bi_int(a, 0, "USB_MANUFACTURER")?, name)?)),
+            "usb_serial" => Value::str_rc(usb::serial(self.usb_dev(bi_int(a, 0, "USB_SERIAL")?, name)?)),
             _ => return Ok(None),
         };
         Ok(Some(v))
@@ -1568,8 +1568,8 @@ impl<'p> Vm<'p> {
         { let _ = (name, a); Ok(None) }
     }
     #[cfg(feature = "bt")]
-    pub(super) fn bt_periph(&self, idx: i64) -> R<&btleplug::platform::Peripheral> {
-        Self::handle_get(&self.bt_periphs, idx, "BT", "ungueltiges/getrenntes BT_HANDLE")
+    pub(super) fn bt_periph(&self, idx: i64, fn_: &str) -> R<&btleplug::platform::Peripheral> {
+        Self::handle_get(&self.bt_periphs, idx, &fn_.to_uppercase(), "ungueltiges/getrenntes BT_HANDLE")
     }
     #[cfg(feature = "bt")]
     pub(super) fn try_bt_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
@@ -1577,12 +1577,12 @@ impl<'p> Vm<'p> {
         let v = match name {
             "bt_scan" => Value::str_rc(bt::scan(bi_num(a, 0, "BT_SCAN")?)?),
             "bt_connect" => { let p = bt::connect(bi_str(a, 0, "BT_CONNECT")?)?; self.bt_periphs.push(Some(p)); Value::Int((self.bt_periphs.len() - 1) as i64) }
-            "bt_disconnect" => { let i = bi_int(a, 0, "BT_DISCONNECT")?; bt::disconnect(self.bt_periph(i)?)?; if let Some(s) = self.bt_periphs.get_mut(i as usize) { *s = None; } Value::Nil }
+            "bt_disconnect" => { let i = bi_int(a, 0, "BT_DISCONNECT")?; bt::disconnect(self.bt_periph(i, name)?)?; if let Some(s) = self.bt_periphs.get_mut(i as usize) { *s = None; } Value::Nil }
             "bt_is_connected" => { let i = bi_int(a, 0, "BT_IS_CONNECTED")?; Value::Bool(match self.bt_periphs.get(i as usize).and_then(|o| o.as_ref()) { Some(p) => bt::is_connected(p), None => false }) }
-            "bt_services" => { let i = bi_int(a, 0, "BT_SERVICES")?; Value::str_rc(bt::services(self.bt_periph(i)?)?) }
-            "bt_characteristics" => { let i = bi_int(a, 0, "BT_CHARACTERISTICS")?; let s = bi_str(a, 1, "BT_CHARACTERISTICS")?.to_string(); Value::str_rc(bt::characteristics(self.bt_periph(i)?, &s)?) }
-            "bt_read" => { let i = bi_int(a, 0, "BT_READ")?; let c = bi_str(a, 1, "BT_READ")?.to_string(); Value::str_rc(bt::read(self.bt_periph(i)?, &c)?) }
-            "bt_write" => { let i = bi_int(a, 0, "BT_WRITE")?; let c = bi_str(a, 1, "BT_WRITE")?.to_string(); let d = bi_str(a, 2, "BT_WRITE")?.to_string(); bt::write(self.bt_periph(i)?, &c, &d)?; Value::Nil }
+            "bt_services" => { let i = bi_int(a, 0, "BT_SERVICES")?; Value::str_rc(bt::services(self.bt_periph(i, name)?)?) }
+            "bt_characteristics" => { let i = bi_int(a, 0, "BT_CHARACTERISTICS")?; let s = bi_str(a, 1, "BT_CHARACTERISTICS")?.to_string(); Value::str_rc(bt::characteristics(self.bt_periph(i, name)?, &s)?) }
+            "bt_read" => { let i = bi_int(a, 0, "BT_READ")?; let c = bi_str(a, 1, "BT_READ")?.to_string(); Value::str_rc(bt::read(self.bt_periph(i, name)?, &c)?) }
+            "bt_write" => { let i = bi_int(a, 0, "BT_WRITE")?; let c = bi_str(a, 1, "BT_WRITE")?.to_string(); let d = bi_str(a, 2, "BT_WRITE")?.to_string(); bt::write(self.bt_periph(i, name)?, &c, &d)?; Value::Nil }
             _ => return Ok(None),
         };
         Ok(Some(v))

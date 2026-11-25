@@ -19,8 +19,8 @@ impl<'p> Vm<'p> {
     }
 
     #[cfg(feature = "db")]
-    pub(super) fn db_conn(&mut self, idx: i64) -> R<&mut crate::db::Verbindung> {
-        Self::handle_get_mut(&mut self.db_conns, idx, "DB", "ungueltiges/geschlossenes DB_CONN-Handle")
+    pub(super) fn db_conn(&mut self, idx: i64, fn_: &str) -> R<&mut crate::db::Verbindung> {
+        Self::handle_get_mut(&mut self.db_conns, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes DB_CONN-Handle")
     }
     #[cfg(feature = "db")]
     pub(super) fn db_res(&self, idx: i64) -> R<&crate::db::DbResult> {
@@ -51,18 +51,18 @@ impl<'p> Vm<'p> {
                 if let Some(s) = self.db_conns.get_mut(i) { *s = None; }
                 Value::Nil
             }
-            "db_last_rowid" => Value::Int(self.db_conn(bi_int(a, 0, "DB_LAST_ROWID")?)?.letzte_id()?),
-            "db_kind$" => Value::str_rc(self.db_conn(bi_int(a, 0, "DB_KIND$")?)?.art()),
-            "db_ping" => Value::Bool(self.db_conn(bi_int(a, 0, "DB_PING")?)?.lebt()),
+            "db_last_rowid" => Value::Int(self.db_conn(bi_int(a, 0, "DB_LAST_ROWID")?, name)?.letzte_id()?),
+            "db_kind$" => Value::str_rc(self.db_conn(bi_int(a, 0, "DB_KIND$")?, name)?.art()),
+            "db_ping" => Value::Bool(self.db_conn(bi_int(a, 0, "DB_PING")?, name)?.lebt()),
             "db_exec" => {
                 let params = db_params(a.get(2..).unwrap_or(&[]), "DB_EXEC")?;
                 let sql = bi_str(a, 1, "DB_EXEC")?.to_string();
-                Value::Int(self.db_conn(bi_int(a, 0, "DB_EXEC")?)?.exec(&sql, &params, "DB_EXEC")?)
+                Value::Int(self.db_conn(bi_int(a, 0, "DB_EXEC")?, name)?.exec(&sql, &params, "DB_EXEC")?)
             }
             "db_query" => {
                 let params = db_params(a.get(2..).unwrap_or(&[]), "DB_QUERY")?;
                 let sql = bi_str(a, 1, "DB_QUERY")?.to_string();
-                let res = self.db_conn(bi_int(a, 0, "DB_QUERY")?)?.query(&sql, &params, "DB_QUERY")?;
+                let res = self.db_conn(bi_int(a, 0, "DB_QUERY")?, name)?.query(&sql, &params, "DB_QUERY")?;
                 self.db_results.push(res);
                 Value::Int((self.db_results.len() - 1) as i64)
             }
@@ -88,9 +88,9 @@ impl<'p> Vm<'p> {
             "db_get_int" => { let i1 = bi_int(a, 1, "DB_GET_INT")?; Value::Int(self.db_res(bi_int(a, 0, "DB_GET_INT")?)?.get_int(i1)?) }
             "db_get_float" => { let i1 = bi_int(a, 1, "DB_GET_FLOAT")?; Value::Float(self.db_res(bi_int(a, 0, "DB_GET_FLOAT")?)?.get_float(i1)?) }
             "db_get_bool" => { let i1 = bi_int(a, 1, "DB_GET_BOOL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_GET_BOOL")?)?.get_bool(i1)?) }
-            "db_begin" => { self.db_conn(bi_int(a, 0, "DB_BEGIN")?)?.befehl("BEGIN", "DB_BEGIN")?; Value::Nil }
-            "db_commit" => { self.db_conn(bi_int(a, 0, "DB_COMMIT")?)?.befehl("COMMIT", "DB_COMMIT")?; Value::Nil }
-            "db_rollback" => { self.db_conn(bi_int(a, 0, "DB_ROLLBACK")?)?.befehl("ROLLBACK", "DB_ROLLBACK")?; Value::Nil }
+            "db_begin" => { self.db_conn(bi_int(a, 0, "DB_BEGIN")?, name)?.befehl("BEGIN", "DB_BEGIN")?; Value::Nil }
+            "db_commit" => { self.db_conn(bi_int(a, 0, "DB_COMMIT")?, name)?.befehl("COMMIT", "DB_COMMIT")?; Value::Nil }
+            "db_rollback" => { self.db_conn(bi_int(a, 0, "DB_ROLLBACK")?, name)?.befehl("ROLLBACK", "DB_ROLLBACK")?; Value::Nil }
             _ => return Ok(None),
         };
         Ok(Some(v))
@@ -108,24 +108,24 @@ impl<'p> Vm<'p> {
     }
 
     #[cfg(feature = "net")]
-    pub(super) fn net_listener(&self, idx: i64) -> R<&(std::net::TcpListener, i64)> {
-        Self::handle_get(&self.tcp_listeners, idx, "NET", "ungueltiges/geschlossenes NET_LISTENER-Handle")
+    pub(super) fn net_listener(&self, idx: i64, fn_: &str) -> R<&(std::net::TcpListener, i64)> {
+        Self::handle_get(&self.tcp_listeners, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes NET_LISTENER-Handle")
     }
     #[cfg(feature = "net")]
-    pub(super) fn net_sock(&self, idx: i64) -> R<&crate::net::NetSock> {
-        Self::handle_get(&self.tcp_socks, idx, "NET", "ungueltiges/geschlossenes NET_SOCKET-Handle")
+    pub(super) fn net_sock(&self, idx: i64, fn_: &str) -> R<&crate::net::NetSock> {
+        Self::handle_get(&self.tcp_socks, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes NET_SOCKET-Handle")
     }
     #[cfg(feature = "net")]
-    pub(super) fn net_sock_mut(&mut self, idx: i64) -> R<&mut crate::net::NetSock> {
-        Self::handle_get_mut(&mut self.tcp_socks, idx, "NET", "ungueltiges/geschlossenes NET_SOCKET-Handle")
+    pub(super) fn net_sock_mut(&mut self, idx: i64, fn_: &str) -> R<&mut crate::net::NetSock> {
+        Self::handle_get_mut(&mut self.tcp_socks, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes NET_SOCKET-Handle")
     }
     #[cfg(feature = "net")]
-    pub(super) fn net_udp(&self, idx: i64) -> R<&crate::net::UdpSock> {
-        Self::handle_get(&self.udp_socks, idx, "NET", "ungueltiges/geschlossenes NET_UDP-Handle")
+    pub(super) fn net_udp(&self, idx: i64, fn_: &str) -> R<&crate::net::UdpSock> {
+        Self::handle_get(&self.udp_socks, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes NET_UDP-Handle")
     }
     #[cfg(feature = "net")]
-    pub(super) fn net_udp_mut(&mut self, idx: i64) -> R<&mut crate::net::UdpSock> {
-        Self::handle_get_mut(&mut self.udp_socks, idx, "NET", "ungueltiges/geschlossenes NET_UDP-Handle")
+    pub(super) fn net_udp_mut(&mut self, idx: i64, fn_: &str) -> R<&mut crate::net::UdpSock> {
+        Self::handle_get_mut(&mut self.udp_socks, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes NET_UDP-Handle")
     }
 
     #[cfg(feature = "net")]
@@ -138,10 +138,10 @@ impl<'p> Vm<'p> {
                 self.tcp_listeners.push(Some((l, port)));
                 Value::Int((self.tcp_listeners.len() - 1) as i64)
             }
-            "net_listener_port" => Value::Int(self.net_listener(bi_int(a, 0, "NET_LISTENER_PORT")?)?.1),
+            "net_listener_port" => Value::Int(self.net_listener(bi_int(a, 0, "NET_LISTENER_PORT")?, name)?.1),
             "net_tcp_accept" => {
                 let i = bi_int(a, 0, "NET_TCP_ACCEPT")?;
-                let res = { let l = &self.net_listener(i)?.0; net::accept(l)? };
+                let res = { let l = &self.net_listener(i, name)?.0; net::accept(l)? };
                 match res {
                     Some(sock) => { self.tcp_socks.push(Some(sock)); Value::Int((self.tcp_socks.len() - 1) as i64) }
                     None => Value::Nil,
@@ -158,23 +158,23 @@ impl<'p> Vm<'p> {
                 // Text oder ein BUFFER -- Bytes, die kein UTF-8 sind, liessen sich
                 // sonst gar nicht verschicken.
                 match a.get(1) {
-                    Some(Value::Buffer(b)) => { let bytes = b.borrow().clone(); Value::Int(net::send_bytes(self.net_sock_mut(i)?, &bytes)?) }
-                    _ => { let t = bi_str(a, 1, "NET_SEND")?.to_string(); Value::Int(net::send(self.net_sock_mut(i)?, &t)?) }
+                    Some(Value::Buffer(b)) => { let bytes = b.borrow().clone(); Value::Int(net::send_bytes(self.net_sock_mut(i, name)?, &bytes)?) }
+                    _ => { let t = bi_str(a, 1, "NET_SEND")?.to_string(); Value::Int(net::send(self.net_sock_mut(i, name)?, &t)?) }
                 }
             }
             "net_recv_bytes" => {
                 let i = bi_int(a, 0, "NET_RECV_BYTES")?;
                 let n = bi_int(a, 1, "NET_RECV_BYTES")?;
-                let bytes = net::recv_bytes(self.net_sock_mut(i)?, n)?;
+                let bytes = net::recv_bytes(self.net_sock_mut(i, name)?, n)?;
                 Value::Buffer(std::rc::Rc::new(std::cell::RefCell::new(bytes)))
             }
-            "net_recv" => { let i = bi_int(a, 0, "NET_RECV")?; let n = bi_int(a, 1, "NET_RECV")?; Value::str_rc(net::recv(self.net_sock_mut(i)?, n)?) }
-            "net_peer_addr" => Value::str_rc(&self.net_sock(bi_int(a, 0, "NET_PEER_ADDR")?)?.peer_host),
-            "net_peer_port" => Value::Int(self.net_sock(bi_int(a, 0, "NET_PEER_PORT")?)?.peer_port),
-            "net_is_connected" => Value::Bool(net::is_connected(self.net_sock(bi_int(a, 0, "NET_IS_CONNECTED")?)?)),
+            "net_recv" => { let i = bi_int(a, 0, "NET_RECV")?; let n = bi_int(a, 1, "NET_RECV")?; Value::str_rc(net::recv(self.net_sock_mut(i, name)?, n)?) }
+            "net_peer_addr" => Value::str_rc(&self.net_sock(bi_int(a, 0, "NET_PEER_ADDR")?, name)?.peer_host),
+            "net_peer_port" => Value::Int(self.net_sock(bi_int(a, 0, "NET_PEER_PORT")?, name)?.peer_port),
+            "net_is_connected" => Value::Bool(net::is_connected(self.net_sock(bi_int(a, 0, "NET_IS_CONNECTED")?, name)?)),
             "net_close" => { let i = bi_int(a, 0, "NET_CLOSE")? as usize; if let Some(s) = self.tcp_socks.get_mut(i) { *s = None; } Value::Nil }
             "net_close_listener" => { let i = bi_int(a, 0, "NET_CLOSE_LISTENER")? as usize; if let Some(s) = self.tcp_listeners.get_mut(i) { *s = None; } Value::Nil }
-            "net_set_timeout" => { let i = bi_int(a, 0, "NET_SET_TIMEOUT")?; let ms = bi_int(a, 1, "NET_SET_TIMEOUT")?; net::set_timeout_tcp(&self.net_sock(i)?.stream, ms); Value::Nil }
+            "net_set_timeout" => { let i = bi_int(a, 0, "NET_SET_TIMEOUT")?; let ms = bi_int(a, 1, "NET_SET_TIMEOUT")?; net::set_timeout_tcp(&self.net_sock(i, name)?.stream, ms); Value::Nil }
             "net_udp_bind" => {
                 let bind_addr = match a.get(1) { Some(Value::Str(s)) => s.as_ref(), _ => "" };
                 let s = net::udp_bind(bi_int(a, 0, "NET_UDP_BIND")?, bind_addr)?;
@@ -182,33 +182,33 @@ impl<'p> Vm<'p> {
                 Value::Int((self.udp_socks.len() - 1) as i64)
             }
             "net_udp_open" => { let s = net::udp_open()?; self.udp_socks.push(Some(s)); Value::Int((self.udp_socks.len() - 1) as i64) }
-            "net_udp_port" => Value::Int(self.net_udp(bi_int(a, 0, "NET_UDP_PORT")?)?.bound_port),
+            "net_udp_port" => Value::Int(self.net_udp(bi_int(a, 0, "NET_UDP_PORT")?, name)?.bound_port),
             "net_udp_send" => {
                 let i = bi_int(a, 0, "NET_UDP_SEND")?;
                 let h = bi_str(a, 1, "NET_UDP_SEND")?.to_string();
                 let p = bi_int(a, 2, "NET_UDP_SEND")?;
                 // Text oder ein BUFFER -- ein Spielstand mit Kommazahlen ist kein UTF-8.
                 match a.get(3) {
-                    Some(Value::Buffer(b)) => { let bytes = b.borrow().clone(); Value::Int(net::udp_send_bytes(self.net_udp(i)?, &h, p, &bytes)?) }
-                    _ => { let t = bi_str(a, 3, "NET_UDP_SEND")?.to_string(); Value::Int(net::udp_send(self.net_udp(i)?, &h, p, &t)?) }
+                    Some(Value::Buffer(b)) => { let bytes = b.borrow().clone(); Value::Int(net::udp_send_bytes(self.net_udp(i, name)?, &h, p, &bytes)?) }
+                    _ => { let t = bi_str(a, 3, "NET_UDP_SEND")?.to_string(); Value::Int(net::udp_send(self.net_udp(i, name)?, &h, p, &t)?) }
                 }
             }
             "net_udp_recv_bytes" => {
                 let i = bi_int(a, 0, "NET_UDP_RECV_BYTES")?;
                 let n = bi_int(a, 1, "NET_UDP_RECV_BYTES")?;
-                let bytes = net::udp_recv_bytes(self.net_udp_mut(i)?, n, "NET_UDP_RECV_BYTES")?;
+                let bytes = net::udp_recv_bytes(self.net_udp_mut(i, name)?, n, "NET_UDP_RECV_BYTES")?;
                 Value::Buffer(std::rc::Rc::new(std::cell::RefCell::new(bytes)))
             }
             // Absender getrennt: "::1:5000" laesst sich nur zerlegen, wenn man
             // weiss, dass am LETZTEN Doppelpunkt geschnitten werden muss.
-            "net_udp_last_host$" | "net_udp_last_host" => Value::str_rc(&self.net_udp(bi_int(a, 0, "NET_UDP_LAST_HOST$")?)?.last_from.0),
-            "net_udp_last_port" => Value::Int(self.net_udp(bi_int(a, 0, "NET_UDP_LAST_PORT")?)?.last_from.1),
-            "net_udp_recv" => { let i = bi_int(a, 0, "NET_UDP_RECV")?; let n = bi_int(a, 1, "NET_UDP_RECV")?; Value::str_rc(net::udp_recv(self.net_udp_mut(i)?, n)?) }
+            "net_udp_last_host$" | "net_udp_last_host" => Value::str_rc(&self.net_udp(bi_int(a, 0, "NET_UDP_LAST_HOST$")?, name)?.last_from.0),
+            "net_udp_last_port" => Value::Int(self.net_udp(bi_int(a, 0, "NET_UDP_LAST_PORT")?, name)?.last_from.1),
+            "net_udp_recv" => { let i = bi_int(a, 0, "NET_UDP_RECV")?; let n = bi_int(a, 1, "NET_UDP_RECV")?; Value::str_rc(net::udp_recv(self.net_udp_mut(i, name)?, n)?) }
             "net_udp_last_from" => {
-                let s = self.net_udp(bi_int(a, 0, "NET_UDP_LAST_FROM")?)?;
+                let s = self.net_udp(bi_int(a, 0, "NET_UDP_LAST_FROM")?, name)?;
                 if s.last_from.0.is_empty() { Value::str_rc("") } else { Value::str_rc(format!("{}:{}", s.last_from.0, s.last_from.1)) }
             }
-            "net_udp_set_timeout" => { let i = bi_int(a, 0, "NET_UDP_SET_TIMEOUT")?; let ms = bi_int(a, 1, "NET_UDP_SET_TIMEOUT")?; net::set_timeout_udp(&self.net_udp(i)?.sock, ms); Value::Nil }
+            "net_udp_set_timeout" => { let i = bi_int(a, 0, "NET_UDP_SET_TIMEOUT")?; let ms = bi_int(a, 1, "NET_UDP_SET_TIMEOUT")?; net::set_timeout_udp(&self.net_udp(i, name)?.sock, ms); Value::Nil }
             "net_udp_close" => { let i = bi_int(a, 0, "NET_UDP_CLOSE")? as usize; if let Some(s) = self.udp_socks.get_mut(i) { *s = None; } Value::Nil }
             _ => return Ok(None),
         };
@@ -297,8 +297,8 @@ impl<'p> Vm<'p> {
     }
 
     #[cfg(feature = "smtp")]
-    pub(super) fn smtp_m(&mut self, idx: i64) -> R<&mut crate::smtp::Mail> {
-        Self::handle_get_mut(&mut self.smtp_mail, idx, "SMTP",
+    pub(super) fn smtp_m(&mut self, idx: i64, fn_: &str) -> R<&mut crate::smtp::Mail> {
+        Self::handle_get_mut(&mut self.smtp_mail, idx, &fn_.to_uppercase(),
                              "ungueltiges/geschlossenes SMTP-Handle")
     }
 
@@ -338,7 +338,7 @@ impl<'p> Vm<'p> {
                     Some(_) => return Err("SMTP_SERVER: die Sicherheit muss ein STRING sein \
                                            (\"starttls\", \"tls\", \"keine\")".into()),
                 };
-                let m = self.smtp_m(i)?;
+                let m = self.smtp_m(i, name)?;
                 m.host = host;
                 m.port = port as u16;
                 m.sicherheit = sicher;
@@ -348,7 +348,7 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "SMTP_LOGIN")?;
                 let b = bi_str(a, 1, "SMTP_LOGIN")?.to_string();
                 let k = bi_str(a, 2, "SMTP_LOGIN")?.to_string();
-                let m = self.smtp_m(i)?;
+                let m = self.smtp_m(i, name)?;
                 m.benutzer = b;
                 m.kennwort = k;
                 Value::Nil
@@ -356,45 +356,45 @@ impl<'p> Vm<'p> {
             "smtp_from" => {
                 let i = bi_int(a, 0, "SMTP_FROM")?;
                 let wer = Self::smtp_wer(a, "SMTP_FROM")?;
-                self.smtp_m(i)?.von = wer;
+                self.smtp_m(i, name)?.von = wer;
                 Value::Nil
             }
             "smtp_to" => {
                 let i = bi_int(a, 0, "SMTP_TO")?;
                 let wer = Self::smtp_wer(a, "SMTP_TO")?;
-                self.smtp_m(i)?.an.push(wer);
+                self.smtp_m(i, name)?.an.push(wer);
                 Value::Nil
             }
             "smtp_cc" => {
                 let i = bi_int(a, 0, "SMTP_CC")?;
                 let wer = Self::smtp_wer(a, "SMTP_CC")?;
-                self.smtp_m(i)?.cc.push(wer);
+                self.smtp_m(i, name)?.cc.push(wer);
                 Value::Nil
             }
             "smtp_bcc" => {
                 let i = bi_int(a, 0, "SMTP_BCC")?;
                 let adresse = bi_str(a, 1, "SMTP_BCC")?.trim().to_string();
                 smtp::pruefe_adresse(&adresse, "SMTP_BCC").map_err(|e| format!("SMTP_BCC: {}", e))?;
-                self.smtp_m(i)?.bcc.push(adresse);
+                self.smtp_m(i, name)?.bcc.push(adresse);
                 Value::Nil
             }
             "smtp_subject" => {
                 let i = bi_int(a, 0, "SMTP_SUBJECT")?;
                 let s = bi_str(a, 1, "SMTP_SUBJECT")?.to_string();
                 smtp::pruefe_kopfwert(&s, "SMTP_SUBJECT: der Betreff")?;
-                self.smtp_m(i)?.betreff = s;
+                self.smtp_m(i, name)?.betreff = s;
                 Value::Nil
             }
             "smtp_text" => {
                 let i = bi_int(a, 0, "SMTP_TEXT")?;
                 let s = bi_str(a, 1, "SMTP_TEXT")?.to_string();
-                self.smtp_m(i)?.text = s;
+                self.smtp_m(i, name)?.text = s;
                 Value::Nil
             }
             "smtp_html" => {
                 let i = bi_int(a, 0, "SMTP_HTML")?;
                 let s = bi_str(a, 1, "SMTP_HTML")?.to_string();
-                self.smtp_m(i)?.html = s;
+                self.smtp_m(i, name)?.html = s;
                 Value::Nil
             }
             "smtp_attach" => {
@@ -417,20 +417,20 @@ impl<'p> Vm<'p> {
                 // Die Art wird an der Endung erkannt -- dieselbe Tabelle, die
                 // auch der Webserver benutzt, damit es nur EINE gibt.
                 let typ = crate::httpd::typ_aus_endung(&pfad).to_string();
-                self.smtp_m(i)?.anhaenge.push(smtp::Anhang { name: anzeige, typ, daten });
+                self.smtp_m(i, name)?.anhaenge.push(smtp::Anhang { name: anzeige, typ, daten });
                 Value::Nil
             }
             "smtp_timeout" => {
                 let i = bi_int(a, 0, "SMTP_TIMEOUT")?;
                 let ms = bi_int(a, 1, "SMTP_TIMEOUT")?;
                 if ms <= 0 { return Err("SMTP_TIMEOUT: die Frist muss groesser als 0 sein".into()); }
-                self.smtp_m(i)?.frist_ms = ms as u64;
+                self.smtp_m(i, name)?.frist_ms = ms as u64;
                 Value::Nil
             }
             "smtp_message$" => {
                 let i = bi_int(a, 0, "SMTP_MESSAGE$")?;
                 let (datum, zufall) = (smtp::rfc_datum(smtp::jetzt_utc()), smtp::zufallszahl());
-                let m = self.smtp_m(i)?;
+                let m = self.smtp_m(i, name)?;
                 let n = smtp::nachricht(m, &datum, zufall)
                     .map_err(|e| format!("SMTP_MESSAGE$: {}", e))?;
                 Value::str_rc(&n)
@@ -438,7 +438,7 @@ impl<'p> Vm<'p> {
             "smtp_send" => {
                 let i = bi_int(a, 0, "SMTP_SEND")?;
                 let (datum, zufall) = (smtp::rfc_datum(smtp::jetzt_utc()), smtp::zufallszahl());
-                let m = self.smtp_m(i)?;
+                let m = self.smtp_m(i, name)?;
                 let n = smtp::nachricht(m, &datum, zufall)
                     .map_err(|e| format!("SMTP_SEND: {}", e))?;
                 smtp::senden(m, &n)?;
@@ -468,20 +468,20 @@ impl<'p> Vm<'p> {
             "xlsx_sheet" => {
                 let i = bi_int(a, 0, "XLSX_SHEET")?;
                 let n = bi_str(a, 1, "XLSX_SHEET")?.to_string();
-                self.xlsx_m(i)?.blatt_dazu(&n).map_err(|e| format!("XLSX_SHEET: {}", e))?;
+                self.xlsx_m(i, name)?.blatt_dazu(&n).map_err(|e| format!("XLSX_SHEET: {}", e))?;
                 Value::Nil
             }
-            "xlsx_sheet_count" => { let i = bi_int(a, 0, "XLSX_SHEET_COUNT")?; Value::Int(self.xlsx_m(i)?.blaetter.len() as i64) }
+            "xlsx_sheet_count" => { let i = bi_int(a, 0, "XLSX_SHEET_COUNT")?; Value::Int(self.xlsx_m(i, name)?.blaetter.len() as i64) }
             "xlsx_set" => {
                 let (i, z, s) = Self::xlsx_zelle(a, "XLSX_SET")?;
                 let t = bi_str(a, 3, "XLSX_SET")?.to_string();
-                self.xlsx_m(i)?.setze(z, s, Wert::Text(t));
+                self.xlsx_m(i, name)?.setze(z, s, Wert::Text(t));
                 Value::Nil
             }
             "xlsx_set_num" => {
                 let (i, z, s) = Self::xlsx_zelle(a, "XLSX_SET_NUM")?;
                 let n = bi_num(a, 3, "XLSX_SET_NUM")?;
-                self.xlsx_m(i)?.setze(z, s, Wert::Zahl(n));
+                self.xlsx_m(i, name)?.setze(z, s, Wert::Zahl(n));
                 Value::Nil
             }
             "xlsx_set_date" => {
@@ -491,7 +491,7 @@ impl<'p> Vm<'p> {
                 let sek = bi_int(a, 3, "XLSX_SET_DATE")?;
                 let muster = match a.get(4) { Some(Value::Str(s)) => s.to_string(),
                                               _ => "DD.MM.YYYY".to_string() };
-                let m = self.xlsx_m(i)?;
+                let m = self.xlsx_m(i, name)?;
                 m.setze(z, s, Wert::Zahl(xlsx::zeit_zu_excel(sek)));
                 // Ohne Format staende in der Zelle die nackte Tageszahl --
                 // ein Datum ist in Excel eine Zahl MIT Formatierung.
@@ -502,7 +502,7 @@ impl<'p> Vm<'p> {
                 let (i, z, s) = Self::xlsx_zelle(a, "XLSX_BOLD")?;
                 let an = match a.get(3) { Some(Value::Bool(b)) => *b, None => true,
                                           Some(_) => return Err("XLSX_BOLD: 4. Argument muss BOOLEAN sein".into()) };
-                self.xlsx_m(i)?.setze_fett(z, s, an);
+                self.xlsx_m(i, name)?.setze_fett(z, s, an);
                 Value::Nil
             }
             "xlsx_bold_row" => {
@@ -510,26 +510,26 @@ impl<'p> Vm<'p> {
                 let z = Self::xlsx_index(a, 1, "XLSX_BOLD_ROW", "Zeile")?;
                 let an = match a.get(2) { Some(Value::Bool(b)) => *b, None => true,
                                           Some(_) => return Err("XLSX_BOLD_ROW: 3. Argument muss BOOLEAN sein".into()) };
-                self.xlsx_m(i)?.setze_zeile_fett(z, an);
+                self.xlsx_m(i, name)?.setze_zeile_fett(z, an);
                 Value::Nil
             }
             "xlsx_format" => {
                 let (i, z, s) = Self::xlsx_zelle(a, "XLSX_FORMAT")?;
                 let f = bi_str(a, 3, "XLSX_FORMAT")?.to_string();
-                self.xlsx_m(i)?.setze_format(z, s, &f);
+                self.xlsx_m(i, name)?.setze_format(z, s, &f);
                 Value::Nil
             }
             "xlsx_col_width" => {
                 let i = bi_int(a, 0, "XLSX_COL_WIDTH")?;
                 let s = Self::xlsx_index(a, 1, "XLSX_COL_WIDTH", "Spalte")?;
                 let w = bi_num(a, 2, "XLSX_COL_WIDTH")?;
-                self.xlsx_m(i)?.setze_breite(s, w.max(0.0));
+                self.xlsx_m(i, name)?.setze_breite(s, w.max(0.0));
                 Value::Nil
             }
             "xlsx_save" => {
                 let i = bi_int(a, 0, "XLSX_SAVE")?;
                 let pfad = bi_str(a, 1, "XLSX_SAVE")?.to_string();
-                let teile = crate::xlsx::teile(self.xlsx_m(i)?);
+                let teile = crate::xlsx::teile(self.xlsx_m(i, name)?);
                 crate::zipdatei::packe_daten(std::path::Path::new(&pfad), &teile)
                     .map_err(|e| format!("XLSX_SAVE: {}", e))?;
                 Value::Nil
@@ -544,8 +544,8 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
-    pub(super) fn xlsx_m(&mut self, idx: i64) -> R<&mut crate::xlsx::Mappe> {
-        Self::handle_get_mut(&mut self.xlsx_mappe, idx, "XLSX", "ungueltiges/geschlossenes XLSX-Handle")
+    pub(super) fn xlsx_m(&mut self, idx: i64, fn_: &str) -> R<&mut crate::xlsx::Mappe> {
+        Self::handle_get_mut(&mut self.xlsx_mappe, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes XLSX-Handle")
     }
 
     /// Zeile und Spalte einer Zelle -- beide 0-basiert wie ueberall in der
@@ -605,20 +605,20 @@ impl<'p> Vm<'p> {
                 self.pdf_dok.push(Some(pdf::Dokument::neu(b, h)));
                 Value::Int((self.pdf_dok.len() - 1) as i64)
             }
-            "pdf_page" => { let i = bi_int(a, 0, "PDF_PAGE")?; self.pdf_d(i)?.seite_beginnen(); Value::Nil }
-            "pdf_page_count" => { let i = bi_int(a, 0, "PDF_PAGE_COUNT")?; Value::Int(self.pdf_d(i)?.seiten.len() as i64) }
-            "pdf_page_width" => { let i = bi_int(a, 0, "PDF_PAGE_WIDTH")?; Value::Float(self.pdf_d(i)?.breite_mm) }
-            "pdf_page_height" => { let i = bi_int(a, 0, "PDF_PAGE_HEIGHT")?; Value::Float(self.pdf_d(i)?.hoehe_mm) }
+            "pdf_page" => { let i = bi_int(a, 0, "PDF_PAGE")?; self.pdf_d(i, name)?.seite_beginnen(); Value::Nil }
+            "pdf_page_count" => { let i = bi_int(a, 0, "PDF_PAGE_COUNT")?; Value::Int(self.pdf_d(i, name)?.seiten.len() as i64) }
+            "pdf_page_width" => { let i = bi_int(a, 0, "PDF_PAGE_WIDTH")?; Value::Float(self.pdf_d(i, name)?.breite_mm) }
+            "pdf_page_height" => { let i = bi_int(a, 0, "PDF_PAGE_HEIGHT")?; Value::Float(self.pdf_d(i, name)?.hoehe_mm) }
             "pdf_title" => {
                 let i = bi_int(a, 0, "PDF_TITLE")?;
                 let t = bi_str(a, 1, "PDF_TITLE")?.to_string();
-                self.pdf_d(i)?.titel = t; Value::Nil
+                self.pdf_d(i, name)?.titel = t; Value::Nil
             }
             "pdf_font" => {
                 let i = bi_int(a, 0, "PDF_FONT")?;
                 let name = bi_str(a, 1, "PDF_FONT")?.to_string();
                 let gr = bi_num(a, 2, "PDF_FONT")?;
-                let d = self.pdf_d(i)?;
+                let d = self.pdf_d(i, "pdf_font")?;
                 let idx = d.schrift_suchen(&name).map_err(|e| format!("PDF_FONT: {}", e))?;
                 if gr <= 0.0 { return Err(format!("PDF_FONT: Schriftgroesse {} ist nicht positiv", gr)); }
                 d.setze_schrift(idx, gr);
@@ -632,7 +632,7 @@ impl<'p> Vm<'p> {
                 let name = bi_str(a, 2, "PDF_FONT_LOAD")?.to_string();
                 let daten = std::fs::read(&pfad)
                     .map_err(|e| format!("PDF_FONT_LOAD: {}: {}", pfad, e))?;
-                self.pdf_d(i)?.schrift_laden(&name, daten)
+                self.pdf_d(i, "pdf_font_load")?.schrift_laden(&name, daten)
                     .map_err(|e| format!("PDF_FONT_LOAD: {}", e))?;
                 Value::Nil
             }
@@ -643,13 +643,13 @@ impl<'p> Vm<'p> {
                 let (r, g, b) = (((c >> 16) & 255) as f64 / 255.0,
                                  ((c >> 8) & 255) as f64 / 255.0,
                                  (c & 255) as f64 / 255.0);
-                self.pdf_d(i)?.setze_farbe(r, g, b);
+                self.pdf_d(i, name)?.setze_farbe(r, g, b);
                 Value::Nil
             }
             "pdf_line_width" => {
                 let i = bi_int(a, 0, "PDF_LINE_WIDTH")?;
                 let mm = bi_num(a, 1, "PDF_LINE_WIDTH")?;
-                self.pdf_d(i)?.setze_strich(mm.max(0.0));
+                self.pdf_d(i, name)?.setze_strich(mm.max(0.0));
                 Value::Nil
             }
             // PDF_TEXT(p, x, y, text$ [, winkel]) -- der Winkel in Grad gegen
@@ -663,7 +663,7 @@ impl<'p> Vm<'p> {
                 let (x, y) = (bi_num(a, 1, "PDF_TEXT")?, bi_num(a, 2, "PDF_TEXT")?);
                 let t = bi_str(a, 3, "PDF_TEXT")?.to_string();
                 let w = if a.len() > 4 { bi_num(a, 4, "PDF_TEXT")? } else { 0.0 };
-                self.pdf_d(i)?.text(x, y, &t, w).map_err(|e| format!("PDF_TEXT: {}", e))?;
+                self.pdf_d(i, name)?.text(x, y, &t, w).map_err(|e| format!("PDF_TEXT: {}", e))?;
                 Value::Nil
             }
             // PDF_OPACITY(p, deckkraft) -- 0..1 fuer alles, was danach kommt;
@@ -671,10 +671,10 @@ impl<'p> Vm<'p> {
             "pdf_opacity" => {
                 let i = bi_int(a, 0, "PDF_OPACITY")?;
                 let d = bi_num(a, 1, "PDF_OPACITY")?;
-                self.pdf_d(i)?.setze_deckkraft(d).map_err(|e| format!("PDF_OPACITY: {}", e))?;
+                self.pdf_d(i, name)?.setze_deckkraft(d).map_err(|e| format!("PDF_OPACITY: {}", e))?;
                 Value::Nil
             }
-            "pdf_get_opacity" => { let i = bi_int(a, 0, "PDF_GET_OPACITY")?; Value::Float(self.pdf_d(i)?.deckkraft()) }
+            "pdf_get_opacity" => { let i = bi_int(a, 0, "PDF_GET_OPACITY")?; Value::Float(self.pdf_d(i, name)?.deckkraft()) }
             // PDF_DASH(p, strich_mm [, luecke_mm]) -- gestrichelt fuer alle
             // folgenden Linien und Umrisse; ohne Luecke so lang wie der
             // Strich, PDF_DASH(p, 0) zieht wieder durch (Glutfaden Stufe 7:
@@ -686,14 +686,14 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "PDF_DASH")?;
                 let an = bi_num(a, 1, "PDF_DASH")?;
                 let aus = if a.len() > 2 { bi_num(a, 2, "PDF_DASH")? } else { an };
-                self.pdf_d(i)?.setze_strichel(an, aus).map_err(|e| format!("PDF_DASH: {}", e))?;
+                self.pdf_d(i, name)?.setze_strichel(an, aus).map_err(|e| format!("PDF_DASH: {}", e))?;
                 Value::Nil
             }
             "pdf_circle" | "pdf_circle_fill" => {
                 let fn_ = if name == "pdf_circle" { "PDF_CIRCLE" } else { "PDF_CIRCLE_FILL" };
                 let i = bi_int(a, 0, fn_)?;
                 let (x, y, r) = (bi_num(a, 1, fn_)?, bi_num(a, 2, fn_)?, bi_num(a, 3, fn_)?);
-                self.pdf_d(i)?.kreis(x, y, r, name == "pdf_circle_fill").map_err(|e| format!("{}: {}", fn_, e))?;
+                self.pdf_d(i, name)?.kreis(x, y, r, name == "pdf_circle_fill").map_err(|e| format!("{}: {}", fn_, e))?;
                 Value::Nil
             }
             // PDF_POLYGON(p, xs, ys) -- ein geschlossener Zug; die Felder
@@ -707,19 +707,19 @@ impl<'p> Vm<'p> {
                     return Err(format!("{}: xs und ys muessen gleich lang sein ({} gegen {})", fn_, xs.len(), ys.len()));
                 }
                 let pkt: Vec<(f64, f64)> = xs.into_iter().zip(ys).collect();
-                self.pdf_d(i)?.vieleck(pkt, name == "pdf_polygon_fill").map_err(|e| format!("{}: {}", fn_, e))?;
+                self.pdf_d(i, name)?.vieleck(pkt, name == "pdf_polygon_fill").map_err(|e| format!("{}: {}", fn_, e))?;
                 Value::Nil
             }
             "pdf_text_width" => {
                 let i = bi_int(a, 0, "PDF_TEXT_WIDTH")?;
                 let t = bi_str(a, 1, "PDF_TEXT_WIDTH")?.to_string();
-                Value::Float(self.pdf_d(i)?.textbreite(&t).map_err(|e| format!("PDF_TEXT_WIDTH: {}", e))?)
+                Value::Float(self.pdf_d(i, name)?.textbreite(&t).map_err(|e| format!("PDF_TEXT_WIDTH: {}", e))?)
             }
             "pdf_line" => {
                 let i = bi_int(a, 0, "PDF_LINE")?;
                 let (x1, y1) = (bi_num(a, 1, "PDF_LINE")?, bi_num(a, 2, "PDF_LINE")?);
                 let (x2, y2) = (bi_num(a, 3, "PDF_LINE")?, bi_num(a, 4, "PDF_LINE")?);
-                self.pdf_d(i)?.linie(x1, y1, x2, y2);
+                self.pdf_d(i, name)?.linie(x1, y1, x2, y2);
                 Value::Nil
             }
             "pdf_rect" | "pdf_rect_fill" => {
@@ -727,7 +727,7 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, fn_)?;
                 let (x, y) = (bi_num(a, 1, fn_)?, bi_num(a, 2, fn_)?);
                 let (b, h) = (bi_num(a, 3, fn_)?, bi_num(a, 4, fn_)?);
-                self.pdf_d(i)?.rechteck(x, y, b, h, name == "pdf_rect_fill");
+                self.pdf_d(i, name)?.rechteck(x, y, b, h, name == "pdf_rect_fill");
                 Value::Nil
             }
             // PDF_IMAGE(pdf, bild, x, y, b [, h]) -- ein IMAGE (LOADIMAGE,
@@ -747,7 +747,7 @@ impl<'p> Vm<'p> {
                 {
                     let g = self.gfx.as_ref().ok_or("PDF_IMAGE: kein Bild geladen -- ein Bild kommt aus LOADIMAGE, IMAGE_NEW oder RENDERTARGET_IMAGE")?;
                     let (px, pw, ph) = g.image_rgba(bild, "PDF_IMAGE")?;
-                    self.pdf_d(i)?.bild(x, y, b, h, px, pw, ph).map_err(|e| format!("PDF_IMAGE: {}", e))?;
+                    self.pdf_d(i, name)?.bild(x, y, b, h, px, pw, ph).map_err(|e| format!("PDF_IMAGE: {}", e))?;
                     Value::Nil
                 }
                 #[cfg(not(feature = "graphics"))]
@@ -756,7 +756,7 @@ impl<'p> Vm<'p> {
             "pdf_save" => {
                 let i = bi_int(a, 0, "PDF_SAVE")?;
                 let pfad = bi_str(a, 1, "PDF_SAVE")?.to_string();
-                let bytes = self.pdf_d(i)?.bauen().map_err(|e| format!("PDF_SAVE: {}", e))?;
+                let bytes = self.pdf_d(i, name)?.bauen().map_err(|e| format!("PDF_SAVE: {}", e))?;
                 std::fs::write(&pfad, &bytes)
                     .map_err(|e| format!("PDF_SAVE: {}: {}", pfad, e))?;
                 Value::Nil
@@ -770,7 +770,7 @@ impl<'p> Vm<'p> {
                 let kopien = if a.len() > 2 { bi_int(a, 2, "PDF_PRINT")? } else { 1 };
                 let ziel = if a.len() > 3 { bi_str(a, 3, "PDF_PRINT")?.to_string() } else { String::new() };
                 if a.len() > 4 { return Err("PDF_PRINT: erwartet 1..4 Argumente (pdf[, drucker$[, kopien[, zieldatei$]]])".into()); }
-                let doc = self.pdf_d(i)?;
+                let doc = self.pdf_d(i, name)?;
                 crate::drucken::drucken(doc, &drucker, kopien, &ziel)?;
                 Value::Nil
             }
@@ -780,7 +780,7 @@ impl<'p> Vm<'p> {
                 let seite = bi_int(a, 1, "PDF_PREVIEW")?;
                 let breite = if a.len() > 2 { bi_int(a, 2, "PDF_PREVIEW")? as i32 } else { 600 };
                 let (ops, b_mm, h_mm, schriften) = {
-                    let doc = self.pdf_d(i)?;
+                    let doc = self.pdf_d(i, name)?;
                     let n = doc.seiten.len() as i64;
                     if seite < 1 || seite > n {
                         return Err(format!("PDF_PREVIEW: Seite {} gibt es nicht (1..{})", seite, n));
@@ -815,8 +815,8 @@ impl<'p> Vm<'p> {
     }
 
     #[cfg(feature = "pdf")]
-    pub(super) fn pdf_d(&mut self, idx: i64) -> R<&mut crate::pdf::Dokument> {
-        Self::handle_get_mut(&mut self.pdf_dok, idx, "PDF", "ungueltiges/geschlossenes PDF-Handle")
+    pub(super) fn pdf_d(&mut self, idx: i64, fn_: &str) -> R<&mut crate::pdf::Dokument> {
+        Self::handle_get_mut(&mut self.pdf_dok, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes PDF-Handle")
     }
 
     /// Modul `httpd` -- ein kleiner Webserver im Takt der Hauptschleife.
@@ -835,8 +835,8 @@ impl<'p> Vm<'p> {
     }
 
     #[cfg(feature = "net")]
-    pub(super) fn httpd_srv(&mut self, idx: i64) -> R<&mut crate::httpd::Server> {
-        Self::handle_get_mut(&mut self.httpd_server, idx, "HTTPD",
+    pub(super) fn httpd_srv(&mut self, idx: i64, fn_: &str) -> R<&mut crate::httpd::Server> {
+        Self::handle_get_mut(&mut self.httpd_server, idx, &fn_.to_uppercase(),
                              "ungueltiges/gestopptes HTTPD-Handle")
     }
 
@@ -856,35 +856,35 @@ impl<'p> Vm<'p> {
                 if let Some(slot) = self.httpd_server.get_mut(i) { *slot = None; }
                 Value::Nil
             }
-            "httpd_port" => { let i = bi_int(a, 0, "HTTPD_PORT")?; Value::Int(self.httpd_srv(i)?.port) }
+            "httpd_port" => { let i = bi_int(a, 0, "HTTPD_PORT")?; Value::Int(self.httpd_srv(i, name)?.port) }
             "httpd_set_header" => {
                 let i = bi_int(a, 0, "HTTPD_SET_HEADER")?;
                 let n = bi_str(a, 1, "HTTPD_SET_HEADER")?.to_string();
                 let w = bi_str(a, 2, "HTTPD_SET_HEADER")?.to_string();
-                httpd::kopfzeile_setzen(self.httpd_srv(i)?, &n, &w)?;
+                httpd::kopfzeile_setzen(self.httpd_srv(i, name)?, &n, &w)?;
                 Value::Nil
             }
             "httpd_accept" => {
                 let i = bi_int(a, 0, "HTTPD_ACCEPT")?;
-                Value::Bool(httpd::annehmen(self.httpd_srv(i)?)?)
+                Value::Bool(httpd::annehmen(self.httpd_srv(i, name)?)?)
             }
             "httpd_method$" | "httpd_method" => {
                 let i = bi_int(a, 0, "HTTPD_METHOD$")?;
-                Value::str_rc(&Self::httpd_anfrage(self.httpd_srv(i)?, "HTTPD_METHOD$")?.methode.clone())
+                Value::str_rc(&Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_METHOD$")?.methode.clone())
             }
             "httpd_path$" | "httpd_path" => {
                 let i = bi_int(a, 0, "HTTPD_PATH$")?;
-                Value::str_rc(&Self::httpd_anfrage(self.httpd_srv(i)?, "HTTPD_PATH$")?.pfad.clone())
+                Value::str_rc(&Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_PATH$")?.pfad.clone())
             }
             "httpd_body$" | "httpd_body" => {
                 let i = bi_int(a, 0, "HTTPD_BODY$")?;
-                let r = Self::httpd_anfrage(self.httpd_srv(i)?, "HTTPD_BODY$")?;
+                let r = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_BODY$")?;
                 Value::str_rc(String::from_utf8_lossy(&r.rumpf).into_owned())
             }
             "httpd_query$" | "httpd_query" => {
                 let i = bi_int(a, 0, "HTTPD_QUERY$")?;
                 let k = bi_str(a, 1, "HTTPD_QUERY$")?.to_lowercase();
-                let r = Self::httpd_anfrage(self.httpd_srv(i)?, "HTTPD_QUERY$")?;
+                let r = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_QUERY$")?;
                 // Nicht vorhanden -> Leerstring, kein Fehler: was in einer
                 // Adresse steht, ist Benutzereingabe (wie ARG$).
                 Value::str_rc(r.abfrage.iter().find(|(n, _)| n.to_lowercase() == k)
@@ -893,7 +893,7 @@ impl<'p> Vm<'p> {
             "httpd_header$" | "httpd_header" => {
                 let i = bi_int(a, 0, "HTTPD_HEADER$")?;
                 let k = bi_str(a, 1, "HTTPD_HEADER$")?.to_lowercase();
-                let r = Self::httpd_anfrage(self.httpd_srv(i)?, "HTTPD_HEADER$")?;
+                let r = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_HEADER$")?;
                 Value::str_rc(r.kopfzeilen.iter().find(|(n, _)| *n == k)
                                .map(|(_, v)| v.as_str()).unwrap_or(""))
             }
@@ -902,7 +902,7 @@ impl<'p> Vm<'p> {
                 let code = bi_int(a, 1, "HTTPD_SEND")?;
                 let typ = bi_str(a, 2, "HTTPD_SEND")?.to_string();
                 let inhalt = bi_str(a, 3, "HTTPD_SEND")?.to_string();
-                httpd::antworten(self.httpd_srv(i)?, code, &typ, inhalt.as_bytes())?;
+                httpd::antworten(self.httpd_srv(i, name)?, code, &typ, inhalt.as_bytes())?;
                 Value::Nil
             }
             "httpd_send_file" => {
@@ -912,7 +912,7 @@ impl<'p> Vm<'p> {
                 let inhalt = std::fs::read(&pfad)
                     .map_err(|e| format!("HTTPD_SEND_FILE: {}: {}", pfad, e))?;
                 let typ = httpd::typ_aus_endung(&pfad);
-                httpd::antworten(self.httpd_srv(i)?, code, typ, &inhalt)?;
+                httpd::antworten(self.httpd_srv(i, name)?, code, typ, &inhalt)?;
                 Value::Nil
             }
             "httpd_send_dir" => {
@@ -925,12 +925,12 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "HTTPD_SEND_DIR")?;
                 let ordner = bi_str(a, 1, "HTTPD_SEND_DIR")?.to_string();
                 let start = match a.get(2) { Some(Value::Str(s)) => s.to_string(), _ => "index.html".to_string() };
-                let pfad = Self::httpd_anfrage(self.httpd_srv(i)?, "HTTPD_SEND_DIR")?.pfad.clone();
+                let pfad = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_SEND_DIR")?.pfad.clone();
                 let wurzel = std::path::Path::new(&ordner);
                 let ziel = match httpd::sicher_verbinden(wurzel, &pfad) {
                     Some(z) => if z.is_dir() { z.join(&start) } else { z },
                     None => {
-                        httpd::antworten(self.httpd_srv(i)?, 403, "text/plain; charset=utf-8",
+                        httpd::antworten(self.httpd_srv(i, name)?, 403, "text/plain; charset=utf-8",
                                          b"403 -- Pfad nicht erlaubt")?;
                         return Ok(Some(Value::Bool(false)));
                     }
@@ -938,14 +938,14 @@ impl<'p> Vm<'p> {
                 match std::fs::read(&ziel) {
                     Ok(inhalt) => {
                         let typ = httpd::typ_aus_endung(&ziel.to_string_lossy());
-                        httpd::antworten(self.httpd_srv(i)?, 200, typ, &inhalt)?;
+                        httpd::antworten(self.httpd_srv(i, name)?, 200, typ, &inhalt)?;
                         Value::Bool(true)
                     }
                     Err(_) => {
                         // Kein Fehler, sondern ein 404 -- eine fehlende Datei
                         // ist der Alltag eines Servers und darf das Programm
                         // nicht anhalten. Der Rueckgabewert sagt es trotzdem.
-                        httpd::antworten(self.httpd_srv(i)?, 404, "text/plain; charset=utf-8",
+                        httpd::antworten(self.httpd_srv(i, name)?, 404, "text/plain; charset=utf-8",
                                          b"404 -- nicht gefunden")?;
                         Value::Bool(false)
                     }
@@ -971,8 +971,8 @@ impl<'p> Vm<'p> {
         { let _ = (name, a); Ok(None) }
     }
     #[cfg(feature = "net")]
-    pub(super) fn mqtt_client(&mut self, idx: i64) -> R<&mut crate::mqtt::Client> {
-        Self::handle_get_mut(&mut self.mqtt_clients, idx, "MQTT", "ungueltiges/geschlossenes MQTT_HANDLE")
+    pub(super) fn mqtt_client(&mut self, idx: i64, fn_: &str) -> R<&mut crate::mqtt::Client> {
+        Self::handle_get_mut(&mut self.mqtt_clients, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes MQTT_HANDLE")
     }
     #[cfg(feature = "net")]
     pub(super) fn try_mqtt_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
@@ -1030,27 +1030,27 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "MQTT_PUBLISH")?; let topic = bi_str(a, 1, "MQTT_PUBLISH")?.to_string(); let payload = bi_str(a, 2, "MQTT_PUBLISH")?.to_string();
                 let retain = if a.len() >= 4 { bi_bool(a, 3, "MQTT_PUBLISH")? } else { false };
                 let qos = mqtt::qos_pruefen("MQTT_PUBLISH", if a.len() >= 5 { bi_int(a, 4, "MQTT_PUBLISH")? } else { 0 })?;
-                Value::Bool(mqtt::publish(self.mqtt_client(i)?, &topic, &payload, retain, qos))
+                Value::Bool(mqtt::publish(self.mqtt_client(i, name)?, &topic, &payload, retain, qos))
             }
             "mqtt_subscribe" => {
                 let i = bi_int(a, 0, "MQTT_SUBSCRIBE")?; let topic = bi_str(a, 1, "MQTT_SUBSCRIBE")?.to_string();
                 let qos = mqtt::qos_pruefen("MQTT_SUBSCRIBE", if a.len() >= 3 { bi_int(a, 2, "MQTT_SUBSCRIBE")? } else { 0 })?;
-                Value::Bool(mqtt::subscribe(self.mqtt_client(i)?, &topic, qos))
+                Value::Bool(mqtt::subscribe(self.mqtt_client(i, name)?, &topic, qos))
             }
             "mqtt_unsubscribe" => {
                 let i = bi_int(a, 0, "MQTT_UNSUBSCRIBE")?; let topic = bi_str(a, 1, "MQTT_UNSUBSCRIBE")?.to_string();
-                Value::Bool(mqtt::unsubscribe(self.mqtt_client(i)?, &topic))
+                Value::Bool(mqtt::unsubscribe(self.mqtt_client(i, name)?, &topic))
             }
-            "mqtt_pending" => { let i = bi_int(a, 0, "MQTT_PENDING")?; Value::Int(mqtt::pending(self.mqtt_client(i)?) as i64) }
+            "mqtt_pending" => { let i = bi_int(a, 0, "MQTT_PENDING")?; Value::Int(mqtt::pending(self.mqtt_client(i, name)?) as i64) }
             "mqtt_flush" => {
                 let i = bi_int(a, 0, "MQTT_FLUSH")?;
                 let ms = if a.len() >= 2 { bi_int(a, 1, "MQTT_FLUSH")? } else { 2000 };
-                Value::Bool(mqtt::flush(self.mqtt_client(i)?, ms)?)
+                Value::Bool(mqtt::flush(self.mqtt_client(i, name)?, ms)?)
             }
-            "mqtt_update" => { let i = bi_int(a, 0, "MQTT_UPDATE")?; mqtt::update(self.mqtt_client(i)?)?; Value::Nil }
-            "mqtt_next_message" => { let i = bi_int(a, 0, "MQTT_NEXT_MESSAGE")?; Value::Bool(mqtt::next_message(self.mqtt_client(i)?)) }
-            "mqtt_message_topic" => { let i = bi_int(a, 0, "MQTT_MESSAGE_TOPIC")?; Value::str_rc(mqtt::message_topic(self.mqtt_client(i)?)) }
-            "mqtt_message_payload" => { let i = bi_int(a, 0, "MQTT_MESSAGE_PAYLOAD")?; Value::str_rc(mqtt::message_payload(self.mqtt_client(i)?)) }
+            "mqtt_update" => { let i = bi_int(a, 0, "MQTT_UPDATE")?; mqtt::update(self.mqtt_client(i, name)?)?; Value::Nil }
+            "mqtt_next_message" => { let i = bi_int(a, 0, "MQTT_NEXT_MESSAGE")?; Value::Bool(mqtt::next_message(self.mqtt_client(i, name)?)) }
+            "mqtt_message_topic" => { let i = bi_int(a, 0, "MQTT_MESSAGE_TOPIC")?; Value::str_rc(mqtt::message_topic(self.mqtt_client(i, name)?)) }
+            "mqtt_message_payload" => { let i = bi_int(a, 0, "MQTT_MESSAGE_PAYLOAD")?; Value::str_rc(mqtt::message_payload(self.mqtt_client(i, name)?)) }
             _ => return Ok(None),
         };
         Ok(Some(v))
