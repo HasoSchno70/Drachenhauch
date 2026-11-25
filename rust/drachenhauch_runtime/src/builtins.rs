@@ -6017,9 +6017,6 @@ fn phys2d_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics
     match v { Value::Phys2d(w) => Ok(w), _ => Err(format!("{}: erwartet PHYS2D_WORLD", fn_)) }
 }
 
-/// Die Nummer eines Koerpers, den es gibt -- sonst eine Meldung statt der
-/// stillen Lage (0, 0), die ein entfernter Koerper frueher lieferte.
-#[cfg(feature = "physik")]
 /// Wie `phys2d_koerper`: eine Koerpernummer, die es nicht gibt, ist ein
 /// Fehler. Bis 2026.53 lieferte physics3d dafuer still (0, 0, 0) und
 /// schluckte SET_POS/SET_VEL/APPLY_IMPULSE.
@@ -6030,6 +6027,9 @@ fn phys3d_koerper(w: &crate::physics3d::Phys3dWorld, v: &Value, fn_: &str) -> Re
     Err(format!("{}: einen Koerper {} gibt es nicht -- nie angelegt oder mit PHYS3D_REMOVE entfernt", fn_, idx))
 }
 
+/// Die Nummer eines Koerpers, den es gibt -- sonst eine Meldung statt der
+/// stillen Lage (0, 0), die ein entfernter Koerper frueher lieferte.
+#[cfg(feature = "physik")]
 fn phys2d_koerper(w: &crate::physics2d::Phys2dWorld, v: &Value, fn_: &str) -> Result<i64, String> {
     let idx = need_int(v, fn_)?;
     if w.gibt_es(idx) { return Ok(idx); }
