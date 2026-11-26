@@ -5703,13 +5703,27 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "char_set_coyote_time" => {
             arity!(2);
             let c = char_h(&a[0], "CHAR_SET_COYOTE_TIME")?;
-            c.borrow_mut().coyote_max = need_int(&a[1], "CHAR_SET_COYOTE_TIME")?.max(0);
+            c.borrow_mut().coyote_max = need_int(&a[1], "CHAR_SET_COYOTE_TIME")?.max(0) as f64;
+            Ok(Value::Nil)
+        }
+        // Dieselben Fristen in ms (Leitlinie: Dauern in ms, Regel 9 in
+        // docs/builtins-namen.md); die alten zaehlen Bilder zu 1/60 s.
+        "char_set_coyote_ms" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_COYOTE_MS")?;
+            c.borrow_mut().coyote_max = need_num(&a[1], "CHAR_SET_COYOTE_MS")?.max(0.0) * 0.06;
+            Ok(Value::Nil)
+        }
+        "char_set_jump_buffer_ms" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_JUMP_BUFFER_MS")?;
+            c.borrow_mut().jump_buffer_max = need_num(&a[1], "CHAR_SET_JUMP_BUFFER_MS")?.max(0.0) * 0.06;
             Ok(Value::Nil)
         }
         "char_set_jump_buffer" => {
             arity!(2);
             let c = char_h(&a[0], "CHAR_SET_JUMP_BUFFER")?;
-            c.borrow_mut().jump_buffer_max = need_int(&a[1], "CHAR_SET_JUMP_BUFFER")?.max(0);
+            c.borrow_mut().jump_buffer_max = need_int(&a[1], "CHAR_SET_JUMP_BUFFER")?.max(0) as f64;
             Ok(Value::Nil)
         }
         "char_set_variable_jump" => {
@@ -5734,11 +5748,32 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         "char_update" => {
-            arity!(3);
+            // Optional dt in Sekunden (wie DELTA); ohne ein Schritt je Bild.
+            // Ein dt ueber 0.1 s wird geteilt, damit ein Ruckler die Figur
+            // nicht durch duenne Boeden traegt (wie PHYS*_STEP).
+            if a.len() != 3 && a.len() != 4 {
+                return Err(format!("CHAR_UPDATE: erwartet 3 oder 4 Argumente, erhalten {}", a.len()));
+            }
             let c = char_h(&a[0], "CHAR_UPDATE")?;
             let m = tiled_h(&a[1], "CHAR_UPDATE")?; let mb = m.borrow();
             let li = tile_layer_idx(&mb, need_int(&a[2], "CHAR_UPDATE")?, "CHAR_UPDATE")?;
-            c.borrow_mut().update(&mb, &mb.layers[li]);
+            if a.len() == 4 {
+                let dt = need_num(&a[3], "CHAR_UPDATE")?;
+                if !dt.is_finite() || dt < 0.0 {
+                    return Err(format!("CHAR_UPDATE: dt muss eine Zahl >= 0 sein (Sekunden), erhalten {}", dt));
+                }
+                if dt > 1.0 {
+                    return Err(format!("CHAR_UPDATE: dt ist in Sekunden (wie DELTA) -- {} sieht nach Millisekunden aus", dt));
+                }
+                let mut rest = dt * 60.0;
+                while rest > 1e-9 {
+                    let s = rest.min(6.0);
+                    c.borrow_mut().update(&mb, &mb.layers[li], s);
+                    rest -= s;
+                }
+            } else {
+                c.borrow_mut().update(&mb, &mb.layers[li], 1.0);
+            }
             Ok(Value::Nil)
         }
         "char_x" => { arity!(1); Ok(Value::Float(char_h(&a[0], "CHAR_X")?.borrow().x)) }

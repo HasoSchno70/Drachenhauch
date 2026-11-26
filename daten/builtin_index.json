@@ -2181,6 +2181,18 @@
    "module": "controller"
   },
   {
+   "name": "CHAR_SET_JUMP_BUFFER_MS",
+   "kind": "core",
+   "signature": "CHAR_SET_JUMP_BUFFER_MS(c: ?, ms: FLOAT)",
+   "module": "controller"
+  },
+  {
+   "name": "CHAR_SET_COYOTE_MS",
+   "kind": "core",
+   "signature": "CHAR_SET_COYOTE_MS(c: ?, ms: FLOAT)",
+   "module": "controller"
+  },
+  {
    "name": "CHAR_SET_JUMP_VELOCITY",
    "kind": "core",
    "signature": "CHAR_SET_JUMP_VELOCITY(c: ?, vy: Zahl)",
@@ -2231,7 +2243,7 @@
   {
    "name": "CHAR_UPDATE",
    "kind": "core",
-   "signature": "CHAR_UPDATE(c: ?, map: ?, layer_idx: INTEGER)",
+   "signature": "CHAR_UPDATE(c: ?, map: ?, layer_idx: INTEGER [, dt: FLOAT])",
    "module": "controller"
   },
   {

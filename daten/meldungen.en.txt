@@ -2183,3 +2183,6 @@ jit: {} Runden in der VM -- {}	jit: {} rounds in the VM -- {}
 {}: keine Verbindung zu {}:{} -- {}	{}: no connection to {}:{} -- {}
 {}: Host '{}' nicht aufloesbar (auch nicht ueber mDNS)	{}: host '{}' cannot be resolved (not even via mDNS)
 {}: das Aufloesen von '{}' hat laenger als {} s gedauert	{}: resolving '{}' took longer than {} s
+CHAR_UPDATE: erwartet 3 oder 4 Argumente, erhalten {}	CHAR_UPDATE: expected 3 or 4 arguments, got {}
+CHAR_UPDATE: dt muss eine Zahl >= 0 sein (Sekunden), erhalten {}	CHAR_UPDATE: dt must be a number >= 0 (seconds), got {}
+CHAR_UPDATE: dt ist in Sekunden (wie DELTA) -- {} sieht nach Millisekunden aus	CHAR_UPDATE: dt is in seconds (like DELTA) -- {} looks like milliseconds
