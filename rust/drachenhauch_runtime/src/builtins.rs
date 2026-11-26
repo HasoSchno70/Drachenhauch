@@ -3350,8 +3350,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(1);
             let path = need_str(&a[0], "ANIM_FSM_LOAD")?;
             let resolved = resolve_asset_path(path);
-            let text = std::fs::read_to_string(&resolved)
-                .map_err(|e| format!("ANIM_FSM_LOAD: Lesefehler '{}': {}", resolved, e))?;
+            let text = text_lesen(&resolved, None, "ANIM_FSM_LOAD")?;
             let data: serde_json::Value = serde_json::from_str(&text)
                 .map_err(|e| format!("ANIM_FSM_LOAD: Parse-Fehler '{}': {}", resolved, e))?;
             let fsm = crate::animfsm::AnimFsmObj::from_json(&data)?;
@@ -6116,9 +6115,9 @@ fn json_to_val(j: &serde_json::Value) -> Value {
 }
 
 fn save_load(path: &str) -> R {
-    let text = std::fs::read_to_string(resolve_asset_path(path)).map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound { format!("SAVE_LOAD: Datei '{}' nicht gefunden", path) } else { format!("SAVE_LOAD: {}", e) }
-    })?;
+    // Wie jede gelesene Textdatei (text_lesen): eine BOM vorn bricht das
+    // JSON nicht mehr (ein Spielstand, den ein Editor mit BOM speicherte).
+    let text = text_lesen(path, None, "SAVE_LOAD")?;
     let raw: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("SAVE_LOAD: '{}' ist kein gueltiges JSON ({})", path, e))?;
     let obj = raw.as_object().ok_or("SAVE_LOAD: Save-Datei muss ein JSON-Objekt sein")?;
     let version = obj.get("_version").and_then(|v| v.as_i64()).unwrap_or(1);
@@ -6326,8 +6325,8 @@ fn text_lesen(pfad: &str, kodierung: Option<&str>, fn_: &str) -> Result<String, 
         Some(n) => crate::kodierung::aus_name(n, fn_)?,
         None => crate::kodierung::Kodierung::Utf8,
     };
-    let bytes = std::fs::read(resolve_asset_path(pfad))
-        .map_err(|e| format!("{}: {}: {}", fn_, pfad, e))?;
+    let gefunden = resolve_asset_path(pfad);
+    let bytes = std::fs::read(&gefunden).map_err(|e| datei_fehler(fn_, &gefunden, &e))?;
     Ok(crate::kodierung::ohne_bom(crate::kodierung::dekodieren(&bytes, k, fn_, pfad)?))
 }
 
