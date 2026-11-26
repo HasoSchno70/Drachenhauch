@@ -6,8 +6,7 @@
 #![cfg(feature = "net")]
 
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream, ToSocketAddrs, UdpSocket};
-use std::sync::mpsc;
+use std::net::{TcpListener, TcpStream, UdpSocket};
 use std::time::Duration;
 
 /// Obergrenze fuer NET_RECV/NET_UDP_RECV(sock, n) -- ohne Cap loest ein
@@ -165,44 +164,13 @@ pub fn accept(l: &TcpListener) -> Result<Option<NetSock>, String> {
     }
 }
 
-/// Loest `host` mit einem eigenen Timeout auf (statt der unbegrenzt blockierenden
-/// stdlib-DNS-Aufloesung), damit ein haengender/langsamer DNS-Server
-/// `NET_TCP_CONNECT` nicht den Game-Loop einfrieren lassen kann.
-fn resolve_with_timeout(fn_: &str, host: &str, port: i64, timeout: Duration) -> Result<std::net::SocketAddr, String> {
-    // Eine Adresse wie "127.0.0.1" oder "::1" braucht keinen Resolver -- und
-    // keinen Faden je Paket (NET_UDP_SEND loest bei JEDEM Datagramm auf).
-    if let Ok(ip) = host.trim_start_matches('[').trim_end_matches(']').parse::<std::net::IpAddr>() {
-        return Ok(std::net::SocketAddr::new(ip, port as u16));
-    }
-    let host = host.to_string();
-    let host_for_thread = host.clone();
-    let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || {
-        let result = (host_for_thread.as_str(), port as u16)
-            .to_socket_addrs()
-            .map(|mut it| it.next())
-            .map_err(|e| e.to_string());
-        let _ = tx.send(result);
-    });
-    match rx.recv_timeout(timeout) {
-        Ok(Ok(Some(addr))) => Ok(addr),
-        Ok(Ok(None)) => Err(format!("{}: Host '{}' nicht aufloesbar", fn_, host)),
-        Ok(Err(e)) => Err(format!("{}: {}", fn_, e)),
-        Err(_) => Err(format!("{}: DNS-Aufloesung von '{}' hat laenger als {}ms gedauert", fn_, host, timeout.as_millis())),
-    }
-    // Hinweis: der Resolver-Thread laeuft im Timeout-Fall im Hintergrund weiter
-    // zu Ende (blockierender OS-Resolver-Call laesst sich nicht abbrechen) und
-    // stirbt beim Send in den dann verwaisten Channel -- kein Leak, nur ein
-    // kurzlebiger Daemon-Thread.
-}
-
 pub fn connect(host: &str, port: i64) -> Result<NetSock, String> {
     if !(0..=65535).contains(&port) {
         return Err(format!("NET_TCP_CONNECT: port out of range: {}", port));
     }
-    let addr = resolve_with_timeout("NET_TCP_CONNECT", host, port, Duration::from_secs(5))?;
-    let stream = TcpStream::connect_timeout(&addr, Duration::from_secs(5))
-        .map_err(|e| format!("NET_TCP_CONNECT: {}", e))?;
+    // Alle Adressen des Namens (verbinden.rs) -- bis 2026.53 nur die erste,
+    // und "localhost" fand unter Windows einen Dienst auf IPv4 nicht.
+    let stream = crate::verbinden::tcp(host, port as u16, Duration::from_secs(5), "NET_TCP_CONNECT")?;
     stream.set_nonblocking(true).ok();
     Ok(NetSock {
         stream,
@@ -325,7 +293,11 @@ pub fn udp_send_bytes(s: &UdpSock, host: &str, port: i64, bytes: &[u8]) -> Resul
     if !(0..=65535).contains(&port) {
         return Err(format!("NET_UDP_SEND: port out of range: {}", port));
     }
-    let addr = resolve_with_timeout("NET_UDP_SEND", host, port, Duration::from_secs(2))?;
+    // Eine Adresse derselben Art wie der eigene Socket: ein IPv4-Socket kann
+    // nicht an `::1` senden (die erste Adresse von "localhost" unter Windows).
+    let alle = crate::verbinden::adressen(host, port as u16, "NET_UDP_SEND")?;
+    let v4 = s.sock.local_addr().map(|a| a.is_ipv4()).unwrap_or(true);
+    let addr = alle.iter().copied().find(|a| a.is_ipv4() == v4).unwrap_or(alle[0]);
     s.sock.send_to(bytes, addr)
         .map(|n| n as i64)
         .map_err(|e| format!("NET_UDP_SEND: {}", e))

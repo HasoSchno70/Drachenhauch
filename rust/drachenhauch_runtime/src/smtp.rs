@@ -481,16 +481,8 @@ pub fn senden(m: &Mail, nachricht: &str) -> Result<(), String> {
     }
 
     let frist = Duration::from_millis(m.frist_ms.max(1));
-    let adressen: Vec<std::net::SocketAddr> = {
-        use std::net::ToSocketAddrs;
-        (m.host.as_str(), m.port).to_socket_addrs()
-            .map_err(|e| format!("SMTP_SEND: {} ist nicht auffindbar ({})", m.host, e))?
-            .collect()
-    };
-    let ziel = adressen.first()
-        .ok_or_else(|| format!("SMTP_SEND: {} liefert keine Adresse", m.host))?;
-    let tcp = TcpStream::connect_timeout(ziel, frist)
-        .map_err(|e| format!("SMTP_SEND: keine Verbindung zu {}:{} ({})", m.host, m.port, e))?;
+    // Alle Adressen des Namens (verbinden.rs), nicht nur die erste.
+    let tcp = crate::verbinden::tcp(&m.host, m.port, frist, "SMTP_SEND")?;
     tcp.set_read_timeout(Some(frist)).ok();
     tcp.set_write_timeout(Some(frist)).ok();
 

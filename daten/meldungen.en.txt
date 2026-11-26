@@ -1123,7 +1123,6 @@ HTTPD_SEND: es liegt keine Anfrage an (erst HTTPD_ACCEPT)	HTTPD_SEND: there is n
 {}: Antwort nicht lesbar: {}	{}: response not readable: {}
 {}: Antwort ist kein gueltiges JSON: {}	{}: the response is not valid JSON: {}
 MQTT_CONNECT: Port {} ausserhalb 0..65535	MQTT_CONNECT: port {} outside 0..65535
-MQTT_CONNECT: Adresse {} nicht aufloesbar	MQTT_CONNECT: address {} cannot be resolved
 unbekannte Sicherheit {} -- erlaubt sind "starttls", "tls", "keine"	unknown security {} -- allowed are "starttls", "tls", "keine"
 {} enthaelt einen Zeilenumbruch -- das waere eine zusaetzliche Kopfzeile und ist deshalb nicht erlaubt	{} contains a line break -- that would be an extra header line and is therefore not allowed
 {} {} sieht nicht wie eine Adresse aus (erwartet wird name@beispiel.de)	{} {} does not look like an address (expected is name@example.com)
@@ -1136,9 +1135,6 @@ TLS liess sich nicht einrichten: {}	TLS could not be set up: {}
 {} ist kein gueltiger Servername fuer TLS	{} is not a valid server name for TLS
 es fehlt der Server (SMTP_SERVER)	the server is missing (SMTP_SERVER)
 SMTP_SEND: Anmeldung ohne Verschluesselung an {} -- das Kennwort ginge im Klartext ueber das Netz. Nimm "starttls" (Port 587) oder "tls" (Port 465); ohne Verschluesselung geht eine Anmeldung nur an den eigenen Rechner	SMTP_SEND: login without encryption to {} -- the password would cross the network in plain text. Use "starttls" (port 587) or "tls" (port 465); without encryption a login only works with your own computer
-SMTP_SEND: {} ist nicht auffindbar ({})	SMTP_SEND: {} cannot be found ({})
-SMTP_SEND: {} liefert keine Adresse	SMTP_SEND: {} returns no address
-SMTP_SEND: keine Verbindung zu {}:{} ({})	SMTP_SEND: no connection to {}:{} ({})
 SMTP_SEND: {}:{} bietet kein STARTTLS an. Entweder ist der Port falsch (Einlieferung laeuft meist ueber 587, TLS-von-Anfang-an ueber 465) oder der Server kann keine Verschluesselung -- dann braucht es "keine", und zwar bewusst	SMTP_SEND: {}:{} does not offer STARTTLS. Either the port is wrong (submission usually runs over 587, TLS from the start over 465) or the server cannot encrypt -- then it needs "keine", and deliberately so
 SMTP_SEND: der Server nimmt die Nachricht nicht an: {} {}	SMTP_SEND: the server does not accept the message: {} {}
 SMTP_SEND: der Server bietet gar keine Anmeldung an. Entweder braucht er keine (dann SMTP_LOGIN weglassen), oder es fehlt die Verschluesselung -- viele Server nennen AUTH erst nach STARTTLS	SMTP_SEND: the server offers no login at all. Either it needs none (then leave out SMTP_LOGIN), or the encryption is missing -- many servers only announce AUTH after STARTTLS
@@ -2183,3 +2179,6 @@ jit: {} Funktionen, {} Schleifen, {} Schleifenlaeufe	jit: {} functions, {} loops
 jit: {} mal mitten in einer Schleife ausgestiegen	jit: left a loop midway {} times
 jit: {} mal neu gebaut, weil eine globale Variable dazukam	jit: rebuilt {} times because a global variable was added
 jit: {} Runden in der VM -- {}	jit: {} rounds in the VM -- {}
+{}: keine Verbindung zu {}:{} -- {}	{}: no connection to {}:{} -- {}
+{}: Host '{}' nicht aufloesbar (auch nicht ueber mDNS)	{}: host '{}' cannot be resolved (not even via mDNS)
+{}: das Aufloesen von '{}' hat laenger als {} s gedauert	{}: resolving '{}' took longer than {} s

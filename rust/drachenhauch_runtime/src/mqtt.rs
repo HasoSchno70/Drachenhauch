@@ -15,7 +15,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::io::{Read, Write};
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::TcpStream;
 use std::time::{Duration, Instant};
 
 const PKT_CONNECT: u8 = 1;
@@ -346,14 +346,9 @@ pub fn connect(
     }
     let (host, tls) = ziel_lesen(host);
     let host = host.as_str();
-    let addr_str = format!("{}:{}", host, port);
-    let sockaddr = addr_str
-        .to_socket_addrs()
-        .map_err(|e| format!("MQTT_CONNECT: {}", e))?
-        .next()
-        .ok_or_else(|| format!("MQTT_CONNECT: Adresse {} nicht aufloesbar", addr_str))?;
-    let tcp = TcpStream::connect_timeout(&sockaddr, Duration::from_secs(5))
-        .map_err(|e| format!("MQTT_CONNECT: {}", e))?;
+    // Alle Adressen des Namens (verbinden.rs) -- ein Mosquitto auf IPv4 war
+    // unter "localhost" sonst nicht zu erreichen.
+    let tcp = crate::verbinden::tcp(host, port as u16, Duration::from_secs(5), "MQTT_CONNECT")?;
     // Waehrend des Aufbaus (TLS-Handschlag, CONNACK) darf gewartet werden;
     // danach liest MQTT_UPDATE ohne Warten (siehe unten).
     tcp.set_read_timeout(Some(Duration::from_secs(5))).ok();

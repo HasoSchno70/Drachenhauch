@@ -14,7 +14,7 @@
 
 use std::collections::VecDeque;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::net::{TcpListener, TcpStream};
 use std::time::{Duration, Instant};
 
 const GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
@@ -228,19 +228,9 @@ fn tls_strom(tcp: TcpStream, name: &str) -> Result<Strom, String> {
 pub fn verbinden(url: &str) -> Result<Verbindung, String> {
     let (tls, host, port, pfad) = adresse_lesen(url)?;
     let ziel = format!("{}:{}", host, port);
-    let adr = match (host.as_str(), port).to_socket_addrs().ok().and_then(|mut a| a.next()) {
-        Some(a) => a,
-        // Ein Name auf .local, den das System nicht kennt (Linux ohne
-        // nss-mdns): selbst ueber mDNS fragen.
-        None if host.to_ascii_lowercase().ends_with(".local") => {
-            let ip = crate::mdns::aufloesen(&host, 1500).unwrap_or_default();
-            format!("{}:{}", ip, port).parse::<std::net::SocketAddr>()
-                .map_err(|_| format!("WS_CONNECT: {} nicht aufloesbar (auch nicht ueber mDNS)", ziel))?
-        }
-        None => return Err(format!("WS_CONNECT: {} nicht aufloesbar", ziel)),
-    };
-    let tcp = TcpStream::connect_timeout(&adr, Duration::from_secs(5))
-        .map_err(|e| format!("WS_CONNECT: {} -- {}", ziel, e))?;
+    // Alle Adressen des Namens, `.local` notfalls ueber mDNS (verbinden.rs).
+    let _ = &ziel;
+    let tcp = crate::verbinden::tcp(&host, port, Duration::from_secs(5), "WS_CONNECT")?;
     tcp.set_nodelay(true).ok();
     tcp.set_read_timeout(Some(Duration::from_millis(50))).ok();
     let mut strom = if tls { tls_strom(tcp, &host)? } else { Strom::Klar(tcp) };

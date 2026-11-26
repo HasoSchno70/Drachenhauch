@@ -104,6 +104,7 @@ mod drucken;
 mod html;
 #[cfg(feature = "net")]
 mod net;
+mod verbinden;
 #[cfg(feature = "net")]
 mod mqtt;
 #[cfg(feature = "net")]
