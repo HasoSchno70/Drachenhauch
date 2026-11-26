@@ -153,7 +153,7 @@ IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 DB_EXEC:  TRUE
 DB_QUERY: die Abfrage hat 2 Platzhalter, uebergeben sind 1 Werte
 1 TRUE
-DB: ungueltiges/geschlossenes DB_CONN-Handle 0
+DB_PING: ungueltiges/geschlossenes DB_CONN-Handle 0
 
 === postgres: abfrage im hintergrund
 IMPORT "db"
@@ -410,7 +410,7 @@ IMPORT "{sammlung}/../_hilfen/dbserver.dh"
 DB_EXEC:  TRUE
 DB_QUERY: die Abfrage hat 2 Platzhalter, uebergeben sind 1 Werte
 1 TRUE
-DB: ungueltiges/geschlossenes DB_CONN-Handle 0
+DB_PING: ungueltiges/geschlossenes DB_CONN-Handle 0
 
 === mysql: abfrage im hintergrund
 IMPORT "db"

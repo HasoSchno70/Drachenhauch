@@ -31,6 +31,18 @@ use raylib::core::texture::RaylibRenderTexture2D;   // .texture() auf RenderText
 /// Shader; die Aufrufer hier pruefen selbst (`id == 0`, Vorgabe-Shader,
 /// `is_shader_valid`) und brauchen den Shader auch im Fehlerfall -- so wie
 /// `load_shader_from_memory` von raylib-rs 6.0 ihn lieferte.
+/// Die Handle-Regel (CLAUDE.md, Handles) fuer eine Art mit Freigabe: einen
+/// Platz, den es nie gab, und einen freigegebenen melden verschiedene Saetze.
+fn griff(fn_: &str, art: &str, was: &str, frei_befehl: &str, h: i64, frei: &[bool]) -> Result<usize, String> {
+    if h < 0 || h as usize >= frei.len() {
+        return Err(format!("{}: ungueltiges {}-Handle {}", fn_, art, h));
+    }
+    if frei[h as usize] {
+        return Err(format!("{}: {} wurde mit {} freigegeben", fn_, was, frei_befehl));
+    }
+    Ok(h as usize)
+}
+
 fn shader_aus_quelltext(vs: Option<&str>, fs: Option<&str>) -> Shader {
     let vs = vs.map(|t| std::ffi::CString::new(t).unwrap_or_default());
     let fs = fs.map(|t| std::ffi::CString::new(t).unwrap_or_default());
@@ -1351,6 +1363,12 @@ pub struct Graphics {
     zoom_rt: Option<(usize, i32, i32)>,
     zoom_vorher: Option<Option<usize>>,
     active_rt: Option<usize>,
+    /// Die Ziele, die das Programm mit RENDERTARGET_NEW angelegt hat (nur die
+    /// darf es freigeben -- native Fenster und GUI_WINDOW_ZOOM haben eigene),
+    /// und die freigegebenen davon (gesperrt sofort, abgeraeumt nach dem FLIP).
+    rt_eigene: std::collections::HashSet<usize>,
+    rt_frei: std::collections::HashSet<usize>,
+    rt_abraeumen: Vec<usize>,
     /// Hat das PROGRAMM ein Render-Ziel begonnen (RENDERTARGET_BEGIN) und noch
     /// nicht beendet? Getrennt von `active_rt`, das auch native Fenster und
     /// die Lupe setzen -- FLIP fragt nur nach dem, was das Programm vergass.
@@ -1394,6 +1412,11 @@ pub struct Graphics {
     cam3d_proj: Option<[f32; 16]>,
     // 3D-Modelle (LOADMODEL / MESH_*): bleiben ueber Frames erhalten.
     models: Vec<Model>,
+    /// MODEL_FREE: der Platz bleibt (ein altes Handle soll sich melden statt
+    /// auf ein fremdes Modell zu zeigen), das Modell selbst geht nach dem
+    /// FLIP (`model_abraeumen`) -- was schon zum Zeichnen ansteht, braucht es.
+    model_frei: Vec<bool>,
+    model_abraeumen: Vec<usize>,
     // Skelett-Animationen (MODEL_LOAD_ANIMS): je Set die Animationen einer
     // Datei. sola-raylib kopiert sie aus raylibs Feld heraus und gibt das Feld
     // frei; jede `ModelAnimation` raeumt beim Drop nur ihre eigenen
@@ -1478,6 +1501,9 @@ pub struct Graphics {
     // TTF-Fonts (LOADFONT): via raylib load_font_ex geladen. active_font = -1
     // -> raylib-Default-Font; text_spacing = Buchstabenabstand fuer DrawTextEx.
     fonts: Vec<Font>,
+    /// FONT_FREE (wie `model_frei`).
+    font_frei: Vec<bool>,
+    font_abraeumen: Vec<usize>,
     // Render-Groesse je geladenem Font (parallel zu `fonts`). Von LOADFONT
     // gesetzt -> SETFONT uebernimmt sie als text_size (ergonomisch: die in
     // LOADFONT gewaehlte Groesse "wirkt" direkt). 0 = Sentinel (DHRT_FONT-
@@ -1574,6 +1600,8 @@ pub struct Graphics {
     /// Handle ist sofort gesperrt, die Textur geht erst nach dem FLIP.
     tex_abraeumen: Vec<usize>,
     atlases: Vec<Atlas>,
+    /// ATLAS_FREE: gesperrte Plaetze.
+    atlas_frei: Vec<bool>,
     pub frame_count: u64,
     max_frames: Option<u64>,
     /// WINDOW_WAIT_EVENTS: hoechstens so lange wartet FLIP (0 = nie).
@@ -1682,6 +1710,9 @@ pub struct Graphics {
     // Post-Processing (Shader): die Szene wird in `scene_rt` gerendert und beim
     // FLIP per Fragment-Shader (Index in `shaders`) auf den Screen praesentiert.
     shaders: Vec<Shader>,
+    /// SHADER_FREE (wie `model_frei`): gesperrt sofort, abgeraeumt nach dem FLIP.
+    shader_frei: Vec<bool>,
+    shader_abraeumen: Vec<usize>,
     /// Der Nebel-Shader: Platz in `shaders` + 1; 0 = noch nicht geladen, -1 = geht nicht.
     nebel_sh: i64,
     /// Zusaetzliche Sampler je Shader: (Uniform-Position, Textur).
@@ -2380,7 +2411,7 @@ impl Graphics {
             zeiger_glfw: std::collections::HashMap::new(), zeiger_eigene: std::collections::HashMap::new(),
             ansage: String::new(), ansage_dringend: false, ansage_nr: 0,
             fullscreen: false, pre_fullscreen: None,
-            shaders: Vec::new(), nebel_sh: 0, shader_textures: HashMap::new(),
+            shaders: Vec::new(), shader_frei: Vec::new(), shader_abraeumen: Vec::new(), nebel_sh: 0, shader_textures: HashMap::new(),
             shader_uniforme: HashMap::new(), shader_gewarnt: HashSet::new(), shader_warnung: None,
             post_shader_idx: None, post_massstab: 1.0, post_klein: None,
             gfx_stack: Vec::new(), clip_tiefe: 0, scene_rt,
@@ -2392,6 +2423,9 @@ impl Graphics {
             zoom_rt: None,
             zoom_vorher: None,
             active_rt: None,
+            rt_eigene: std::collections::HashSet::new(),
+            rt_frei: std::collections::HashSet::new(),
+            rt_abraeumen: Vec::new(),
             rt_vom_programm: false,
             // Transparente Fenster starten voll durchsichtig (Alpha 0), normale deckend schwarz.
             clear_color: if transparent { Color::new(0, 0, 0, 0) } else { Color::BLACK },
@@ -2401,6 +2435,8 @@ impl Graphics {
             shake_x: 0.0, shake_y: 0.0,
             cmds3d: Vec::new(),
             models: Vec::new(),
+            model_frei: Vec::new(),
+            model_abraeumen: Vec::new(),
             model_anims: Vec::new(),
             light_shader: None,
             normal_mapped: std::collections::HashSet::new(),
@@ -2467,7 +2503,7 @@ impl Graphics {
             cam3d_view: None,
             cam3d_proj: None,
             text_size: 20,
-            fonts: Vec::new(),
+            fonts: Vec::new(), font_frei: Vec::new(), font_abraeumen: Vec::new(),
             font_sizes: Vec::new(),
             font_herkunft: Vec::new(), sdf_shader: None, schnitte: HashMap::new(), text_stil: 0,
             active_font: -1,
@@ -2490,7 +2526,7 @@ impl Graphics {
             tex_frei: Vec::new(),
             tex_veraltet: Vec::new(),
             tex_abraeumen: Vec::new(),
-            atlases: Vec::new(),
+            atlases: Vec::new(), atlas_frei: Vec::new(),
             frame_count: 0,
             max_frames,
             warten_max: 0.0, bild_bedarf: f64::INFINITY, leerlauf_stand: 0,
@@ -2599,7 +2635,7 @@ impl Graphics {
     /// nicht enthaelt. `None` = eingebaute Schrift.
     fn font_von(&self, h: i64) -> Option<&Font> {
         if h == FONT_AUSWEICH { return self.ausweich.first().map(|a| &a.font); }
-        if h < 0 { return None; }
+        if h < 0 || self.font_frei.get(h as usize).copied().unwrap_or(false) { return None; }
         self.fonts.get(h as usize)
     }
 
@@ -2736,6 +2772,8 @@ impl Graphics {
         let auftraege: Vec<(i64, std::collections::BTreeSet<u32>)> = self.eigen_fehlt.borrow_mut().drain().collect();
         let mut weiter = Vec::new();
         for (h, neue) in auftraege {
+            // Freigegeben (FONT_FREE): nicht wieder laden.
+            if self.font_frei.get(h as usize).copied().unwrap_or(true) { continue; }
             let Some((pfad, zeichen, groesse)) = self.font_herkunft.get(h as usize).cloned() else { continue };
             let mut alle: std::collections::BTreeSet<char> = zeichen.chars().collect();
             for &c in &neue { if let Some(ch) = char::from_u32(c) { alle.insert(ch); } }
@@ -2776,7 +2814,36 @@ impl Graphics {
     }
 
     /// Ist `h` ein gueltiges Font-Handle (-1 = Standardschrift)?
-    pub fn font_gueltig(&self, h: i64) -> bool { h == -1 || (h >= 0 && (h as usize) < self.fonts.len()) }
+    pub fn font_gueltig(&self, h: i64) -> bool { h == -1 || (h >= 0 && (h as usize) < self.fonts.len() && !self.font_frei[h as usize]) }
+
+    /// FONT_FREE: die Schrift und ihre Schnitte (FONT_STYLE) freigeben. Still,
+    /// auch doppelt. Ist sie die aktive, gilt wieder die eingebaute; eine
+    /// gui, die mit ihr zeichnet, bekommt die eingebaute zu sehen.
+    pub fn font_free(&mut self, h: i64) -> Result<(), String> {
+        if h >= 0 && (h as usize) < self.font_frei.len() && self.font_frei[h as usize] { return Ok(()); }
+        let i = griff("FONT_FREE", "FONT", "diese Schrift", "FONT_FREE", h, &self.font_frei)?;
+        // Die Schnitte, die aus ihr geladen wurden, gehoeren ihr.
+        let schnitte: Vec<i64> = self.schnitte.iter()
+            .filter(|((b, _), (v, _))| *b == h && *v != h).map(|(_, (v, _))| *v).collect();
+        self.schnitte.retain(|(b, _), (v, _)| *b != h && *v != h);
+        for k in std::iter::once(i).chain(schnitte.into_iter().filter(|v| *v >= 0).map(|v| v as usize)) {
+            if self.font_frei[k] { continue; }
+            self.font_frei[k] = true;
+            self.font_glyphs[k].clear();
+            if self.active_font == k as i64 { self.active_font = -1; }
+            self.font_bytes.borrow_mut().remove(&(k as i64));
+            self.font_abraeumen.push(k);
+        }
+        Ok(())
+    }
+
+    /// Den Platz mit einer genullten Schrift belegen: raylib zeichnet mit ihr
+    /// die eingebaute, und ihre Freigabe beim Beenden laeuft ueber leere Felder.
+    fn font_abraeumen_jetzt(&mut self, i: usize) {
+        let leer: raylib::ffi::Font = unsafe { std::mem::zeroed() };
+        let alt = std::mem::replace(&mut self.fonts[i], unsafe { Font::from_raw(leer) });
+        drop(alt);
+    }
 
     /// Die Bytes der Schriftdatei hinter einem Handle -- fuer die Masse.
     fn font_daten(&self, h: i64, befehl: &str) -> Result<std::rc::Rc<Vec<u8>>, String> {
@@ -2891,7 +2958,34 @@ impl Graphics {
         let rt = render_ziel(&mut self.rl, &self.thread, w.max(1) as u32, h.max(1) as u32)
             .map_err(|e| format!("RENDERTARGET_NEW: {}", e))?;
         self.render_targets.push(RenderTarget::neu(rt, behalten));
+        self.rt_eigene.insert(self.render_targets.len() - 1);
         Ok((self.render_targets.len() - 1) as i64)
+    }
+
+    /// RENDERTARGET_FREE: still, auch doppelt. Ein Ziel, in das gerade
+    /// gezeichnet wird, laesst sich nicht freigeben.
+    pub fn rendertarget_free(&mut self, idx: i64) -> Result<(), String> {
+        if idx >= 0 && self.rt_frei.contains(&(idx as usize)) { return Ok(()); }
+        if idx < 0 || !self.rt_eigene.contains(&(idx as usize)) {
+            return Err(format!("RENDERTARGET_FREE: ungueltiges RENDERTARGET-Handle {}", idx));
+        }
+        let i = idx as usize;
+        if self.active_rt == Some(i) {
+            return Err("RENDERTARGET_FREE: in das Ziel wird gerade gezeichnet -- erst RENDERTARGET_END()".into());
+        }
+        self.rt_frei.insert(i);
+        self.render_targets[i].cmds.clear();
+        self.rt_abraeumen.push(i);
+        Ok(())
+    }
+
+    /// Den Platz mit einem genullten Ziel belegen: raylibs Freigabe
+    /// ueberspringt es (id 0), und gezeichnet wird nur, wo Befehle anstehen.
+    fn rt_abraeumen_jetzt(&mut self, i: usize) {
+        let leer: raylib::ffi::RenderTexture2D = unsafe { std::mem::zeroed() };
+        let neu = RenderTarget::neu(unsafe { RenderTexture2D::from_raw(leer) }, false);
+        let alt = std::mem::replace(&mut self.render_targets[i], neu);
+        drop(alt);
     }
 
     /// RENDERTARGET_CLEAR(rt [, farbe]): ein behaltenes Target von Hand leeren.
@@ -2908,6 +3002,9 @@ impl Graphics {
         let i = idx as usize;
         if idx < 0 || i >= self.render_targets.len() {
             return Err(format!("{}: ungueltiges RENDERTARGET-Handle {}", fn_, idx));
+        }
+        if self.rt_frei.contains(&i) {
+            return Err(format!("{}: dieses Render-Ziel wurde mit RENDERTARGET_FREE freigegeben", fn_));
         }
         Ok(i)
     }
@@ -3553,11 +3650,55 @@ impl Graphics {
     /// Laedt ein Modell von Datei (OBJ/GLTF/...) -> MODEL-Handle (Index).
     pub fn load_model(&mut self, path: &str) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
-        let path = resolved.as_str();
-        let m = self.rl.load_model(&self.thread, path)
+        // raylib liefert fuer eine fehlende oder unlesbare Datei ein Modell
+        // ohne Netz (und ein weisses Material) -- bis 2026.53 kam so Handle 0
+        // ohne jede Meldung zurueck, und das Bild blieb leer.
+        crate::builtins::datei_da(&resolved, "LOADMODEL")?;
+        let m = self.rl.load_model(&self.thread, resolved.as_str())
             .map_err(|e| format!("LOADMODEL: '{}' nicht ladbar: {}", path, e))?;
+        // Ohne Eckpunkte (raylibs Ersatz, oder eine OBJ ohne Flaechen) ist es
+        // kein Modell.
+        let roh: &raylib::ffi::Model = m.as_ref();
+        let punkte: i64 = (0..roh.meshCount.max(0) as usize)
+            .map(|k| unsafe { (*roh.meshes.add(k)).vertexCount.max(0) as i64 }).sum();
+        if punkte == 0 {
+            return Err(format!("LOADMODEL: '{}' laesst sich nicht als Modell lesen (gelesen werden OBJ, GLTF/GLB, IQM, VOX und M3D)", path));
+        }
+        Ok(self.model_neu(m))
+    }
+
+    /// Ein neues Modell ablegen -> Handle.
+    fn model_neu(&mut self, m: Model) -> i64 {
         self.models.push(m);
-        Ok((self.models.len() - 1) as i64)
+        self.model_frei.push(false);
+        (self.models.len() - 1) as i64
+    }
+
+    /// MODEL_FREE: Netze und Materialfelder des Modells freigeben. Still,
+    /// auch doppelt; nur ein Handle, das es nie gab, ist ein Fehler.
+    /// Texturen (MODEL_TEXTURE) und Shader (MODEL_LIT) bleiben -- sie
+    /// gehoeren dem Bild bzw. dem Licht, nicht dem Modell.
+    pub fn model_free(&mut self, idx: i64) -> Result<(), String> {
+        if idx < 0 || idx as usize >= self.models.len() {
+            return Err(format!("MODEL_FREE: ungueltiges MODEL-Handle {}", idx));
+        }
+        let i = idx as usize;
+        if self.model_frei[i] { return Ok(()); }
+        self.model_frei[i] = true;
+        self.normal_mapped.remove(&i);
+        if self.cmds3d.is_empty() { self.modell_abraeumen(i); } else { self.model_abraeumen.push(i); }
+        Ok(())
+    }
+
+    /// Den Speicher eines freigegebenen Modells abgeben. Zurueck bleibt ein
+    /// genulltes Modell: ohne Netze zeichnet es nichts, und raylibs
+    /// UnloadModel beim Beenden laeuft ueber leere Felder.
+    fn modell_abraeumen(&mut self, i: usize) {
+        let raw: &mut raylib::ffi::Model = self.models[i].as_mut();
+        unsafe {
+            raylib::ffi::UnloadModel(*raw);
+            *raw = std::mem::zeroed();
+        }
     }
     /// Laedt Skelett-Animationen (GLTF/IQM/M3D) aus einer Datei -> ANIM_SET-Index.
     pub fn load_model_anims(&mut self, path: &str) -> Result<i64, String> {
@@ -3633,8 +3774,7 @@ impl Graphics {
         let weak = unsafe { mesh.make_weak() };
         let m = self.rl.load_model_from_mesh(&self.thread, weak)
             .map_err(|e| format!("{}: Mesh-Modell fehlgeschlagen: {}", fn_, e))?;
-        self.models.push(m);
-        Ok((self.models.len() - 1) as i64)
+        Ok(self.model_neu(m))
     }
     // Review-Fund: Segment-Zahlen wurden nur nach UNTEN geklemmt (.max(3)
     // etc.), nie nach oben -- `MESH_SPHERE(1, 100000, 100000)` fordert von
@@ -3756,6 +3896,9 @@ impl Graphics {
         let i = idx as usize;
         if idx < 0 || i >= self.models.len() {
             return Err(format!("{}: ungueltiges MODEL-Handle {}", fn_, idx));
+        }
+        if self.model_frei[i] {
+            return Err(format!("{}: dieses Modell wurde mit MODEL_FREE freigegeben", fn_));
         }
         Ok(i)
     }
@@ -4070,7 +4213,7 @@ impl Graphics {
     #[allow(clippy::too_many_arguments)]
     pub fn ray_hit_model(&self, idx: i64, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32,
                          px: f32, py: f32, pz: f32, scale: f32) -> f64 {
-        if idx < 0 || idx as usize >= self.models.len() { return -1.0; }
+        if idx < 0 || idx as usize >= self.models.len() || self.model_frei[idx as usize] { return -1.0; }
         let Some(ray) = Self::unit_ray(ox, oy, oz, dx, dy, dz) else { return -1.0; };
         // Gleiche Transform-Reihenfolge wie DrawModel: erst skalieren, dann verschieben.
         let transform = Matrix::scale(scale, scale, scale) * Matrix::translate(px, py, pz);
@@ -4810,7 +4953,7 @@ impl Graphics {
     pub fn nebel(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, radius: i32, farbe: i64, staerke: f64, zeit: f64) {
         if staerke <= 0.0 { return; }
         if self.nebel_sh == 0 {
-            let h = self.load_shader(NEBEL_GLSL);
+            let h = self.load_shader(NEBEL_GLSL).unwrap_or(-1);
             self.nebel_sh = if h >= 0 { h + 1 } else { -1 };
             if let Some(sh) = usize::try_from(h).ok().and_then(|i| self.shaders.get_mut(i)) {
                 let lagen = [sh.get_shader_location("uZeit"), sh.get_shader_location("uMass"),
@@ -4967,6 +5110,17 @@ impl Graphics {
     /// in raylibs Image-Generatoren aus, die bei Fehlschlag den Prozess
     /// abbricht statt einen fangbaren Fehler zu liefern.
     const MAX_GENTEX_CELLS: i64 = 64_000_000; // z.B. 8000x8000
+
+    /// Ein Text als Bild ist hoechstens so breit wie Zeichen x Groesse und so
+    /// hoch wie Zeilen x Groesse -- das darf die Grenze von IMAGE_NEW nicht
+    /// sprengen.
+    fn text_flaeche_pruefen(fn_: &str, text: &str, size: i32) -> Result<(), String> {
+        let zeilen = text.split('\n').count() as i64;
+        let breit = text.split('\n').map(|z| z.chars().count()).max().unwrap_or(0) as i64;
+        let s = size.max(1) as i64;
+        let eng = |v: i64| v.clamp(1, i32::MAX as i64) as i32;
+        Self::check_gentex_dims(fn_, eng(breit * s), eng(zeilen * s)).map(|_| ())
+    }
 
     fn check_gentex_dims(fn_: &str, w: i32, h: i32) -> Result<(i32, i32), String> {
         let w = w.max(1);
@@ -5257,6 +5411,7 @@ impl Graphics {
                             unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
                             self.font_glyphs.push(glyph_menge(&f));
                             self.fonts.push(f);
+                            self.font_frei.push(false);
                             let fs = self.font_sizes.get(basis as usize).copied().unwrap_or(groesse);
                             self.font_sizes.push(fs);
                             self.font_herkunft.push((kand.clone(), zeichen.clone(), groesse));
@@ -5288,9 +5443,7 @@ impl Graphics {
     /// FONT_STYLE(font, stil$) -> Handle des echten Schnitts, oder `font`
     /// selbst, wenn es keinen gibt. Fuer SETFONT/GUI_SET_FONT.
     pub fn font_schnitt(&mut self, basis: i64, stil: u8) -> Result<(i64, bool), String> {
-        if basis < -1 || basis >= self.fonts.len() as i64 {
-            return Err(format!("FONT_STYLE: ungueltiges FONT-Handle {}", basis));
-        }
+        self.font_handle_ok(basis, "FONT_STYLE")?;
         let (h, emu) = self.schnitt(basis, stil);
         Ok((h, emu == 0))
     }
@@ -5390,6 +5543,7 @@ impl Graphics {
         unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
         self.font_glyphs.push(glyph_menge(&f));
         self.fonts.push(f);
+        self.font_frei.push(false);
         self.font_sizes.push(size.max(4));   // SETFONT uebernimmt diese Groesse
         self.font_herkunft.push((path.to_string(), chars, size.max(4)));
         crate::formung::schrift_merken((self.font_herkunft.len() - 1) as i64, path);
@@ -5414,6 +5568,7 @@ impl Graphics {
         unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
         self.font_glyphs.push(glyph_menge(&f));
         self.fonts.push(f);
+        self.font_frei.push(false);
         self.font_sizes.push(size.max(4));
         self.font_herkunft.push((path.to_string(), chars, size.max(4)));
         crate::formung::schrift_merken((self.font_herkunft.len() - 1) as i64, path);
@@ -5494,6 +5649,7 @@ impl Graphics {
         unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
         self.font_glyphs.push(glyph_menge(&f));
         self.fonts.push(f);
+        self.font_frei.push(false);
         self.font_sizes.push(0);   // Sentinel: Default-Font wendet seine Groesse NICHT an
         self.font_herkunft.push((path.to_string(), chars, size.max(4)));
         crate::formung::schrift_merken((self.font_herkunft.len() - 1) as i64, path);
@@ -5504,9 +5660,7 @@ impl Graphics {
     /// Lade-Groesse (so "wirkt" die LOADFONT-Groesse direkt); TEXT_SIZE
     /// danach uebersteuert weiterhin.
     pub fn set_font(&mut self, h: i64) -> Result<(), String> {
-        if h < -1 || h >= self.fonts.len() as i64 {
-            return Err(format!("SETFONT: ungueltiges FONT-Handle {}", h));
-        }
+        self.font_handle_ok(h, "SETFONT")?;
         self.active_font = h;
         if h >= 0 {
             if let Some(&sz) = self.font_sizes.get(h as usize) {
@@ -5597,6 +5751,7 @@ impl Graphics {
         // zeigte jede spaeter geladene Schrift auf die Liste ihres Vorgaengers.
         self.font_glyphs.push(glyph_menge(&f));
         self.fonts.push(f);
+        self.font_frei.push(false);
         self.font_herkunft.push((String::new(), String::new(), 0));
         self.font_sizes.push(size);
         Ok((self.fonts.len() - 1) as i64)
@@ -5650,6 +5805,7 @@ impl Graphics {
         if let Some(sh) = &self.sdf_shader { sdf::anmelden(*sh.as_ref(), nr); }
         self.font_glyphs.push(glyph_menge(&f));
         self.fonts.push(f);
+        self.font_frei.push(false);
         self.font_sizes.push(size);
         // Kein Pfad: ein fetter Schnitt waere eine gewoehnliche Schrift und
         // saehe gross gezeichnet verschwommen aus; nachgebildet wird er ueber
@@ -5660,10 +5816,8 @@ impl Graphics {
 
     /// Handle pruefen: -1 = eingebaute Schrift, sonst eine geladene.
     fn font_handle_ok(&self, h: i64, fn_: &str) -> Result<(), String> {
-        if h < -1 || h >= self.fonts.len() as i64 {
-            return Err(format!("{}: ungueltiges FONT-Handle {}", fn_, h));
-        }
-        Ok(())
+        if h == -1 { return Ok(()); }
+        griff(fn_, "FONT", "diese Schrift", "FONT_FREE", h, &self.font_frei).map(|_| ())
     }
 
     /// FONT_HAS_GLYPH: hat die Schrift selbst ein Zeichen dafuer? Dieselbe
@@ -5835,6 +5989,9 @@ impl Graphics {
     /// noch in einem Widget oder einem Sprite-Atlas stecken -- die melden
     /// sich immerhin, weil ihr Zeichenweg das Handle prueft.
     pub fn image_free(&mut self, idx: i64) -> Result<(), String> {
+        // Freigeben ist still, auch doppelt (die Handle-Regel, CLAUDE.md);
+        // bis 2026.53 war das zweite IMAGE_FREE ein Fehler.
+        if idx >= 0 && (idx as usize) < self.textures.len() && self.tex_frei[idx as usize] { return Ok(()); }
         if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_FREE")); }
         let i = idx as usize;
         // Aus dem Pfad-Cache werfen: sonst gibt LOADIMAGE fuer denselben Pfad
@@ -5882,6 +6039,9 @@ impl Graphics {
     // --- imgfx (immutable: liefern neues IMAGE-Handle) ---
     pub fn image_scale(&mut self, idx: i64, w: i32, h: i32) -> Result<i64, String> {
         if w <= 0 || h <= 0 { return Err("IMAGE_SCALE: w und h muessen > 0 sein".into()); }
+        // Dieselbe Grenze wie IMAGE_NEW: IMAGE_SCALE(b, 50000, 50000) war ein
+        // Speicherzugriffsfehler in raylib (0xC0000005).
+        Self::check_gentex_dims("IMAGE_SCALE", w, h)?;
         let mut img = self.src_image(idx, "IMAGE_SCALE")?;
         img.resize(w, h);
         self.push_tex_from_image(img)
@@ -5892,6 +6052,7 @@ impl Graphics {
     /// diesen Zahlen. Ohne Filter bleibt es bei raylibs Glaetten.
     pub fn image_scale_filter(&mut self, idx: i64, w: i32, h: i32, filter: crate::resample::Filter) -> Result<i64, String> {
         if w <= 0 || h <= 0 { return Err("IMAGE_SCALE: w und h muessen > 0 sein".into()); }
+        Self::check_gentex_dims("IMAGE_SCALE", w, h)?;
         let (px, b, hh) = self.image_rgba(idx, "IMAGE_SCALE")?;
         let neu = crate::resample::skalieren(&px, b as usize, hh as usize, w as usize, h as usize, filter);
         self.bild_aus_rgba(&neu, w, h, "IMAGE_SCALE")
@@ -5917,6 +6078,7 @@ impl Graphics {
     /// matschig statt gross. Diese Variante behaelt die Bloecke.
     pub fn image_scale_nn(&mut self, idx: i64, w: i32, h: i32) -> Result<i64, String> {
         if w <= 0 || h <= 0 { return Err("IMAGE_SCALE_NN: w und h muessen > 0 sein".into()); }
+        Self::check_gentex_dims("IMAGE_SCALE_NN", w, h)?;
         let mut img = self.src_image(idx, "IMAGE_SCALE_NN")?;
         img.resize_nn(w, h);
         self.push_tex_from_image(img)
@@ -5971,13 +6133,32 @@ impl Graphics {
     }
     pub fn image_resize_canvas(&mut self, idx: i64, w: i32, h: i32, offx: i32, offy: i32, fill: i64) -> Result<i64, String> {
         if w <= 0 || h <= 0 { return Err("IMAGE_RESIZE_CANVAS: w und h muessen > 0 sein".into()); }
+        Self::check_gentex_dims("IMAGE_RESIZE_CANVAS", w, h)?;
         let mut img = self.src_image(idx, "IMAGE_RESIZE_CANVAS")?;
-        img.resize_canvas(w, h, offx, offy, col(fill));
+        // raylibs ImageResizeCanvas rechnet den kopierten Ausschnitt so aus;
+        // liegt das Bild ganz neben der neuen Flaeche, wird er leer oder
+        // negativ, und memcpy bekam eine negative Laenge (0xC0000005 bei
+        // IMAGE_RESIZE_CANVAS(b, 8, 8, 100, 0)). Dann bleibt nur die Fuellfarbe.
+        let ausschnitt = |alt: i32, neu: i32, off: i32| {
+            let mut n = alt;
+            if off < 0 { n += off } else if off + alt > neu { n = neu - off }
+            n.min(neu)
+        };
+        let anders = w != img.width || h != img.height;
+        if anders && (ausschnitt(img.width, w, offx) <= 0 || ausschnitt(img.height, h, offy) <= 0) {
+            img.resize_canvas(w, h, 0, 0, col(fill));
+            img.draw_rectangle(0, 0, w, h, col(fill));
+        } else {
+            img.resize_canvas(w, h, offx, offy, col(fill));
+        }
         self.push_tex_from_image(img)
     }
     pub fn image_blur(&mut self, idx: i64, radius: i32) -> Result<i64, String> {
         let mut img = self.src_image(idx, "IMAGE_BLUR")?;
-        img.blur_gaussian(radius.max(0));
+        // raylib liest bei einem Radius ueber Breite oder Hoehe hinter das
+        // Bild (undefiniert; ab etwa 10000 ein Absturz). Bis dahin ist alles
+        // gleich, darueber gibt es nichts Sinnvolles mehr zu verwischen.
+        img.blur_gaussian(radius.max(0).min(img.width.min(img.height)));
         self.push_tex_from_image(img)
     }
     /// IMAGE_CONVOLVE(bild, kern): freie Faltung mit einem quadratischen Kern
@@ -6154,6 +6335,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             return Err(format!("{}: eine SDF-Schrift (LOADFONT_SDF) laesst sich nicht in ein Bild schreiben -- dort waere ihr Abstandsfeld zu sehen; dieselbe Datei mit LOADFONT laden", fn_));
         }
         if text.is_empty() { return Err(format!("{}: der Text ist leer", fn_)); }
+        Self::text_flaeche_pruefen(fn_, text, size.max(10))?;
         let (f, groesse, abstand) = match self.font_von(font) {
             Some(f) => (*f.as_ref(), size.max(1) as f32, self.text_spacing),
             // Wie raylibs ImageText: die eingebaute Schrift mindestens 10
@@ -6254,8 +6436,13 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn image_draw_text(&mut self, idx: i64, x: i32, y: i32, text: &str, size: i32, color: i64) -> Result<(), String> {
         let i = idx as usize;
         if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_DRAW_TEXT")); }
+        // Unter 2 Punkten werden raylibs Glyphen 0 Pixel breit, und es teilt
+        // durch null (0xC0000094 bei Groesse 0 oder 1); riesig wird das
+        // Zwischenbild zu gross (999999: 0xC0000005).
+        let size = size.max(2);
+        Self::text_flaeche_pruefen("IMAGE_DRAW_TEXT", text, size)?;
         let t = &mut self.textures[i];
-        t.img.draw_text(text, x, y, size.max(1), col(color));
+        t.img.draw_text(text, x, y, size, col(color));
         self.reupload_tex(i)
     }
 
@@ -6886,12 +7073,27 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             }
         }
         self.atlases.push(Atlas { tex_idx, frames });
+        self.atlas_frei.push(false);
         Ok((self.atlases.len() - 1) as i64)
+    }
+
+    /// ATLAS_FREE: den Atlas und sein Bild freigeben (das Bild nur, wenn kein
+    /// anderer Atlas es noch braucht). Still, auch doppelt.
+    pub fn atlas_free(&mut self, idx: i64) -> Result<(), String> {
+        if idx >= 0 && (idx as usize) < self.atlas_frei.len() && self.atlas_frei[idx as usize] { return Ok(()); }
+        let i = griff("ATLAS_FREE", "ATLAS", "dieser Atlas", "ATLAS_FREE", idx, &self.atlas_frei)?;
+        self.atlas_frei[i] = true;
+        self.atlases[i].frames.clear();
+        let tex = self.atlases[i].tex_idx;
+        let geteilt = self.atlases.iter().enumerate().any(|(k, a)| k != i && !self.atlas_frei[k] && a.tex_idx == tex);
+        if !geteilt { self.image_free(tex as i64)?; }
+        Ok(())
     }
     pub fn atlas_draw(&mut self, atlas: i64, name: &str, x: i32, y: i32, flip_h: bool,
                       flip_v: bool, tint: Option<i64>) -> Result<(), String> {
         let (tex, sx, sy, sw, sh) = {
-            let a = self.atlases.get(atlas as usize).ok_or("ATLAS_DRAW: ungueltiges Atlas-Handle")?;
+            let k = griff("ATLAS_DRAW", "ATLAS", "dieser Atlas", "ATLAS_FREE", atlas, &self.atlas_frei)?;
+            let a = &self.atlases[k];
             let &(sx, sy, sw, sh) = a.frames.get(name)
                 .ok_or_else(|| format!("ATLAS_DRAW: Sprite '{}' nicht im Atlas", name))?;
             (a.tex_idx, sx, sy, sw, sh)
@@ -7884,12 +8086,12 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         self.text_size = ts; self.text_spacing = tsp; self.text_stil = tst;
         // Schrift nur setzen, wenn sie noch existiert (Fonts werden nie
         // entladen, aber ein Handle aus einem anderen Lauf waere ungueltig).
-        if af < 0 || (af as usize) < self.fonts.len() { self.active_font = af; }
+        if af < 0 || ((af as usize) < self.fonts.len() && !self.font_frei[af as usize]) { self.active_font = af; }
         // Post-Effekt zurueck. Ohne diese Zeile bliebe der Shader der
         // verlassenen Szene ueber allem Folgenden liegen -- genau der Fehler,
         // gegen den PUSH/POP gebaut ist.
         self.post_shader_idx = match st.post_shader_idx {
-            Some(i) if i < self.shaders.len() => Some(i),
+            Some(i) if i < self.shaders.len() && !self.shader_frei[i] => Some(i),
             Some(_) => None,   // Shader gibt es nicht mehr -> lieber ohne
             None => None,
         };
@@ -8225,15 +8427,51 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn clip_depth(&self) -> i64 { self.clip_tiefe as i64 }
 
     // --- Shader / Post-Processing ---
-    /// Laedt einen Fragment-Shader (GLSL-Quelltext) -> Handle (Index) oder -1.
-    pub fn load_shader(&mut self, code: &str) -> i64 {
+    /// Laedt einen Fragment-Shader (GLSL-Quelltext) -> Handle (Index). Laesst
+    /// er sich nicht uebersetzen, ist das ein Fehler (bis 2026.53 -1, und der
+    /// naechste SHADER_SET/POSTFX lief still ins Leere).
+    pub fn load_shader(&mut self, code: &str) -> Result<i64, String> {
         let sh = shader_aus_quelltext(None,
                                         Some(&fuer_ziel_uebersetzen(code)));
-        if !sh.is_shader_valid() { return -1; }
+        if !sh.is_shader_valid() {
+            return Err("SHADER_LOAD: der Shader laesst sich nicht uebersetzen -- die Meldung des Grafiktreibers steht davor".into());
+        }
         self.shaders.push(sh);
+        self.shader_frei.push(false);
         let idx = self.shaders.len() - 1;
         self.shader_uniforme.insert(idx, crate::glsl::uniforme(code));
-        idx as i64
+        Ok(idx as i64)
+    }
+
+    /// Ein Shader-Handle des Programms (nicht der eigene Nebel-Shader).
+    fn check_shader(&self, h: i64, fn_: &str) -> Result<usize, String> {
+        if self.nebel_sh > 0 && h == self.nebel_sh - 1 {
+            return Err(format!("{}: ungueltiges SHADER-Handle {}", fn_, h));
+        }
+        griff(fn_, "SHADER", "dieser Shader", "SHADER_FREE", h, &self.shader_frei)
+    }
+
+    /// SHADER_FREE: still, auch doppelt. Laeuft er als POSTFX, ist der aus.
+    pub fn shader_free(&mut self, h: i64) -> Result<(), String> {
+        if h >= 0 && (h as usize) < self.shader_frei.len() && self.shader_frei[h as usize] { return Ok(()); }
+        let i = self.check_shader(h, "SHADER_FREE")?;
+        self.shader_frei[i] = true;
+        if self.post_shader_idx == Some(i) { self.post_shader_idx = None; }
+        self.shader_uniforme.remove(&i);
+        self.shader_textures.remove(&i);
+        self.shader_abraeumen.push(i);
+        Ok(())
+    }
+
+    /// Den Platz auf raylibs Standard-Shader setzen -- dessen Freigabe
+    /// ueberspringt raylib, und gezeichnet wird mit ihm wie ohne Shader.
+    fn shader_abraeumen_jetzt(&mut self, i: usize) {
+        let std_sh = raylib::ffi::Shader {
+            id: unsafe { raylib::ffi::rlGetShaderIdDefault() },
+            locs: unsafe { raylib::ffi::rlGetShaderLocsDefault() },
+        };
+        let alt = std::mem::replace(&mut self.shaders[i], unsafe { Shader::from_raw(std_sh) });
+        drop(alt);
     }
     /// Der Ort eines Uniforms, oder -1. Deklariert der Quelltext den Namen gar
     /// nicht, gibt es einmal je Shader und Name eine Warnung -- mit dem
@@ -8258,23 +8496,25 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         }
         loc
     }
-    pub fn shader_set_float(&mut self, h: i64, name: &str, v: f64) {
-        let loc = self.uniform_ort(h as usize, name, "SHADER_SET");
-        if let (Some(sh), true) = (self.shaders.get_mut(h as usize), loc >= 0) {
-            sh.set_shader_value(loc, v as f32);
-        }
+    // Ein Shader, den es nicht gibt, ist ein Fehler (bis 2026.53 lief
+    // SHADER_SET(99, ...) still ins Leere).
+    pub fn shader_set_float(&mut self, h: i64, name: &str, v: f64) -> Result<(), String> {
+        let i = self.check_shader(h, "SHADER_SET")?;
+        let loc = self.uniform_ort(i, name, "SHADER_SET");
+        if loc >= 0 { self.shaders[i].set_shader_value(loc, v as f32); }
+        Ok(())
     }
-    pub fn shader_set_vec2(&mut self, h: i64, name: &str, x: f64, y: f64) {
-        let loc = self.uniform_ort(h as usize, name, "SHADER_SET2");
-        if let (Some(sh), true) = (self.shaders.get_mut(h as usize), loc >= 0) {
-            sh.set_shader_value(loc, [x as f32, y as f32]);
-        }
+    pub fn shader_set_vec2(&mut self, h: i64, name: &str, x: f64, y: f64) -> Result<(), String> {
+        let i = self.check_shader(h, "SHADER_SET2")?;
+        let loc = self.uniform_ort(i, name, "SHADER_SET2");
+        if loc >= 0 { self.shaders[i].set_shader_value(loc, [x as f32, y as f32]); }
+        Ok(())
     }
-    pub fn shader_set_vec3(&mut self, h: i64, name: &str, x: f64, y: f64, z: f64) {
-        let loc = self.uniform_ort(h as usize, name, "SHADER_SET3");
-        if let (Some(sh), true) = (self.shaders.get_mut(h as usize), loc >= 0) {
-            sh.set_shader_value(loc, [x as f32, y as f32, z as f32]);
-        }
+    pub fn shader_set_vec3(&mut self, h: i64, name: &str, x: f64, y: f64, z: f64) -> Result<(), String> {
+        let i = self.check_shader(h, "SHADER_SET3")?;
+        let loc = self.uniform_ort(i, name, "SHADER_SET3");
+        if loc >= 0 { self.shaders[i].set_shader_value(loc, [x as f32, y as f32, z as f32]); }
+        Ok(())
     }
     /// SHADER_SET_ARRAY(shader, name$, werte): `uniform float[]` fuellen.
     /// Bisher liess sich pro Aufruf nur EIN Wert setzen -- damit waren
@@ -8284,9 +8524,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         if vals.is_empty() {
             return Err("SHADER_SET_ARRAY: Werte-Array ist leer".into());
         }
-        if h < 0 || self.shaders.get(h as usize).is_none() {
-            return Err("SHADER_SET_ARRAY: ungueltiges SHADER-Handle".into());
-        }
+        self.check_shader(h, "SHADER_SET_ARRAY")?;
         let loc = self.uniform_ort(h as usize, name, "SHADER_SET_ARRAY");
         let sh = &mut self.shaders[h as usize];
         if loc < 0 {
@@ -8308,10 +8546,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         let tex: raylib::ffi::Texture2D = *self.textures.get(img.max(0) as usize)
             .ok_or_else(|| self.tex_fehler(img, "SHADER_SET_TEXTURE"))?
             .tex;
-        let idx = h as usize;
-        if self.shaders.get(idx).is_none() {
-            return Err("SHADER_SET_TEXTURE: ungueltiges SHADER-Handle".into());
-        }
+        let idx = self.check_shader(h, "SHADER_SET_TEXTURE")?;
         let loc = self.uniform_ort(idx, name, "SHADER_SET_TEXTURE");
         if loc < 0 { return Ok(()); }            // Uniform wegoptimiert: harmlos
         // Nur vormerken -- gesetzt wird beim Zeichnen (siehe Feld-Kommentar).
@@ -8325,9 +8560,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// SHADER_SET_MATRIX(shader, name$, mat): MAT4 aus dem `m3d`-Modul als
     /// `uniform mat4` -- eigene Projektionen/Bone-Transformationen im Shader.
     pub fn shader_set_matrix(&mut self, h: i64, name: &str, m: &[f32; 16]) -> Result<(), String> {
-        if h < 0 || self.shaders.get(h as usize).is_none() {
-            return Err("SHADER_SET_MATRIX: ungueltiges SHADER-Handle".into());
-        }
+        self.check_shader(h, "SHADER_SET_MATRIX")?;
         let loc = self.uniform_ort(h as usize, name, "SHADER_SET_MATRIX");
         let sh = &mut self.shaders[h as usize];
         if loc >= 0 {
@@ -8353,9 +8586,9 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         } else {
             self.post_massstab = 1.0;
         }
-        self.post_shader_idx = if h >= 0 && (h as usize) < self.shaders.len() {
-            Some(h as usize)
-        } else { None };
+        // -1 (oder jede negative Zahl) schaltet aus; ein Shader, den es nicht
+        // gibt, ist ein Fehler (bis 2026.53 schaltete POSTFX(99) still aus).
+        self.post_shader_idx = if h < 0 { None } else { Some(self.check_shader(h, "POSTFX")?) };
         Ok(())
     }
 
@@ -8858,9 +9091,21 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
         self.cmds3d.clear();
-        // Was IMAGE_FREE in diesem Bild freigab, ist jetzt gezeichnet.
+        // Was IMAGE_FREE/MODEL_FREE in diesem Bild freigab, ist jetzt gezeichnet.
         for i in std::mem::take(&mut self.tex_abraeumen) {
             let _ = self.textur_abraeumen(i);
+        }
+        for i in std::mem::take(&mut self.model_abraeumen) {
+            self.modell_abraeumen(i);
+        }
+        for i in std::mem::take(&mut self.shader_abraeumen) {
+            self.shader_abraeumen_jetzt(i);
+        }
+        for i in std::mem::take(&mut self.font_abraeumen) {
+            self.font_abraeumen_jetzt(i);
+        }
+        for i in std::mem::take(&mut self.rt_abraeumen) {
+            self.rt_abraeumen_jetzt(i);
         }
         // Der Abspieler schliesst offen gebliebene Clips am Bildende; der
         // Zaehler muss ihm folgen, sonst schleppte ein vergessenes SCISSOR

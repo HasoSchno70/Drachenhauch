@@ -98,7 +98,9 @@ ELSE
     PRINT "art "; JSON_GET_STRING(d, "d.0.severity"); " Zeile "; JSON_GET_INT(d, "d.0.line")
     DIM m AS STRING : m = JSON_GET_STRING(d, "d.0.message")
     PRINT "nennt das modul "; (INSTR(LOWER$(m), "wifi") >= 0)
-    PRINT "nennt den ausweg "; (INSTR(m, "--hardware") >= 0)
+    ' Der Ausweg: im Entwicklerbau "neu bauen mit ... --hardware", in einer
+    ' kopierten oder installierten Laufzeit (die der CI) IMPORT ... OPTIONAL.
+    PRINT "nennt den ausweg "; (INSTR(m, "--hardware") >= 0 OR INSTR(m, "OPTIONAL") >= 0)
 END IF
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"

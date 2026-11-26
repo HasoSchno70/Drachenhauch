@@ -335,3 +335,23 @@ mod tests {
         assert!(passt("/*", "/x") && passt("/x*y", "/xy") && passt("/x*y", "/xabcy"));
     }
 }
+
+#[cfg(test)]
+mod zufall_tests {
+    use super::*;
+
+    /// Ein Paket aus dem Netz beendet kein Programm (crate::zufallsprobe).
+    #[test]
+    fn kein_paket_fuehrt_zur_panik() {
+        let n = Nachricht { adresse: "/a/b".into(), werte: vec![
+            Wert::Int(1), Wert::Long(-2), Wert::Float(0.5), Wert::Double(1.5), Wert::Text("hallo".into()),
+            Wert::Blob(vec![1, 2, 3]), Wert::Wahr, Wert::Falsch, Wert::Nichts, Wert::Unendlich,
+            Wert::Zeit(7), Wert::Zeichen('x'), Wert::Farbe(0x11223344), Wert::Midi([1, 2, 3, 4])] };
+        let einzeln = kodieren(&n);
+        let mut buendel = b"#bundle\0".to_vec();
+        buendel.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0, 1]);
+        buendel.extend_from_slice(&(einzeln.len() as i32).to_be_bytes());
+        buendel.extend_from_slice(&einzeln);
+        crate::zufallsprobe::nie_panik("OSC", &[einzeln, buendel], |b| { let _ = lesen(b); });
+    }
+}

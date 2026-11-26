@@ -82,3 +82,18 @@ mod tests {
         assert_eq!(text, "vor\u{FFFD}nach");
     }
 }
+
+#[cfg(test)]
+mod zufall_tests {
+    use super::*;
+
+    /// NET_RECV$ zerlegt den Strom an jeder Stelle -- auch mitten im Zeichen.
+    #[test]
+    fn kein_strom_fuehrt_zur_panik() {
+        let gueltig = vec!["äöü€😀abc".as_bytes().to_vec(), vec![0xE2, 0x82], vec![0xF0, 0x9F, 0x98]];
+        crate::zufallsprobe::nie_panik("UTF-8-Strom", &gueltig, |b| {
+            let (_, rest) = decode_utf8_streaming(b.to_vec());
+            let _ = decode_utf8_streaming([rest, b.to_vec()].concat());
+        });
+    }
+}

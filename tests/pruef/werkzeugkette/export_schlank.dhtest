@@ -131,6 +131,30 @@ IMPORT "{sammlung}/../_hilfen/schlanklauf.dh"
 --- erwartet
 TRUE
 
+=== ein httpd-programm bekommt nicht die mini-laufzeit
+' Bis 2026.53 sagte httpd ohne Netz "httpd: dieser dhrt-Build hat das
+' Netz-Feature nicht" -- ein Satz, den --fehlende nicht kannte. Die
+' Mini-Laufzeit nannte HTTPD_START darum nicht, der Export nahm sie, und das
+' Programm brach beim ersten Aufruf ab. Jetzt sagen es alle Befehle mit einem
+' Satz aus einer Tabelle (bau.rs).
+IMPORT "lauf.dh"
+pruefen()
+PRINT "mini: "; REPLACE$(TRIM$(lauf$(mini$(), ["--fehlende", "httpd_start", "httpd_accept", "ws_connect", "len"])), CHR$(10), " ")
+DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "dienst.dh", "ziel"])
+PRINT "nicht mini "; INSTR(zeile$(aus, "Schlank:"), "dhrt-mini") < 0
+PRINT TRIM$(lauf$(PATHJOIN(CWD$(), "ziel/dienst" + endung), [""]))
+--- datei dienst.dh
+IMPORT "httpd"
+DIM s AS INTEGER : s = HTTPD_START(0)
+PRINT "laeuft "; (HTTPD_PORT(s) > 0)
+HTTPD_STOP(s)
+--- datei lauf.dh
+IMPORT "{sammlung}/../_hilfen/schlanklauf.dh"
+--- erwartet
+mini: httpd_start httpd_accept ws_connect
+nicht mini TRUE
+laeuft TRUE
+
 === ein pdf-programm bekommt die volle laufzeit und den grund
 IMPORT "lauf.dh"
 pruefen()

@@ -1181,7 +1181,7 @@ worked.
 | `CWD$()` → STRING | current working directory |
 | `CHDIR(path$)` | change the working directory |
 | `EXEPATH$()` → STRING | path of the running program file |
-| `MODULE_AVAILABLE(module$)` → BOOLEAN | is the module in this build? (hardware modules are missing without `--hardware`) |
+| `MODULE_AVAILABLE(module$)` → BOOLEAN | is the module in this runtime? (the same answer as `dhrt --version` under “dabei”: hardware modules are missing without `--hardware`, in `dhrt-mini` also graphics, network and database) |
 | `EXIT([code])` | end immediately, `code` = return value (0..255, default 0) |
 | `EPRINT(text)` | line to **stderr** instead of stdout |
 | `SHELL(program$, ...)` → INTEGER | start a program, wait, return value |

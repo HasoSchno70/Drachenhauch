@@ -201,6 +201,8 @@ impl Fenster {
         Ok(matches!(kind.prozess.try_wait(), Ok(None)))
     }
     pub fn schliessen(&mut self, k: i64) -> Result<(), String> {
+        // Doppelt schliessen ist still (die Handle-Regel, CLAUDE.md).
+        if k >= 0 && self.kinder.get(k as usize).is_some_and(|o| o.is_none()) { return Ok(()); }
         let kind = self.kind(k, "WINDOW_CLOSE")?;
         let _ = kind.prozess.kill();
         let _ = kind.prozess.wait();

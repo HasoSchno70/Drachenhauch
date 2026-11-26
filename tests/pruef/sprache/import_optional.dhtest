@@ -87,3 +87,71 @@ IMPORT "fehlt.dh"
 PRINT 1
 --- fehler
 Datei nicht gefunden: fehlt.dh
+
+=== module_available passt in jedem bau zu dabei
+' Bis 2026.53 kannte MODULE_AVAILABLE nur die Hardware-Module: in einem Bau
+' ohne Grafik oder Netz (dhrt-mini, die CI auf Linux und macOS) sagte es
+' TRUE zu gui, db, net, pdf, websocket ... und der erste Aufruf scheiterte.
+' Jetzt fragt es dieselbe Tabelle wie `dhrt --version` (bau.rs). Ausgegeben
+' wird nur, was NICHT passt.
+IMPORT "helfer.dh"
+dlStarten(["--version"])
+DIM dabei AS STRING : dabei = ""
+DIM z AS STRING
+FOR EACH z IN SPLIT(dlAus, CHR$(10))
+    IF LEFT$(TRIM$(z), 6) = "dabei:" THEN dabei = TRIM$(z) + ","
+NEXT
+' Modul = das Wort, das --version fuer sein Feature nennt.
+DIM paare AS ARRAY OF STRING
+paare = ["db=datenbank", "net=netz", "mqtt=netz", "websocket=netz", "httpd=netz",
+         "html=http", "cloud=http", "smtp=mail", "pdf=pdf", "physics2d=physik", "physics3d=physik",
+         "serial=seriell", "usb=usb", "bt=bluetooth", "wifi=wlan",
+         "gui=grafik", "audio=grafik", "ui=grafik", "imgfx=grafik", "g3d=grafik", "input=grafik", "webcam=grafik"]
+DIM p AS STRING
+DIM falsch AS INTEGER : falsch = 0
+FOR EACH p IN paare
+    DIM teile AS ARRAY OF STRING : teile = SPLIT(p, "=")
+    DIM soll AS BOOLEAN : soll = (INSTR(dabei, " " + teile[1]) >= 0)
+    IF MODULE_AVAILABLE(teile[0]) <> soll THEN
+        PRINT teile[0]; ": MODULE_AVAILABLE "; MODULE_AVAILABLE(teile[0]); ", --version "; soll
+        falsch = falsch + 1
+    END IF
+NEXT
+' Was ohne Feature immer geht.
+PRINT "json "; MODULE_AVAILABLE("json"); " m3d "; MODULE_AVAILABLE("m3d"); " geld "; MODULE_AVAILABLE("geld")
+PRINT "falsch "; falsch
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- erwartet
+json TRUE m3d TRUE geld TRUE
+falsch 0
+
+=== ein fehlender befehl sagt es mit einem satz
+' Bis 2026.53 acht Wortlaute: "Builtin 'X' gehoert zum Hardware-Modul ...",
+' "... im Rust-Kern noch nicht verfuegbar (Schritt 4)", "httpd: dieser
+' dhrt-Build hat das Netz-Feature nicht", "... ist ohne das Feature `pdf`
+' gebaut" ... Jetzt einer: "NAME: gibt es in dieser Laufzeit nicht (ohne x
+' gebaut)" -- und `dhrt --fehlende` erkennt ihn.
+IMPORT "helfer.dh"
+IF MODULE_AVAILABLE("serial") AND MODULE_AVAILABLE("bt") THEN
+    PRINT "UEBERSPRINGEN: Hardware-Bau, die Module sind dabei"
+ELSE
+    TRY
+        PRINT SERIAL_PORTS()
+    CATCH e
+        PRINT LEFT$(e, INSTR(e, ")") + 1)
+    END TRY
+    TRY
+        PRINT BT_SCAN(1)
+    CATCH e
+        PRINT LEFT$(e, INSTR(e, ")") + 1)
+    END TRY
+    dlStarten(["--fehlende", "serial_ports", "bt_scan", "json_parse"])
+    PRINT "fehlende "; REPLACE$(TRIM$(dlAus), CHR$(10), " ")
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- erwartet
+SERIAL_PORTS: gibt es in dieser Laufzeit nicht (ohne seriell gebaut)
+BT_SCAN: gibt es in dieser Laufzeit nicht (ohne bluetooth gebaut)
+fehlende serial_ports bt_scan

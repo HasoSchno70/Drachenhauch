@@ -21,6 +21,8 @@ CATCH e3
     PRINT e3
 END TRY
 WINDOW_CLOSE(k)
+' Ein zweites WINDOW_CLOSE ist still (seit 2026.54, die Handle-Regel).
+WINDOW_CLOSE(k)
 TRY
     WINDOW_SEND(k, "x")
 CATCH e4

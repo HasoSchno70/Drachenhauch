@@ -196,7 +196,8 @@ das mit jedem Schritt wuchs. Gemessen an 1200 Kopien zu 256×256:
 Nach dem Freigeben ist das Handle **nicht wiederverwendbar und wird auch
 nicht neu vergeben**. Jede weitere Benutzung meldet sich im Klartext
 (`… wurde mit IMAGE_FREE freigegeben`) statt still auf ein fremdes Bild zu
-zeigen — das ist der Grund, warum der Platz stehen bleibt. `GETPIXEL` und
+zeigen — das ist der Grund, warum der Platz stehen bleibt. Ein zweites
+`IMAGE_FREE` auf dasselbe Handle ist still (bis 2026.53 ein Fehler). `GETPIXEL` und
 `GETALPHA` bleiben bei ihrer alten Zusage und liefern `-1`.
 
 `LOADIMAGE` merkt sich Pfad → Handle; beim Freigeben wird der Eintrag

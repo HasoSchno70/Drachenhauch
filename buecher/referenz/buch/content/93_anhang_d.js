@@ -41,7 +41,7 @@ module.exports = (H) => {
         "Beim Zerlegen (a, b) = ... muss die Anzahl der Ziele exakt zur Tupel-Länge passen."),
       err("AUDIO_SFX: erwartet STRING",
         "Ein Befehl bekam ein Argument vom falschen Typ (hier eine Zahl statt eines Strings). Vergleiche den Aufruf mit der Signatur in Anhang A."),
-      err("Builtin 'WIFI_AVAILABLE' gehoert zum Hardware-Modul 'wifi', das in diesem dhrt-Build fehlt",
+      err("WIFI_AVAILABLE: gibt es in dieser Laufzeit nicht (ohne wlan gebaut)",
         "Die Hardware-Module (serial/usb/wifi/bt) sind nur im Spezial-Build enthalten. Baue mit: python rust\\build_runtime.py --hardware (siehe Kapitel „Hardware: serial, usb, wifi, bt“)."),
     ]),
 

@@ -152,3 +152,16 @@ das ist kein Video
 VIDEO_LOAD: Datei 'gibtsnicht.mp4' nicht gefunden
 TRUE
 VIDEO_PLAY: ungueltiges oder freigegebenes VIDEO 7
+
+=== video_free doppelt ist still
+' Die Handle-Regel (CLAUDE.md): bis 2026.53 war das zweite VIDEO_FREE ein
+' Fehler.
+IMPORT "video"
+DIM v AS VIDEO : v = VIDEO_LOAD(ARG$(0))
+VIDEO_FREE(v)
+VIDEO_FREE(v)
+PRINT "still"
+--- argumente
+{sammlung}/../../../daten/video/vorspann.mp4
+--- erwartet
+still

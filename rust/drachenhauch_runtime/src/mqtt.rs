@@ -873,3 +873,26 @@ mod tests {
         let _ = faden.join();
     }
 }
+
+#[cfg(test)]
+mod zufall_tests {
+    use super::*;
+
+    #[test]
+    fn kein_paket_fuehrt_zur_panik() {
+        let gueltig = vec![
+            encode_publish("a/b", b"hallo", false, 0, 0),
+            encode_publish("a/b", b"hallo", true, 1, 7),
+            wrap_packet(PKT_CONNACK << 4, &[0, 0]),
+            wrap_packet(PKT_PUBACK << 4, &[0, 7]),
+            wrap_packet(PKT_SUBACK << 4, &[0, 1, 0]),
+            wrap_packet(PKT_PINGRESP << 4, &[]),
+            [encode_publish("x", &[1u8; 200], false, 0, 0), wrap_packet(PKT_PINGRESP << 4, &[])].concat(),
+        ];
+        crate::zufallsprobe::nie_panik("MQTT", &gueltig, |b| {
+            let _ = parse_packets(b.to_vec());
+            let _ = decode_remaining_length(b);
+            let _ = decode_str(b);
+        });
+    }
+}

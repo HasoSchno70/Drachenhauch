@@ -214,8 +214,11 @@ Der Ausdruck endet mitten drin -- geht er in der naechsten Zeile weiter, die Zei
 # ---------------------------------------------------------------- IMPORT
 IMPORT: Datei nicht gefunden: {} (gesucht: {})	IMPORT: file not found: {} (searched: {})
 IMPORT: Lesefehler bei {}: {}	IMPORT: error reading {}: {}
-Hardware-Modul '{}' ist in diesem dhrt-Build nicht enthalten -- Funktionsaufrufe schlagen zur Laufzeit fehl. Neu bauen mit: python rust\build_runtime.py --hardware	Hardware module '{}' is not included in this dhrt build -- calls will fail at run time. Rebuild with: python rust\build_runtime.py --hardware
-Hardware-Modul 'midi' ist in diesem dhrt-Build nur zum Teil enthalten -- MIDI-Dateien und MIDI_NOTE_NAME$/MIDI_NOTE_FREQ gehen, Ein- und Ausgaenge nicht. Neu bauen mit: python rust\build_runtime.py --hardware	Hardware module 'midi' is only partly included in this dhrt build -- MIDI files and MIDI_NOTE_NAME$/MIDI_NOTE_FREQ work, inputs and outputs do not. Rebuild with: python rust\build_runtime.py --hardware
+Modul '{}' gibt es in dieser Laufzeit nicht (ohne {} gebaut) -- jeder Aufruf meldet einen Fehler	Module '{}' does not exist in this runtime (built without {}) -- every call reports an error
+Modul 'midi' ist in dieser Laufzeit nur zum Teil enthalten -- MIDI-Dateien und MIDI_NOTE_NAME$/MIDI_NOTE_FREQ gehen, Ein- und Ausgaenge nicht (ohne {} gebaut)	Module 'midi' is only partly contained in this runtime -- MIDI files and MIDI_NOTE_NAME$/MIDI_NOTE_FREQ work, inputs and outputs do not (built without {})
+Modul '{}' gibt es in dieser Laufzeit nicht	Module '{}' does not exist in this runtime
+{}. Neu bauen mit: python rust/build_runtime.py{}	{}. Rebuild with: python rust/build_runtime.py{}
+{}. Wer ohne das Modul auskommt: IMPORT "{}" OPTIONAL und vorher MODULE_AVAILABLE("{}") fragen	{}. To do without the module: IMPORT "{}" OPTIONAL and ask MODULE_AVAILABLE("{}") first
 {} kennt keine Klasse {}.{}	{} has no class {}.{}
 {} kennt keinen Namen {}.{}	{} has no name {}.{}
 {} steht in {}, und diese Datei gehoert nicht zum Namensraum {} -- was eine Datei des Namensraums ohne AS einbindet, bleibt draussen. Dort IMPORT "{}" AS {} schreiben.	{} is in {}, and that file does not belong to the namespace {} -- what a file of the namespace imports without AS stays outside. Write IMPORT "{}" AS {} there.
@@ -487,6 +490,8 @@ Im gewoehnlichen Lauf heisst das: das DIM von '{}' ist noch nicht gelaufen -- st
 {}: erwartet INTEGER, erhalten {}	{}: expected INTEGER, got {}
 {}: erwartet BOOLEAN, erhalten {}	{}: expected BOOLEAN, got {}
 {}: fehlendes Argument {}	{}: missing argument {}
+{}: zu wenige Argumente	{}: too few arguments
+{}: interner Fehler der Laufzeit ({}{}) -- bitte als Fehler in dhrt melden	{}: internal runtime error ({}{}) -- please report it as a bug in dhrt
 {}: erwartet {} (Arg {}), erhalten {}	{}: expected {} (argument {}), got {}
 {}: erwartet {}, erhalten {}	{}: expected {}, got {}
 Zahl	a number
@@ -501,9 +506,21 @@ die Variable hat noch keinen Wert (Bild/Klang vorher laden, z.B. b = LOADIMAGE("
 Grafik-Builtin vor SCREEN aufgerufen	Graphics builtin called before SCREEN
 UI-Builtin vor SCREEN aufgerufen	UI builtin called before SCREEN
 Unbekannter Befehl '{}' -- dhrt kennt ihn nicht (Tippfehler?){}	Unknown command '{}' -- dhrt does not know it (typo?){}
-Builtin '{}' gehoert zum Hardware-Modul '{}', das in diesem dhrt-Build fehlt. Neu bauen mit: python rust\build_runtime.py --hardware	Builtin '{}' belongs to the hardware module '{}', which is missing in this dhrt build. Rebuild with: python rust\build_runtime.py --hardware
-Grafik-Builtin '{}' im Rust-Kern noch nicht verfuegbar (Schritt 4)	Graphics builtin '{}' is not available in this build
-Builtin '{}' im Rust-Kern noch nicht verfuegbar	Builtin '{}' is not available in this build
+{}: gibt es in dieser Laufzeit nicht (ohne {} gebaut) -- neu bauen mit: python rust/build_runtime.py{}	{}: does not exist in this runtime (built without {}) -- rebuild with: python rust/build_runtime.py{}
+{}: gibt es in dieser Laufzeit nicht (ohne {} gebaut)	{}: does not exist in this runtime (built without {})
+{}: gibt es in dieser Laufzeit nicht	{}: does not exist in this runtime
+{} -- native Dialoge gibt es nur auf dem Desktop, nicht im Browser	{} -- native dialogs exist only on the desktop, not in the browser
+{}: fremde Bibliotheken (DECLARE ... LIB) gibt es in dieser Laufzeit nicht (ohne ffi gebaut)	{}: foreign libraries (DECLARE ... LIB) do not exist in this runtime (built without ffi)
+{}: Zeiger gibt es in dieser Laufzeit nicht (ohne ffi gebaut)	{}: pointers do not exist in this runtime (built without ffi)
+grafik	graphics
+grafik (OpenGL ES)	graphics (OpenGL ES)
+dialoge	dialogs
+datenbank	database
+netz	network
+maschinencode	machine code
+schriften	fonts
+seriell	serial
+wlan	wifi
 {}: diese Fassung von dhrt ist ohne das Feature `{}` gebaut	{}: this version of dhrt is built without the feature `{}`
 ASSERT fehlgeschlagen: {}	ASSERT failed: {}
 Bedingung nicht erfuellt	condition not met
@@ -949,9 +966,6 @@ Action '{}' nicht gebunden	action '{}' is not bound
 {}: Text konnte nicht in die Zwischenablage gelegt werden -- ein anderes Programm haelt sie offen, oder der Text enthaelt ein Nullbyte	{}: the text could not be put into the clipboard -- another program holds it open, or the text contains a null byte
 {} muss die ERSTE Grafik-Anweisung sein (vor LOADIMAGE/SCREEN/... -- Transparenz kann nicht nachtraeglich gesetzt werden)	{} must be the FIRST graphics statement (before LOADIMAGE/SCREEN/... -- transparency cannot be set afterwards)
 {}: braucht ein Fenster (SCREEN) -- die Vorschau ist ein IMAGE	{}: needs a window (SCREEN) -- the preview is an IMAGE
-{}: dieser Bau hat keine Grafik	{}: this build has no graphics
-{}: in diesem Build nicht verfuegbar -- native OS-Dialoge gibt es nur auf dem Desktop (Feature `dialogs`), nicht im Browser.	{}: not available in this build -- native OS dialogs only exist on the desktop (feature `dialogs`), not in the browser.
-{}: diese Fassung von dhrt ist ohne das Feature `smtp` gebaut (verschluesselte Verbindungen fehlen dann)	{}: this version of dhrt is built without the feature `smtp` (encrypted connections are missing then)
 httpd: dieser dhrt-Build hat das Netz-Feature nicht (neu bauen mit python rust/build_runtime.py)	httpd: this dhrt build does not have the network feature (rebuild with python rust/build_runtime.py)
 GUI_FORM_LOAD/SAVE: dieser Bau hat kein db-Modul	GUI_FORM_LOAD/SAVE: this build has no db module
 {}: CLOUD_CONFIGURE(base_url, api_key) muss zuerst aufgerufen werden	{}: CLOUD_CONFIGURE(base_url, api_key) must be called first
@@ -1287,11 +1301,9 @@ AUDIO_SAVE_WAV: bits muss 8 oder 16 sein	AUDIO_SAVE_WAV: bits must be 8 or 16
 AUDIO_SAVE_WAV: ungueltiges SOUND-Handle {}	AUDIO_SAVE_WAV: invalid SOUND handle {}
 AUDIO_SAVE_WAV: '{}' liess sich nicht schreiben -- {}	AUDIO_SAVE_WAV: '{}' could not be written -- {}
 SAMPLE_LOAD: Sample ist leer	SAMPLE_LOAD: sample is empty
-SAMPLE_SET_LOOP: ungueltiges SAMPLE-Handle {}	SAMPLE_SET_LOOP: invalid SAMPLE handle {}
-SAMPLE_NOTE: ungueltiges SAMPLE-Handle {}	SAMPLE_NOTE: invalid SAMPLE handle {}
+{}: ungueltiges SAMPLE-Handle {}	{}: invalid SAMPLE handle {}
+{}: ungueltiges {}-Handle {}	{}: invalid {} handle {}
 SAMPLE_NOTE: release_ms muss <= 60000 sein	SAMPLE_NOTE: release_ms must be <= 60000
-SAMPLE_LEN: ungueltiges SAMPLE-Handle {}	SAMPLE_LEN: invalid SAMPLE handle {}
-SAMPLE_PLAY: ungueltiges SAMPLE-Handle {}	SAMPLE_PLAY: invalid SAMPLE handle {}
 SAMPLE_PLAY: ungueltige Tonhoehe	SAMPLE_PLAY: invalid pitch
 AUDIO_MUSIC_PLAY: Modul konnte nicht gestartet werden	AUDIO_MUSIC_PLAY: module could not be started
 AUDIO_MUSIC_SEEK: MOD-/XM-Musik laesst sich nicht auf eine Sekunde setzen (ihre Zeitachse sind Pattern und Zeilen)	AUDIO_MUSIC_SEEK: MOD/XM music cannot be set to a second (its time axis is patterns and rows)
@@ -1307,6 +1319,17 @@ MODEL_ANIM_COUNT: ungueltiges ANIM_SET-Handle {}	MODEL_ANIM_COUNT: invalid ANIM_
 {}: '{}' muss eine endliche Zahl > 0 sein, erhalten {}	{}: '{}' must be a finite number > 0, got {}
 MESH_CUBICMAP: eine Karte von {}x{} Punkten ist zu gross (hoechstens eine Million)	MESH_CUBICMAP: a map of {}x{} pixels is too large (at most one million)
 {}: ungueltiges MODEL-Handle {}	{}: invalid MODEL handle {}
+MODEL_FREE: ungueltiges MODEL-Handle {}	MODEL_FREE: invalid MODEL handle {}
+{}: dieses Modell wurde mit MODEL_FREE freigegeben	{}: this model was released with MODEL_FREE
+{}: {} wurde mit {} freigegeben	{}: {} was released with {}
+dieser Shader	this shader
+diese Schrift	this font
+dieser Atlas	this atlas
+{}: dieses Render-Ziel wurde mit RENDERTARGET_FREE freigegeben	{}: this render target was released with RENDERTARGET_FREE
+{}: dieses Sample wurde mit SAMPLE_FREE freigegeben	{}: this sample was released with SAMPLE_FREE
+RENDERTARGET_FREE: in das Ziel wird gerade gezeichnet -- erst RENDERTARGET_END()	RENDERTARGET_FREE: the target is being drawn into -- first RENDERTARGET_END()
+LOADMODEL: '{}' laesst sich nicht als Modell lesen (gelesen werden OBJ, GLTF/GLB, IQM, VOX und M3D)	LOADMODEL: '{}' cannot be read as a model (read are OBJ, GLTF/GLB, IQM, VOX and M3D)
+SHADER_LOAD: der Shader laesst sich nicht uebersetzen -- die Meldung des Grafiktreibers steht davor	SHADER_LOAD: the shader does not compile -- the graphics driver's message comes before this
 MODEL_TEXTURE: Modell hat kein Material	MODEL_TEXTURE: model has no material
 MODEL_SAVE: geschrieben wird Wavefront-OBJ, der Name muss auf .obj enden, nicht '{}'	MODEL_SAVE: the file is written as Wavefront OBJ, the name must end in .obj, not '{}'
 MODEL_SAVE: das Modell hat keine Eckpunkte	MODEL_SAVE: the model has no vertices
@@ -1324,17 +1347,14 @@ IMAGE_FROM_BUFFER: {} liess sich nicht lesen ({})	IMAGE_FROM_BUFFER: {} could no
 IMAGE_FROM_BUFFER: {} liess sich nicht lesen	IMAGE_FROM_BUFFER: {} could not be read
 IMAGE_TO_BUFFER: raylib hat nichts geschrieben	IMAGE_TO_BUFFER: raylib wrote nothing
 {}: Breite*Hoehe ueberschreitet das Limit von {} Pixeln (erhalten {}x{})	{}: width*height exceeds the limit of {} pixels (got {}x{})
-FONT_STYLE: ungueltiges FONT-Handle {}	FONT_STYLE: invalid FONT handle {}
 LOADFONT: Font nicht ladbar: {}	LOADFONT: font cannot be loaded: {}
 LOADFONT: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)	LOADFONT: font '{}' cannot be loaded (not a TrueType/OpenType font raylib can read)
 DHRT_FONT nicht ladbar: {}	DHRT_FONT cannot be loaded: {}
-SETFONT: ungueltiges FONT-Handle {}	SETFONT: invalid FONT handle {}
 SETFONT: erwartet (handle[, groesse]), erhalten {} Argument(e)	SETFONT: expects (handle[, groesse]), got {} argument(s)
 SETFONT: groesse muss mindestens 1 sein, erhalten {}	SETFONT: groesse must be at least 1, got {}
 LOADFONT_SDF: Font nicht ladbar: {}	LOADFONT_SDF: font cannot be loaded: {}
 LOADFONT_SDF: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)	LOADFONT_SDF: font '{}' cannot be loaded (not a TrueType/OpenType font raylib can read)
 LOADFONT_SDF: der Schrift-Shader liess sich nicht uebersetzen	LOADFONT_SDF: the font shader could not be compiled
-{}: ungueltiges FONT-Handle {}	{}: invalid FONT handle {}
 FONT_TO_IMAGE: die Zeichen {}..{} gehen nicht -- hoechstens 256, das erste nicht nach dem letzten (so viele liest LOADFONT_IMAGE)	FONT_TO_IMAGE: the characters {}..{} do not work -- at most 256, the first not after the last (that is how many LOADFONT_IMAGE reads)
 {}: ungueltiges IMAGE-Handle {}	{}: invalid IMAGE handle {}
 IMAGE_CONVOLVE: Kern muss quadratisch sein (9 = 3x3, 25 = 5x5, ...), hat aber {} Werte	IMAGE_CONVOLVE: the kernel must be square (9 = 3x3, 25 = 5x5, ...), but has {} values
@@ -1354,7 +1374,6 @@ LOAD_ASSETS: Pfad muss STRING sein	LOAD_ASSETS: path must be a STRING
 ATLAS_LOAD: Manifest nicht gefunden: {}	ATLAS_LOAD: manifest not found: {}
 ATLAS_LOAD: 'image' fehlt im Manifest	ATLAS_LOAD: 'image' is missing from the manifest
 ATLAS_LOAD: rect muss [x,y,w,h] sein	ATLAS_LOAD: rect must be [x,y,w,h]
-ATLAS_DRAW: ungueltiges Atlas-Handle	ATLAS_DRAW: invalid atlas handle
 ATLAS_DRAW: Sprite '{}' nicht im Atlas	ATLAS_DRAW: sprite '{}' is not in the atlas
 AUTOMATION_RECORD: Dateiname fehlt	AUTOMATION_RECORD: file name is missing
 AUTOMATION_STOP: '{}' nicht schreibbar	AUTOMATION_STOP: '{}' is not writable
@@ -1364,9 +1383,6 @@ MOUSE_CURSOR: unbekannte Form '{}' -- erwartet {} oder auto	MOUSE_CURSOR: unknow
 {}: der Brennpunkt {},{} liegt nicht im Bild ({}x{})	{}: the hot spot {},{} is not inside the image ({}x{})
 OPENURL: nur http:// und https:// erlaubt (bekam '{}')	OPENURL: only http:// and https:// are allowed (got '{}')
 SHADER_SET_ARRAY: Werte-Array ist leer	SHADER_SET_ARRAY: the value array is empty
-SHADER_SET_ARRAY: ungueltiges SHADER-Handle	SHADER_SET_ARRAY: invalid SHADER handle
-SHADER_SET_TEXTURE: ungueltiges SHADER-Handle	SHADER_SET_TEXTURE: invalid SHADER handle
-SHADER_SET_MATRIX: ungueltiges SHADER-Handle	SHADER_SET_MATRIX: invalid SHADER handle
 {} bindet schwaecher als {}: gerechnet wird {}. Ist das gemeint, die Klammern hinschreiben; sonst {}	{} binds more weakly than {}: this computes {}. If that is what you mean, write the brackets; otherwise {}
 {}: der Shader hat kein uniform '{}' -- der Wert kommt nicht an.{}	{}: the shader has no uniform '{}' -- the value does not arrive.{}
 Meintest du {}? Im Shader zaehlt Gross/klein.	Did you mean {}? Case matters in the shader.
@@ -1651,13 +1667,13 @@ die Funktion '{}' gibt es in "{}" nicht (Gross/klein zaehlt{})	there is no funct
 fremde Funktion: kaputte Signatur	foreign function: broken signature
 fremde Funktion: Signatur fehlt	foreign function: signature missing
 {}: fremde Bibliotheken (DECLARE ... LIB) gibt es im Browser nicht	{}: there are no foreign libraries (DECLARE ... LIB) in the browser
-{}: fremde Bibliotheken (DECLARE ... LIB) gehen in diesem Bau nicht -- er ist ohne das Feature ffi gebaut	{}: foreign libraries (DECLARE ... LIB) do not work in this build -- it was built without the ffi feature
-{}: Zeiger gibt es nur mit fremden Bibliotheken -- dieser Bau ist ohne das Feature ffi gebaut	{}: pointers only exist with foreign libraries -- this build was made without the ffi feature
 {}: erwartet einen Zeiger (INTEGER), erhalten {}	{}: expects a pointer (INTEGER), got {}
 {}: breit erwartet TRUE/FALSE, erhalten {}	{}: wide expects TRUE/FALSE, got {}
 {}: die Laenge erwartet INTEGER, erhalten {}	{}: the length expects INTEGER, got {}
 {}: Laenge {} ist negativ	{}: length {} is negative
 {}: Laenge {} ueberschreitet die Obergrenze von {} Bytes	{}: length {} exceeds the limit of {} bytes
+{}: Laenge ueberschreitet die Obergrenze von {} Bytes	{}: length exceeds the limit of {} bytes
+{}: {} Elemente ueberschreiten die Obergrenze von {}	{}: {} elements exceed the limit of {}
 {}: der Zeiger ist 0 (NULL) -- dort liegen keine {} Bytes	{}: the pointer is 0 (NULL) -- there are no {} bytes there
 {}: erwartet einen BUFFER, erhalten {}	{}: expects a BUFFER, got {}
 BYREF geht nicht bei einem Rueckruf -- die Bibliothek bekommt ohnehin einen Zeiger auf die Funktion	BYREF does not work for a callback -- the library gets a pointer to the function anyway
@@ -1794,7 +1810,6 @@ CHART_X: der x-Wert von Punkt {} ist kleiner als der davor -- die Werte muessen 
 RENDERTARGET_IMAGE: das Ziel ist noch offen -- erst RENDERTARGET_END	RENDERTARGET_IMAGE: the target is still open -- RENDERTARGET_END first
 PDF_IMAGE: erwartet 5 oder 6 Argumente (pdf, bild, x, y, b [, h]), nicht {}	PDF_IMAGE: expects 5 or 6 arguments (pdf, image, x, y, w [, h]), not {}
 PDF_IMAGE: kein Bild geladen -- ein Bild kommt aus LOADIMAGE, IMAGE_NEW oder RENDERTARGET_IMAGE	PDF_IMAGE: no image loaded -- an image comes from LOADIMAGE, IMAGE_NEW or RENDERTARGET_IMAGE
-PDF_IMAGE: dieser Bau hat keine Grafik	PDF_IMAGE: this build has no graphics
 PDF_DASH: erwartet 2 oder 3 Argumente (pdf, strich_mm [, luecke_mm]), nicht {}	PDF_DASH: expects 2 or 3 arguments (pdf, dash_mm [, gap_mm]), not {}
 Strich und Luecke muessen beide groesser als 0 sein (oder beide 0 fuer durchgezogen), nicht {} und {}	dash and gap must both be greater than 0 (or both 0 for solid), not {} and {}
 die Breite muss groesser als 0 sein, nicht {}	the width must be greater than 0, not {}

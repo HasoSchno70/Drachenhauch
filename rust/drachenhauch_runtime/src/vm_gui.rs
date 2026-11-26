@@ -593,7 +593,7 @@ impl<'p> Vm<'p> {
                     if name == "gui_form_load" {
                         let spalten = if mit_version { format!("{}, {}", keys.join(", "), vspalte) } else { keys.join(", ") };
                         let sql = format!("SELECT {} FROM {} WHERE id = ?", spalten, tabelle);
-                        let res = self.db_conn(conn_idx)?.query(&sql, &[crate::db::Param::Int(id)], fn_)?;
+                        let res = self.db_conn(conn_idx, name)?.query(&sql, &[crate::db::Param::Int(id)], fn_)?;
                         match res.rows.first() {
                             None => Value::Bool(false),
                             Some(row) => {
@@ -635,7 +635,7 @@ impl<'p> Vm<'p> {
                                 (keys.join(", "), keys.iter().map(|_| "?").collect::<Vec<_>>().join(", "))
                             };
                             let sql = format!("INSERT INTO {} ({}) VALUES ({})", tabelle, spalten, platz);
-                            let nid = self.db_conn(conn_idx)?.einfuegen(&sql, &params, fn_)?;
+                            let nid = self.db_conn(conn_idx, name)?.einfuegen(&sql, &params, fn_)?;
                             if mit_version { self.gui.form_stand_setzen(win, &form, Some(1)); }
                             nid
                         } else {
@@ -652,19 +652,19 @@ impl<'p> Vm<'p> {
                             } else {
                                 format!("UPDATE {} SET {} WHERE id = ?", tabelle, setz)
                             };
-                            let n = self.db_conn(conn_idx)?.exec(&sql, &params, fn_)?;
+                            let n = self.db_conn(conn_idx, name)?.exec(&sql, &params, fn_)?;
                             if n == 0 {
                                 // Getroffen hat es nichts: gibt es die Zeile noch?
                                 let sql = format!("SELECT {} FROM {} WHERE id = ?",
                                                   if mit_version { vspalte.as_str() } else { "id" }, tabelle);
-                                let da = !self.db_conn(conn_idx)?.query(&sql, &[crate::db::Param::Int(id)], fn_)?.rows.is_empty();
+                                let da = !self.db_conn(conn_idx, name)?.query(&sql, &[crate::db::Param::Int(id)], fn_)?.rows.is_empty();
                                 self.gui.form_konflikt_setzen(win, &form, if da && pruefen { "geaendert" } else { "geloescht" });
                                 return Ok(Some(Value::Int(0)));
                             }
                             if mit_version {
                                 let neu = match vstand { Some(s) if !ueberschreiben => Some(s + 1), _ => {
                                     let sql = format!("SELECT {} FROM {} WHERE id = ?", vspalte, tabelle);
-                                    let res = self.db_conn(conn_idx)?.query(&sql, &[crate::db::Param::Int(id)], fn_)?;
+                                    let res = self.db_conn(conn_idx, name)?.query(&sql, &[crate::db::Param::Int(id)], fn_)?;
                                     match res.rows.first().and_then(|z| z.first()) {
                                         Some(crate::db::DbVal::Int(n)) => Some(*n),
                                         Some(crate::db::DbVal::Real(f)) => Some(*f as i64),

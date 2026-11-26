@@ -29,12 +29,6 @@ const MODULES: &[&str] = &[
     "spi", "tile_collide", "tiled", "timer", "tween", "ui", "usb", "vec2", "video", "webcam", "websocket", "wifi", "zeit",
 ];
 
-/// Hardware-/IoT-Module hinter Cargo-Features (= die `--hardware`-Features in
-/// `rust/build_runtime.py`). Importierbar (sie stehen in `MODULES`), aber im
-/// Default-Build NICHT einkompiliert -- jeder Funktionsaufruf schluege sonst
-/// erst zur Laufzeit fehl (vgl. `vm.rs::unknown_builtin_msg`). Darum wird beim
-/// IMPORT frueh gewarnt.
-const HARDWARE_MODULES: &[&str] = &["serial", "usb", "bt", "wifi", "firmata", "midi", "gpio", "i2c", "spi"];
 
 /// Externe Typen, die ein Built-in-Modul registriert (lowercase, wie der
 /// Lexer IDENTs liefert). Spiegelt `register_type(...)` der Module -- damit
@@ -220,6 +214,16 @@ pub fn modul_verfuegbar(name: &str) -> bool {
     is_known_module(&low) && hardware_module_compiled(&low)
 }
 
+/// Fehlt dieses importierte Modul hier ganz oder zum Teil, so dass der
+/// IMPORT warnen soll? (`bau.rs` fuer die Features, dazu die Pins nur unter
+/// Linux.)
+fn modul_fehlt_hier(m: &str) -> bool {
+    match m {
+        "gpio" | "i2c" | "spi" => !cfg!(target_os = "linux"),
+        _ => crate::bau::import_fehlt(m).is_some(),
+    }
+}
+
 /// Existiert das Built-in-Modul? (entspricht `load_module(rel) == True`).
 /// Modul-Aufloesung ist case-insensitiv (Python importiert `name.lower()`).
 fn is_known_module(rel: &str) -> bool {
@@ -233,17 +237,16 @@ fn is_known_module(rel: &str) -> bool {
 fn hardware_module_compiled(m: &str) -> bool {
     match m {
         "midi" => cfg!(feature = "midi"),
-        "serial" => cfg!(feature = "serial"),
         // Firmata geht in jedem Bau ueber tcp:host:port; nur die serielle
         // Leitung braucht --hardware, das sagt FIRMATA_OPEN selbst.
         "firmata" => true,
         // Die Pins des Kernels (/dev/gpiochip*, /dev/i2c-*, /dev/spidev*)
         // gibt es nur unter Linux -- dort in jedem Bau, ohne Feature.
         "gpio" | "i2c" | "spi" => cfg!(target_os = "linux"),
-        "usb" => cfg!(feature = "usb"),
-        "bt" => cfg!(feature = "bt"),
-        "wifi" => cfg!(feature = "wifi"),
-        _ => true,
+        // Alles andere sagt die eine Tabelle (bau.rs) -- bis 2026.53 kannte
+        // diese Stelle nur die Hardware-Module, und MODULE_AVAILABLE sagte
+        // in der Mini-Laufzeit TRUE zu db, net, pdf, websocket ...
+        _ => crate::bau::modul_fehlt(m).is_none(),
     }
 }
 
@@ -257,18 +260,10 @@ pub fn hardware_missing_msg(module: &str) -> String {
             "Modul '{}' gibt es nur unter Linux (etwa auf dem Raspberry Pi) -- Funktionsaufrufe melden hier einen Fehler",
             module);
     }
-    if module == "midi" {
-        // MIDI-Dateien und die Notenrechnung brauchen kein Geraet und gehen
-        // in jedem Bau -- nur Ein- und Ausgaenge fehlen.
-        return "Hardware-Modul 'midi' ist in diesem dhrt-Build nur zum Teil enthalten -- \
-                MIDI-Dateien und MIDI_NOTE_NAME$/MIDI_NOTE_FREQ gehen, Ein- und Ausgaenge nicht. \
-                Neu bauen mit: python rust\\build_runtime.py --hardware".to_string();
+    match crate::bau::import_fehlt(module) {
+        Some(f) => crate::bau::import_warnung(module, f),
+        None => format!("Modul '{}' gibt es in dieser Laufzeit nicht", module),
     }
-    format!(
-        "Hardware-Modul '{}' ist in diesem dhrt-Build nicht enthalten -- \
-         Funktionsaufrufe schlagen zur Laufzeit fehl. Neu bauen mit: \
-         python rust\\build_runtime.py --hardware",
-        module)
 }
 
 /// Wo nach einer importierten Quelldatei gesucht wird, wenn sie nicht neben
@@ -319,9 +314,9 @@ pub fn bibliothekspfade() -> Vec<std::path::PathBuf> {
 /// Build fehlen (importierbar, aber jeder Aufruf wuerde zur Laufzeit scheitern).
 /// Basis fuer eine Warnung schon beim IMPORT statt erst beim ersten Aufruf.
 pub fn missing_hardware_modules(imports: &[(String, Option<String>)]) -> Vec<&'static str> {
-    HARDWARE_MODULES.iter()
-        .filter(|&&m| !hardware_module_compiled(m) && !nur_optional(m)
-            && imports.iter().any(|(name, _)| name == m))
+    MODULES.iter()
+        .filter(|&&m| modul_fehlt_hier(m) && !nur_optional(m)
+            && imports.iter().any(|(name, _)| crate::namen::modul(name) == m))
         .copied()
         .collect()
 }
@@ -335,8 +330,8 @@ pub fn missing_hardware_imports_with_lines(source: &str) -> Vec<(usize, &'static
         let raw = raw_line.strip_suffix('\r').unwrap_or(raw_line);
         if let Some(caps) = import_re().captures(raw) {
             let rel = caps.get(1).unwrap().as_str().to_lowercase();
-            if let Some(&m) = HARDWARE_MODULES.iter().find(|&&h| h == rel) {
-                if !hardware_module_compiled(m) && caps.get(3).is_none() {
+            if let Some(&m) = MODULES.iter().find(|&&h| h == crate::namen::modul(&rel)) {
+                if modul_fehlt_hier(m) && caps.get(3).is_none() {
                     out.push((idx0 + 1, m));
                 }
             }

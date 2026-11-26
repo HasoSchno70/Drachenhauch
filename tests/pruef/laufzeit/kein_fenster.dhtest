@@ -22,7 +22,7 @@ TRY
 CATCH e
     gefangen = e
 END TRY
-IF INSTR(gefangen, "im Rust-Kern") >= 0 OR INSTR(gefangen, "ohne Grafik") >= 0 THEN
+IF INSTR(gefangen, "gibt es in dieser Laufzeit nicht") >= 0 OR INSTR(gefangen, "im Rust-Kern") >= 0 OR INSTR(gefangen, "ohne Grafik") >= 0 THEN
     PRINT "UEBERSPRINGEN: Laufzeit ohne Grafik"
     EXIT(0)
 END IF
@@ -50,7 +50,7 @@ TRY
 CATCH e
     gefangen = e
 END TRY
-IF INSTR(gefangen, "im Rust-Kern") >= 0 OR INSTR(gefangen, "ohne Grafik") >= 0 THEN
+IF INSTR(gefangen, "gibt es in dieser Laufzeit nicht") >= 0 OR INSTR(gefangen, "im Rust-Kern") >= 0 OR INSTR(gefangen, "ohne Grafik") >= 0 THEN
     PRINT "UEBERSPRINGEN: Laufzeit ohne Grafik"
     EXIT(0)
 END IF

@@ -1183,7 +1183,7 @@ geklappt hat.
 | `CWD$()` → STRING | aktuelles Arbeitsverzeichnis |
 | `CHDIR(path$)` | Arbeitsverzeichnis wechseln |
 | `EXEPATH$()` → STRING | Pfad der laufenden Programmdatei |
-| `MODULE_AVAILABLE(module$)` → BOOLEAN | ist das Modul in diesem Bau dabei? (Hardware-Module fehlen ohne `--hardware`) |
+| `MODULE_AVAILABLE(module$)` → BOOLEAN | ist das Modul in dieser Laufzeit dabei? (dieselbe Antwort wie `dhrt --version` unter „dabei“: Hardware-Module fehlen ohne `--hardware`, in `dhrt-mini` auch Grafik, Netz und Datenbank) |
 | `EXIT([code])` | sofort beenden, `code` = Rückgabewert (0..255, Vorgabe 0) |
 | `EPRINT(text)` | Zeile nach **stderr** statt stdout |
 | `SHELL(program$, ...)` → INTEGER | Programm starten, warten, Rückgabewert |

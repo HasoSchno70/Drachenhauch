@@ -1307,23 +1307,35 @@ Aufwand. Jeder Punkt hält `docs/stabilitaet.md` ein.
      stille Abschneiden in der Grafik, den fehlenden Aufruf-Hinweis und fünf
      Meldungsformen.
    - Bricht nichts: Es wird nur mehr angenommen, still Falsches wird richtig.
-2. **Meldungen mit dem geschriebenen Namen** (B1, B2, A2 Teil). Eine Stelle an der
+2. **Meldungen mit dem geschriebenen Namen** (B1, B2, A2 Teil). *Umgesetzt auf
+   `thema/argumente-einheitlich` (`Func::anzeigen`, `fehler_benennen`).* Eine Stelle an der
    Fehlergrenze ersetzt `ALT:` durch den Namen aus dem Quelltext. Damit ist die
    Namensreform auch in Fehlern angekommen, für alle 143 Paare und die
    Arm-Aliase. Dazu die Arm-Aliase nach `namen.rs`.
-3. **Eine Feature-Tabelle** (A3, C2): Modul → Präfixe → Feature. Daraus speisen
+3. **Eine Feature-Tabelle** (A3, C2). *Umgesetzt auf `thema/abstuerze-features-handles`
+   (`bau.rs`, Modul → Features, gemessen mit `--fehlende` an einem Bau mit nur
+   `jit ffi`).* Modul → Präfixe → Feature. Daraus speisen
    sich `MODULE_AVAILABLE`, die IMPORT-Warnung, **eine** Meldung „gibt es in
    dieser Laufzeit nicht“ und `fehlt_im_bau`. Behebt den kaputten schlanken
    Export für httpd, falsche TRUE bei `MODULE_AVAILABLE`, die MIDI-Meldung und
    „(Schritt 4)“.
-4. **Eine Handle-Regel und ein `handle_get`** (A4, B5, D5).
+4. **Eine Handle-Regel und ein `handle_get`** (A4, B5, D5). *Umgesetzt auf
+   `thema/abstuerze-features-handles`: Regel in CLAUDE.md, `MODEL_FREE`, `FONT_FREE`,
+   `SHADER_FREE`, `RENDERTARGET_FREE`, `ATLAS_FREE`, `SAMPLE_FREE`, Getter nennen den
+   Befehl, doppelt freigeben still. Offen: `_REMOVE`/`_DESTROY`/`_DISCONNECT` als
+   `_FREE`-Namen, `db_res_mut` nennt noch das Modul, getaggte Handles.*
    - Ungültig ist ein Fehler mit Befehlsnamen, Freigeben ist idempotent und
      still, Laden scheitert laut (LOADMODEL, SHADER_LOAD).
    - Fehlende `_FREE` nachrüsten (Modell, Schrift, Shader, Render-Ziel, Atlas,
      Sample).
    - `TASK_READY` mit unbekannter Nummer wird ein Fehler.
    - Danach können getaggte Handles `IS`, `TYPEOF` und Verwechslungen lösen.
-5. **Abstürze aus der Laufzeit nehmen.** `familie_rufen` unter `catch_unwind`
+5. **Abstürze aus der Laufzeit nehmen.** *Umgesetzt auf
+   `thema/abstuerze-features-handles`: `builtin_rufen` unter `panik_fangen`, `.dhc`
+   mit `Result`, Zufallsproben für jeden Netz-Decoder, dazu die Funde einer
+   Zufallssuche (riesige Texte/Felder, imgfx im C-Code von raylib). Offen: die
+   Argumentzahl-Warnung des Compilers als Fehler (bräche Programme).*
+   `familie_rufen` unter `catch_unwind`
    stellen, `try_geld` prüft die Argumentzahl, die Argumentzahl-Warnung des
    Compilers wird ein Fehler. Der URL-Dekodierer von httpd arbeitet auf Bytes
    (ein Dekodierer statt zwei). `.dhc` lädt mit `Result`. Ein Netzwerkpaket darf

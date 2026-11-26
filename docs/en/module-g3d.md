@@ -61,7 +61,8 @@ and guide lines. Anyone who needs the same shape often uses a model (see below).
 
 | Function | Returns | Meaning |
 |---|---|---|
-| `LOADMODEL(path$)` | INTEGER | load a model from a file (OBJ, GLTF, IQM …) |
+| `LOADMODEL(path$)` | INTEGER | load a model from a file (OBJ, GLTF, IQM …); a missing or unreadable file is an error |
+| `MODEL_FREE(model)` | — | release the model (meshes and graphics memory) — the handle is invalid at once, whatever this frame already drew with it still appears at `FLIP`; releasing twice is silent |
 | `MESH_CUBE(width, height, depth)` | INTEGER | box as a model — without a file |
 | `MESH_SPHERE(radius, rings, segments)` | INTEGER | sphere; more rings and segments = rounder and more expensive |
 | `MESH_CYLINDER(radius, height, segments)` | INTEGER | cylinder |

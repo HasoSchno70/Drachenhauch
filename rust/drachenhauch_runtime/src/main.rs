@@ -20,6 +20,7 @@ mod animfsm;
 mod appstart;
 mod ast;
 mod namen;
+mod bau;
 mod namensraum;
 mod schreibweise;
 mod astar;
@@ -128,6 +129,8 @@ mod pruef;
 mod pruefsammlung;
 mod prozess;
 mod text_stream;
+#[cfg(test)]
+mod zufallsprobe;
 #[cfg(feature = "bt")]
 mod bt;
 // midi.rs ist NICHT gegatet: die beiden Umrechner darin (Notenname,
@@ -324,38 +327,7 @@ fn fassung() -> String {
 /// die Meldung kommt dann erst beim ersten Aufruf, tief im Programm. Wer
 /// `dhrt --version` tippt, soll das in einer Zeile sehen koennen.
 fn eingebaut() -> String {
-    let mut an: Vec<&str> = Vec::new();
-    let mut aus: Vec<&str> = Vec::new();
-    for (name, da) in [
-        // Der Bau fuer den Raspberry Pi zeichnet ueber OpenGL ES (Feature `gles`).
-        (if cfg!(feature = "gles") { "grafik (OpenGL ES)" } else { "grafik" }, cfg!(feature = "graphics")),
-        ("dialoge", cfg!(feature = "dialogs")),
-        ("tray", cfg!(feature = "tray")),
-        ("video", cfg!(feature = "video")),
-        ("datenbank", cfg!(feature = "db")),
-        ("postgres", cfg!(feature = "pg")),
-        ("mysql", cfg!(feature = "mysql")),
-        ("netz", cfg!(feature = "net")),
-        ("http", cfg!(feature = "http")),
-        ("mail", cfg!(feature = "smtp")),
-        ("maschinencode", cfg!(feature = "jit")),
-        ("ffi", cfg!(feature = "ffi")),
-        ("pdf", cfg!(feature = "pdf")),
-        ("schriften", cfg!(feature = "schriften")),
-        ("physik", cfg!(feature = "physik")),
-        ("seriell", cfg!(feature = "serial")),
-        ("usb", cfg!(feature = "usb")),
-        ("bluetooth", cfg!(feature = "bt")),
-        ("wlan", cfg!(feature = "wifi")),
-        ("midi", cfg!(feature = "midi")),
-    ] {
-        if da { an.push(name) } else { aus.push(name) }
-    }
-    let mut s = format!("dabei: {}", if an.is_empty() { "nichts".to_string() } else { an.join(", ") });
-    if !aus.is_empty() {
-        s.push_str(&format!("\nfehlt: {} (neu bauen mit: python rust/build_runtime.py --hardware)", aus.join(", ")));
-    }
-    s
+    bau::version_zeilen()
 }
 
 const HILFE: &str = "\

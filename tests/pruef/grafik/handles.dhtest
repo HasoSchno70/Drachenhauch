@@ -1,0 +1,230 @@
+' Die Handle-Regel (CLAUDE.md, Rangliste Punkt 4 in
+' docs/intern/inkonsistenzen-runtime.md): ein ungueltiges Handle ist ein
+' Fehler mit dem Befehlsnamen, Freigeben ist still (auch doppelt), Laden,
+' das scheitert, ist ein Fehler -- und jede Art mit Handle-Nummer hat ein
+' _FREE.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== model_free gibt frei und das handle meldet sich
+' Bis 2026.53 gab es kein MODEL_FREE: jedes LOADMODEL und jedes MESH_* blieb
+' bis zum Programmende im Grafikspeicher. Ein freigegebenes Handle zeigt
+' danach nicht still auf etwas anderes, sondern meldet sich; was in diesem
+' Bild schon gezeichnet wurde, erscheint beim FLIP noch.
+IMPORT "g3d"
+SCREEN(160, 120, "t")
+DIM a AS INTEGER : a = MESH_CUBE(1, 1, 1)
+DIM b AS INTEGER : b = MESH_CUBE(2, 2, 2)
+CAMERA3D(4, 4, 4, 0, 0, 0, 45)
+MODEL(a, 0, 0, 0, 1, RED)
+MODEL_FREE(a)
+FLIP()
+MODEL_FREE(a)
+PRINT "doppelt still"
+TRY
+    PRINT MODEL_BBOX(a)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    MODEL_FREE(99)
+CATCH e
+    PRINT e
+END TRY
+PRINT "strahl "; RAY_HIT_MODEL(a, 4, 0, 0, -1, 0, 0, 0, 0, 0, 1)
+' Das andere Modell bleibt, und ein neues bekommt einen neuen Platz.
+DIM t AS TUPLE : t = MODEL_BBOX(b)
+PRINT "b "; t[3]
+DIM c AS INTEGER : c = MESH_CUBE(1, 1, 1)
+PRINT "neu "; (c <> a)
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+doppelt still
+MODEL_BBOX: dieses Modell wurde mit MODEL_FREE freigegeben
+MODEL_FREE: ungueltiges MODEL-Handle 99
+strahl -1.0
+b 1.0
+neu TRUE
+
+=== image_free ist doppelt still
+' Bis 2026.53 war das zweite IMAGE_FREE ein Fehler -- anders als jedes
+' andere Freigeben. Ein Handle, das es nie gab, bleibt einer.
+IMPORT "imgfx"
+SCREEN(80, 60, "t")
+DIM b AS INTEGER : b = IMAGE_NEW(8, 8, &HFF0000)
+IMAGE_FREE(b)
+IMAGE_FREE(b)
+PRINT "doppelt still"
+TRY
+    IMAGE_FREE(9999)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+doppelt still
+IMAGE_FREE: ungueltiges IMAGE-Handle 9999
+
+=== laden das scheitert ist ein fehler
+' Bis 2026.53: LOADMODEL einer fehlenden Datei lieferte ein Handle ohne
+' Netz (raylibs Ersatz) und keine Meldung; SHADER_LOAD eines kaputten
+' Shaders lieferte -1, und POSTFX/SHADER_SET liefen danach still ins Leere.
+IMPORT "g3d"
+SCREEN(80, 60, "t")
+TRY
+    PRINT LOADMODEL("gibtsnicht.obj")
+CATCH e
+    PRINT LEFT$(e, INSTR(e, " (gesucht"))
+END TRY
+TRY
+    PRINT LOADMODEL("leer.obj")
+CATCH e
+    PRINT e
+END TRY
+--- datei leer.obj
+# nur ein Kommentar, kein Netz
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+LOADMODEL: Datei 'gibtsnicht.obj' nicht gefunden
+LOADMODEL: 'leer.obj' laesst sich nicht als Modell lesen (gelesen werden OBJ, GLTF/GLB, IQM, VOX und M3D)
+
+=== ein kaputter shader ist ein fehler
+' Die Meldung des Treibers schreibt raylib selbst davor (je Treiber anders),
+' darum hier nur "enthaelt".
+SCREEN(80, 60, "t")
+TRY
+    PRINT SHADER_LOAD("#version 330" + CHR$(10) + "void main() { kaputt }")
+CATCH e
+    PRINT e
+END TRY
+PRINT "weiter"
+--- umgebung
+DHRT_FRAMES=2
+--- enthaelt
+SHADER_LOAD: der Shader laesst sich nicht uebersetzen -- die Meldung des Grafiktreibers steht davor
+weiter
+
+=== shader_free und ein shader den es nicht gibt
+' Bis 2026.53 lief SHADER_SET(99, ...) still ins Leere und POSTFX(99)
+' schaltete still aus; ein Shader liess sich nicht freigeben.
+SCREEN(80, 60, "t")
+DIM s AS INTEGER : s = SHADER_LOAD("#version 330" + CHR$(10) + "in vec2 fragTexCoord; uniform sampler2D texture0; uniform float k; out vec4 finalColor; void main() { finalColor = texture(texture0, fragTexCoord) * k; }")
+SHADER_SET(s, "k", 1.0)
+POSTFX(s)
+SHADER_FREE(s)
+SHADER_FREE(s)
+PRINT "doppelt still"
+TRY
+    SHADER_SET(s, "k", 0.5)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    SHADER_SET(99, "k", 0.5)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    POSTFX(99)
+CATCH e
+    PRINT e
+END TRY
+POSTFX(-1)
+FLIP()
+PRINT "weiter"
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+doppelt still
+SHADER_SET: dieser Shader wurde mit SHADER_FREE freigegeben
+SHADER_SET: ungueltiges SHADER-Handle 99
+POSTFX: ungueltiges SHADER-Handle 99
+weiter
+
+=== font_free gibt die schrift frei und die eingebaute gilt wieder
+SCREEN(80, 60, "t")
+DIM f AS INTEGER : f = LOADFONT("sans", 20)
+SETFONT(f)
+TEXT(1, 1, "vorher", WHITE)
+FONT_FREE(f)
+FONT_FREE(f)
+PRINT "doppelt still"
+TRY
+    SETFONT(f)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    FONT_FREE(-1)
+CATCH e
+    PRINT e
+END TRY
+TEXT(1, 20, "nachher", WHITE)
+FLIP()
+DIM g AS INTEGER : g = LOADFONT("sans", 12)
+PRINT "neu "; (g <> f)
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+doppelt still
+SETFONT: diese Schrift wurde mit FONT_FREE freigegeben
+FONT_FREE: ungueltiges FONT-Handle -1
+neu TRUE
+
+=== rendertarget_free nicht waehrend hineingezeichnet wird
+SCREEN(80, 60, "t")
+DIM r AS INTEGER : r = RENDERTARGET_NEW(32, 32)
+RENDERTARGET_BEGIN(r)
+TRY
+    RENDERTARGET_FREE(r)
+CATCH e
+    PRINT e
+END TRY
+RENDERTARGET_END()
+RENDERTARGET_FREE(r)
+RENDERTARGET_FREE(r)
+PRINT "doppelt still"
+TRY
+    RENDERTARGET_BEGIN(r)
+CATCH e
+    PRINT e
+END TRY
+FLIP()
+TRY
+    RENDERTARGET_FREE(0 - 5)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+RENDERTARGET_FREE: in das Ziel wird gerade gezeichnet -- erst RENDERTARGET_END()
+doppelt still
+RENDERTARGET_BEGIN: dieses Render-Ziel wurde mit RENDERTARGET_FREE freigegeben
+RENDERTARGET_FREE: ungueltiges RENDERTARGET-Handle -5
+
+=== atlas_free gibt atlas und bild frei
+IMPORT "imgfx"
+SCREEN(80, 60, "t")
+DIM b AS INTEGER : b = IMAGE_NEW(16, 8, RED)
+IMAGE_SAVE(b, "blatt.png")
+DIM a AS INTEGER : a = ATLAS_LOAD("blatt.json")
+ATLAS_DRAW(a, "links", 0, 0)
+ATLAS_FREE(a)
+ATLAS_FREE(a)
+PRINT "doppelt still"
+TRY
+    ATLAS_DRAW(a, "links", 0, 0)
+CATCH e
+    PRINT e
+END TRY
+FLIP()
+--- datei blatt.json
+{"image": "blatt.png", "sprites": {"links": [0, 0, 8, 8], "rechts": [8, 0, 8, 8]}}
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+doppelt still
+ATLAS_DRAW: dieser Atlas wurde mit ATLAS_FREE freigegeben

@@ -105,7 +105,6 @@ const EXIT_REQUEST: &str = "__EXIT__";
 /// Windows (1 MB Vorgabe) crashte der Prozess bereits bei 147.
 const MAX_CALL_DEPTH: u32 = 1000;
 
-use crate::builtins;
 use crate::model::{op, Arg, ClassInfo, Func, Program};
 use crate::value::{as_f64, is_num, value_eq, Cells, CoroState, DhArray, DhMap, Instance, Value};
 
@@ -613,22 +612,15 @@ pub(crate) fn braucht_zeile(name: &str) -> bool {
 
 pub(crate) const BUILTIN_FAMILIEN: u8 = 34;
 
+/// Die reine Familie, auch fuer Container-Methoden (`liste.push(1)`), die
+/// nicht ueber `builtin_rufen` gehen -- darum fangen sie ihre Panik selbst.
 fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
-    use std::panic::{catch_unwind, AssertUnwindSafe};
-    match catch_unwind(AssertUnwindSafe(|| crate::builtins::call_builtin(name, args))) {
-        Ok(r) => r,
-        Err(payload) => {
-            let msg = payload.downcast_ref::<String>().cloned()
-                .or_else(|| payload.downcast_ref::<&str>().map(|s| s.to_string()))
-                .unwrap_or_else(|| "interner Fehler".to_string());
-            let friendly = if msg.contains("index out of bounds") {
-                format!("{}: zu wenige Argumente", name.to_uppercase())
-            } else {
-                format!("{}: interner Fehler ({})", name.to_uppercase(), msg)
-            };
-            Some(Err(friendly))
-        }
-    }
+    let mut unbekannt = false;
+    let r = panik_fangen(name, args.len(), || match crate::builtins::call_builtin(name, args) {
+        Some(r) => r,
+        None => { unbekannt = true; Ok(Value::Nil) }
+    });
+    if unbekannt { None } else { Some(r) }
 }
 
 #[cfg(feature = "graphics")]
@@ -1165,6 +1157,10 @@ mod grafik;
 mod helfer;
 pub(crate) use helfer::*;
 
+impl Drop for Vm<'_> {
+    fn drop(&mut self) { vm_abgeraeumt(); }
+}
+
 impl<'p> Vm<'p> {
     /// Meldung fuer einen globalen Platz, der gelesen wird, bevor er gesetzt
     /// ist -- mit dem NAMEN der Variable. Seit auch Felder, Maps und
@@ -1199,6 +1195,9 @@ impl<'p> Vm<'p> {
     }
 
     pub fn new(prog: &'p Program) -> Self {
+        // Vor jedem fremden take_hook (`dhrt --fehlende`), damit der Haken
+        // fuer gefangene Paniken nicht im Ersatz eines anderen landet.
+        vm_angelegt();
         crate::value::klassen_setzen(prog.classes.iter().map(|(n, ci)| (n, ci.layout.vorfahren.as_slice())));
         let mut global_slots = Vec::with_capacity(prog.n_globals);
         for _ in 0..prog.n_globals {
@@ -1410,8 +1409,8 @@ impl<'p> Vm<'p> {
         self.exec(&self.prog.functions[idx], args, None)
     }
 
-    pub fn take_output(self) -> String {
-        self.out
+    pub fn take_output(mut self) -> String {
+        std::mem::take(&mut self.out)
     }
 
     /// Ausgabe sammeln statt sie laufend hinauszuschreiben (`dhrt call`).
@@ -1648,6 +1647,10 @@ impl<'p> Vm<'p> {
     }
 
     fn try_typtest(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        // Nur im Testbau: ein Befehl, der in Panik geraet, fuer die Probe
+        // `panik_in_einem_befehl_ist_ein_fehler` (vm_helfer.rs).
+        #[cfg(test)]
+        if name == "__panik_probe" { let leer: &[i64] = &[]; let _ = leer[a.len() + 3]; }
         // `__frisch(typ$)`: ein NEUER Startwert fuer ein DIM in einem
         // Schleifenrumpf (compiler.rs `dim_frisch`) -- leeres Feld, leere MAP,
         // neue Struct-Instanz, neutrales Element, NIL fuer Klassen. Ein DIM in
@@ -2358,9 +2361,15 @@ impl<'p> Vm<'p> {
         }
     }
 
+    /// Jeder Befehl laeuft unter `panik_fangen`: eine Panik in irgendeiner
+    /// Familie wird ein Laufzeitfehler mit Befehlsnamen, den TRY faengt.
     pub(crate) fn builtin_rufen(&mut self, name: &str, a: &[Value], merk: &std::cell::Cell<u8>) -> R<Value> {
+        panik_fangen(name, a.len(), || self.builtin_rufen_innen(name, a, merk))
+    }
+
+    fn builtin_rufen_innen(&mut self, name: &str, a: &[Value], merk: &std::cell::Cell<u8>) -> R<Value> {
         if let Some(Value::Tuple(_)) = a.first() {
-            if let Some(neu) = tupel_fuer_feldbefehl(name, a) { return self.builtin_rufen(name, &neu, merk); }
+            if let Some(neu) = tupel_fuer_feldbefehl(name, a) { return self.builtin_rufen_innen(name, &neu, merk); }
         }
         let f = merk.get();
         if f != 0 {
@@ -2419,7 +2428,9 @@ impl<'p> Vm<'p> {
             31 => self.try_webcam(name, a),
             32 => self.try_netzdienste(name, a),
             33 => self.try_geraete(name, a),
-            _ => match safe_call_builtin(name, a) {
+            // Ohne eigenen Fang: `builtin_rufen` faengt schon (ein zweiter
+            // kostete in builtins.dh messbar).
+            _ => match crate::builtins::call_builtin(name, a) {
                 Some(Ok(v)) => Ok(Some(v)),
                 Some(Err(e)) if e.starts_with("__UNKNOWN_BUILTIN__:") => Err(unknown_builtin_msg(name)),
                 Some(Err(e)) => Err(e),
@@ -4545,7 +4556,7 @@ impl<'p> Vm<'p> {
         // einem harten Allocator-Abort statt eines DH-Fehlers. Hier einmalig
         // mit checked_mul + einer Obergrenze validieren, BEVOR DhArray::new
         // (das selbst keinen Result-Rueckgabewert hat) ueberhaupt aufgerufen wird.
-        const MAX_ARRAY_ELEMENTS: i64 = 100_000_000;
+        use crate::builtins::MAX_ARRAY_ELEMENTS;
         let mut total: i64 = 1;
         for &d in &dims {
             total = total.checked_mul(d).ok_or_else(||
@@ -4605,6 +4616,13 @@ impl<'p> Vm<'p> {
     fn handle_get<'a, T>(vec: &'a [Option<T>], idx: i64, modul: &str, was: &str) -> R<&'a T> {
         vec.get(idx as usize).and_then(|o| o.as_ref())
             .ok_or_else(|| format!("{}: {} {}", modul, was, idx))
+    }
+    /// Ist der Platz schon freigegeben (es gab ihn, jetzt ist er leer)? Dann
+    /// ist ein weiteres Freigeben still (die Handle-Regel, CLAUDE.md) -- ein
+    /// Platz, den es nie gab, bleibt ein Fehler beim Getter.
+    #[allow(dead_code)]
+    pub(super) fn schon_frei<T>(vec: &[Option<T>], idx: i64) -> bool {
+        idx >= 0 && vec.get(idx as usize).is_some_and(|o| o.is_none())
     }
     // Ohne Feature-Gate: `pdf` und `xlsx` brauchen denselben Helfer und
     // haengen an keinem Feature -- ein Konsolenprogramm soll eine Rechnung

@@ -7,7 +7,19 @@ c = DB_OPEN(":memory:")
 DB_CLOSE(c)
 DB_EXEC(c, "SELECT 1")
 --- fehler
-DB: ungueltiges/geschlossenes DB_CONN-Handle 0
+DB_EXEC: ungueltiges/geschlossenes DB_CONN-Handle 0
+
+=== ein ergebnis doppelt schliessen ist still
+' Die Handle-Regel (CLAUDE.md): Freigeben ist still, auch doppelt -- bis
+' 2026.53 war das zweite DB_CLOSE_RESULT ein Fehler.
+IMPORT "db"
+DIM c AS DB_CONN : c = DB_OPEN(":memory:")
+DIM r AS DB_RESULT : r = DB_QUERY(c, "SELECT 1")
+DB_CLOSE_RESULT(r)
+DB_CLOSE_RESULT(r)
+PRINT "still"
+--- erwartet
+still
 
 === exec insert returns rowcount
 IMPORT "db"

@@ -474,3 +474,20 @@ mod tests {
         assert_eq!(txt_aus_text("a=1; b = zwei ;c"), vec![("a".into(), "1".into()), ("b".into(), "zwei".into()), ("c".into(), String::new())]);
     }
 }
+
+#[cfg(test)]
+mod zufall_tests {
+    use super::*;
+
+    #[test]
+    fn keine_antwort_fuehrt_zur_panik() {
+        let a = Ankuendigung { name: "Drucker".into(), dienst: "_ipp._tcp.local".into(),
+                               host: "kasten.local".into(), port: 631,
+                               txt: vec![("rp".into(), "ipp/print".into())] };
+        let gueltig = vec![
+            antwort_bauen(7, &a, Ipv4Addr::new(192, 168, 1, 9), 120),
+            frage(3, "kasten.local", 1),
+        ];
+        crate::zufallsprobe::nie_panik("mDNS", &gueltig, |b| { let _ = antwort_lesen(b); });
+    }
+}

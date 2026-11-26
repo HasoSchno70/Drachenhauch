@@ -231,6 +231,16 @@ Einzelheiten stehen in der Geschichte des Bereichs.
 - Kamera: nach `CAMERA_SET` sind alle Zeichenkoordinaten Welt-Koordinaten;
   `TEXT` wird nur verschoben, für scharfen HUD-Text vorher `CAMERA_RESET()`.
 
+**Handles** (Bilder, Modelle, Schriften, Datenbanken …)
+- Ein ungültiges Handle ist ein Fehler, der den Befehl nennt
+  („MODEL_BBOX: ungueltiges MODEL-Handle 7“, nach dem Freigeben „… wurde mit
+  MODEL_FREE freigegeben“). Alte Zusage: `GETPIXEL`/`GETALPHA` liefern -1.
+- Freigeben (`_FREE`) ist still, auch doppelt; nur ein Handle, das es nie
+  gab, ist ein Fehler. Der Platz wird nicht neu vergeben, der Speicher geht
+  nach dem nächsten FLIP (was schon zum Zeichnen ansteht, braucht ihn noch).
+- Laden, das scheitert, ist ein Fehler -- nie ein Ersatz-Handle, 0 oder -1.
+- Jede Art mit Handle-Nummer bekommt ein `_FREE`.
+
 **gui**
 - Geometrie je Widget aus EINER Quelle, die Zeichnen, Treffertest, Tastatur
   und Bildschirmleser gemeinsam fragen (`table_geom`, `ta_rows`, `tb_geom`,

@@ -852,6 +852,12 @@ fn builtin_modul() -> &'static std::collections::HashMap<String, String> {
     })
 }
 
+/// Das Modul eines Befehls laut Index (klein), ohne `core`/`dhrt` --
+/// `bau::befehl_fehlt` fragt so, welches Feature er braucht.
+pub(crate) fn modul_von_builtin(name: &str) -> Option<String> {
+    builtin_modul().get(&name.to_lowercase()).cloned()
+}
+
 /// "3", "3 bis 4" bzw. "mindestens 3" -- fuer lesbare Meldungen.
 ///
 /// Variadische Signaturen ("...") liefern `usize::MAX` als Obergrenze. Ohne den

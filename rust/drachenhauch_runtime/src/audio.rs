@@ -888,6 +888,8 @@ pub struct Audio {
     audio_stack: Vec<([BusValues; 3], f32)>,
     sounds: Vec<SoundSlot>,
     samples: Vec<Sample>,
+    /// SAMPLE_FREE: der Platz bleibt gesperrt stehen, die Daten sind weg.
+    sample_frei: Vec<bool>,
     sample_cache: HashMap<(usize, i64, i64), i64>,
     // Kira-Uhren fuer sample-genaues Musik-/Rhythmus-Timing (AUDIO_CLOCK_*).
     // `None` = per AUDIO_CLOCK_REMOVE entfernt (Tombstone, Index bleibt stabil;
@@ -958,7 +960,7 @@ impl Audio {
             sfx_bus: 1.0, music_bus: 1.0, master_bus: 1.0, speech_bus: 1.0,
             sfx_fx, music_fx, master_fx,
             bus_values: [BusValues::default(); 3], audio_stack: Vec::new(),
-            sounds: Vec::new(), samples: Vec::new(),
+            sounds: Vec::new(), samples: Vec::new(), sample_frei: Vec::new(),
             sample_cache: HashMap::new(), clocks: Vec::new(),
             listeners: Vec::new(), emitters: Vec::new(), mods: Vec::new(), mod_bindungen: Vec::new(), num_channels: 16,
             bands: Vec::new(), agc: 1e-4, fft_zuletzt: None,
@@ -2170,6 +2172,7 @@ resonance/reverb/distortion", other)),
         if mono.is_empty() { return Err("SAMPLE_LOAD: Sample ist leer".into()); }
         self.samples.push(Sample { data: mono, sr, loop_start: 0, loop_end: 0,
                                    loop_mode: LoopArt::Vorwaerts });
+        self.sample_frei.push(false);
         Ok((self.samples.len() - 1) as i64)
     }
 
@@ -2190,6 +2193,7 @@ resonance/reverb/distortion", other)),
         let data = pcm16_zu_float(bytes);
         self.samples.push(Sample { data, sr: sr as u32, loop_start: 0, loop_end: 0,
                                    loop_mode: LoopArt::Vorwaerts });
+        self.sample_frei.push(false);
         Ok((self.samples.len() - 1) as i64)
     }
 
@@ -2207,14 +2211,37 @@ resonance/reverb/distortion", other)),
         if mono.is_empty() { return Err("SAMPLE_FROM_SOUND: der Klang ist leer".into()); }
         self.samples.push(Sample { data: mono, sr, loop_start: 0, loop_end: 0,
                                    loop_mode: LoopArt::Vorwaerts });
+        self.sample_frei.push(false);
         Ok((self.samples.len() - 1) as i64)
+    }
+
+    /// Die Handle-Regel fuer Samples (CLAUDE.md, Handles).
+    fn sample_griff(&self, idx: i64, fn_: &str) -> Result<usize, String> {
+        if idx < 0 || idx as usize >= self.samples.len() {
+            return Err(format!("{}: ungueltiges SAMPLE-Handle {}", fn_, idx));
+        }
+        if self.sample_frei[idx as usize] {
+            return Err(format!("{}: dieses Sample wurde mit SAMPLE_FREE freigegeben", fn_));
+        }
+        Ok(idx as usize)
+    }
+
+    /// SAMPLE_FREE: die Daten freigeben. Still, auch doppelt. Was schon
+    /// klingt, hat seine eigene Kopie und klingt zu Ende.
+    pub fn sample_free(&mut self, idx: i64) -> Result<(), String> {
+        if idx >= 0 && (idx as usize) < self.sample_frei.len() && self.sample_frei[idx as usize] { return Ok(()); }
+        let i = self.sample_griff(idx, "SAMPLE_FREE")?;
+        self.sample_frei[i] = true;
+        self.samples[i].data = Vec::new();
+        self.sample_cache.retain(|k, _| k.0 != i);
+        Ok(())
     }
 
     pub fn sample_set_loop(&mut self, idx: i64, start: i64, end: i64,
                            art: Option<&str>) -> Result<(), String> {
         let modus = match art { Some(a) => Some(LoopArt::parse(a, "SAMPLE_SET_LOOP")?), None => None };
-        let s = self.samples.get_mut(idx as usize)
-            .ok_or_else(|| format!("SAMPLE_SET_LOOP: ungueltiges SAMPLE-Handle {}", idx))?;
+        let i = self.sample_griff(idx, "SAMPLE_SET_LOOP")?;
+        let s = &mut self.samples[i];
         let n = s.data.len();
         let start = start.max(0) as usize;
         let end = (end.max(0) as usize).min(n);
@@ -2236,8 +2263,8 @@ resonance/reverb/distortion", other)),
     pub fn sample_note(&mut self, sidx: i64, halbtoene: f64, dauer_ms: i64,
                        attack_ms: i64, decay_ms: i64, sustain: f64, release_ms: i64,
                        volume: f64, slide_halbtoene: f64) -> Result<i64, String> {
-        let s = self.samples.get(sidx as usize)
-            .ok_or_else(|| format!("SAMPLE_NOTE: ungueltiges SAMPLE-Handle {}", sidx))?;
+        let i = self.sample_griff(sidx, "SAMPLE_NOTE")?;
+        let s = &self.samples[i];
         if !(-120.0..=120.0).contains(&halbtoene) || !halbtoene.is_finite() {
             return Err("SAMPLE_NOTE: halbtoene muss -120..120 sein".into());
         }
@@ -2267,17 +2294,14 @@ resonance/reverb/distortion", other)),
     }
 
     pub fn sample_len(&self, idx: i64) -> Result<f64, String> {
-        let s = self.samples.get(idx as usize)
-            .ok_or_else(|| format!("SAMPLE_LEN: ungueltiges SAMPLE-Handle {}", idx))?;
+        let i = self.sample_griff(idx, "SAMPLE_LEN")?;
+        let s = &self.samples[i];
         Ok(s.data.len() as f64 / s.sr as f64)
     }
 
     pub fn sample_play(&mut self, sidx: i64, semitones: f64, volume: f64,
                        dur_ms: i64) -> Result<i64, String> {
-        let si = sidx as usize;
-        if si >= self.samples.len() {
-            return Err(format!("SAMPLE_PLAY: ungueltiges SAMPLE-Handle {}", sidx));
-        }
+        let si = self.sample_griff(sidx, "SAMPLE_PLAY")?;
         let ratio = 2f64.powf(semitones / 12.0);
         if !ratio.is_finite() || ratio <= 0.0 {
             return Err("SAMPLE_PLAY: ungueltige Tonhoehe".into());

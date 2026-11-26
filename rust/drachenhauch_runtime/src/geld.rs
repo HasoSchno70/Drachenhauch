@@ -126,6 +126,7 @@ pub fn teilen(w: i64, n: i64) -> Result<Vec<i64>, String> {
     if n <= 0 {
         return Err("GELD_TEILEN: die Anzahl muss groesser als 0 sein".to_string());
     }
+    crate::builtins::elemente_pruefen("GELD_TEILEN", n)?;
     // Aufgeteilt wird in ganzen Cent -- Bruchteile eines Cents kann niemand
     // ueberweisen.
     let cent = runden(w, 2) / 100;
