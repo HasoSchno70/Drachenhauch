@@ -1349,7 +1349,11 @@ Aufwand. Jeder Punkt hält `docs/stabilitaet.md` ein.
    - gui-Fristen auf `takt` statt `delta`: der Toast im Leerlauf.
    - Eine Spieluhr für TWEEN, SHAKE und timer, kein `get_time()` in der gui.
    - `SLEEP` nimmt FLOAT, `PHYS*_STEP` bekommt einen Schutz.
-7. **gui: nach außen logisch, innen eine Geometrie** (A6 Teil, A18, D4).
+7. **gui: nach außen logisch, innen eine Geometrie** (A6 Teil, A18, D4). *Teilweise umgesetzt auf
+   `thema/lesen-verbinden`: Splitter logisch, Reiterleiste, Panel-Kopf (`panel_kopf`),
+   GroupBox, Fenster-Rollbalken und Mausrad durch `sk`. Offen: Pixel-Abfragen mit
+   `_SCREEN_`-Namen (bräche Programme, eine Entscheidung), der Textbereich-Rand 5, die
+   Bausteine aus A18 und die Ordnung aus D4.*
    - Splitter-Wert mit `unsk`/`sk`.
    - Pixel-Abfragen bekommen `_SCREEN_`-Namen und logische Geschwister.
    - Alle festen Pixel laufen durch `sk`.
