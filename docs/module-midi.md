@@ -245,7 +245,7 @@ Bildschleife — ein Bild sind 16 ms, und das hört man.
 
 | Funktion | Wirkung |
 |---|---|
-| `MIDI_NOTE_NAME$(note)` → STRING | `60` → `"C4"`, leer außerhalb 0..127 |
+| `MIDI_NOTE_NAME$(note)` → STRING | `60` → `"C4"`, leer außerhalb 0..127; deutsche Schreibweise: `71` → `"H4"` (englisch B4), `70` → `"A#4"` |
 | `MIDI_NOTE_FREQ(note)` → FLOAT | `69` → `440.0` Hz — die Brücke zu `AUDIO_TONE` |
 
 Die Oktavzählung folgt der verbreiteten Konvention (Note 60 = C4). Manche

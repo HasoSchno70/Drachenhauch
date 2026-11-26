@@ -47,6 +47,13 @@ pub struct Vorlage {
 /// selben Prozess.
 pub fn englisch() -> bool { sprache() == "en" }
 
+/// Ein eingebauter Text in der Sprache der Laufzeit (Knoepfe der gui,
+/// Tastennamen, Wochentage) -- deutsch auf einem deutschen System, sonst
+/// englisch. Bis 2026.53 waren sie fest deutsch (Bericht A14.5).
+pub fn text(de: &'static str, en: &'static str) -> &'static str {
+    if englisch() { en } else { de }
+}
+
 /// Die Sprache der Meldungen, `"de"` oder `"en"`: `DHRT_LANG`, wenn gesetzt
 /// (`en`, `en_US`, `en-GB` = Englisch, alles andere Deutsch); sonst die des
 /// Systems -- Deutsch nur auf einem deutschen System (seit 2026-11-18;

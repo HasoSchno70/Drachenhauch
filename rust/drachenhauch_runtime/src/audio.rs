@@ -1258,14 +1258,12 @@ impl Audio {
     // Frame einbricht -- und das DH-Programm ruft dafuer gar nichts pro Frame.
 
     fn waveform_from(name: &str) -> Result<Waveform, String> {
-        Ok(match name.to_ascii_lowercase().as_str() {
-            "sine" | "sinus" => Waveform::Sine,
-            "triangle" | "dreieck" => Waveform::Triangle,
-            "saw" | "saegezahn" => Waveform::Saw,
-            "pulse" | "puls" | "square" | "rechteck" => Waveform::Pulse { width: 0.5 },
-            other => return Err(format!(
-                "AUDIO_LFO: unbekannte Wellenform '{}' -- erwartet sine/triangle/saw/pulse",
-                other)),
+        Ok(match wellenform(name, "AUDIO_LFO_NEW")? {
+            "sine" => Waveform::Sine,
+            "triangle" => Waveform::Triangle,
+            "saw" => Waveform::Saw,
+            "square" => Waveform::Pulse { width: 0.5 },
+            _ => return Err("AUDIO_LFO_NEW: ein LFO rauscht nicht -- sine, square/pulse, saw oder triangle".into()),
         })
     }
 
@@ -1865,11 +1863,7 @@ resonance/reverb/distortion", other)),
         lautstaerke(volume, "AUDIO_TONE")?;
         if freq <= 0.0 { return Err("AUDIO_TONE: freq_hz muss > 0 sein".into()); }
         if dur_ms <= 0 { return Err("AUDIO_TONE: dauer_ms muss > 0 sein".into()); }
-        let wf = waveform.to_lowercase();
-        if !matches!(wf.as_str(), "sine" | "square" | "saw" | "triangle" | "noise") {
-            return Err(format!(
-                "AUDIO_TONE: unbekannte Waveform '{}' (erlaubt: sine, square, saw, triangle, noise)", waveform));
-        }
+        let wf = wellenform(waveform, "AUDIO_TONE")?.to_string();
         let sr: u32 = 44100;
         let n = (sr as f64 * dur_ms as f64 / 1000.0) as usize;
         if n == 0 { return Err("AUDIO_TONE: dauer_ms zu klein fuer Sample-Rate".into()); }
@@ -1931,11 +1925,7 @@ resonance/reverb/distortion", other)),
                 volume: f64, vib_depth: f64, vib_speed: f64,
                 detune_cents: f64, slide_halbtoene: f64) -> Result<i64, String> {
         lautstaerke(volume, "AUDIO_NOTE")?;
-        let wf = waveform.to_lowercase();
-        if !matches!(wf.as_str(), "sine" | "square" | "saw" | "triangle" | "noise") {
-            return Err(format!(
-                "AUDIO_NOTE: unbekannte Waveform '{}' (erlaubt: sine, square, saw, triangle, noise)", waveform));
-        }
+        let wf = wellenform(waveform, "AUDIO_NOTE")?.to_string();
         if wf != "noise" && !(freq > 0.0 && freq.is_finite()) {
             return Err("AUDIO_NOTE: freq muss > 0 sein".into());
         }
@@ -2106,11 +2096,7 @@ resonance/reverb/distortion", other)),
                flt_cutoff: f64, flt_sweep: f64, flt_res: f64) -> Result<i64, String> {
         lautstaerke(volume, "AUDIO_SFX")?;
         let fx = SidFx { duty, pwm_depth, pwm_speed, flt_cutoff, flt_sweep, flt_res };
-        let wf = waveform.to_lowercase();
-        if !matches!(wf.as_str(), "sine" | "square" | "saw" | "triangle" | "noise") {
-            return Err(format!(
-                "AUDIO_SFX: unbekannte Waveform '{}' (erlaubt: sine, square, saw, triangle, noise)", waveform));
-        }
+        let wf = wellenform(waveform, "AUDIO_SFX")?.to_string();
         if attack_ms < 0 || sustain_ms < 0 || decay_ms < 0 {
             return Err("AUDIO_SFX: Attack/Sustain/Decay muessen >= 0 sein".into());
         }
@@ -2813,6 +2799,24 @@ resonance/reverb/distortion", other)),
 // ======================================================================
 // Pure DSP-Helfer (verbatim aus audio.rs -- gleiche Mathematik)
 // ======================================================================
+
+/// Die Wellenformen der Ton-Befehle: EINE Tafel fuer AUDIO_TONE, AUDIO_NOTE,
+/// AUDIO_SFX und AUDIO_LFO_NEW (bis 2026.53 drei Leser: der LFO nahm
+/// "sinus" und "puls", die anderen nur Englisch, ohne "pulse"). Eingang
+/// zweisprachig, englisch zuerst; geliefert wird der englische Name.
+const WELLENFORMEN: &[(&str, &[&str])] = &[
+    ("sine", &["sinus"]),
+    ("square", &["pulse", "puls", "rechteck"]),
+    ("saw", &["sawtooth", "saege", "saegezahn"]),
+    ("triangle", &["dreieck"]),
+    ("noise", &["rauschen"]),
+];
+
+pub(crate) fn wellenform(name: &str, fn_: &str) -> Result<&'static str, String> {
+    let n = name.trim().to_lowercase().replace("ä", "ae");
+    WELLENFORMEN.iter().find(|(k, alias)| *k == n || alias.contains(&n.as_str())).map(|(k, _)| *k)
+        .ok_or_else(|| format!("{}: unbekannte Wellenform '{}' (erlaubt: sine, square/pulse, saw, triangle, noise -- auch sinus, rechteck, saege, dreieck, rauschen)", fn_, name))
+}
 
 fn waveform_value(kind: &str, freq: f64, t: f64) -> f64 {
     match kind {

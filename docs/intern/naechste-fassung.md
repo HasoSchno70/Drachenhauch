@@ -86,6 +86,16 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
 * `AUDIO_DELAY` ohne `time_ms` nimmt die Vorgabe 300 ms (vorher blieb die
   alte Zeit stehen).
 
+**Sprache der Eingaben und Ausgaben**
+
+* Eingaben nehmen englische Zweitnamen: Wellenformen (eine Tafel für
+  `AUDIO_TONE`/`_NOTE`/`_SFX`/`AUDIO_LFO_NEW`, auch „pulse“, „rechteck“,
+  „saege“), chart-Schlüssel und -Wörter, Knopfarten, Formen, Sinnbilder,
+  `GUI_TEXTAREA_SET`-Schlüssel, `TIME_PART`-Teile.
+* Eingebaute Texte folgen der Sprache der Laufzeit: `KEY_NAME$` („SPACE“
+  statt „LEER“ auf einem englischen System), die Knöpfe von Assistent und
+  Ja/Nein-Dialog, der Schriftdialog, die Wochentage im Datumswähler.
+
 **Kindprozesse**
 
 * `SHELL`, `SHELL_OUT$`, `SHELL_START` und `TASK_START` geben `DHRT_FRAMES`,
@@ -127,4 +137,3 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
 * Gerätelisten als ARRAY OF STRING: `SERIAL_DEVICES`, `USB_DEVICES` (mit dem
   HID-Pfad für `USB_OPEN_PATH`), `MIDI_IN_DEVICES`, `MIDI_OUT_DEVICES`,
   `WIFI_NETWORKS`; `BT_SCAN_MS` liefert ein Feld.
-

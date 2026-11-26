@@ -1677,7 +1677,7 @@
   "MIDI_NEXT": "Fetch the next message; FALSE = nothing there",
   "MIDI_NOTE": "Note number (0..127, 60 = C4)",
   "MIDI_NOTE_FREQ": "69 → 440.0 Hz — the bridge to AUDIO_TONE",
-  "MIDI_NOTE_NAME$": "60 → \"C4\", empty outside 0..127",
+  "MIDI_NOTE_NAME$": "60 → \"C4\", empty outside 0..127; German spelling: 71 → \"H4\" (English B4), 70 → \"A#4\"",
   "MIDI_NOTE_OFF": "Note off",
   "MIDI_NOTE_ON": "Strike a note",
   "MIDI_OUT_CLOSE": "Close again",

@@ -723,15 +723,15 @@ impl Gui {
         let (sw, sh) = (self.unsk(g.screen_width() as i32), self.unsk(g.screen_height() as i32));
         let h = self.new_window(titel, ((sw - ww) / 2).max(0), ((sh - wh) / 2).max(0), ww, wh);
         let wi = h as usize;
-        let filter = self.textinput(h, 12, 12, 446, 28, "Suchen ...".into())?;
+        let filter = self.textinput(h, 12, 12, 446, 28, crate::meldung::text("Suchen ...", "Search ...").into())?;
         self.feld_suche_setzen(filter, true)?;
         let namen: Vec<String> = alle.iter().map(|a| a.0.clone()).collect();
         let liste = self.listbox(h, 12, 50, 290, 250, namen)?;
-        self.label(h, "Groesse".into(), 314, 52, None)?;
+        self.label(h, crate::meldung::text("Größe", "Size").into(), 314, 52, None)?;
         let gr = self.spinner(h, 314, 74, 144, 4.0, 200.0, groesse.clamp(4, 200) as f64, 1.0)?;
         let vorschau = self.label(h, VORSCHAU_TEXT.into(), 12, 310, None)?;
         let ok = self.button(h, "OK".into(), 258, inhalt_h - 42, 96, 30)?;
-        let ab = self.button(h, "Abbrechen".into(), 362, inhalt_h - 42, 96, 30)?;
+        let ab = self.button(h, crate::meldung::text("Abbrechen", "Cancel").into(), 362, inhalt_h - 42, 96, 30)?;
         let idx = |x: i64| Self::dec_widget(x).1;
         {
             let win = &mut self.windows[wi];

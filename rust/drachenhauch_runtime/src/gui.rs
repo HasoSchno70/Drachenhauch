@@ -2104,7 +2104,8 @@ struct WzState {
 impl Default for WzState {
     fn default() -> Self {
         WzState { pruefen: false, weiter_aus: false, ereignis: 0,
-                  texte: ["Zurück".into(), "Weiter".into(), "Fertig".into(), "Abbrechen".into()] }
+                  texte: [crate::meldung::text("Zurück", "Back").into(), crate::meldung::text("Weiter", "Next").into(),
+                          crate::meldung::text("Fertig", "Finish").into(), crate::meldung::text("Abbrechen", "Cancel").into()] }
     }
 }
 
@@ -2217,8 +2218,39 @@ pub const SINNBILDER: &[&str] = &[
     "datei_daten", "datei_text", "datei_ton", "datei_form",
 ];
 
-fn sinnbild_pruefen(name: &str, fn_: &str) -> Result<String, String> {
+/// Englische Zweitnamen fuer Sinnbilder, Knopfarten und Formen: Eingang
+/// zweisprachig, englisch zuerst; gespeichert und geliefert wird der
+/// deutsche Name (Bericht A14; bis 2026.53 nur deutsch).
+const ZWEITNAMEN_EN: &[(&str, &str)] = &[
+    ("new", "neu"), ("file", "datei"), ("open", "oeffnen"), ("save", "sichern"), ("print", "drucken"),
+    ("undo", "rueckgaengig"), ("redo", "wiederholen"), ("cut", "ausschneiden"), ("copy", "kopieren"),
+    ("paste", "einfuegen"), ("search", "suchen"), ("stop", "stopp"), ("breakpoint", "haltepunkt"),
+    ("check", "pruefen"), ("profile", "profil"), ("help", "handbuch"), ("manual", "handbuch"),
+    ("settings", "einstellungen"), ("tool", "werkzeug"), ("wrap", "umbruch"), ("warning", "warnung"),
+    ("close", "schliessen"), ("left", "links"), ("right", "rechts"), ("up", "hoch"), ("down", "runter"),
+    ("menu", "menue"), ("refresh", "aktualisieren"), ("pen", "stift"), ("eraser", "radierer"),
+    ("fill", "fuellen"), ("line", "linie"), ("rectangle", "rechteck"), ("eyedropper", "pipette"),
+    ("select", "auswahl"), ("magic_wand", "zauberstab"), ("move", "verschieben"), ("spray", "spruehen"),
+    ("dice", "wuerfel"), ("grid", "raster"), ("eye", "auge"), ("eye_closed", "auge_zu"),
+    ("mirror", "spiegeln"), ("rotate", "drehen"), ("folder", "ordner"), ("folder_open", "ordner_offen"),
+    ("file_code", "datei_code"), ("file_test", "datei_test"), ("file_image", "datei_bild"),
+    ("file_data", "datei_daten"), ("file_text", "datei_text"), ("file_sound", "datei_ton"),
+    ("file_form", "datei_form"),
+    // Knopfarten
+    ("default", "standard"), ("primary", "primaer"), ("success", "erfolg"), ("danger", "gefahr"),
+    ("outline", "umriss"), ("flat", "flach"),
+    // Formen
+    ("pill", "pille"), ("circle", "kreis"), ("diamond", "raute"), ("image", "bild"),
+];
+
+/// Ein Wort der gui (Sinnbild, Knopfart, Form), klein und deutsch.
+pub(crate) fn gui_wort(name: &str) -> String {
     let n = name.trim().to_lowercase();
+    ZWEITNAMEN_EN.iter().find(|(en, _)| *en == n).map(|(_, de)| de.to_string()).unwrap_or(n)
+}
+
+fn sinnbild_pruefen(name: &str, fn_: &str) -> Result<String, String> {
+    let n = gui_wort(name);
     if SINNBILDER.contains(&n.as_str()) { return Ok(n); }
     Err(format!("{}: Sinnbild '{}' gibt es nicht -- bekannt sind: {}", fn_, name, SINNBILDER.join(", ")))
 }
@@ -4357,7 +4389,7 @@ impl Gui {
     /// lang in `GUI_ANSWER` an, genau wie ein Klick in `GUI_CLICKED`.
     pub fn dialog(&mut self, g: &Graphics, titel: String, text: String, frage: bool)
                   -> Result<i64, String> {
-        let knoepfe: Vec<String> = if frage { vec!["Ja".into(), "Nein".into()] } else { vec!["OK".into()] };
+        let knoepfe: Vec<String> = if frage { vec![crate::meldung::text("Ja", "Yes").into(), crate::meldung::text("Nein", "No").into()] } else { vec!["OK".into()] };
         self.dialog_frei(g, titel, text, knoepfe, None)
     }
 
@@ -5192,14 +5224,16 @@ impl Gui {
         }
         let n = wert as i32;
         match key.to_lowercase().as_str() {
-            "zeilennummern" => wd.zeilennummern = n != 0,
-            "aktive_zeile" => wd.aktive_zeile = n != 0,
+            // Englische Zweitnamen fuer alle (Bericht A14; bis 2026.53 fehlten
+            // sie bei den ersten vier).
+            "zeilennummern" | "line_numbers" => wd.zeilennummern = n != 0,
+            "aktive_zeile" | "active_line" => wd.aktive_zeile = n != 0,
             // Ohne diesen Schalter waere ein Code-Feld nicht benutzbar: TAB
             // wechselt sonst das Bedienelement, und man kann nicht einruecken.
             // Aus per Vorgabe, damit die Tastatur-Navigation ueberall sonst
             // bleibt, wie sie ist.
-            "tab_fuegt_ein" => wd.tab_fuegt_ein = n != 0,
-            "tabbreite" => wd.tabbreite = n.clamp(1, 16),
+            "tab_fuegt_ein" | "tab_inserts" => wd.tab_fuegt_ein = n != 0,
+            "tabbreite" | "tab_width" => wd.tabbreite = n.clamp(1, 16),
             // Umbruch an Wortgrenzen -- fuer Notizen und Briefe, nicht fuer
             // Code. Mit Umbruch gibt es keinen waagerechten Versatz mehr.
             "umbruch" | "wrap" => { wd.umbruch = n != 0; if wd.umbruch { wd.scroll_x = 0; } }
@@ -5231,9 +5265,10 @@ impl Gui {
             // (GUI_TEXTAREA_HINT_CLICKED) -- etwa "3 Aufrufe" hinter einer SUB.
             "hinweise_klickbar" | "hints_clickable" => wd.hinweise_klickbar = n != 0,
             other => return Err(format!(
-                "GUI_TEXTAREA_SET: '{}' unbekannt -- moeglich sind zeilennummern, \
-                 aktive_zeile, tab_fuegt_ein, tabbreite, umbruch, auto_einzug, \
-                 einzugslinien, tab_meldet, kopfzeilen, hinweise_klickbar", other)),
+                "GUI_TEXTAREA_SET: '{}' unbekannt -- moeglich sind line_numbers/zeilennummern, \
+                 active_line/aktive_zeile, tab_inserts/tab_fuegt_ein, tab_width/tabbreite, \
+                 wrap/umbruch, formatted/formatiert, auto_indent/auto_einzug, indent_guides/einzugslinien, \
+                 tab_reports/tab_meldet, sticky_headers/kopfzeilen, hints_clickable/hinweise_klickbar", other)),
         }
         Ok(())
     }

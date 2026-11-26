@@ -1509,7 +1509,7 @@ impl Gui {
     /// Akzent) bzw. aus einer festen, lesbaren Reihe -- und die TEXTfarbe wird
     /// danach gewaehlt, wie hell der Grund ist.
     pub fn set_button_variant(&mut self, h: i64, art: &str) -> Result<(), String> {
-        let a = art.trim().to_lowercase();
+        let a = gui_wort(art);
         let k = KNOPF_ARTEN.iter().position(|x| *x == a).ok_or_else(|| format!(
             "GUI_BUTTON_VARIANT: Knopfart '{}' gibt es nicht -- bekannt sind: {}", art, KNOPF_ARTEN.join(", ")))?;
         let w = self.wdg_mut(h, "GUI_BUTTON_VARIANT")?;

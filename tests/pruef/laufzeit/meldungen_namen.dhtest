@@ -157,7 +157,7 @@ FOR i = 1 TO 4 : probe(i) : NEXT
 --- erwartet
 FILE_EXISTS: erwartet STRING, erhalten INTEGER
 FILEEXISTS: erwartet STRING, erhalten INTEGER
-TIME_PART: 'x' ist kein Feld -- moeglich sind jahr, monat, tag, stunde, minute, sekunde, wochentag
+TIME_PART: 'x' ist kein Feld -- moeglich sind year/jahr, month/monat, day/tag, hour/stunde, minute, second/sekunde, weekday/wochentag
 SET_COUNT: erwartet eine MAP OF INTEGER als Menge
 
 === ein befehl heisst in der meldung wie im quelltext (maschinencode)

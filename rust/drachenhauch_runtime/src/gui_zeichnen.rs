@@ -2513,7 +2513,8 @@ impl Gui {
         // Wochentage.
         let wy = ay + kopf;
         for i in 0..7i32 {
-            let name = crate::kalender::WOCHENTAGE[((i + wdg.wochenbeginn) % 7) as usize];
+            let tage = if crate::meldung::englisch() { crate::kalender::WOCHENTAGE_EN } else { crate::kalender::WOCHENTAGE };
+            let name = tage[((i + wdg.wochenbeginn) % 7) as usize];
             let cx = ax + zw * i;
             let bw = self.wtext_width(g, wdg, name);
             self.wtext(g, wdg, cx + (zw - bw) / 2, wy, name.to_string(), matt);

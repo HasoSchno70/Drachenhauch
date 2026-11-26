@@ -343,20 +343,22 @@ pub fn dauer(sekunden: i64) -> String {
 /// Einzelnes Feld eines Zeitpunkts. `None` = unbekannter Name.
 pub fn teil(t: i64, was: &str) -> Option<i64> {
     let (j, mo, d, h, mi, s) = in_teile(t);
+    // Eingang zweisprachig, englisch zuerst (Bericht A14; bis 2026.53 nur
+    // deutsch -- TIME_PART(t, "year") scheiterte am englischen Namen).
     match was.to_lowercase().as_str() {
-        "jahr" => Some(j),
-        "monat" => Some(mo),
-        "tag" => Some(d),
-        "stunde" => Some(h),
+        "year" | "jahr" => Some(j),
+        "month" | "monat" => Some(mo),
+        "day" | "tag" => Some(d),
+        "hour" | "stunde" => Some(h),
         "minute" => Some(mi),
-        "sekunde" => Some(s),
-        "wochentag" => Some(wochentag(t)),
+        "second" | "sekunde" => Some(s),
+        "weekday" | "wochentag" => Some(wochentag(t)),
         _ => None,
     }
 }
 
 /// Die Namen, die `teil` versteht -- fuer die Fehlermeldung.
-pub const TEILE: &str = "jahr, monat, tag, stunde, minute, sekunde, wochentag";
+pub const TEILE: &str = "year/jahr, month/monat, day/tag, hour/stunde, minute, second/sekunde, weekday/wochentag";
 
 #[cfg(test)]
 mod tests {
@@ -488,6 +490,7 @@ mod tests {
     fn teile_lesen() {
         let t = aus_teilen(2026, 8, 28, 20, 30, 5);
         assert_eq!(teil(t, "jahr"), Some(2026));
+        assert_eq!(teil(t, "year"), Some(2026));
         assert_eq!(teil(t, "monat"), Some(8));
         assert_eq!(teil(t, "STUNDE"), Some(20));
         assert_eq!(teil(t, "quartal"), None);

@@ -11217,6 +11217,28 @@ fn dh_key_code(k: KeyboardKey) -> Option<i64> {
 /// auch hier nichts Sinnvolles steht (dann zeigt der Aufrufer den Code).
 fn key_label(k: KeyboardKey) -> &'static str {
     use KeyboardKey::*;
+    // In der Sprache der Laufzeit (bis 2026.53 auch mit DHRT_LANG=en deutsch).
+    if crate::meldung::englisch() {
+        return match k {
+            KEY_SPACE => "SPACE", KEY_ENTER | KEY_KP_ENTER => "ENTER", KEY_ESCAPE => "ESC",
+            KEY_TAB => "TAB", KEY_BACKSPACE => "BACKSPACE", KEY_DELETE => "DEL",
+            KEY_INSERT => "INS", KEY_HOME => "HOME", KEY_END => "END",
+            KEY_PAGE_UP => "PAGE UP", KEY_PAGE_DOWN => "PAGE DOWN",
+            KEY_LEFT => "LEFT", KEY_RIGHT => "RIGHT", KEY_UP => "UP", KEY_DOWN => "DOWN",
+            KEY_LEFT_SHIFT | KEY_RIGHT_SHIFT => "SHIFT",
+            KEY_LEFT_CONTROL | KEY_RIGHT_CONTROL => "CTRL",
+            KEY_LEFT_ALT | KEY_RIGHT_ALT => "ALT",
+            KEY_LEFT_SUPER | KEY_RIGHT_SUPER => "SUPER",
+            KEY_CAPS_LOCK => "CAPS LOCK", KEY_NUM_LOCK => "NUM", KEY_SCROLL_LOCK => "SCROLL",
+            KEY_PRINT_SCREEN => "PRINT", KEY_PAUSE => "PAUSE",
+            _ => key_label_de(k),
+        };
+    }
+    key_label_de(k)
+}
+
+fn key_label_de(k: KeyboardKey) -> &'static str {
+    use KeyboardKey::*;
     match k {
         KEY_SPACE => "LEER", KEY_ENTER | KEY_KP_ENTER => "ENTER", KEY_ESCAPE => "ESC",
         KEY_TAB => "TAB", KEY_BACKSPACE => "RUECK", KEY_DELETE => "ENTF",

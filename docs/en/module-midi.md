@@ -243,7 +243,7 @@ a frame is 16 ms, and you can hear that.
 
 | Function | Effect |
 |---|---|
-| `MIDI_NOTE_NAME$(note)` → STRING | `60` → `"C4"`, empty outside 0..127 |
+| `MIDI_NOTE_NAME$(note)` → STRING | `60` → `"C4"`, empty outside 0..127; German spelling: `71` → `"H4"` (English B4), `70` → `"A#4"` |
 | `MIDI_NOTE_FREQ(note)` → FLOAT | `69` → `440.0` Hz — the bridge to `AUDIO_TONE` |
 
 Octave numbering follows the common convention (note 60 = C4). Some

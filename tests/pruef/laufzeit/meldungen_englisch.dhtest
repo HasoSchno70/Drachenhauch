@@ -352,3 +352,14 @@ IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 ueber 400 vorlagen TRUE
 rueckgabe 0
+
+=== tastennamen folgen der sprache
+' KEY_NAME$ war auch mit DHRT_LANG=en deutsch ("LEER", "LINKS"); die
+' eingebauten Texte folgen jetzt der Sprache (Bericht A14.5).
+SCREEN(100, 100, "t", 1)
+PRINT KEY_NAME$(KEY_SPACE); " "; KEY_NAME$(KEY_LEFT)
+--- umgebung
+DHRT_FRAMES=1
+DHRT_LANG=en
+--- erwartet
+SPACE LEFT

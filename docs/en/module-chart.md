@@ -93,6 +93,9 @@ CHART_SET_COLOR(c, "gitter", DARKGRAY)     ' colour
 CHART_SET_FLAG(c,  "prozent", TRUE)        ' on/off
 ```
 
+Every name and every word has an English alias -- `"title"`, `"inner_radius"`,
+`"grid"`, `"percent"`, `"legend"` with `"bottom"` --; the German one is stored.
+
 The price: a typo only shows up at run time. The message, however, always names
 what would have been valid:
 

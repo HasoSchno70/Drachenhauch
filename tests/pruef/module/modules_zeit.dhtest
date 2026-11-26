@@ -226,7 +226,7 @@ PRINT ZEIT_TEIL(a, "sekunde")
 IMPORT "zeit"
 PRINT ZEIT_TEIL(ZEIT_PARSE("2026-08-28"), "quartal")
 --- fehler
-ZEIT_TEIL: 'quartal' ist kein Feld -- moeglich sind jahr, monat, tag, stunde, minute, sekunde, wochentag
+ZEIT_TEIL: 'quartal' ist kein Feld -- moeglich sind year/jahr, month/monat, day/tag, hour/stunde, minute, second/sekunde, weekday/wochentag
 
 === wochentag montag ist eins
 IMPORT "zeit"
@@ -366,3 +366,11 @@ PRINT ZEIT_AUS_TEILEN(2026, 13, 1)
 DHRT_LANG=en
 --- fehler
 ZEIT_AUS_TEILEN: month 13 does not exist (1..12) -- to count on, use ZEIT_PLUS
+
+=== time_part nimmt die teile auch englisch
+' Bericht A14.4: bis 2026.53 scheiterte TIME_PART(t, "year").
+IMPORT "zeit"
+DIM t AS INTEGER : t = TIME_FROM_PARTS(2026, 11, 26, 8, 30, 0)
+PRINT TIME_PART(t, "year"); " "; TIME_PART(t, "month"); " "; TIME_PART(t, "hour")
+--- erwartet
+2026 11 8

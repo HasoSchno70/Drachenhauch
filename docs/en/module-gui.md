@@ -2669,7 +2669,7 @@ properties and six commands.
 
 | Property / command | Effect |
 |---|---|
-| `klang: klick \| tick \| ping \| plopp \| fehler \| erfolg \| datei.wav [NN%]` | a sound for the rule's occasion: **without a state on click**, `:hover` on entering, `:active` on pressing, `:focus` on focus. Built-in sounds (click, tick, ping, plop, error, success) need no file; `NN%` is the volume (0..200) |
+| `klang: klick \| tick \| ping \| plopp \| fehler \| erfolg \| datei.wav [NN%]` | a sound for the rule's occasion: **without a state on click**, `:hover` on entering, `:active` on pressing, `:focus` on focus. Built-in sounds (click, tick, ping, plop, error, success) need no file; `NN%` is the volume (0..100) |
 | `effekt: funken \| konfetti \| sterne` | particles (sparks, confetti, stars) on the same occasions, drawn above everything |
 | `GUI_SOUND(name$ [, volume])` | play a gui sound (same names, volume in percent) |
 | `GUI_SET_SOUNDS(on)` / `GUI_SOUNDS()` | all gui sounds on or off -- for a "sounds" switch in the settings |

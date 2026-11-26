@@ -778,7 +778,7 @@ pub(super) fn lesen(text: &str, thema: &dyn Fn(&str) -> bool) -> Result<Stildate
                     for (k, d) in je { werte.uebergang_je.retain(|(x, _)| *x != k); werte.uebergang_je.push((k, d)); }
                 }
                 "form" | "shape" => {
-                    let f = wert.trim().trim_matches('"').to_lowercase();
+                    let f = super::gui_wort(wert.trim().trim_matches('"'));
                     let n = super::aussehen::FORMEN.iter().position(|x| !x.is_empty() && *x == f)
                         .ok_or_else(|| format!("Zeile {}: form '{}' unbekannt -- rechteck, pille, kreis, raute, bild", zeile, wert))?;
                     werte.form = Some(n as u8);

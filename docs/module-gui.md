@@ -2684,7 +2684,7 @@ Stildatei mehr und sechs Befehle.
 
 | Eigenschaft / Befehl | Wirkung |
 |---|---|
-| `klang: klick \| tick \| ping \| plopp \| fehler \| erfolg \| datei.wav [NN%]` | ein Klang zum Anlass der Regel: **ohne Zustand beim Klick**, `:hover` beim Hineinfahren, `:active` beim Drücken, `:focus` beim Fokus. Eingebaute Klänge brauchen keine Datei; `NN%` ist die Lautstärke (0..200) |
+| `klang: klick \| tick \| ping \| plopp \| fehler \| erfolg \| datei.wav [NN%]` | ein Klang zum Anlass der Regel: **ohne Zustand beim Klick**, `:hover` beim Hineinfahren, `:active` beim Drücken, `:focus` beim Fokus. Eingebaute Klänge brauchen keine Datei; `NN%` ist die Lautstärke (0..100) |
 | `effekt: funken \| konfetti \| sterne` | Teilchen zu denselben Anlässen, gezeichnet über allem |
 | `GUI_SOUND(name$ [, volume])` | einen Klang der gui spielen (dieselben Namen, Lautstärke in Prozent) |
 | `GUI_SET_SOUNDS(on)` / `GUI_SOUNDS()` | alle Klänge der gui an oder aus -- für einen Schalter „Töne“ in den Einstellungen |

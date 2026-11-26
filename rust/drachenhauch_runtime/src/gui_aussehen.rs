@@ -548,7 +548,7 @@ impl Gui {
     /// GUI_SET_SHAPE(knopf, form$): rechteck, pille, kreis, raute, bild --
     /// fuer Zeichnen und Treffer; "" = wieder die Stildatei.
     pub fn set_shape(&mut self, h: i64, form: &str) -> Result<(), String> {
-        let f = form.trim().to_lowercase();
+        let f = super::gui_wort(form);
         let n = FORMEN.iter().position(|x| *x == f)
             .ok_or_else(|| format!("GUI_SET_SHAPE: Form '{}' unbekannt -- rechteck, pille, kreis, raute, bild oder \"\"", form))?;
         let w = self.wdg_mut(h, "GUI_SET_SHAPE")?;

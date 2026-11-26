@@ -93,6 +93,10 @@ CHART_SET_COLOR(c, "gitter", DARKGRAY)     ' Farbe
 CHART_SET_FLAG(c,  "prozent", TRUE)        ' An/Aus
 ```
 
+Jeder Name und jedes Wort hat einen englischen Zweitnamen -- `"title"`,
+`"inner_radius"`, `"grid"`, `"percent"`, `"legend"` mit `"bottom"` --, gespeichert
+wird der deutsche.
+
 Der Preis dafür: ein Tippfehler fällt erst zur Laufzeit auf. Die Meldung nennt
 dann aber immer, was gültig gewesen wäre:
 
