@@ -182,12 +182,12 @@ impl Gui {
         let win = &self.windows[wi];
         let by = win.y + (if win.chrome { self.m("title_h") } else { 0 }) + self.menubar_h(wi);
         let mut liste = Node::new(Role::TabList);
-        liste.set_bounds(Self::a11y_rect(win.x, by, win.w, TABBAR_H));
+        liste.set_bounds(Self::a11y_rect(win.x, by, win.w, self.sk(TABBAR_H)));
         let mut kinder = Vec::new();
         for (ti, x0, x1) in self.tab_slots(g, wi) {
             let mut t = Node::new(Role::Tab);
             t.set_label(win.tabs[ti].clone());
-            t.set_bounds(Self::a11y_rect(x0, by, x1 - x0, TABBAR_H));
+            t.set_bounds(Self::a11y_rect(x0, by, x1 - x0, self.sk(TABBAR_H)));
             t.set_selected(win.active_tab == ti as i32);
             t.add_action(Action::Click);
             let id = NodeId(ids::reiter(wi, ti));

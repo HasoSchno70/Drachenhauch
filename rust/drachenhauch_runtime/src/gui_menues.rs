@@ -262,7 +262,9 @@ impl Gui {
         let w = self.wdg(h, "GUI_VALUE")?;
         match w.kind {
             Kind::Slider | Kind::Progress | Kind::Spinner | Kind::Knob | Kind::Eigen => Ok(w.value),
-            Kind::Splitter => Ok(if w.group == "v" { w.x as f64 } else { w.y as f64 }),
+            // Logisch wie GUI_GET_X (bis 2026.53 Bildschirmpixel: bei
+            // GUI_SCALE(2) sagte GUI_GET_X 100 und GUI_GET_VALUE 200).
+            Kind::Splitter => Ok(self.unsk(if w.group == "v" { w.x } else { w.y }) as f64),
             _ => Err("GUI_VALUE: Widget ist kein slider/progress/spinner/splitter/knob".into()),
         }
     }
@@ -343,13 +345,15 @@ impl Gui {
         Ok(())
     }
     pub fn set_value(&mut self, h: i64, v: f64) -> Result<(), String> {
+        // Ein Splitter nimmt die Lage logisch (wie GUI_SET_BOUNDS).
+        let px = self.sk(v.round().clamp(-1e6, 1e6) as i32);
         let w = self.wdg_mut(h, "GUI_SET_VALUE")?;
         match w.kind {
             Kind::Slider | Kind::Progress | Kind::Spinner | Kind::Knob => { w.value = v.clamp(w.min, w.max); }
             // Selbst gezeichnet: der Wert gehoert dem Programm (Rolle "slider").
             Kind::Eigen => { w.value = v; }
             Kind::Splitter => {
-                let c = (v.round() as i32).clamp(w.min as i32, w.max as i32);
+                let c = px.clamp(w.min as i32, w.max as i32);
                 if w.group == "v" { w.x = c; } else { w.y = c; }
             }
             _ => return Err("GUI_SET_VALUE: Widget ist kein slider/progress/spinner/splitter".into()),

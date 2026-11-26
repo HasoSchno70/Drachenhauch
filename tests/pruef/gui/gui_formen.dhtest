@@ -272,10 +272,11 @@ DHRT_FRAMES=3
 DHRT_SCREENSHOT={fall}/bild.png
 --- nachher
 DIM b AS IMAGE : b = LOADIMAGE("bild.png")
-' Zeile 37: die obere Rahmenlinie (ay 30 + 7); rechts aussen ist sie sicher.
-DIM rahmen AS INTEGER : rahmen = GETPIXEL(b, 440, 37)
+' Zeile 41: die obere Rahmenlinie (ay 30 + 7 * 1.5 -- seit 2026.54 skaliert
+' auch der Abstand); rechts aussen ist sie sicher.
+DIM rahmen AS INTEGER : rahmen = GETPIXEL(b, 440, 41)
 DIM x AS INTEGER : x = 30
-WHILE x < 440 AND GETPIXEL(b, x, 37) <> rahmen
+WHILE x < 440 AND GETPIXEL(b, x, 41) <> rahmen
     x = x + 1
 WEND
 ' Der Titel reicht bei Massstab 1.5 bis etwa x = 225.

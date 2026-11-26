@@ -683,7 +683,7 @@ impl Gui {
     }
     pub(super) fn panel_max_scroll(&self, wi: usize, pi: usize) -> i32 {
         let w = &self.windows[wi].widgets[pi];
-        let kopf = if w.text.is_empty() { 0 } else { 18 };
+        let kopf = self.panel_kopf(w);
         w.panel.as_ref().map(|p| (p.inhalt_h - (w.h - kopf)).max(0)).unwrap_or(0)
     }
     pub(super) fn panel_scroll_um(&mut self, wi: usize, pi: usize, dy: i32) {
@@ -697,7 +697,7 @@ impl Gui {
         let w = &self.windows[wi].widgets[pi];
         let p = w.panel.as_ref()?;
         if !self.widget_shown(wi, w) { return None; }
-        let kopf = if w.text.is_empty() { 0 } else { 18 };
+        let kopf = self.panel_kopf(w);
         let sicht = w.h - kopf - 2;
         if p.inhalt_h <= sicht || sicht <= 0 { return None; }
         let (ax, ay, aw, _) = self.abs_rect(wi, w);
@@ -731,7 +731,7 @@ impl Gui {
                 }
                 let pad = self.m("pad");
                 let ph = self.windows[wi].widgets[p].h;
-                let kopf = if self.windows[wi].widgets[p].text.is_empty() { 0 } else { 18 };
+                let kopf = self.panel_kopf(&self.windows[wi].widgets[p]);
                 if let Some(ps) = self.windows[wi].widgets[p].panel.as_mut() {
                     ps.inhalt_h = unten + pad;
                     ps.scroll = ps.scroll.clamp(0, (ps.inhalt_h - (ph - kopf)).max(0));

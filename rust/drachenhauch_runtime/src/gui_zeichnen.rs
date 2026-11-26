@@ -274,7 +274,7 @@ impl Gui {
                 // Kind eines rollenden Panels: auf dessen Innenflaeche beschnitten.
                 let p = &win.widgets[wdg.panel_von as usize];
                 let (px, py, pw, ph) = self.abs_rect(wi, p);
-                let kopf = if p.text.is_empty() { 0 } else { 18 };
+                let kopf = self.panel_kopf(p);
                 g.push_clip(px + 1, py + kopf + 1, (pw - 2).max(0), (ph - kopf - 2).max(0));
                 self.draw_widget(g, wi, i, wdg);
                 g.pop_clip();
@@ -851,8 +851,8 @@ impl Gui {
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
                     self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
                 if !wdg.text.is_empty() {
-                    g.box_fill(ax, ay, ax + w - 1, ay + 17, self.th("win_border"));
-                    self.wtext(g, wdg, ax + 5, ay + 2, wdg.text.clone(), self.wcol(wdg, "fg", "title_fg"));
+                    g.box_fill(ax, ay, ax + w - 1, ay + self.panel_kopf(wdg) - 1, self.th("win_border"));
+                    self.wtext(g, wdg, ax + self.sk(5), ay + self.sk(2), wdg.text.clone(), self.wcol(wdg, "fg", "title_fg"));
                 }
                 // Rollbalken rechts, wenn der Inhalt hoeher ist als das Panel.
                 if let Some((tx, ty, bw, th, thy, thh)) = self.panel_bar_geom(wi, idx) {
@@ -1979,14 +1979,14 @@ impl Gui {
             }
             Kind::GroupBox => {
                 // Rahmen + eingelassener Titel oben-links (ueber dem Rahmen).
-                g.rect(ax, ay + 7, ax + w - 1, ay + h - 1, self.th("widget_border"));
+                g.rect(ax, ay + self.sk(7), ax + w - 1, ay + h - 1, self.th("widget_border"));
                 if !wdg.text.is_empty() {
                     // Gemessen, nicht aus der Zeichenzahl geschaetzt: bis 2026.53
                     // lief die Rahmenlinie bei breiten Buchstaben oder GUI_SCALE
                     // mitten durch den Titel.
-                    let tw = self.wtext_width(g, wdg, &wdg.text) + 8;
-                    g.box_fill(ax + 8, ay, ax + 8 + tw.min(w - 16), ay + 13, self.th("win_bg"));
-                    self.wtext(g, wdg, ax + 12, ay + 1, wdg.text.clone(), self.th("title_fg"));
+                    let tw = self.wtext_width(g, wdg, &wdg.text) + self.sk(8);
+                    g.box_fill(ax + self.sk(8), ay, ax + self.sk(8) + tw.min(w - self.sk(16)), ay + self.sk(13), self.th("win_bg"));
+                    self.wtext(g, wdg, ax + self.sk(12), ay + self.sk(1), wdg.text.clone(), self.th("title_fg"));
                 }
             }
             Kind::Accordion => {

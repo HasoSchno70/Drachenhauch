@@ -217,7 +217,7 @@ impl Gui {
                 let wheel = Self::rad(g);
                 if wheel != 0 {
                     let ms = self.max_scroll_y(top);
-                    self.windows[top].scroll_y = (self.windows[top].scroll_y - wheel as i32 * 40).clamp(0, ms);
+                    self.windows[top].scroll_y = (self.windows[top].scroll_y - wheel as i32 * self.sk(40)).clamp(0, ms);
                 }
             }
         }
@@ -259,7 +259,7 @@ impl Gui {
                 let by = self.windows[wi].y
                     + (if self.windows[wi].chrome { self.m("title_h") } else { 0 })
                     + self.menubar_h(wi);
-                if my < by || my >= by + TABBAR_H { continue; }
+                if my < by || my >= by + self.sk(TABBAR_H) { continue; }
                 if let Some((ti, _, _)) = self.tab_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1) {
                     self.windows[wi].tab_zu = ti as i32;
                     break;
@@ -292,7 +292,7 @@ impl Gui {
                 let by = self.windows[wi].y
                     + (if self.windows[wi].chrome { self.m("title_h") } else { 0 })
                     + self.menubar_h(wi);
-                if my < by || my >= by + TABBAR_H { continue; }
+                if my < by || my >= by + self.sk(TABBAR_H) { continue; }
                 if let Some((ti, _, x1)) = self.tab_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1) {
                     // Das Kreuz schliesst, statt umzuschalten -- und die
                     // MITTLERE Taste tut es von ueberall auf dem Reiter aus
@@ -410,7 +410,7 @@ impl Gui {
                 };
                 if rollt && Self::in_rect(mx, my, r) {
                     let wheel = Self::rad(g);
-                    if wheel != 0 { self.panel_scroll_um(top, i, -(wheel as i32) * 40); }
+                    if wheel != 0 { let s = self.sk(40); self.panel_scroll_um(top, i, -(wheel as i32) * s); }
                 }
                 let akk = { let w = &self.windows[top].widgets[i]; w.akk.is_some() && self.widget_shown(top, w) };
                 if akk && Self::in_rect(mx, my, r) {
@@ -1027,7 +1027,7 @@ impl Gui {
                     let by = self.windows[wi].y
                         + (if self.windows[wi].chrome { self.m("title_h") } else { 0 })
                         + self.menubar_h(wi);
-                    if self.tabbar_h(wi) > 0 && my >= by && my < by + TABBAR_H {
+                    if self.tabbar_h(wi) > 0 && my >= by && my < by + self.tabbar_h(wi) {
                         if let Some((ti, _, _)) = self.tab_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1) {
                             self.windows[wi].tab_kontext = ti as i32;
                             self.context_open = Some((wi, mi, mx, my));

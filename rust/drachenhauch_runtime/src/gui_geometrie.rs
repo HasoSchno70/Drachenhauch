@@ -43,9 +43,16 @@ impl Gui {
         (if self.windows[win].chrome { self.m("title_h") } else { 0 })
             + self.menubar_h(win) + self.tabbar_h(win)
     }
+    /// Hoehe des Titelstreifens eines Panels (0 ohne Titel) -- EINE Quelle
+    /// fuer Zeichnen, Beschnitt, Rollbalken und die Lage der Kinder. Bis
+    /// 2026.53 stand dort fuenfmal eine rohe 18: bei GUI_SCALE(2) lief der
+    /// Titel ueber den Streifen.
+    pub(super) fn panel_kopf(&self, w: &Widget) -> i32 {
+        if w.text.is_empty() { 0 } else { self.sk(18) }
+    }
     /// Hoehe der Reiter-Leiste (0, wenn keine Tabs).
     pub(super) fn tabbar_h(&self, win: usize) -> i32 {
-        if self.windows[win].tabs.is_empty() { 0 } else { TABBAR_H }
+        if self.windows[win].tabs.is_empty() { 0 } else { self.sk(TABBAR_H) }
     }
     /// Ist das Widget aktuell sichtbar/bedienbar? (Tab-Seite beruecksichtigt)
     pub(super) fn widget_shown(&self, win: usize, w: &Widget) -> bool {
@@ -109,18 +116,19 @@ impl Gui {
 
     /// Wie viel Platz das Kreuz am Reiter braucht (0, wenn es keins gibt).
     pub(super) fn tab_kreuz_w(&self, wi: usize) -> i32 {
-        if self.windows[wi].tabs_closable { 18 } else { 0 }
+        if self.windows[wi].tabs_closable { self.sk(18) } else { 0 }
     }
 
     /// Das Rechteck des Kreuzes eines Reiters: (x, y, kante).
     ///
     /// EINE Quelle fuer Zeichnen und Treffertest -- liefen sie auseinander,
     /// schloesse ein Klick neben dem Kreuz einen Reiter (oder gar keiner).
-    /// Unskaliert wie die Reiterleiste selbst (TABBAR_H).
+    /// Skaliert wie die Reiterleiste selbst (bis 2026.53 beide unskaliert --
+    /// bei GUI_SCALE(2) lief die Schrift der Reiter ueber ihren Streifen).
     pub(super) fn tab_kreuz_rect(&self, wi: usize, x1: i32, by: i32) -> (i32, i32, i32) {
-        let k = 9;
+        let k = self.sk(9);
         let w = self.tab_kreuz_w(wi);
-        (x1 - w + (w - k) / 2, by + (TABBAR_H - k) / 2, k)
+        (x1 - w + (w - k) / 2, by + (self.sk(TABBAR_H) - k) / 2, k)
     }
     /// Inhaltshoehe = unterster Widget-Rand (+Rand). Basis fuer den Scrollbereich.
     pub(super) fn content_height(&self, win: usize) -> i32 {
@@ -217,7 +225,7 @@ impl Gui {
         let view = self.view_height(wi);
         if !self.windows[wi].scrollable || content <= view { return None; }
         let w = &self.windows[wi];
-        let bw = 10;
+        let bw = self.sk(10);
         let tx = w.x + w.w - bw - 2;
         let ty = w.y + self.content_top(wi) + 1;
         // Review-Fund: `th` (Scrollbar-Spurlaenge) hat keine Untergrenze --
@@ -228,7 +236,7 @@ impl Gui {
         // haelt sich selbst unter 24, wenn die Spur kuerzer ist.
         let th = (view - 2).max(0);
         let max_s = content - view;
-        let lo = th.min(24);
+        let lo = th.min(self.sk(24));
         let thh = if th > 0 { ((th * view) / content.max(1)).clamp(lo, th) } else { 0 };
         let thy = ty + if max_s > 0 { (w.scroll_y * (th - thh)) / max_s } else { 0 };
         Some((tx, ty, bw, th, thy, thh))

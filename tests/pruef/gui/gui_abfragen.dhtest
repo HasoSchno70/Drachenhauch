@@ -350,3 +350,52 @@ PRINT "breite "; GUI_TEXT_WIDTH(k, "Umbenennen")
 DHRT_FRAMES=2
 --- erwartet
 breite 113
+
+=== der splitter spricht logisch wie gui_get_x
+' Nach aussen ist alles logisch (CLAUDE.md, gui). Der Splitter lieferte und
+' nahm in GUI_VALUE/GUI_SET_VALUE bis 2026.53 Bildschirmpixel: bei
+' GUI_SCALE(2) sagte GUI_GET_X 100 und GUI_VALUE 200, und nach
+' GUI_SET_VALUE(120) stand er bei GUI_GET_X 60.
+IMPORT "gui"
+SCREEN(800, 600, "T", 1)
+GUI_SCALE(2)
+DIM a AS GUI_WINDOW : a = GUI_WINDOW("A", 0, 0, 380, 280)
+DIM s AS GUI_WIDGET : s = GUI_SPLITTER(a, 100, 0, 200, "v", 20, 300)
+PRINT "splitter "; GUI_GET_X(s); " "; GUI_VALUE(s)
+GUI_SET_VALUE(s, 120)
+PRINT "gesetzt "; GUI_GET_X(s); " "; GUI_VALUE(s)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+splitter 100 100.0
+gesetzt 120 120.0
+
+=== reiterleiste und panel-kopf wachsen mit dem massstab
+' Feste Pixel ohne Massstab: die Reiterleiste eines Fensters (30) und der
+' Titelstreifen eines Panels (18) blieben bei GUI_SCALE(2) so hoch wie bei 1,
+' die Schrift darin aber doppelt -- sie lief ueber ihren Streifen. Gemessen an
+' der Lage einer Liste unter der Reiterleiste (Bildschirmpixel) und an der
+' Rollweite eines Panels mit Titel (logisch).
+IMPORT "gui"
+SCREEN(800, 600, "T", 1)
+GUI_SCALE(2)
+DIM a AS GUI_WINDOW : a = GUI_WINDOW("A", 0, 0, 380, 280)
+DIM b AS GUI_WINDOW : b = GUI_WINDOW("B", 0, 0, 380, 280)
+GUI_TABS(b, ["eins", "zwei"])
+DIM la AS GUI_WIDGET : la = GUI_LISTBOX(a, 10, 10, 100, 80, ["x"])
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(b, 10, 10, 100, 80, ["x"])
+DIM p AS GUI_WIDGET : p = GUI_PANEL(a, 10, 100, 200, 100, "Titel")
+DIM l AS GUI_WIDGET : l = GUI_LISTBOX(a, 10, 100, 150, 200, ["x"])
+GUI_PANEL_ADD(p, l)
+GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+DIM ra AS TUPLE : ra = GUI_LISTBOX_ITEM_RECT(la, 0)
+DIM rb AS TUPLE : rb = GUI_LISTBOX_ITEM_RECT(lb, 0)
+PRINT "reiterleiste "; rb[1] - ra[1]
+GUI_PANEL_SCROLL(p, 10000)
+GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+PRINT "rollen bis "; GUI_PANEL_SCROLL_GET(p)
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+reiterleiste 60
+rollen bis 124
