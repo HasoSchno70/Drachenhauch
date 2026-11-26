@@ -1,13 +1,10 @@
 //! Modul `cloud`: Cloud-Save + Leaderboard gegen den mitgelieferten
-//! Referenz-Server (`cloudserver/server.dh`, REST+JSON). HTTP via `ureq`
-//! (wie html.rs), Feature `http`. Kein eigener State hier -- die VM haelt
+//! Referenz-Server (`cloudserver/server.dh`, REST+JSON). HTTP ueber
+//! `html::http_request`, Feature `http`. Kein eigener State hier -- die VM haelt
 //! Basis-URL/API-Key/letzte Fehlermeldung/Leaderboard-Ergebnisse
 //! (`vm.rs`, analog zu db_conns/db_results).
 
 #![cfg(feature = "http")]
-
-use std::io::Read;
-use std::time::Duration;
 
 const USER_AGENT: &str = "Drachenhauch-cloud/0.1";
 const TIMEOUT_SECS: u64 = 10;
@@ -18,41 +15,33 @@ pub struct CloudErr {
     pub status: i64,
 }
 
-fn map_transport_err(e: ureq::Error, ctx: &str) -> CloudErr {
-    match e {
-        ureq::Error::Status(code, resp) => {
-            let body = resp.into_string().unwrap_or_default();
-            CloudErr { msg: format!("{}: HTTP {} - {}", ctx, code, body.trim()), status: code as i64 }
-        }
-        ureq::Error::Transport(t) => CloudErr { msg: format!("{}: {}", ctx, t), status: 0 },
-    }
-}
-
+/// Eine Anfrage an den Server, Antwort als JSON. Geht durch
+/// `html::http_request` -- denselben Weg wie `HTTP_REQUEST` (Pruefung der
+/// Kopfzeilen, Groessengrenze, Meldungen ohne Netz); bis 2026.53 baute
+/// `cloud` seine Anfragen mit ureq selbst (Bericht A15). Bei einem
+/// Fehlerstatus steht der Text des Servers in der Meldung.
 fn req_json(method: &str, url: &str, api_key: &str, body: Option<&serde_json::Value>, ctx: &str)
     -> Result<serde_json::Value, CloudErr>
 {
-    let mut req = match method {
-        "GET" => ureq::get(url),
-        "POST" => ureq::post(url),
-        _ => unreachable!(),
-    }
-    .set("User-Agent", USER_AGENT)
-    .timeout(Duration::from_secs(TIMEOUT_SECS));
+    let mut a = crate::html::Anfrage::neu(method, url);
+    a.timeout = TIMEOUT_SECS * 1000;
+    a.fehlerstatus_als_antwort = true;
+    a.header.push(("User-Agent".into(), USER_AGENT.into()));
     if !api_key.is_empty() {
-        req = req.set("X-Api-Key", api_key);
+        a.header.push(("X-Api-Key".into(), api_key.into()));
     }
-    let resp = match body {
-        Some(b) => req.set("Content-Type", "application/json").send_string(&b.to_string()),
-        None => req.call(),
-    };
-    let resp = resp.map_err(|e| map_transport_err(e, ctx))?;
-    let mut text = String::new();
-    resp.into_reader().read_to_string(&mut text).map_err(|e| CloudErr {
-        msg: format!("{}: Antwort nicht lesbar: {}", ctx, e),
-        status: 0,
-    })?;
+    if let Some(b) = body {
+        a.header.push(("Content-Type".into(), "application/json".into()));
+        a.body = b.to_string().into_bytes();
+    }
+    let r = crate::html::http_request(&a)
+        .map_err(|e| CloudErr { msg: format!("{}: {}", ctx, e.msg), status: e.status })?;
+    let text = String::from_utf8_lossy(&r.body).into_owned();
+    if r.status >= 400 {
+        return Err(CloudErr { msg: format!("{}: HTTP {} - {}", ctx, r.status, text.trim()), status: r.status });
+    }
     serde_json::from_str(&text).map_err(|e| CloudErr {
-        msg: format!("{}: Antwort ist kein gueltiges JSON: {}", ctx, e),
+        msg: format!("{}: Antwort ist kein gueltiges JSON: {}", ctx, crate::builtins::json_fehler_text(&e)),
         status: 0,
     })
 }

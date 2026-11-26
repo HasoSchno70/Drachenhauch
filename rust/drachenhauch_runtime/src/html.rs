@@ -116,6 +116,10 @@ pub struct Anfrage {
     pub header: Vec<(String, String)>,
     /// Frist in ms.
     pub timeout: u64,
+    /// Eine Antwort mit Fehlerstatus (4xx/5xx) als `Ok` liefern, samt Rumpf
+    /// -- fuer Aufrufer, die den Fehlertext des Servers zeigen wollen
+    /// (`cloud`). Vorgabe: ein Fehlerstatus ist ein `HttpErr`.
+    pub fehlerstatus_als_antwort: bool,
 }
 
 impl Anfrage {
@@ -126,6 +130,7 @@ impl Anfrage {
             body: Vec::new(),
             header: Vec::new(),
             timeout: TIMEOUT_SECS * 1000,
+            fehlerstatus_als_antwort: false,
         }
     }
 }
@@ -184,7 +189,11 @@ pub fn http_request(anfrage: &Anfrage) -> Result<HttpResult, HttpErr> {
     // gar keines -- es setzte eine Behauptung in die Welt, die der Aufrufer
     // nicht mehr zurueckziehen kann, ohne sie zu kennen.
     let antwort = if anfrage.body.is_empty() { r.call() } else { r.send_bytes(&anfrage.body) };
-    antwort.map_err(|e| map_err(e, &anfrage.url)).and_then(finish)
+    match antwort {
+        Ok(resp) => finish(resp),
+        Err(ureq::Error::Status(_, resp)) if anfrage.fehlerstatus_als_antwort => finish(resp),
+        Err(e) => Err(map_err(e, &anfrage.url)),
+    }
 }
 
 // Fruehere `http_get`/`http_post`-Kurzformen gibt es hier nicht mehr: seit
@@ -511,101 +520,12 @@ pub fn html_get_attr(s: &str, attr: &str) -> String {
 //  Bewusst NUR GET: das deckt "Daten holen" ab, und jede weitere Form
 //  verdoppelt die Zustaende, die ein Programm im Blick behalten muss.
 
-use std::sync::mpsc::{channel, Receiver, TryRecvError};
+//  Die Verwaltung (Nummern, Nachsehen, Abholen) ist `hintergrund::Auftraege`
+//  -- dieselbe wie bei `TASK_*` und `SHELL_START`. Gestartet wird in
+//  `vm_dienste.rs` mit `http_request` als Arbeit.
 
-pub struct Abruf {
-    empfang: Receiver<Result<HttpResult, HttpErr>>,
-    /// Fertiges Ergebnis, bis es abgeholt wird. Der Kanal liefert nur
-    /// EINMAL -- ohne diesen Zwischenspeicher waere `HTTP_READY` ein
-    /// Verbrauch, und ein zweiter Aufruf im selben Bild verloere die
-    /// Antwort.
-    ergebnis: Option<Result<HttpResult, HttpErr>>,
-    url: String,
-}
-
-#[derive(Default)]
-pub struct Abrufe {
-    /// Tombstones -- eine einmal vergebene Nummer bleibt gueltig, auch
-    /// wenn davor stehende Abrufe abgeholt wurden.
-    eintraege: Vec<Option<Abruf>>,
-}
-
-impl Abrufe {
-    /// Startet eine beliebige Anfrage im Hintergrund und liefert ihre Nummer.
-    ///
-    /// Seit WP C nimmt der Hintergrund-Pfad dieselbe `Anfrage` wie der
-    /// blockierende -- vorher konnte er nur GET, und ausgerechnet ein POST
-    /// gegen eine langsame API (der Fall, der das Fenster am laengsten
-    /// einfriert) liess sich nicht auslagern.
-    pub fn start(&mut self, anfrage: Anfrage) -> i64 {
-        let (sender, empfang) = channel();
-        let url = anfrage.url.clone();
-        std::thread::spawn(move || {
-            // Das Ergebnis interessiert niemanden mehr, wenn der Empfaenger
-            // weg ist (Abruf abgebrochen) -- `send` scheitert dann still.
-            let _ = sender.send(http_request(&anfrage));
-        });
-        self.eintraege.push(Some(Abruf { empfang, ergebnis: None, url }));
-        (self.eintraege.len() - 1) as i64
-    }
-
-    fn eintrag(&mut self, id: i64) -> Option<&mut Abruf> {
-        if id < 0 { return None; }
-        self.eintraege.get_mut(id as usize)?.as_mut()
-    }
-
-    /// Ist die Antwort da? Fragt nach, ohne zu warten.
-    pub fn fertig(&mut self, id: i64) -> bool {
-        let Some(e) = self.eintrag(id) else { return false; };
-        if e.ergebnis.is_some() { return true; }
-        match e.empfang.try_recv() {
-            Ok(r) => { e.ergebnis = Some(r); true }
-            Err(TryRecvError::Empty) => false,
-            // Thread ist weg, ohne zu senden -- das kann nur ein Absturz im
-            // Abruf-Thread sein. Als Fehler melden statt ewig "noch nicht".
-            Err(TryRecvError::Disconnected) => {
-                let url = e.url.clone();
-                e.ergebnis = Some(Err(HttpErr {
-                    msg: format!("HTTP-Abruf abgebrochen: {}", url),
-                    status: 0,
-                    headers: Vec::new(),
-                }));
-                true
-            }
-        }
-    }
-
-    /// Holt das Ergebnis ab und gibt den Platz frei.
-    ///
-    /// `None` = noch nicht fertig (oder unbekannte Nummer); der Aufrufer
-    /// soll dann weiter `fertig` fragen statt zu blockieren.
-    pub fn abholen(&mut self, id: i64) -> Option<Result<HttpResult, HttpErr>> {
-        if !self.fertig(id) { return None; }
-        let e = self.eintraege.get_mut(id as usize)?.take()?;
-        e.ergebnis
-    }
-
-    /// Abbrechen: der Thread laeuft zu Ende, sein Ergebnis wird verworfen.
-    /// Tolerant gegenueber schon abgeholten Nummern.
-    pub fn abbrechen(&mut self, id: i64) {
-        if id >= 0 {
-            if let Some(platz) = self.eintraege.get_mut(id as usize) { *platz = None; }
-        }
-    }
-
-    /// Wie viele Abrufe noch unterwegs sind (fuer Anzeigen wie "lade ...").
-    pub fn offen(&self) -> i64 {
-        self.eintraege.iter().filter(|e| e.is_some()).count() as i64
-    }
-
-    pub fn url(&self, id: i64) -> String {
-        if id < 0 { return String::new(); }
-        self.eintraege.get(id as usize)
-            .and_then(|e| e.as_ref())
-            .map(|e| e.url.clone())
-            .unwrap_or_default()
-    }
-}
+/// Die Auftraege der HTTP-Abrufe; `was` ist die URL (`HTTP_URL$`).
+pub type Abrufe = crate::hintergrund::Auftraege<Result<HttpResult, HttpErr>>;
 
 #[cfg(test)]
 mod tests {

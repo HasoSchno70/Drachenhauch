@@ -263,7 +263,7 @@ MQTT_PUBLISH(h, "a/b", "null", FALSE, 0)
 DIM t0 AS INTEGER : t0 = MILLIS()
 PRINT "bestaetigt "; MQTT_FLUSH(h, 300)
 PRINT "gewartet "; MILLIS() - t0 >= 250
-PRINT "offen "; MQTT_PENDING(h)
+PRINT "offen "; MQTT_UNACKED_COUNT(h)
 MQTT_DISCONNECT(h)
 --- datei start.dh
 IMPORT "mqtt"

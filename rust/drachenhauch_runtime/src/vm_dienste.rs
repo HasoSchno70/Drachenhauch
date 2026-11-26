@@ -1101,6 +1101,13 @@ impl<'p> Vm<'p> {
     /// Frueher stand dieser Block viermal wortgleich in `try_html_impl`. Mit
     /// `HTTP_BYTES` (WP C) kam eine fuenfte Sache dazu, die JEDER Pfad tun
     /// muss -- und genau so vergisst man sie in einem davon.
+    /// Eine Anfrage im Hintergrund starten (`HTTP_*_START`), Nummer zurueck.
+    #[cfg(feature = "http")]
+    pub(super) fn http_abruf_starten(&mut self, anfrage: crate::html::Anfrage) -> i64 {
+        let url = anfrage.url.clone();
+        self.http_abrufe.start(&url, move || crate::html::http_request(&anfrage))
+    }
+
     #[cfg(feature = "http")]
     pub(super) fn http_antwort(&mut self, r: Result<crate::html::HttpResult, crate::html::HttpErr>) -> R<Value> {
         match r {
@@ -1195,7 +1202,7 @@ impl<'p> Vm<'p> {
             }
             "http_request_start" => {
                 let anfrage = self.http_anfrage("HTTP_REQUEST_START", a)?;
-                Value::Int(self.http_abrufe.start(anfrage))
+                Value::Int(self.http_abruf_starten(anfrage))
             }
             "http_bytes" => {
                 if !a.is_empty() { return Err(format!("HTTP_BYTES: erwartet 0 Argumente, erhalten {}", a.len())); }
@@ -1258,23 +1265,22 @@ impl<'p> Vm<'p> {
                 let mut anfrage = html::Anfrage::neu("GET", bi_str(a, 0, "HTTP_GET_START")?);
                 anfrage.timeout = self.http_timeout;
                 anfrage.header = self.http_default_header.clone();
-                Value::Int(self.http_abrufe.start(anfrage))
+                Value::Int(self.http_abruf_starten(anfrage))
             }
-            "http_ready" => Value::Bool(self.http_abrufe.fertig(bi_int(a, 0, "HTTP_READY")?)),
+            "http_ready" => Value::Bool(self.http_abrufe.fertig(bi_int(a, 0, "HTTP_READY")?, "HTTP_READY")?),
             "http_result" => {
                 let id = bi_int(a, 0, "HTTP_RESULT")?;
-                match self.http_abrufe.abholen(id) {
+                match self.http_abrufe.abholen(id, "HTTP_RESULT")? {
                     Some(r) => self.http_antwort(r)?,
                     // Abholen ohne vorheriges HTTP_READY ist der haeufigste
                     // Anfaengerfehler -- deshalb sagt die Meldung, was fehlt.
                     None => return Err(format!(
-                        "HTTP_RESULT: Abruf {} ist nicht fertig (oder schon abgeholt) \
-                         -- erst HTTP_READY({}) abfragen", id, id)),
+                        "HTTP_RESULT: Abruf {} ist noch nicht fertig -- erst HTTP_READY({}) abfragen", id, id)),
                 }
             }
             "http_cancel" => { self.http_abrufe.abbrechen(bi_int(a, 0, "HTTP_CANCEL")?); Value::Nil }
             "http_pending" => Value::Int(self.http_abrufe.offen()),
-            "http_url$" | "http_url" => Value::str_rc(&self.http_abrufe.url(bi_int(a, 0, "HTTP_URL$")?)),
+            "http_url$" | "http_url" => Value::str_rc(&self.http_abrufe.was(bi_int(a, 0, "HTTP_URL$")?)),
 
             "http_status" => Value::Int(self.http_status),
             "http_header" => {

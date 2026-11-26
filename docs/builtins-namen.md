@@ -278,6 +278,7 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `MAP_COUNT(m)` | Anzahl der Schlüssel-Wert-Paare — bisher `MAPSIZE` |
 | `ARRAY_DIM_COUNT(arr)` | Anzahl Dimensionen — bisher `DIMCOUNT` |
 | `ARRAY_DIM_SIZE(arr, n)` | Größe der n-ten Dimension (0-basiert) — bisher `DIMSIZE` |
+| `MQTT_UNACKED_COUNT(handle)` | wie viele QoS-1-Nachrichten der Broker noch nicht bestätigt hat — bisher `MQTT_PENDING` |
 | `MOVE_TOWARD(cur, target, maxdelta)` | cur um max. maxd Richtung target bewegen — bisher `MOVETOWARD` |
 
 ### Englisch statt Deutsch (Module zeit und geld, FFI-Zeiger)

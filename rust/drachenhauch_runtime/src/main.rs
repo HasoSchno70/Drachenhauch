@@ -80,6 +80,8 @@ mod glsl;
 mod httpd;
 #[cfg(feature = "smtp")]
 mod smtp;
+#[cfg(any(feature = "net", feature = "smtp", feature = "pg"))]
+mod tls;
 mod zipdatei;
 // Siehe Cargo.toml: mimalloc statt des System-Verwalters (nicht im Web).
 #[cfg(not(target_os = "emscripten"))]

@@ -71,6 +71,15 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
   GUI_WIDGET_FREE freigegeben“); vorher ging es still durch.
 * `MIDI_FILE_FREE` und `MQTT_IS_CONNECTED` mit einer Nummer, die es nie gab,
   sind Fehler (vorher still bzw. FALSE).
+* `HTTP_READY` und `HTTP_RESULT` mit einer Nummer, die es nicht (mehr) gibt
+  (abgeholt, abgebrochen, nie gestartet), sind Fehler wie bei `TASK_READY`;
+  vorher lieferte `HTTP_READY` FALSE. Die Meldung „Abruf n ist nicht fertig
+  (oder schon abgeholt)“ heißt jetzt „ist noch nicht fertig“, ebenso bei
+  `SHELL_RESULT$` und `DB_QUERY_RESULT`.
+* `CLOUD_*` geht durch denselben HTTP-Weg wie `HTTP_REQUEST`: ohne Netz
+  dieselbe Meldung („keine Verbindung …“), Antworten über 64 MB sind ein
+  Fehler.
+* Neuer Name `MQTT_UNACKED_COUNT` für `MQTT_PENDING` (der alte bleibt).
 
 **Ton**
 

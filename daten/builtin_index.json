@@ -10881,6 +10881,12 @@
    "module": "mqtt"
   },
   {
+   "name": "MQTT_UNACKED_COUNT",
+   "kind": "core",
+   "signature": "MQTT_UNACKED_COUNT(handle) AS INTEGER",
+   "module": "mqtt"
+  },
+  {
    "name": "MQTT_PUBLISH",
    "kind": "core",
    "signature": "MQTT_PUBLISH(handle, topic$, payload$[, retain: BOOLEAN = FALSE[, qos: INTEGER]]) AS BOOLEAN",

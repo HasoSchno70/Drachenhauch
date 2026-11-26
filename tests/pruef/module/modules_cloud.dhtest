@@ -167,13 +167,15 @@ DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("cloud", "0", "geheim"), "|")
 DIM basis AS STRING : basis = srv[0]
 CLOUD_CONFIGURE(basis, "falsch")
 PRINT "["; CLOUD_LOAD("p"); "]"
-PRINT CLOUD_LAST_ERROR$() <> ""
+' Die Meldung traegt den Status UND den Text des Servers (der Weg ueber
+' html::http_request darf den Rumpf einer Fehlerantwort nicht verlieren).
+PRINT CLOUD_LAST_ERROR$()
 PROCESS_KILL(VAL(srv[1]))
 --- argumente
 {sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
 []
-TRUE
+CLOUD_LOAD: HTTP 401 - {"error": "unauthorized"}
 
 === cloud correct api key works
 ' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_cloud.py.)

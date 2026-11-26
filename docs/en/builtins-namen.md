@@ -278,6 +278,7 @@ hand are callback timers from the `timer` module.
 | `MAP_COUNT(m)` | The number of key-value pairs — formerly `MAPSIZE` |
 | `ARRAY_DIM_COUNT(arr)` | number of dimensions — formerly `DIMCOUNT` |
 | `ARRAY_DIM_SIZE(arr, n)` | size of the n-th dimension (0-based) — formerly `DIMSIZE` |
+| `MQTT_UNACKED_COUNT(handle)` | how many QoS 1 messages the broker has not acknowledged yet — formerly `MQTT_PENDING` |
 | `MOVE_TOWARD(cur, target, maxdelta)` | move cur by at most maxd towards target — formerly `MOVETOWARD` |
 
 ### English instead of German (modules zeit and geld, FFI pointers)

@@ -34,7 +34,7 @@ message that must arrive (a command that stops a motor).
 | `MQTT_PUBLISH(handle, topic$, payload$[, retain[, qos]])` | BOOLEAN | send a message to a topic; with `retain` the broker keeps it for later subscribers, `qos` 0 or 1. FALSE if the connection is gone The payload may be a BUFFER. |
 | `MQTT_SUBSCRIBE(handle, topic$[, qos])` | BOOLEAN | subscribe to a topic -- incoming messages are then fetched by `MQTT_UPDATE`; `qos` 0 or 1. FALSE if the connection is gone |
 | `MQTT_UNSUBSCRIBE(handle, topic$)` | BOOLEAN | end a subscription |
-| `MQTT_PENDING(handle)` | INTEGER | how many QoS 1 messages the broker has not acknowledged yet |
+| `MQTT_UNACKED_COUNT(handle)` | INTEGER | how many QoS 1 messages the broker has not acknowledged yet |
 | `MQTT_FLUSH(handle[, ms])` | BOOLEAN | wait until all QoS 1 messages are acknowledged (default 2000 ms); FALSE when the time is up |
 | `MQTT_WILL(topic$, content$[, retain])` | — | the **last will** for the next `MQTT_CONNECT`: if the connection breaks without a disconnect, the broker publishes this message |
 | `MQTT_UPDATE(handle)` | — | **call once per frame**: reads in received messages and keeps the connection alive with PINGREQ |
@@ -150,7 +150,7 @@ END IF
 ## QoS 1: arriving for sure
 
 With QoS 1 the broker acknowledges every message. Until then it counts in
-`MQTT_PENDING`; `MQTT_FLUSH` waits for it — useful in a program that sends a
+`MQTT_UNACKED_COUNT`; `MQTT_FLUSH` waits for it — useful in a program that sends a
 message and ends right away. If you subscribe with QoS 1, the client
 acknowledges incoming messages itself. QoS 1 means "at least once": if an
 acknowledgement gets lost, the same message arrives a second time.
@@ -159,12 +159,12 @@ acknowledgement gets lost, the same message arrives a second time.
 IMPORT "mqtt"
 DIM h AS MQTT_HANDLE : h = MQTT_CONNECT("192.168.1.50", 1883, "werkstatt-steuerung")
 MQTT_PUBLISH(h, "werkstatt/motor", "stopp", FALSE, 1)
-IF NOT MQTT_FLUSH(h, 3000) THEN PRINT "nicht bestaetigt: "; MQTT_PENDING(h)
+IF NOT MQTT_FLUSH(h, 3000) THEN PRINT "nicht bestaetigt: "; MQTT_UNACKED_COUNT(h)
 MQTT_DISCONNECT(h)
 ```
 
 If the connection breaks before the acknowledgement came, the client does not
-resend the message by itself; `MQTT_PENDING` shows whether something was
+resend the message by itself; `MQTT_UNACKED_COUNT` shows whether something was
 outstanding.
 
 ## Encrypted: mqtts://

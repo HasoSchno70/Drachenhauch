@@ -89,7 +89,7 @@ p = SHELL_START("cmd", "/c", "ping -n 3 127.0.0.1 > nul")
 PRINT SHELL_RESULT$(p)
 --- system windows
 --- fehler
-SHELL_RESULT$: Auftrag 0 ist nicht fertig (oder schon abgeholt) -- erst SHELL_READY(0) abfragen
+SHELL_RESULT$: Auftrag 0 ist noch nicht fertig -- erst SHELL_READY(0) abfragen
 
 === pending zaehlt und cancel raeumt auf
 DIM p AS INTEGER

@@ -166,7 +166,7 @@ For anything running in a loop there is therefore the same request for checking 
 |---|---|
 | `HTTP_REQUEST_START(method$, url$ [, body [, headers]])` → INTEGER | starts **any** request in the background |
 | `HTTP_GET_START(url$)` → INTEGER | short form of it for GET |
-| `HTTP_READY(request)` → BOOLEAN | is the response there? (checks, does not wait) |
+| `HTTP_READY(request)` → BOOLEAN | is the response there? (checks, does not wait; unknown number = error) |
 | `HTTP_RESULT(request)` → STRING | collects the body and frees the slot |
 | `HTTP_CANCEL(request)` | discard a request (unknown number = no-op) |
 | `HTTP_PENDING()` → INTEGER | how many requests are still open |
@@ -211,6 +211,7 @@ After `HTTP_RESULT`, `HTTP_STATUS()` and `HTTP_HEADER()` are ready exactly as af
 - **`HTTP_RESULT` before `HTTP_READY`** aborts with a plain-language message instead of blocking — otherwise the advantage would be thrown away again.
 - **Several requests really run at the same time.** Two requests of 300 ms each are done after ~300 ms, not after 600.
 - **Numbers stay stable** (tombstones as with `timer`): a collected or cancelled number is not handed out again. So a program cannot accidentally refer an old number to someone else's request.
+- **A number that does not exist (any more)** — never started, already collected or cancelled — is an error for `HTTP_READY` and `HTTP_RESULT` (up to 2026.53 `HTTP_READY` returned FALSE, and `WHILE NOT HTTP_READY(n)` ran forever). `HTTP_CANCEL` accepts it silently, `HTTP_URL$` returns "".
 - **The first number is 0** (as with `timer`). To remember "no request in flight", use -1 -- a fresh `DIM abruf AS INTEGER` is 0 and thus already the number of the first request.
 - **Cancelling does not stop the request in mid-network** — it runs to the end, and its result is discarded. The program does not wait for anything.
 - **Any method.** `HTTP_GET_START` is the short form for GET; `HTTP_REQUEST_START` takes any method together with body and headers (see the table). There is no `HTTP_DOWNLOAD` in the background -- for that use `HTTP_GET_START` and, after `HTTP_RESULT`, save the raw body from `HTTP_BYTES()` with `WRITEALL_BYTES`.

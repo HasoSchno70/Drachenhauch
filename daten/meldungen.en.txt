@@ -916,8 +916,8 @@ Action '{}' nicht gebunden	action '{}' is not bound
 {}: '{}' ist an ein Objekt gebunden. Ein Auftrag laeuft in einem eigenen Prozess und sieht dieses Objekt nicht -- nimm eine freie FUNCTION und gib ihr die Werte als Argumente mit.	{}: '{}' is bound to an object. A task runs in its own process and does not see this object -- take a free FUNCTION and pass it the values as arguments.
 {}: Argument {} geht ueber eine Prozessgrenze und muss eine Zahl, ein Text oder BOOLEAN sein, nicht {}. Fuer alles andere reich JSON durch.	{}: argument {} crosses a process boundary and must be a number, a text or BOOLEAN, not {}. For anything else pass JSON.
 {}: Auftrag {} ist noch nicht fertig -- erst TASK_READY({}) fragen	{}: task {} is not finished yet -- ask TASK_READY({}) first
-{}: Auftrag {} ist nicht fertig (oder schon abgeholt) -- erst {}({}) abfragen	{}: task {} is not finished (or already fetched) -- ask {}({}) first
-{}: Abruf {} ist nicht fertig (oder schon abgeholt) -- erst HTTP_READY({}) abfragen	{}: request {} is not finished (or already fetched) -- ask HTTP_READY({}) first
+{}: Auftrag {} ist noch nicht fertig -- erst {}({}) abfragen	{}: task {} is not finished yet -- ask {}({}) first
+{}: Abruf {} ist noch nicht fertig -- erst HTTP_READY({}) abfragen	{}: request {} is not finished yet -- ask HTTP_READY({}) first
 {}: die laufende Datei ist unbekannt -- Auftraege gibt es nur bei `dhrt run <datei.dh>`	{}: the running file is unknown -- tasks only exist with `dhrt run <file.dh>`
 {}: eigenen Programmpfad nicht gefunden: {}	{}: own program path not found: {}
 {}: '{}' laesst sich nicht starten: {}	{}: '{}' cannot be started: {}
@@ -1077,7 +1077,6 @@ HTTPD_START: Port {} nicht belegbar: {}	HTTPD_START: port {} cannot be used: {}
 Anfrage zu gross	request too large
 Rumpf zu gross	body too large
 HTTPD_SEND: es liegt keine Anfrage an (erst HTTPD_ACCEPT)	HTTPD_SEND: there is no pending request (HTTPD_ACCEPT first)
-{}: Antwort nicht lesbar: {}	{}: response not readable: {}
 {}: Antwort ist kein gueltiges JSON: {}	{}: the response is not valid JSON: {}
 MQTT_CONNECT: Port {} ausserhalb 0..65535	MQTT_CONNECT: port {} outside 0..65535
 unbekannte Sicherheit {} -- erlaubt sind "starttls", "tls", "keine"	unknown security {} -- allowed are "starttls", "tls", "keine"
@@ -1090,6 +1089,10 @@ die Nachricht ist leer (SMTP_TEXT, SMTP_HTML oder SMTP_ATTACH)	the message is em
 die Verbindung ist bereits verschluesselt	the connection is already encrypted
 TLS liess sich nicht einrichten: {}	TLS could not be set up: {}
 {} ist kein gueltiger Servername fuer TLS	{} is not a valid server name for TLS
+{}die Verbindung ist bereits verschluesselt	{}the connection is already encrypted
+{}in der CA-Datei {} steht kein Zertifikat (erwartet PEM, -----BEGIN CERTIFICATE-----)	{}the CA file {} contains no certificate (expected PEM, -----BEGIN CERTIFICATE-----)
+{}TLS liess sich nicht einrichten: {}	{}TLS could not be set up: {}
+{}CA-Datei {}: {}	{}CA file {}: {}
 es fehlt der Server (SMTP_SERVER)	the server is missing (SMTP_SERVER)
 SMTP_SEND: Anmeldung ohne Verschluesselung an {} -- das Kennwort ginge im Klartext ueber das Netz. Nimm "starttls" (Port 587) oder "tls" (Port 465); ohne Verschluesselung geht eine Anmeldung nur an den eigenen Rechner	SMTP_SEND: login without encryption to {} -- the password would cross the network in plain text. Use "starttls" (port 587) or "tls" (port 465); without encryption a login only works with your own computer
 SMTP_SEND: {}:{} bietet kein STARTTLS an. Entweder ist der Port falsch (Einlieferung laeuft meist ueber 587, TLS-von-Anfang-an ueber 465) oder der Server kann keine Verschluesselung -- dann braucht es "keine", und zwar bewusst	SMTP_SEND: {}:{} does not offer STARTTLS. Either the port is wrong (submission usually runs over 587, TLS from the start over 465) or the server cannot encrypt -- then it needs "keine", and deliberately so
@@ -1759,9 +1762,6 @@ FIRMATA_FIRMWARE$: keine Antwort -- laeuft Firmata auf dem Board?	FIRMATA_FIRMWA
 {}: QoS 2 kann dieser Client nicht -- 0 oder 1	{}: this client cannot do QoS 2 -- 0 or 1
 {}: QoS {} gibt es nicht -- 0 oder 1	{}: there is no QoS {} -- 0 or 1
 MQTT_TLS_CA: die Datei {} gibt es nicht	MQTT_TLS_CA: the file {} does not exist
-MQTT_CONNECT: CA-Datei {}: {}	MQTT_CONNECT: CA file {}: {}
-MQTT_CONNECT: in der CA-Datei {} steht kein Zertifikat (erwartet PEM, -----BEGIN CERTIFICATE-----)	MQTT_CONNECT: the CA file {} contains no certificate (expected PEM, -----BEGIN CERTIFICATE-----)
-MQTT_CONNECT: TLS liess sich nicht einrichten: {}	MQTT_CONNECT: TLS could not be set up: {}
 MQTT_CONNECT: {} ist kein gueltiger Servername fuer TLS	MQTT_CONNECT: {} is not a valid server name for TLS
 MQTT_CONNECT: TLS-Verbindung fehlgeschlagen: {}	MQTT_CONNECT: TLS connection failed: {}
 # ---------------------------------------------------------------- gpio/i2c/spi (2026-11-06)
@@ -1835,7 +1835,6 @@ WS_CONNECT: {} -- der Rechner fehlt	WS_CONNECT: {} -- the host is missing
 WS_CONNECT: {} nicht aufloesbar (auch nicht ueber mDNS)	WS_CONNECT: {} cannot be resolved (not over mDNS either)
 WS_CONNECT: {} will kein WebSocket -- Antwort {}	WS_CONNECT: {} does not want a WebSocket -- answer {}
 WS_CONNECT: {} antwortet mit einem falschen Sec-WebSocket-Accept	WS_CONNECT: {} answers with a wrong Sec-WebSocket-Accept
-WS_CONNECT: TLS liess sich nicht einrichten: {}	WS_CONNECT: TLS could not be set up: {}
 WS_CONNECT: TLS-Verbindung fehlgeschlagen: {}	WS_CONNECT: TLS connection failed: {}
 WS_CONNECT: {} ist kein gueltiger Servername fuer TLS	WS_CONNECT: {} is not a valid server name for TLS
 WS_LISTEN: Port {} ausserhalb 0..65535	WS_LISTEN: port {} outside 0..65535

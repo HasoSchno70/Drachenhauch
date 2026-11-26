@@ -169,6 +169,7 @@ pub const NEU: &[(&str, &str)] = &[
     ("map_count", "mapsize"),
     ("array_dim_count", "dimcount"),
     ("array_dim_size", "dimsize"),
+    ("mqtt_unacked_count", "mqtt_pending"),
     ("move_toward", "movetoward"),
     // ---- Englisch statt Deutsch (Module zeit und geld, FFI-Zeiger)
     ("time_now", "zeit_jetzt"),

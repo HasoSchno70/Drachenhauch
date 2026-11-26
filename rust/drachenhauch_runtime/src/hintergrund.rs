@@ -1,9 +1,8 @@
 //! Hintergrund-Auftraege (WP H).
 //!
 //! Ein Muster fuer alles, was laenger dauert als ein Bild: starten, pro Frame
-//! nachsehen, abholen. Dasselbe, was `html.rs` fuer HTTP schon tut -- hier
-//! einmal allgemein, damit die naechste blockierende Sache es nicht ein
-//! drittes Mal nachbaut.
+//! nachsehen, abholen. Auch die HTTP-Abrufe (`HTTP_*_START`) laufen hierueber;
+//! bis 2026.53 hatte `html.rs` eine eigene Kopie (`Abrufe`, Bericht A15).
 //!
 //! **Was hier NICHT laeuft: DH-Code.** Ein Auftrag ist eine Rust-Funktion, die
 //! ohne VM auskommt (eine SQL-Abfrage, ein Kindprozess). Der Grund steht in
@@ -100,6 +99,15 @@ impl<T: Send + 'static> Auftraege<T> {
     /// `fertig`.
     pub fn offen(&self) -> i64 {
         self.eintraege.iter().filter(|e| e.is_some()).count() as i64
+    }
+
+    /// Die Kurzbeschreibung eines Auftrags (`HTTP_URL$`); leer, wenn es die
+    /// Nummer nicht (mehr) gibt.
+    #[allow(dead_code)] // nur http
+    pub fn was(&self, id: i64) -> String {
+        if id < 0 { return String::new(); }
+        self.eintraege.get(id as usize).and_then(|e| e.as_ref())
+            .map(|e| e.was.clone()).unwrap_or_default()
     }
 }
 
