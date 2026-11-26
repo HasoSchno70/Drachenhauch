@@ -159,7 +159,13 @@ pub(crate) fn import_warnung(modul: &str, feature: &str) -> String {
         format!("Modul '{}' gibt es in dieser Laufzeit nicht (ohne {} gebaut) -- jeder Aufruf meldet einen Fehler",
                 modul, anzeige(feature))
     };
-    if entwicklerbau() { format!("{}. Neu bauen mit: python rust/build_runtime.py{}", teil, schalter(feature)) } else { teil }
+    // Der Ausweg: im Entwicklerbau neu bauen; sonst (eine installierte oder
+    // kopierte Laufzeit, auch die der CI) das Modul wahlweise benutzen.
+    if entwicklerbau() {
+        format!("{}. Neu bauen mit: python rust/build_runtime.py{}", teil, schalter(feature))
+    } else {
+        format!("{}. Wer ohne das Modul auskommt: IMPORT \"{}\" OPTIONAL und vorher MODULE_AVAILABLE(\"{}\") fragen", teil, modul, modul)
+    }
 }
 
 /// Fehlt dem Modul in dieser Laufzeit etwas, wovor der IMPORT warnen soll?

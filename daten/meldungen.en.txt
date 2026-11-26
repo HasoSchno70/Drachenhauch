@@ -218,6 +218,7 @@ Modul '{}' gibt es in dieser Laufzeit nicht (ohne {} gebaut) -- jeder Aufruf mel
 Modul 'midi' ist in dieser Laufzeit nur zum Teil enthalten -- MIDI-Dateien und MIDI_NOTE_NAME$/MIDI_NOTE_FREQ gehen, Ein- und Ausgaenge nicht (ohne {} gebaut)	Module 'midi' is only partly contained in this runtime -- MIDI files and MIDI_NOTE_NAME$/MIDI_NOTE_FREQ work, inputs and outputs do not (built without {})
 Modul '{}' gibt es in dieser Laufzeit nicht	Module '{}' does not exist in this runtime
 {}. Neu bauen mit: python rust/build_runtime.py{}	{}. Rebuild with: python rust/build_runtime.py{}
+{}. Wer ohne das Modul auskommt: IMPORT "{}" OPTIONAL und vorher MODULE_AVAILABLE("{}") fragen	{}. To do without the module: IMPORT "{}" OPTIONAL and ask MODULE_AVAILABLE("{}") first
 {} kennt keine Klasse {}.{}	{} has no class {}.{}
 {} kennt keinen Namen {}.{}	{} has no name {}.{}
 {} steht in {}, und diese Datei gehoert nicht zum Namensraum {} -- was eine Datei des Namensraums ohne AS einbindet, bleibt draussen. Dort IMPORT "{}" AS {} schreiben.	{} is in {}, and that file does not belong to the namespace {} -- what a file of the namespace imports without AS stays outside. Write IMPORT "{}" AS {} there.
