@@ -90,8 +90,8 @@ IMPORT "gui"
 | `GUI_SEPARATOR(win, x, y, w)` | GUI_WIDGET | decorative divider line (horizontal) |
 | `GUI_GROUPBOX(win, x, y, w, h, title$)` | GUI_WIDGET | framed group with an inset title |
 | `GUI_BIND(widget, key$[, form$])` | — | **data binding**: the widget carries a key (column name) — see [Data binding](#data-binding) |
-| `GUI_FORM_GET(win[, form$])` / `GUI_FORM_SET(win, map[, form$])` | MAP OF STRING / — | read all bound values / set them from a MAP |
-| `GUI_FORM_CLEAR` / `GUI_FORM_CLEAN` / `GUI_FORM_CHANGED(win[, formular$])` | — / — / BOOL | clear / mark as saved / changed since the last set? |
+| `GUI_FORM_GET(win[, form$])` / `GUI_FORM_SET(win, values[, form$])` | MAP OF STRING / — | read all bound values / set them from a MAP |
+| `GUI_FORM_CLEAR` / `GUI_FORM_CLEAN` / `GUI_FORM_CHANGED(win[, form$])` | — / — / BOOL | clear / mark as saved / changed since the last set? |
 | `GUI_FORM_LOAD(win, db, table$, id[, form$])` | BOOL | load the row `WHERE id = ?` into the widgets |
 | `GUI_FORM_SAVE(win, db, table$, id[, form$[, overwrite]])` | INTEGER | INSERT (id < 0) or UPDATE, returns the id -- **0 if nothing was saved** (row deleted or changed in the meantime) |
 | `GUI_FORM_VERSION(win, column$[, form$])` | — | version column: SAVE only saves while the row still carries the state it was loaded with (empty = off) — see [Data binding](#data-binding) |
@@ -102,16 +102,16 @@ IMPORT "gui"
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | what a container needs at least — the value for `WINDOW_MIN_SIZE` |
 | `GUI_TEXT_WIDTH(widget, text)` | INTEGER | how wide the widget draws `text` (its font, size, style; logical) — for column and button widths instead of guessing from the character count |
 | `GUI_RULE(feld, art$[, a, b][, muster$][, meldung$])` | — | attach a **validation rule**: `pflicht` (required), `zahl` (number), `ganz` (integer), `bereich a b` (range), `laenge min max` (length), `email`, `datum` (date), `muster regex$` (pattern) — see [Form validation](#form-validation) |
-| `GUI_VALIDATE(win)` / `GUI_VALIDATE_WIDGET(feld)` | INTEGER / STRING | check all rules of the window (number of errors, the first field gets focus) / one field (message or "") |
-| `GUI_ERROR(field)` / `GUI_SET_ERROR(field, meldung$)` / `GUI_CLEAR_ERRORS(win)` | STRING / — / — | read the message, set it from outside (e.g. from the database), clear all |
-| `GUI_ERROR_LABEL(field, label)` / `GUI_VALIDATE_LIVE(win, an)` / `GUI_RULES_CLEAR(field)` | — | a label shows the message / check when leaving a field / remove the rules |
+| `GUI_VALIDATE(win)` / `GUI_VALIDATE_WIDGET(field)` | INTEGER / STRING | check all rules of the window (number of errors, the first field gets focus) / one field (message or "") |
+| `GUI_ERROR(field)` / `GUI_SET_ERROR(field, message$)` / `GUI_CLEAR_ERRORS(win)` | STRING / — / — | read the message, set it from outside (e.g. from the database), clear all |
+| `GUI_ERROR_LABEL(field, label)` / `GUI_VALIDATE_LIVE(win, on)` / `GUI_RULES_CLEAR(field)` | — | a label shows the message / check when leaving a field / remove the rules |
 | `GUI_VSLIDER(win, x, y, h, min, max, default)` | GUI_WIDGET | **vertical slider** — `h` is the length, the value grows upwards |
 | `GUI_PROGRESS_SET(progress, "unbestimmt", 1)` | — | a running band instead of a value, for anything whose duration is unknown |
 | `GUI_IMAGE_MODE(image, mode$)` / `GUI_IMAGE_MODE_GET(image)` | — / STRING | `strecken` (stretch, default), `einpassen` (fit), `fuellen` (fill), `mitte` (centre), `kacheln` (tile) |
-| `GUI_TREE_ICON(tree, node, image)` / `GUI_TREE_COLOR(tree, node, farbe)` | — | icon and text colour per tree node; instead of an image also the name of a built-in icon (`"ordner"`), `""` removes it |
+| `GUI_TREE_ICON(tree, node, image)` / `GUI_TREE_COLOR(tree, node, color)` | — | icon and text colour per tree node; instead of an image also the name of a built-in icon (`"ordner"`), `""` removes it |
 | `GUI_PANEL_ADD(panel, widget)` / `GUI_PANEL_REMOVE` / `GUI_PANEL_SCROLL(panel, y)` / `GUI_PANEL_SCROLL_GET(panel)` | — | a **panel that scrolls its children** (mouse wheel, scroll bar) — see [Finishing touches](#finishing-touches-slider-progress-image-tree-panel-dragging) |
 | `GUI_DRAGGABLE(widget, on)` / `GUI_DROP_TARGET(widget, on)` | — | **dragging between widgets**: source and drop target |
-| `GUI_DRAGGING()` / `GUI_DROPPED(wdg)` / `GUI_DROP_TEXT()` / `GUI_DROP_SOURCE()` / `GUI_DRAG_INDEX()` / `GUI_DROP_INDEX()` | GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER | current drag, drop in this frame, what was dragged, from where, which row, onto which row |
+| `GUI_DRAGGING()` / `GUI_DROPPED(widget)` / `GUI_DROP_TEXT()` / `GUI_DROP_SOURCE()` / `GUI_DRAG_INDEX()` / `GUI_DROP_INDEX()` | GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER | current drag, drop in this frame, what was dragged, from where, which row, onto which row |
 | `GUI_CURSORS(on)` | — | mouse pointer shapes depending on the spot in the widget (default on): text beam over text, hand over anything clickable, double arrow at dividers, column edges and the window grip |
 | `GUI_SET_CURSOR(widget, form$)` / `GUI_GET_CURSOR$(widget)` | — / STRING | a custom pointer shape over a widget (say, a canvas); `auto` or `""` = the gui decides |
 | `GUI_LAYOUT(win, kind$, x, y, w, h)` | GUI_WIDGET | invisible **layout container**: `zeile` (row), `spalte` (column), `fluss` (flow, wrapping) or `raster:N` (grid) — distributes its children in every `GUI_UPDATE` (see [Layout](#layout-size-by-content-and-containers)) |
@@ -247,7 +247,7 @@ IMPORT "gui"
 | `GUI_FILETREE_EXPAND(ft, path$, on)` | — | expand or collapse a folder |
 | `GUI_FILETREE_COUNT(ft)` / `GUI_FILETREE_PATH$(ft, i)` | INTEGER / STRING | count and read the visible rows |
 | `GUI_FILETREE_SEL_COUNT(ft)` / `GUI_FILETREE_SEL_PATH$(ft, i)` | INTEGER / STRING | count and read the multi-selection |
-| `GUI_FILETREE_CHECKED(ft, path$)` / `GUI_FILETREE_SET_CHECKED(ft, path$, an)` | BOOLEAN / — | read and set the check mark on a path |
+| `GUI_FILETREE_CHECKED(ft, path$)` / `GUI_FILETREE_SET_CHECKED(ft, path$, on)` | BOOLEAN / — | read and set the check mark on a path |
 | `GUI_FILETREE_CHECKED_COUNT(ft)` / `GUI_FILETREE_CHECKED_PATH$(ft, i)` | INTEGER / STRING | all checked paths, including those currently collapsed |
 | `GUI_FILETREE_ICONS(ft, folder_icon, file_icon)` | — | icons for folders and files (-1 = none) |
 | `GUI_FILETREE_COLOR(tree, pattern$, color)` | — | text colour per file type: patterns as with the filter (`"*.json;*.ini"`), `"/"` for folders; the first match wins, -1 removes the colour |
@@ -255,9 +255,9 @@ IMPORT "gui"
 | `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | tabs **inside** a window (card index); if the heads do not fit the width, the widest get narrower first and their title is shortened |
 | `GUI_TABCONTROL_ADD(tc, title$)` | INTEGER | append a page, returns its number |
 | `GUI_TABCONTROL_ADD_WIDGET(tc, widget, page)` | — | put a widget on a page; it keeps its position in the window |
-| `GUI_TABCONTROL_PAGE(tc)` / `GUI_TABCONTROL_SET_PAGE(tc, seite)` | INTEGER / — | read and set the front page |
+| `GUI_TABCONTROL_PAGE(tc)` / `GUI_TABCONTROL_SET_PAGE(tc, page)` | INTEGER / — | read and set the front page |
 | `GUI_TABCONTROL_COUNT(tc)` | INTEGER | how many pages there are |
-| `GUI_TABCONTROL_TITLE$(tc, i)` / `GUI_TABCONTROL_SET_TITLE(tc, i, titel$)` | STRING / — | read and set the label of a page |
+| `GUI_TABCONTROL_TITLE$(tc, i)` / `GUI_TABCONTROL_SET_TITLE(tc, i, title$)` | STRING / — | read and set the label of a page |
 | `GUI_TABCONTROL_REMOVE(tc, i)` | — | remove a page; its children remain as widgets |
 | `GUI_TABCONTROL_SET(tc, "schliessbar", an)` | — | every tab gets a cross; nothing is closed, it is reported through `GUI_TABCONTROL_CLOSED` |
 | `GUI_TABCONTROL_CLOSED(tc)` | INTEGER | which page is to close in this frame (cross or middle mouse button), -1 = none; the program removes it itself |
@@ -291,14 +291,14 @@ IMPORT "gui"
 | `GUI_ACCORDION_OPEN(acc, section, on)` | — | expand or collapse a section; without `mehrere`, expanding closes the others |
 | `GUI_ACCORDION_IS_OPEN(acc, section)` | BOOLEAN | is the section open? |
 | `GUI_ACCORDION_COUNT(acc)` | INTEGER | how many sections there are |
-| `GUI_ACCORDION_TITLE$(acc, section)` / `GUI_ACCORDION_SET_TITLE(acc, section, titel$)` | STRING / — | read and set the header of a section |
+| `GUI_ACCORDION_TITLE$(acc, section)` / `GUI_ACCORDION_SET_TITLE(acc, section, title$)` | STRING / — | read and set the header of a section |
 | `GUI_ACCORDION_SET_HEIGHT(acc, section, px)` | — | fixed height of an open section (0 = by content) |
 | `GUI_ACCORDION_SET(acc, key$, value)` | — | `mehrere` (several): several sections open at once (off by default) |
 | `GUI_ACCORDION_TOGGLED(acc)` | INTEGER | which section was toggled in this frame (-1 = none) |
 | `GUI_WIZARD(win, x, y, w, h)` | GUI_WIDGET | **wizard**: steps with a step indicator and Back/Next/Finish/Cancel |
 | `GUI_WIZARD_ADD(wz, title$)` | INTEGER | append a step, returns its number |
 | `GUI_WIZARD_ADD_WIDGET(wz, widget, step)` | — | put a widget on a step; it keeps its position in the window |
-| `GUI_WIZARD_STEP(wz)` / `GUI_WIZARD_SET_STEP(wz, schritt)` | INTEGER / — | read and set the current step |
+| `GUI_WIZARD_STEP(wz)` / `GUI_WIZARD_SET_STEP(wz, step)` | INTEGER / — | read and set the current step |
 | `GUI_WIZARD_COUNT(wz)` | INTEGER | how many steps there are |
 | `GUI_WIZARD_NEXT(wz)` | BOOLEAN | like the Next button (on the last step: Finish); FALSE if disabled or the validation fails |
 | `GUI_WIZARD_BACK(wz)` | BOOLEAN | like the Back button; FALSE on the first step |
@@ -443,11 +443,11 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_LISTBOX_SET_SELECTED(lb, i)` | — | set the selection from the program |
 | `GUI_SET_LISTBOX(lb, items)` | — | replace the entries |
 | `GUI_LISTBOX_ADD(lb, text$[, pos])` / `GUI_LISTBOX_REMOVE(lb, i)` / `GUI_LISTBOX_CLEAR(lb)` | INTEGER / — / — | entries one by one (also for dropdowns); omit `pos` = append at the end |
-| `GUI_LISTBOX_COUNT(lb)` / `GUI_LISTBOX_ITEM(lb, i)` / `GUI_LISTBOX_SET_ITEM(lb, i, text$)` / `GUI_LISTBOX_MOVE(lb, von, nach)` | — | count, read, relabel, move |
+| `GUI_LISTBOX_COUNT(lb)` / `GUI_LISTBOX_ITEM(lb, i)` / `GUI_LISTBOX_SET_ITEM(lb, i, text$)` / `GUI_LISTBOX_MOVE(lb, from, to)` | — | count, read, relabel, move |
 | `GUI_LISTBOX_SET(lb, key$, value)` | — | `mehrfachauswahl` (multi-select), `kaestchen` (checkboxes), `bearbeitbar` (editable: F2 renames) |
-| `GUI_LISTBOX_ICON(lb, i, image)` / `GUI_LISTBOX_COLOR(lb, i, farbe)` | — | icon and text colour per entry (-1 = none / theme) |
-| `GUI_LISTBOX_CHECKED(lb, i)` / `GUI_LISTBOX_SET_CHECKED(lb, i, an)` | BOOLEAN / — | check mark per entry (with `kaestchen`) |
-| `GUI_LISTBOX_IS_SELECTED(lb, i)` / `GUI_LISTBOX_SELECT(lb, i, an)` / `GUI_LISTBOX_SEL_COUNT(lb)` / `GUI_LISTBOX_SEL_ROW(lb, k)` / `GUI_LISTBOX_CLEAR_SELECTION(lb)` | — | multi-selection as in the table |
+| `GUI_LISTBOX_ICON(lb, i, image)` / `GUI_LISTBOX_COLOR(lb, i, color)` | — | icon and text colour per entry (-1 = none / theme) |
+| `GUI_LISTBOX_CHECKED(lb, i)` / `GUI_LISTBOX_SET_CHECKED(lb, i, on)` | BOOLEAN / — | check mark per entry (with `kaestchen`) |
+| `GUI_LISTBOX_IS_SELECTED(lb, i)` / `GUI_LISTBOX_SELECT(lb, i, on)` / `GUI_LISTBOX_SEL_COUNT(lb)` / `GUI_LISTBOX_SEL_ROW(lb, k)` / `GUI_LISTBOX_CLEAR_SELECTION(lb)` | — | multi-selection as in the table |
 | `GUI_LISTBOX_SET_DATA(lb, i, value$)` | — | invisible value per entry (an ID, a path, a tax rate) -- also for dropdowns; a bound dropdown with values binds the value instead of the number |
 | `GUI_LISTBOX_DATA$(lb, i)` | STRING | read the invisible value of an entry |
 | `GUI_LISTBOX_FIND_DATA(lb, value$)` | INTEGER | first entry with this value, -1 = none |
@@ -4357,7 +4357,7 @@ More finely controllable:
 | `GUI_SET_FONT(widget, font)` | a font of its own for this widget only |
 | `GUI_SET_FONT_SIZE(widget, px)` | a size of its own for this widget only |
 | `GUI_SET_FONT_STYLE(widget, style$)` | bold, italic, underlined, strikethrough for this widget only (also stored in the `.dhform` as `font_style`) |
-| `GUI_STYLE_SET(name$, "font", font)` + `GUI_APPLY_STYLE(wdg, name$)` | one font for a whole group |
+| `GUI_STYLE_SET(name$, "font", font)` + `GUI_APPLY_STYLE(widget, name$)` | one font for a whole group |
 
 For a **pixel font** from a PNG there is `LOADFONT_IMAGE(bild, trennfarbe,
 erstes_zeichen)`. It deliberately stays unfiltered (nearest), so that a pixel

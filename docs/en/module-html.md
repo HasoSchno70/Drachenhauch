@@ -11,29 +11,29 @@ IMPORT "html"
 
 | Area | Function | Returns | Meaning |
 |---|---|---|---|
-| HTTP | `HTTP_REQUEST(methode$, url$ [, rumpf [, kopfzeilen]])` | STRING (response body) | any HTTP method with its own body and headers |
+| HTTP | `HTTP_REQUEST(method$, url$ [, body [, headers]])` | STRING (response body) | any HTTP method with its own body and headers |
 | HTTP | `HTTP_GET(url$)` | STRING (response body) | fetch a page or file |
 | HTTP | `HTTP_POST(url$, body$)` | STRING | send data and read the response |
-| HTTP | `HTTP_DOWNLOAD(url$, pfad$)` | INTEGER (bytes) | download a file and save it |
+| HTTP | `HTTP_DOWNLOAD(url$, path$)` | INTEGER (bytes) | download a file and save it |
 | HTTP | `HTTP_STATUS()` | INTEGER (e.g. 200, 404) | status of the last request (200 = good, 404 = not there) |
 | HTTP | `HTTP_HEADER(name$)` | STRING (header of the response) | read a header of the last response |
 | HTTP | `HTTP_BYTES()` | BUFFER (raw body of the last response) |  |
-| HTTP | `HTTP_SET_HEADER(name$, wert$)` | — (applies to all following calls) |  |
+| HTTP | `HTTP_SET_HEADER(name$, value$)` | — (applies to all following calls) |  |
 | HTTP | `HTTP_CLEAR_HEADERS()` | — |  |
-| HTTP | `HTTP_TIMEOUT(sekunden)` | — |  |
+| HTTP | `HTTP_TIMEOUT(seconds)` | — |  |
 | HTTP | `HTTP_SET_TIMEOUT(ms)` | — | the same time limit in milliseconds (1..600000) — like every time limit; `HTTP_TIMEOUT` counts seconds |
-| HTTP (background) | `HTTP_REQUEST_START(methode$, url$ [, rumpf [, kopfzeilen]])` | INTEGER (request number) |  |
+| HTTP (background) | `HTTP_REQUEST_START(method$, url$ [, body [, headers]])` | INTEGER (request number) |  |
 | HTTP (background) | `HTTP_GET_START(url$)` | INTEGER (request number) |  |
-| HTTP (background) | `HTTP_READY(abruf)` | BOOLEAN |  |
-| HTTP (background) | `HTTP_RESULT(abruf)` | STRING (response body) |  |
-| HTTP (background) | `HTTP_CANCEL(abruf)` | — |  |
+| HTTP (background) | `HTTP_READY(request)` | BOOLEAN |  |
+| HTTP (background) | `HTTP_RESULT(request)` | STRING (response body) |  |
+| HTTP (background) | `HTTP_CANCEL(request)` | — |  |
 | HTTP (background) | `HTTP_PENDING()` | INTEGER (open requests) |  |
-| HTTP (background) | `HTTP_URL$(abruf)` | STRING |  |
+| HTTP (background) | `HTTP_URL$(request)` | STRING |  |
 | URL | `URL_ENCODE(s$)` | STRING | make text safe for a URL (spaces, umlauts, `&`) |
 | URL | `URL_DECODE(s$)` | STRING | the counterpart — turn encoded text back |
-| HTML | `HTML_TEXT(html$)` | STRING (tags removed, entities decoded) |  |
-| HTML | `HTML_FIND_ALL(html$, tag$)` | ARRAY OF STRING |  |
-| HTML | `HTML_GET_ATTR(tag_html$, attr$)` | STRING |  |
+| HTML | `HTML_TEXT(s$)` | STRING (tags removed, entities decoded) |  |
+| HTML | `HTML_FIND_ALL(s$, tag$)` | ARRAY OF STRING |  |
+| HTML | `HTML_GET_ATTR(s$, attr$)` | STRING |  |
 
 ## HTTP_REQUEST — for everything beyond GET and POST
 

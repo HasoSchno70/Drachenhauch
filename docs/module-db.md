@@ -27,7 +27,7 @@ IMPORT "db"
 | `DB_LAST_ROWID(conn)` | INTEGER | Kennung der zuletzt eingefuegten Zeile (SQLite rowid, MySQL `AUTO_INCREMENT`, PostgreSQL `lastval()`) |
 | `DB_KIND$(conn)` | STRING | welche Datenbank: `sqlite`, `postgres` oder `mysql` |
 | `DB_PING(conn)` | BOOLEAN | steht die Verbindung noch? (eine Datei immer; ein Server antwortet in 5 s oder nicht) |
-| `DB_BEGIN(conn)`, `DB_COMMIT(conn)`, `DB_ROLLBACK(conn)` | — | Transaktion beginnen, festschreiben, verwerfen |
+| `DB_BEGIN(conn)`, `DB_COMMIT(c)`, `DB_ROLLBACK(c)` | — | Transaktion beginnen, festschreiben, verwerfen |
 
 ## Server: PostgreSQL und MySQL
 

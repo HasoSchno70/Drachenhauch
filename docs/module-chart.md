@@ -72,11 +72,11 @@ CHART_LABEL(c, 0, "Mo")                ' Kategorie beschriften
 | `CHART_LABEL(chart, point, text$)` | Kategorie beschriften |
 | `CHART_X(chart, x_values)` | Liniendiagramm: echte x-Werte je Punkt (z. B. Zeitstempel), aufsteigend; `[]` = wieder gleiche Abstände |
 | `CHART_GET(chart, series, point)` | Wert auslesen |
-| `CHART_COUNT(chart)` / `CHART_SERIES_COUNT(c)` | Anzahl Punkte / Reihen |
+| `CHART_COUNT(chart)` / `CHART_SERIES_COUNT(chart)` | Anzahl Punkte / Reihen |
 | `CHART_CLEAR(chart)` | Daten verwerfen |
 | `CHART_STAT(chart, series, stat$)` | `anzahl`/`summe`/`mittel`/`min`/`max` |
 | `CHART_BOUNDS(chart, x, y, width, height)` | Feld verschieben/skalieren |
-| `CHART_ZONE(chart, from, to, color [, name$])` / `CHART_ZONE_CLEAR(c)` | Farbzonen der Tacho-Skala, wahlweise beschriftet |
+| `CHART_ZONE(chart, from, to, color [, name$])` / `CHART_ZONE_CLEAR(chart)` | Farbzonen der Tacho-Skala, wahlweise beschriftet |
 | `CHART_UPDATE(chart, seconds)` | Animation weiterlaufen lassen (siehe unten) |
 | `CHART_DRAW(chart)` | Zeichnen (braucht `SCREEN`) |
 

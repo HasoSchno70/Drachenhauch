@@ -90,8 +90,8 @@ IMPORT "gui"
 | `GUI_SEPARATOR(win, x, y, w)` | GUI_WIDGET | dekorative Trennlinie (horizontal) |
 | `GUI_GROUPBOX(win, x, y, w, h, title$)` | GUI_WIDGET | gerahmte Gruppe mit eingelassenem Titel |
 | `GUI_BIND(widget, key$[, form$])` | — | **Datenbindung**: das Widget trägt einen Schlüssel (Spaltennamen) — siehe [Datenbindung](#datenbindung) |
-| `GUI_FORM_GET(win[, form$])` / `GUI_FORM_SET(win, map[, form$])` | MAP OF STRING / — | alle gebundenen Werte lesen / aus einer MAP setzen |
-| `GUI_FORM_CLEAR` / `GUI_FORM_CLEAN` / `GUI_FORM_CHANGED(win[, formular$])` | — / — / BOOL | leeren / als gespeichert markieren / seit dem letzten Setzen geändert? |
+| `GUI_FORM_GET(win[, form$])` / `GUI_FORM_SET(win, values[, form$])` | MAP OF STRING / — | alle gebundenen Werte lesen / aus einer MAP setzen |
+| `GUI_FORM_CLEAR` / `GUI_FORM_CLEAN` / `GUI_FORM_CHANGED(win[, form$])` | — / — / BOOL | leeren / als gespeichert markieren / seit dem letzten Setzen geändert? |
 | `GUI_FORM_LOAD(win, db, table$, id[, form$])` | BOOL | Zeile `WHERE id = ?` in die Widgets laden |
 | `GUI_FORM_SAVE(win, db, table$, id[, form$[, overwrite]])` | INTEGER | INSERT (id < 0) oder UPDATE, liefert die id -- **0, wenn nichts gespeichert wurde** (Zeile gelöscht oder inzwischen geändert) |
 | `GUI_FORM_VERSION(win, column$[, form$])` | — | Versionsspalte: SAVE speichert nur, wenn die Zeile noch den Stand vom Laden trägt (leer = aus) — siehe [Datenbindung](#datenbindung) |
@@ -102,16 +102,16 @@ IMPORT "gui"
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | was ein Behälter mindestens braucht — der Wert für `WINDOW_MIN_SIZE` |
 | `GUI_TEXT_WIDTH(widget, text)` | INTEGER | wie breit das Widget `text` zeichnet (seine Schrift, Größe, Stil; logisch) — für Spalten- und Knopfbreiten, statt an der Zeichenzahl zu schätzen |
 | `GUI_RULE(feld, art$[, a, b][, muster$][, meldung$])` | — | **Prüfregel** anhängen: `pflicht`, `zahl`, `ganz`, `bereich a b`, `laenge min max`, `email`, `datum`, `muster regex$` — siehe [Formularprüfung](#formularprüfung) |
-| `GUI_VALIDATE(win)` / `GUI_VALIDATE_WIDGET(feld)` | INTEGER / STRING | alle Regeln des Fensters prüfen (Zahl der Fehler, erstes Feld bekommt den Fokus) / ein Feld (Meldung oder "") |
-| `GUI_ERROR(field)` / `GUI_SET_ERROR(field, meldung$)` / `GUI_CLEAR_ERRORS(win)` | STRING / — / — | Meldung lesen, von außen setzen (z. B. aus der Datenbank), alle löschen |
-| `GUI_ERROR_LABEL(field, label)` / `GUI_VALIDATE_LIVE(win, an)` / `GUI_RULES_CLEAR(field)` | — | Beschriftung zeigt die Meldung / beim Verlassen eines Feldes prüfen / Regeln entfernen |
+| `GUI_VALIDATE(win)` / `GUI_VALIDATE_WIDGET(field)` | INTEGER / STRING | alle Regeln des Fensters prüfen (Zahl der Fehler, erstes Feld bekommt den Fokus) / ein Feld (Meldung oder "") |
+| `GUI_ERROR(field)` / `GUI_SET_ERROR(field, message$)` / `GUI_CLEAR_ERRORS(win)` | STRING / — / — | Meldung lesen, von außen setzen (z. B. aus der Datenbank), alle löschen |
+| `GUI_ERROR_LABEL(field, label)` / `GUI_VALIDATE_LIVE(win, on)` / `GUI_RULES_CLEAR(field)` | — | Beschriftung zeigt die Meldung / beim Verlassen eines Feldes prüfen / Regeln entfernen |
 | `GUI_VSLIDER(win, x, y, h, min, max, default)` | GUI_WIDGET | **senkrechter Schieber** — `h` ist die Länge, der Wert wächst nach oben |
 | `GUI_PROGRESS_SET(progress, "unbestimmt", 1)` | — | laufendes Band statt Wert, für alles, dessen Dauer man nicht kennt |
 | `GUI_IMAGE_MODE(image, mode$)` / `GUI_IMAGE_MODE_GET(image)` | — / STRING | `strecken` (Vorgabe), `einpassen`, `fuellen`, `mitte`, `kacheln` |
-| `GUI_TREE_ICON(tree, node, image)` / `GUI_TREE_COLOR(tree, node, farbe)` | — | Sinnbild und Textfarbe je Baumknoten; statt eines Bildes auch der Name eines eingebauten Sinnbilds (`"ordner"`), `""` nimmt es weg |
+| `GUI_TREE_ICON(tree, node, image)` / `GUI_TREE_COLOR(tree, node, color)` | — | Sinnbild und Textfarbe je Baumknoten; statt eines Bildes auch der Name eines eingebauten Sinnbilds (`"ordner"`), `""` nimmt es weg |
 | `GUI_PANEL_ADD(panel, widget)` / `GUI_PANEL_REMOVE` / `GUI_PANEL_SCROLL(panel, y)` / `GUI_PANEL_SCROLL_GET(panel)` | — | ein **Panel, das seine Kinder rollt** (Mausrad, Rollbalken) — siehe [Feinschliff](#feinschliff-schieber-fortschritt-bild-baum-panel-ziehen) |
 | `GUI_DRAGGABLE(widget, on)` / `GUI_DROP_TARGET(widget, on)` | — | **Ziehen zwischen Widgets**: Quelle und Ablage |
-| `GUI_DRAGGING()` / `GUI_DROPPED(wdg)` / `GUI_DROP_TEXT()` / `GUI_DROP_SOURCE()` / `GUI_DRAG_INDEX()` / `GUI_DROP_INDEX()` | GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER | laufender Zug, Ablage in diesem Bild, was gezogen wurde, woher, welche Zeile, auf welche Zeile |
+| `GUI_DRAGGING()` / `GUI_DROPPED(widget)` / `GUI_DROP_TEXT()` / `GUI_DROP_SOURCE()` / `GUI_DRAG_INDEX()` / `GUI_DROP_INDEX()` | GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER | laufender Zug, Ablage in diesem Bild, was gezogen wurde, woher, welche Zeile, auf welche Zeile |
 | `GUI_CURSORS(on)` | — | Zeigerformen je nach Stelle im Widget (Vorgabe an): Textstrich über Text, Hand über allem Anklickbaren, Doppelpfeil an Trennern, Spaltenkanten und am Fenstergriff |
 | `GUI_SET_CURSOR(widget, form$)` / `GUI_GET_CURSOR$(widget)` | — / STRING | eigene Zeigerform über einem Widget (etwa einer Zeichenfläche); `auto` oder `""` = die gui entscheidet |
 | `GUI_LAYOUT(win, kind$, x, y, w, h)` | GUI_WIDGET | unsichtbarer **Layout-Behälter**: `zeile`, `spalte`, `fluss` (umbrechend) oder `raster:N` — verteilt seine Kinder in jedem `GUI_UPDATE` (siehe [Layout](#layout-größe-nach-inhalt-und-behälter)) |
@@ -247,7 +247,7 @@ IMPORT "gui"
 | `GUI_FILETREE_EXPAND(ft, path$, on)` | — | einen Ordner auf- oder zuklappen |
 | `GUI_FILETREE_COUNT(ft)` / `GUI_FILETREE_PATH$(ft, i)` | INTEGER / STRING | die sichtbaren Zeilen zählen und lesen |
 | `GUI_FILETREE_SEL_COUNT(ft)` / `GUI_FILETREE_SEL_PATH$(ft, i)` | INTEGER / STRING | die Mehrfachauswahl zählen und lesen |
-| `GUI_FILETREE_CHECKED(ft, path$)` / `GUI_FILETREE_SET_CHECKED(ft, path$, an)` | BOOLEAN / — | Haken an einem Weg lesen und setzen |
+| `GUI_FILETREE_CHECKED(ft, path$)` / `GUI_FILETREE_SET_CHECKED(ft, path$, on)` | BOOLEAN / — | Haken an einem Weg lesen und setzen |
 | `GUI_FILETREE_CHECKED_COUNT(ft)` / `GUI_FILETREE_CHECKED_PATH$(ft, i)` | INTEGER / STRING | alle angehakten Wege, auch die gerade zugeklappten |
 | `GUI_FILETREE_ICONS(ft, folder_icon, file_icon)` | — | Sinnbilder für Ordner und Dateien (-1 = keins) |
 | `GUI_FILETREE_COLOR(tree, pattern$, color)` | — | Textfarbe je Dateiart: Muster wie beim Filter (`"*.json;*.ini"`), `"/"` für Ordner; das erste passende gilt, -1 nimmt die Farbe weg |
@@ -255,9 +255,9 @@ IMPORT "gui"
 | `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | Reiter **innerhalb** eines Fensters (Karteikasten); passen die Köpfe nicht in die Breite, werden die breitesten zuerst schmaler und ihr Titel gekürzt |
 | `GUI_TABCONTROL_ADD(tc, title$)` | INTEGER | eine Seite anhängen, liefert ihre Nummer |
 | `GUI_TABCONTROL_ADD_WIDGET(tc, widget, page)` | — | ein Widget auf eine Seite legen; es behält seine Lage im Fenster |
-| `GUI_TABCONTROL_PAGE(tc)` / `GUI_TABCONTROL_SET_PAGE(tc, seite)` | INTEGER / — | vordere Seite lesen und setzen |
+| `GUI_TABCONTROL_PAGE(tc)` / `GUI_TABCONTROL_SET_PAGE(tc, page)` | INTEGER / — | vordere Seite lesen und setzen |
 | `GUI_TABCONTROL_COUNT(tc)` | INTEGER | wie viele Seiten es gibt |
-| `GUI_TABCONTROL_TITLE$(tc, i)` / `GUI_TABCONTROL_SET_TITLE(tc, i, titel$)` | STRING / — | Beschriftung einer Seite lesen und setzen |
+| `GUI_TABCONTROL_TITLE$(tc, i)` / `GUI_TABCONTROL_SET_TITLE(tc, i, title$)` | STRING / — | Beschriftung einer Seite lesen und setzen |
 | `GUI_TABCONTROL_REMOVE(tc, i)` | — | eine Seite entfernen; ihre Kinder bleiben als Widgets bestehen |
 | `GUI_TABCONTROL_SET(tc, "schliessbar", an)` | — | jeder Reiter bekommt ein Kreuz; geschlossen wird nichts, gemeldet wird über `GUI_TABCONTROL_CLOSED` |
 | `GUI_TABCONTROL_CLOSED(tc)` | INTEGER | welche Seite in diesem Bild zu soll (Kreuz oder mittlere Maustaste), -1 = keine; das Programm entfernt sie selbst |
@@ -291,14 +291,14 @@ IMPORT "gui"
 | `GUI_ACCORDION_OPEN(acc, section, on)` | — | einen Abschnitt auf- oder zuklappen; ohne `mehrere` schließt Aufklappen die anderen |
 | `GUI_ACCORDION_IS_OPEN(acc, section)` | BOOLEAN | ist der Abschnitt offen? |
 | `GUI_ACCORDION_COUNT(acc)` | INTEGER | wie viele Abschnitte es gibt |
-| `GUI_ACCORDION_TITLE$(acc, section)` / `GUI_ACCORDION_SET_TITLE(acc, section, titel$)` | STRING / — | Kopf eines Abschnitts lesen und setzen |
+| `GUI_ACCORDION_TITLE$(acc, section)` / `GUI_ACCORDION_SET_TITLE(acc, section, title$)` | STRING / — | Kopf eines Abschnitts lesen und setzen |
 | `GUI_ACCORDION_SET_HEIGHT(acc, section, px)` | — | feste Höhe eines offenen Abschnitts (0 = nach Inhalt) |
 | `GUI_ACCORDION_SET(acc, key$, value)` | — | `mehrere`: mehrere Abschnitte zugleich offen (aus per Vorgabe) |
 | `GUI_ACCORDION_TOGGLED(acc)` | INTEGER | welcher Abschnitt in diesem Bild umgeklappt wurde (-1 = keiner) |
 | `GUI_WIZARD(win, x, y, w, h)` | GUI_WIDGET | **Assistent**: Schritte mit Schrittanzeige und Zurück/Weiter/Fertig/Abbrechen |
 | `GUI_WIZARD_ADD(wz, title$)` | INTEGER | einen Schritt anhängen, liefert seine Nummer |
 | `GUI_WIZARD_ADD_WIDGET(wz, widget, step)` | — | ein Widget auf einen Schritt legen; es behält seine Lage im Fenster |
-| `GUI_WIZARD_STEP(wz)` / `GUI_WIZARD_SET_STEP(wz, schritt)` | INTEGER / — | aktuellen Schritt lesen und setzen |
+| `GUI_WIZARD_STEP(wz)` / `GUI_WIZARD_SET_STEP(wz, step)` | INTEGER / — | aktuellen Schritt lesen und setzen |
 | `GUI_WIZARD_COUNT(wz)` | INTEGER | wie viele Schritte es gibt |
 | `GUI_WIZARD_NEXT(wz)` | BOOLEAN | wie der Knopf Weiter (auf dem letzten Schritt: Fertig); FALSE, wenn gesperrt oder die Prüfung scheitert |
 | `GUI_WIZARD_BACK(wz)` | BOOLEAN | wie der Knopf Zurück; FALSE auf dem ersten Schritt |
@@ -443,11 +443,11 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_LISTBOX_SET_SELECTED(lb, i)` | — | Auswahl vom Programm aus setzen |
 | `GUI_SET_LISTBOX(lb, items)` | — | Eintraege ersetzen |
 | `GUI_LISTBOX_ADD(lb, text$[, pos])` / `GUI_LISTBOX_REMOVE(lb, i)` / `GUI_LISTBOX_CLEAR(lb)` | INTEGER / — / — | Einträge einzeln (auch bei Klapplisten); `pos` weglassen = hinten anhängen |
-| `GUI_LISTBOX_COUNT(lb)` / `GUI_LISTBOX_ITEM(lb, i)` / `GUI_LISTBOX_SET_ITEM(lb, i, text$)` / `GUI_LISTBOX_MOVE(lb, von, nach)` | — | zählen, lesen, umbeschriften, verschieben |
+| `GUI_LISTBOX_COUNT(lb)` / `GUI_LISTBOX_ITEM(lb, i)` / `GUI_LISTBOX_SET_ITEM(lb, i, text$)` / `GUI_LISTBOX_MOVE(lb, from, to)` | — | zählen, lesen, umbeschriften, verschieben |
 | `GUI_LISTBOX_SET(lb, key$, value)` | — | `mehrfachauswahl`, `kaestchen`, `bearbeitbar` (F2 benennt um) |
-| `GUI_LISTBOX_ICON(lb, i, image)` / `GUI_LISTBOX_COLOR(lb, i, farbe)` | — | Sinnbild und Textfarbe je Eintrag (-1 = keins / Thema) |
-| `GUI_LISTBOX_CHECKED(lb, i)` / `GUI_LISTBOX_SET_CHECKED(lb, i, an)` | BOOLEAN / — | Haken je Eintrag (mit `kaestchen`) |
-| `GUI_LISTBOX_IS_SELECTED(lb, i)` / `GUI_LISTBOX_SELECT(lb, i, an)` / `GUI_LISTBOX_SEL_COUNT(lb)` / `GUI_LISTBOX_SEL_ROW(lb, k)` / `GUI_LISTBOX_CLEAR_SELECTION(lb)` | — | Mehrfachauswahl wie bei der Tabelle |
+| `GUI_LISTBOX_ICON(lb, i, image)` / `GUI_LISTBOX_COLOR(lb, i, color)` | — | Sinnbild und Textfarbe je Eintrag (-1 = keins / Thema) |
+| `GUI_LISTBOX_CHECKED(lb, i)` / `GUI_LISTBOX_SET_CHECKED(lb, i, on)` | BOOLEAN / — | Haken je Eintrag (mit `kaestchen`) |
+| `GUI_LISTBOX_IS_SELECTED(lb, i)` / `GUI_LISTBOX_SELECT(lb, i, on)` / `GUI_LISTBOX_SEL_COUNT(lb)` / `GUI_LISTBOX_SEL_ROW(lb, k)` / `GUI_LISTBOX_CLEAR_SELECTION(lb)` | — | Mehrfachauswahl wie bei der Tabelle |
 | `GUI_LISTBOX_SET_DATA(lb, i, value$)` | — | unsichtbarer Wert je Eintrag (eine ID, ein Pfad, ein Steuersatz) -- auch für Klapplisten; eine gebundene Klappliste mit Werten bindet den Wert statt der Nummer |
 | `GUI_LISTBOX_DATA$(lb, i)` | STRING | den unsichtbaren Wert eines Eintrags lesen |
 | `GUI_LISTBOX_FIND_DATA(lb, value$)` | INTEGER | erster Eintrag mit diesem Wert, -1 = keiner |
@@ -4374,7 +4374,7 @@ Feiner steuerbar:
 | `GUI_SET_FONT(widget, font)` | eigene Schrift nur für dieses Widget |
 | `GUI_SET_FONT_SIZE(widget, px)` | eigene Größe nur für dieses Widget |
 | `GUI_SET_FONT_STYLE(widget, style$)` | fett, kursiv, unterstrichen, durchgestrichen nur für dieses Widget (steht auch in der `.dhform` als `font_style`) |
-| `GUI_STYLE_SET(name$, "font", font)` + `GUI_APPLY_STYLE(wdg, name$)` | eine Schrift für eine ganze Gruppe |
+| `GUI_STYLE_SET(name$, "font", font)` + `GUI_APPLY_STYLE(widget, name$)` | eine Schrift für eine ganze Gruppe |
 
 Für **Pixel-Schrift** aus einem PNG gibt es `LOADFONT_IMAGE(bild, trennfarbe,
 erstes_zeichen)`. Die bleibt bewusst ungefiltert (nearest), damit Pixel-Schrift
