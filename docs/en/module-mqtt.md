@@ -31,7 +31,7 @@ message that must arrive (a command that stops a motor).
 | `MQTT_TLS_CA(path$)` | — | your own CA (PEM file) for every following `mqtts://` connection; `""` = the public roots again |
 | `MQTT_DISCONNECT(handle)` | — | close the connection |
 | `MQTT_IS_CONNECTED(handle)` | BOOLEAN | is the connection still up? |
-| `MQTT_PUBLISH(handle, topic$, payload$[, retain[, qos]])` | BOOLEAN | send a message to a topic; with `retain` the broker keeps it for later subscribers, `qos` 0 or 1. FALSE if the connection is gone |
+| `MQTT_PUBLISH(handle, topic$, payload$[, retain[, qos]])` | BOOLEAN | send a message to a topic; with `retain` the broker keeps it for later subscribers, `qos` 0 or 1. FALSE if the connection is gone The payload may be a BUFFER. |
 | `MQTT_SUBSCRIBE(handle, topic$[, qos])` | BOOLEAN | subscribe to a topic -- incoming messages are then fetched by `MQTT_UPDATE`; `qos` 0 or 1. FALSE if the connection is gone |
 | `MQTT_UNSUBSCRIBE(handle, topic$)` | BOOLEAN | end a subscription |
 | `MQTT_PENDING(handle)` | INTEGER | how many QoS 1 messages the broker has not acknowledged yet |

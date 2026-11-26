@@ -879,6 +879,13 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "HTTPD_PATH$")?;
                 Value::str_rc(&Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_PATH$")?.pfad.clone())
             }
+            // Der Rumpf, wie er kam (HTTPD_BODY$ dekodiert UTF-8 und ersetzt
+            // Unlesbares).
+            "httpd_body_bytes" => {
+                let i = bi_int(a, 0, "HTTPD_BODY_BYTES")?;
+                let r = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_BODY_BYTES")?;
+                crate::argument::buffer_wert(r.rumpf.clone())
+            }
             "httpd_body$" | "httpd_body" => {
                 let i = bi_int(a, 0, "HTTPD_BODY$")?;
                 let r = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_BODY$")?;
@@ -904,8 +911,13 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "HTTPD_SEND")?;
                 let code = bi_int(a, 1, "HTTPD_SEND")?;
                 let typ = bi_str(a, 2, "HTTPD_SEND")?.to_string();
-                let inhalt = bi_str(a, 3, "HTTPD_SEND")?.to_string();
-                httpd::antworten(self.httpd_srv(i, name)?, code, &typ, inhalt.as_bytes())?;
+                // Der Rumpf als Text oder BUFFER (Bilder, Downloads; bis 2026.53
+                // nur Text).
+                let inhalt: Vec<u8> = match a.get(3) {
+                    Some(Value::Buffer(b)) => b.borrow().clone(),
+                    _ => bi_str(a, 3, "HTTPD_SEND")?.as_bytes().to_vec(),
+                };
+                httpd::antworten(self.httpd_srv(i, name)?, code, &typ, &inhalt)?;
                 Value::Nil
             }
             "httpd_send_file" => {
@@ -1038,7 +1050,13 @@ impl<'p> Vm<'p> {
                 }
             }
             "mqtt_publish" => {
-                let i = bi_int(a, 0, "MQTT_PUBLISH")?; let topic = bi_str(a, 1, "MQTT_PUBLISH")?.to_string(); let payload = bi_str(a, 2, "MQTT_PUBLISH")?.to_string();
+                // Die Nutzlast als Text (UTF-8) oder als BUFFER, wie sie ist
+                // (Bericht A13; bis 2026.53 nur Text).
+                let i = bi_int(a, 0, "MQTT_PUBLISH")?; let topic = bi_str(a, 1, "MQTT_PUBLISH")?.to_string();
+                let payload: Vec<u8> = match a.get(2) {
+                    Some(Value::Buffer(b)) => b.borrow().clone(),
+                    _ => bi_str(a, 2, "MQTT_PUBLISH")?.as_bytes().to_vec(),
+                };
                 let retain = if a.len() >= 4 { bi_bool(a, 3, "MQTT_PUBLISH")? } else { false };
                 let qos = mqtt::qos_pruefen("MQTT_PUBLISH", if a.len() >= 5 { bi_int(a, 4, "MQTT_PUBLISH")? } else { 0 })?;
                 Value::Bool(mqtt::publish(self.mqtt_client(i, name)?, &topic, &payload, retain, qos))

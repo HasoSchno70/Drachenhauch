@@ -459,9 +459,9 @@ pub fn qos_pruefen(fn_: &str, qos: i64) -> Result<u8, String> {
 
 /// TRUE, wenn die Nachricht hinausging; FALSE, wenn die Verbindung weg ist.
 /// Mit QoS 1 zaehlt sie, bis der Broker sie bestaetigt (MQTT_PENDING).
-pub fn publish(c: &mut Client, topic: &str, payload: &str, retain: bool, qos: u8) -> bool {
+pub fn publish(c: &mut Client, topic: &str, payload: &[u8], retain: bool, qos: u8) -> bool {
     let id = if qos > 0 { naechste_nummer(c) } else { 0 };
-    let pkt = encode_publish(topic, payload.as_bytes(), retain, qos, id);
+    let pkt = encode_publish(topic, payload, retain, qos, id);
     let ok = senden(c, &pkt);
     if ok && qos > 0 {
         c.unbestaetigt.insert(id, Instant::now());
@@ -839,7 +839,7 @@ mod tests {
             .expect("TLS-Verbindung mit eigener CA");
         let _ = std::fs::remove_file(&ca);
         assert!(subscribe(&mut c, "a/b", 1));
-        assert!(publish(&mut c, "a/b", "hallo", false, 1));
+        assert!(publish(&mut c, "a/b", b"hallo", false, 1));
         assert_eq!(pending(&c), 1);
         assert!(flush(&mut c, 3000).unwrap(), "PUBACK kam nicht");
         assert_eq!(pending(&c), 0);

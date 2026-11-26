@@ -29,11 +29,14 @@ monitor** with a plot (View → Serial monitor, Alt+4, see [IDE](ide.md)).
 | Function | Returns | Meaning |
 |---|---|---|
 | `SERIAL_PORTS()` | STRING (comma-separated list of available ports) | which serial ports are there? |
+| `SERIAL_DEVICES()` | ARRAY OF STRING | the ports as an array (`SERIAL_PORTS` returns a text with ", ") |
 | `SERIAL_OPEN(port$, baud)` | SERIAL_HANDLE | open a port (`baud` must match the other side) |
 | `SERIAL_CLOSE(handle)` | — | close the port |
 | `SERIAL_IS_OPEN(handle)` | BOOLEAN | is the connection still up? |
 | `SERIAL_WRITE(handle, s$)` | INTEGER (bytes written) | send text |
+| `SERIAL_WRITE_BYTES(handle, data)` | INTEGER (bytes written) | send bytes as they are: a BUFFER or an array of numbers 0..255 (`SERIAL_WRITE` sends text as UTF-8) |
 | `SERIAL_READ(handle, n)` | STRING (up to n bytes, max. 64 MiB) | read up to n bytes |
+| `SERIAL_READ_BYTES(handle, n)` | BUFFER (up to n bytes) | read bytes as they come (`SERIAL_READ` decodes UTF-8 and turns 0xFF into a replacement character) |
 | `SERIAL_READLINE(handle)` | STRING (up to newline) | read a line -- up to the line break or until the timeout kicks in |
 | `SERIAL_AVAILABLE(handle)` | INTEGER (bytes waiting in the input buffer) | how much is ready? (without waiting) |
 | `SERIAL_FLUSH(handle)` | — (clear input and output buffers) | discard buffers |
@@ -42,7 +45,7 @@ monitor** with a plot (View → Serial monitor, Alt+4, see [IDE](ide.md)).
 
 ## Bytes ↔ STRING
 
-`SERIAL_READ` and `SERIAL_READLINE` decode as UTF-8 with a replace strategy for undecodable bytes. For pure text protocols (Arduino serial print, NMEA, AT commands) that is enough. For a raw binary protocol, better parse byte value by byte value via `MID$` and `ASC`.
+`SERIAL_READ` and `SERIAL_READLINE` decode as UTF-8 with a replace strategy for undecodable bytes. For pure text protocols (Arduino serial print, NMEA, AT commands) that is enough. A binary protocol is read and written with `SERIAL_READ_BYTES` and `SERIAL_WRITE_BYTES` as a BUFFER (`BUFFER_GET` & co.) -- it does not work via `MID$`/`ASC`, there a byte 0xFF has already become a replacement character.
 
 `SERIAL_READ` correctly holds back a multi-byte UTF-8 character (umlaut/special character) that arrives split exactly at a read boundary until the next `SERIAL_READ` call, instead of displaying it as `�`. `n` is limited to 64 MiB per call — an accidentally huge `n` (e.g. swapped with another parameter) throws a clear error instead of triggering a huge allocation. `SERIAL_READLINE`, by contrast, decodes lossily once per call (no buffering across timeouts).
 

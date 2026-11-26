@@ -70,7 +70,7 @@ FUNCTION holen$(port AS INTEGER, methode AS STRING, pfad AS STRING, kopfzeilen A
             IF k[i] <> "" THEN a = a + k[i] + CRLF
         NEXT
     END IF
-    IF rumpf <> "" OR methode = "POST" THEN a = a + "Content-Length: " + STR$(LEN(rumpf)) + CRLF
+    IF rumpf <> "" OR methode = "POST" THEN a = a + "Content-Length: " + STR$(BUFFER_LEN(BUFFER_FROM_STRING(rumpf))) + CRLF
     RETURN roh$(port, a + CRLF + rumpf)
 END FUNCTION
 

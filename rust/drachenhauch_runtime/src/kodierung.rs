@@ -139,6 +139,26 @@ fn utf8_meldung(fn_: &str, pfad: &str, bytes: &[u8], bis: usize) -> String {
             fn_, wo, zeile, byte, zeichen, NAMEN)
 }
 
+/// Bytes als Text in latin-1 (jedes Byte ein Zeichen U+0000..U+00FF) --
+/// so lesen USB und BT ihre Daten als STRING. EINE Stelle (bis 2026.53 je
+/// eine Kopie in usb.rs und bt.rs).
+pub fn latin1_lesen(bytes: &[u8]) -> String {
+    bytes.iter().map(|&b| b as char).collect()
+}
+
+/// Text als latin-1-Bytes; ein Zeichen ueber U+00FF ist ein Fehler.
+pub fn latin1_schreiben(text: &str, fn_: &str) -> Result<Vec<u8>, String> {
+    let mut out = Vec::with_capacity(text.len());
+    for c in text.chars() {
+        let n = c as u32;
+        if n > 0xFF {
+            return Err(format!("{}: STRING enthaelt Zeichen > 0xFF. Nur Bytes 0..255 sind erlaubt (latin-1) -- fuer Binaeres die _BYTES-Fassung mit BUFFER", fn_));
+        }
+        out.push(n as u8);
+    }
+    Ok(out)
+}
+
 /// Text zu Bytes.
 ///
 /// Latin-1 und Windows-1252 kennen nur 256 Zeichen. Ein Zeichen, das dort

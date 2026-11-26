@@ -1173,6 +1173,12 @@
    "module": "bt"
   },
   {
+   "name": "BT_READ_BYTES",
+   "kind": "core",
+   "signature": "BT_READ_BYTES(handle: ?, char_uuid: STRING) AS BUFFER",
+   "module": "bt"
+  },
+  {
    "name": "BT_SCAN",
    "kind": "core",
    "signature": "BT_SCAN(timeout_s: Zahl)",
@@ -1181,7 +1187,7 @@
   {
    "name": "BT_SCAN_MS",
    "kind": "core",
-   "signature": "BT_SCAN_MS(timeout_ms: Zahl)",
+   "signature": "BT_SCAN_MS(timeout_ms: Zahl) AS ARRAY OF STRING",
    "module": "bt"
   },
   {
@@ -1194,6 +1200,12 @@
    "name": "BT_WRITE",
    "kind": "core",
    "signature": "BT_WRITE(handle: ?, char_uuid: STRING, payload: STRING)",
+   "module": "bt"
+  },
+  {
+   "name": "BT_WRITE_BYTES",
+   "kind": "core",
+   "signature": "BT_WRITE_BYTES(handle: ?, char_uuid: STRING, data)",
    "module": "bt"
   },
   {
@@ -8595,6 +8607,12 @@
    "module": "httpd"
   },
   {
+   "name": "HTTPD_BODY_BYTES",
+   "kind": "core",
+   "signature": "HTTPD_BODY_BYTES(s: HTTPD) AS BUFFER",
+   "module": "httpd"
+  },
+  {
    "name": "HTTPD_HEADER$",
    "kind": "core",
    "signature": "HTTPD_HEADER$(s: HTTPD, name$) AS STRING",
@@ -10179,6 +10197,12 @@
    "module": "midi"
   },
   {
+   "name": "MIDI_IN_DEVICES",
+   "kind": "core",
+   "signature": "MIDI_IN_DEVICES() AS ARRAY OF STRING",
+   "module": "midi"
+  },
+  {
    "name": "MIDI_IN_NAME$",
    "kind": "module",
    "signature": "MIDI_IN_NAME$(i: INTEGER) AS STRING",
@@ -10254,6 +10278,12 @@
    "name": "MIDI_OUT_COUNT",
    "kind": "module",
    "signature": "MIDI_OUT_COUNT() AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_OUT_DEVICES",
+   "kind": "core",
+   "signature": "MIDI_OUT_DEVICES() AS ARRAY OF STRING",
    "module": "midi"
   },
   {
@@ -13017,9 +13047,21 @@
    "module": "serial"
   },
   {
+   "name": "SERIAL_DEVICES",
+   "kind": "core",
+   "signature": "SERIAL_DEVICES() AS ARRAY OF STRING",
+   "module": "serial"
+  },
+  {
    "name": "SERIAL_READ",
    "kind": "core",
    "signature": "SERIAL_READ(handle: ?, n: INTEGER)",
+   "module": "serial"
+  },
+  {
+   "name": "SERIAL_READ_BYTES",
+   "kind": "core",
+   "signature": "SERIAL_READ_BYTES(handle: ?, n: INTEGER) AS BUFFER",
    "module": "serial"
   },
   {
@@ -13044,6 +13086,12 @@
    "name": "SERIAL_WRITE",
    "kind": "core",
    "signature": "SERIAL_WRITE(handle: ?, s: STRING)",
+   "module": "serial"
+  },
+  {
+   "name": "SERIAL_WRITE_BYTES",
+   "kind": "core",
+   "signature": "SERIAL_WRITE_BYTES(handle: ?, data) AS INTEGER",
    "module": "serial"
   },
   {
@@ -14697,6 +14745,12 @@
    "module": "usb"
   },
   {
+   "name": "USB_DEVICES",
+   "kind": "core",
+   "signature": "USB_DEVICES() AS ARRAY OF STRING",
+   "module": "usb"
+  },
+  {
    "name": "USB_MANUFACTURER",
    "kind": "core",
    "signature": "USB_MANUFACTURER(handle)",
@@ -14727,6 +14781,12 @@
    "module": "usb"
   },
   {
+   "name": "USB_READ_BYTES",
+   "kind": "core",
+   "signature": "USB_READ_BYTES(handle: ?, n: INTEGER[, timeout_ms: INTEGER = 1000]) AS BUFFER",
+   "module": "usb"
+  },
+  {
    "name": "USB_SERIAL",
    "kind": "core",
    "signature": "USB_SERIAL(handle)",
@@ -14736,6 +14796,12 @@
    "name": "USB_WRITE",
    "kind": "core",
    "signature": "USB_WRITE(handle: ?, data: STRING)",
+   "module": "usb"
+  },
+  {
+   "name": "USB_WRITE_BYTES",
+   "kind": "core",
+   "signature": "USB_WRITE_BYTES(handle: ?, data) AS INTEGER",
    "module": "usb"
   },
   {
@@ -15180,6 +15246,12 @@
    "name": "WIFI_SCAN",
    "kind": "core",
    "signature": "WIFI_SCAN()",
+   "module": "wifi"
+  },
+  {
+   "name": "WIFI_NETWORKS",
+   "kind": "core",
+   "signature": "WIFI_NETWORKS() AS ARRAY OF STRING",
    "module": "wifi"
   },
   {

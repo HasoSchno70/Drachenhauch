@@ -63,16 +63,27 @@ fn sammler<R: Read + Send + 'static>(quelle: R, ziel: Arc<Mutex<String>>) {
 /// Der Befehl fuer ein Kind: "dhrt" meint diese Runtime -- so startet die
 /// IDE ein Programm, ohne dass die Exe im PATH liegen muss --, und die
 /// Schalter eines Testlaufs gehen nicht an das Kind weiter.
-fn befehl(programm: &str, args: &[String], fn_: &str) -> Result<Command, String> {
+/// Die Steuerung eines Testlaufs gilt fuer die Eltern, nicht fuer Kinder --
+/// ein Kind mit geerbtem DHRT_FRAMES stuerbe nach N Bildern. EINE Liste fuer
+/// PROCESS_*, WINDOW_OPEN, SHELL*, TASK_START (bis 2026.53 zwei Kopien, und
+/// SHELL*/TASK_START vererbten die Variablen).
+pub(crate) const TEST_VARIABLEN: &[&str] = &["DHRT_FRAMES", "DHRT_SCREENSHOT", "DHRT_CONTACT",
+    "DHRT_CONTACT_MAX", "DHRT_CONTACT_COLS", "DHRT_CONTACT_EVERY"];
+
+pub(crate) fn test_variablen_entfernen(cmd: &mut Command) {
+    for v in TEST_VARIABLEN { cmd.env_remove(v); }
+}
+
+/// Der Befehl fuer ein Kind: "dhrt" meint die eigene Laufzeit, die
+/// Testvariablen gehen nicht mit. EIN Weg fuer alle Kindprozesse.
+pub(crate) fn befehl(programm: &str, args: &[String], fn_: &str) -> Result<Command, String> {
     let exe = if programm.eq_ignore_ascii_case("dhrt") {
         std::env::current_exe().map_err(|e| format!("{}: eigener Pfad unbekannt: {}", fn_, e))?
             .to_string_lossy().into_owned()
     } else { programm.to_string() };
     let mut cmd = Command::new(&exe);
     cmd.args(args);
-    for v in ["DHRT_FRAMES", "DHRT_SCREENSHOT", "DHRT_CONTACT", "DHRT_CONTACT_MAX", "DHRT_CONTACT_COLS", "DHRT_CONTACT_EVERY"] {
-        cmd.env_remove(v);
-    }
+    test_variablen_entfernen(&mut cmd);
     Ok(cmd)
 }
 

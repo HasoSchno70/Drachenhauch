@@ -86,6 +86,13 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
 * `AUDIO_DELAY` ohne `time_ms` nimmt die Vorgabe 300 ms (vorher blieb die
   alte Zeit stehen).
 
+**Kindprozesse**
+
+* `SHELL`, `SHELL_OUT$`, `SHELL_START` und `TASK_START` geben `DHRT_FRAMES`,
+  `DHRT_SCREENSHOT` & Co. nicht mehr an Kinder weiter (wie `PROCESS_START`);
+  „dhrt“ meint bei `SHELL*` die eigene Laufzeit, ein Feld von Texten wird
+  ausgebreitet.
+
 **Sprites und Partikel**
 
 * `SPRITE_COLLIDES`/`SPRITE_HIT_*` rechnen mit `SPRITE_SET_SCALE` wie
@@ -113,3 +120,11 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
   `sustain_ms`, `decay_ms`, `vib_depth`, `vib_speed` (die alten gelten).
 * Regeln 10 bis 12 in `docs/builtins-namen.md`: Winkel, Rechtecke und
   Strahlen, Zählen ab 0 oder 1.
+* Bytes für Geräte und Netz: `SERIAL_WRITE_BYTES`/`_READ_BYTES`,
+  `USB_WRITE_BYTES`/`_READ_BYTES`, `BT_WRITE_BYTES`/`_READ_BYTES` (BUFFER oder
+  Feld aus Zahlen), `HTTPD_BODY_BYTES`; `MQTT_PUBLISH` und `HTTPD_SEND`
+  nehmen einen BUFFER.
+* Gerätelisten als ARRAY OF STRING: `SERIAL_DEVICES`, `USB_DEVICES` (mit dem
+  HID-Pfad für `USB_OPEN_PATH`), `MIDI_IN_DEVICES`, `MIDI_OUT_DEVICES`,
+  `WIFI_NETWORKS`; `BT_SCAN_MS` liefert ein Feld.
+

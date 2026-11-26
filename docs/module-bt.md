@@ -24,14 +24,16 @@ Auf Windows funktioniert das mit dem eingebauten BT-Stack ab Win 10 — Bluetoot
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
 | `BT_SCAN(timeout_s)` | STRING (multi-line `addr|name|rssi`), 0..300s | nach Geraeten in Reichweite suchen |
-| `BT_SCAN_MS(timeout_ms)` | STRING wie `BT_SCAN` | dieselbe Suche, die Dauer in Millisekunden |
+| `BT_SCAN_MS(timeout_ms)` | ARRAY OF STRING, je Gerät `addr|name|rssi` | dieselbe Suche, die Dauer in Millisekunden, das Ergebnis als Feld |
 | `BT_CONNECT(address$)` | BT_HANDLE | Verbindung zu einem Geraet aufbauen |
 | `BT_DISCONNECT(handle)` | — | Verbindung trennen |
 | `BT_IS_CONNECTED(handle)` | BOOLEAN | steht die Verbindung noch? |
 | `BT_SERVICES(handle)` | STRING (multi-line UUIDs) | welche Dienste bietet das Geraet an? |
 | `BT_CHARACTERISTICS(handle, svc_uuid$)` | STRING (multi-line `uuid|properties`) | welche Merkmale hat ein Dienst -- und was laesst sich damit tun? |
 | `BT_READ(handle, char_uuid$)` | STRING (Bytes als latin-1) | Wert eines Merkmals lesen |
+| `BT_READ_BYTES(handle, char_uuid$)` | BUFFER | Wert eines Merkmals als BUFFER lesen |
 | `BT_WRITE(handle, char_uuid$, payload$)` | — | Wert eines Merkmals schreiben |
+| `BT_WRITE_BYTES(handle, char_uuid$, data)` | — | Wert als BUFFER oder Feld aus Zahlen 0..255 schreiben |
 
 ## Async/Sync
 

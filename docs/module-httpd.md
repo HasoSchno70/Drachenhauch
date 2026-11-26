@@ -29,7 +29,8 @@ und es war der kleinste von allen, weil `NET_TCP_LISTEN` schon darunter liegt.
 | `HTTPD_QUERY$(s, name$)` → STRING | ein Wert aus `?a=1&b=2` (aufgelöst) |
 | `HTTPD_HEADER$(s, name$)` → STRING | eine Kopfzeile (Groß-/Kleinschreibung egal) |
 | `HTTPD_BODY$(s)` → STRING | der Rumpf (bei `POST`) |
-| `HTTPD_SEND(s, code, type$, content$)` | antworten und schließen |
+| `HTTPD_BODY_BYTES(s)` → BUFFER | der Rumpf, wie er kam (Bilder, Dateien) |
+| `HTTPD_SEND(s, code, type$, content$)` | antworten und schließen; `content$` darf ein BUFFER sein (Bilder, Downloads) |
 | `HTTPD_SET_HEADER(s, name$, value$)` | eine Kopfzeile für **alle** folgenden Antworten; leerer Wert entfernt sie |
 | `HTTPD_SEND_FILE(s, code, path$)` | eine bestimmte Datei ausliefern |
 | `HTTPD_SEND_DIR(s, folder$[, start$])` → BOOLEAN | den angefragten Pfad **sicher** im Ordner auflösen |

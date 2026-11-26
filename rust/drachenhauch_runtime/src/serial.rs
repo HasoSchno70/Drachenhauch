@@ -24,9 +24,14 @@ pub struct Port {
 }
 
 pub fn ports() -> String {
+    port_liste().join(", ")
+}
+
+/// Die Ports als Liste (SERIAL_DEVICES liefert sie als ARRAY OF STRING).
+pub fn port_liste() -> Vec<String> {
     match serialport::available_ports() {
-        Ok(list) => list.iter().map(|p| p.port_name.clone()).collect::<Vec<_>>().join(", "),
-        Err(_) => String::new(),
+        Ok(list) => list.iter().map(|p| p.port_name.clone()).collect(),
+        Err(_) => Vec::new(),
     }
 }
 
@@ -40,6 +45,30 @@ pub fn open(port: &str, baud: i64) -> Result<Port, String> {
 
 pub fn write(p: &mut Port, s: &str) -> Result<i64, String> {
     p.conn.write(s.as_bytes()).map(|n| n as i64).map_err(|e| format!("SERIAL_WRITE: {}", e))
+}
+
+/// Bytes, wie sie sind (SERIAL_WRITE_BYTES) -- SERIAL_WRITE schickt Text
+/// als UTF-8, `CHR$(200)` gingen dort als zwei Bytes hinaus.
+pub fn write_bytes(p: &mut Port, d: &[u8]) -> Result<i64, String> {
+    p.conn.write(d).map(|n| n as i64).map_err(|e| format!("SERIAL_WRITE_BYTES: {}", e))
+}
+
+/// Bis zu `n` Bytes, wie sie kommen (SERIAL_READ_BYTES) -- SERIAL_READ
+/// dekodiert UTF-8 und machte aus 0xFF ein U+FFFD. Was SERIAL_READ als
+/// halbes Zeichen zurueckhielt, kommt zuerst.
+pub fn read_bytes(p: &mut Port, n: i64) -> Result<Vec<u8>, String> {
+    if n < 0 { return Err("SERIAL_READ_BYTES: Anzahl muss >= 0 sein".into()); }
+    if n > MAX_READ_BYTES {
+        return Err(format!("SERIAL_READ_BYTES: Anzahl {} ueberschreitet das Limit von {} Byte", n, MAX_READ_BYTES));
+    }
+    let mut out = std::mem::take(&mut p.pending);
+    if out.len() >= n as usize { p.pending = out.split_off(n as usize); return Ok(out); }
+    let mut buf = vec![0u8; n as usize - out.len()];
+    match p.conn.read(&mut buf) {
+        Ok(got) => { out.extend_from_slice(&buf[..got]); Ok(out) }
+        Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => Ok(out),
+        Err(e) => Err(format!("SERIAL_READ_BYTES: {}", e)),
+    }
 }
 
 pub fn read(p: &mut Port, n: i64) -> Result<String, String> {

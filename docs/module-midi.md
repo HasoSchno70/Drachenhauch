@@ -24,7 +24,9 @@ Keyboard etwas davon ansteuern. Genau diese Brücke schließt das Modul.
 | Funktion | Wirkung |
 |---|---|
 | `MIDI_IN_COUNT()` → INTEGER | Wie viele Eingänge es gibt |
+| `MIDI_IN_DEVICES()` → ARRAY OF STRING | die Namen der Eingänge als Feld; der Index ist der für `MIDI_IN_OPEN` |
 | `MIDI_OUT_COUNT()` → INTEGER | Wie viele Ausgänge es gibt |
+| `MIDI_OUT_DEVICES()` → ARRAY OF STRING | die Namen der Ausgänge als Feld; der Index ist der für `MIDI_OUT_OPEN` |
 | `MIDI_IN_NAME$(i)` → STRING | Name des Eingangs `i` |
 | `MIDI_OUT_NAME$(i)` → STRING | Name des Ausgangs `i` |
 

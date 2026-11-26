@@ -449,3 +449,31 @@ HTTPD_STOP(h)
 TRUE TRUE
 TRUE a+b c
 der server lebt
+
+=== rumpf als buffer hin und zurueck
+' HTTPD_BODY_BYTES liefert den Rumpf, wie er kam; HTTPD_SEND nimmt einen
+' BUFFER (Bericht A13; bis 2026.53 nur Text).
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+DIM a AS STRING : a = holen$(port, "POST", "/", "", "abc")
+PRINT rumpf$(a)
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+DIM b AS BUFFER : b = HTTPD_BODY_BYTES(s)
+DIM antwort AS BUFFER : antwort = BUFFER_FROM_STRING("Bytes " + STR$(BUFFER_LEN(b)))
+HTTPD_SEND(s, 200, "text/plain", antwort)
+HTTPD_STOP(s)
+
+--- erwartet
+Bytes 3
+

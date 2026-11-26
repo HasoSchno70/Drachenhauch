@@ -32,7 +32,7 @@ Motor stoppt).
 | `MQTT_TLS_CA(path$)` | — | eigene CA (PEM-Datei) fuer jedes folgende `mqtts://`-Verbinden; `""` = wieder die oeffentlichen Wurzeln |
 | `MQTT_DISCONNECT(handle)` | — | Verbindung schliessen |
 | `MQTT_IS_CONNECTED(handle)` | BOOLEAN | steht die Verbindung noch? |
-| `MQTT_PUBLISH(handle, topic$, payload$[, retain[, qos]])` | BOOLEAN | Nachricht auf ein Topic senden; `retain` laesst der Broker sie fuer spaetere Abonnenten aufheben, `qos` 0 oder 1. FALSE, wenn die Verbindung weg ist |
+| `MQTT_PUBLISH(handle, topic$, payload$[, retain[, qos]])` | BOOLEAN | Nachricht auf ein Topic senden; `retain` laesst der Broker sie fuer spaetere Abonnenten aufheben, `qos` 0 oder 1. FALSE, wenn die Verbindung weg ist Die Nutzlast darf ein BUFFER sein. |
 | `MQTT_SUBSCRIBE(handle, topic$[, qos])` | BOOLEAN | Topic abonnieren -- eingehende Nachrichten holt danach `MQTT_UPDATE` ab; `qos` 0 oder 1. FALSE, wenn die Verbindung weg ist |
 | `MQTT_UNSUBSCRIBE(handle, topic$)` | BOOLEAN | ein Abonnement beenden |
 | `MQTT_PENDING(handle)` | INTEGER | wie viele QoS-1-Nachrichten der Broker noch nicht bestaetigt hat |

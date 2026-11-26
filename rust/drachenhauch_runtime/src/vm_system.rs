@@ -12,6 +12,24 @@ impl<'p> Vm<'p> {
     /// so passen `ZEIT_JETZT()` und ein aus der Datenbank gelesener Anstoss
     /// ohne Zeitzonen-Umrechnung zusammen. Alles hier ist reine Mathematik
     /// (die Tests dazu stehen in zeit.rs); nur JETZT fragt die Uhr.
+    /// Argumente ab `ab` als Texte; ein FELD von Texten wird ausgebreitet
+    /// (SHELL, SHELL_OUT$, SHELL_START wie PROCESS_START).
+    fn argumente_ausbreiten(a: &[Value], ab: usize, fn_: &str) -> R<Vec<String>> {
+        let mut rest = Vec::new();
+        for i in ab..a.len() {
+            match &a[i] {
+                Value::Array(arr) => for x in arr.borrow().cells.iter() {
+                    match x {
+                        Value::Str(s) => rest.push(s.to_string()),
+                        _ => return Err(format!("{}: ein Feld von Argumenten muss aus Texten bestehen", fn_)),
+                    }
+                },
+                _ => rest.push(bi_str(a, i, fn_)?.to_string()),
+            }
+        }
+        Ok(rest)
+    }
+
     pub(super) fn try_zeit(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("zeit_") { return Ok(None); }
         use crate::zeit;
@@ -206,10 +224,11 @@ impl<'p> Vm<'p> {
                 // einem Dateinamen mit Leerzeichen zwei Argumente macht. Wer
                 // wirklich eine Shell will, ruft sie ausdruecklich auf
                 // (SHELL("cmd", "/c", "dir | more")).
-                let mut rest: Vec<String> = Vec::new();
-                for i in 1..a.len() { rest.push(o_str(a, i, anzeige)?.to_string()); }
-                let mut cmd = std::process::Command::new(&prog);
-                cmd.args(&rest);
+                // Ein FELD von Texten wird ausgebreitet wie bei PROCESS_START;
+                // der Befehl kommt aus prozess::befehl ("dhrt" = eigene
+                // Laufzeit, keine Testvariablen) -- bis 2026.53 eigene Wege.
+                let rest = Self::argumente_ausbreiten(a, 1, anzeige)?;
+                let mut cmd = crate::prozess::befehl(&prog, &rest, anzeige)?;
                 self.flush_out();
                 if name == "shell" {
                     // Erbt stdout/stderr -- das Kind schreibt direkt aufs
@@ -537,8 +556,7 @@ impl<'p> Vm<'p> {
             "shell_start" => {
                 if a.is_empty() { return Err("SHELL_START: erwartet mindestens 1 Argument(e), erhalten 0".into()); }
                 let prog = bi_str(a, 0, "SHELL_START")?.to_string();
-                let mut rest: Vec<String> = Vec::new();
-                for i in 1..a.len() { rest.push(bi_str(a, i, "SHELL_START")?.to_string()); }
+                let rest = Self::argumente_ausbreiten(a, 1, "SHELL_START")?;
                 Value::Int(self.shell_auftraege.start(&prog.clone(),
                     move || crate::hintergrund::shell_arbeit(prog, rest)))
             }

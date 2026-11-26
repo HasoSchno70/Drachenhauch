@@ -23,20 +23,16 @@ fn api() -> Result<&'static Mutex<HidApi>, String> {
     API.get().ok_or_else(|| "USB: hidapi nicht verfuegbar".into())
 }
 
-pub fn latin1_encode(s: &str, fn_: &str) -> Result<Vec<u8>, String> {
-    let mut out = Vec::with_capacity(s.len());
-    for c in s.chars() {
-        let cp = c as u32;
-        if cp > 0xFF {
-            return Err(format!("{}: STRING enthaelt Zeichen > 0xFF. Nur Bytes 0..255 sind erlaubt (latin-1).", fn_));
-        }
-        out.push(cp as u8);
-    }
-    Ok(out)
-}
-
-pub fn latin1_decode(bytes: &[u8]) -> String {
-    bytes.iter().map(|&b| b as char).collect()
+/// Die Geraete samt HID-Pfad, je eins "VID:PID|Produkt|Hersteller|Pfad"
+/// (USB_DEVICES) -- der Pfad ist, was USB_OPEN_PATH braucht; bis 2026.53
+/// lieferte ihn kein Befehl.
+pub fn geraete() -> Result<Vec<String>, String> {
+    let mutex = api()?;
+    let mut a = mutex.lock().map_err(|_| "USB: hidapi-Lock vergiftet".to_string())?;
+    a.refresh_devices().map_err(|e| format!("USB_DEVICES: {}", e))?;
+    Ok(a.device_list().map(|d| format!("{:04X}:{:04X}|{}|{}|{}", d.vendor_id(), d.product_id(),
+        d.product_string().unwrap_or(""), d.manufacturer_string().unwrap_or(""),
+        d.path().to_string_lossy())).collect())
 }
 
 pub fn list() -> Result<String, String> {
@@ -80,7 +76,7 @@ pub fn open_path(path: &str) -> Result<HidDevice, String> {
 }
 
 pub fn write(d: &HidDevice, data: &str) -> Result<i64, String> {
-    let bytes = latin1_encode(data, "USB_WRITE")?;
+    let bytes = crate::kodierung::latin1_schreiben(data, "USB_WRITE")?;
     d.write(&bytes).map(|n| n as i64).map_err(|e| format!("USB_WRITE: {}", e))
 }
 
@@ -89,6 +85,24 @@ pub fn write(d: &HidDevice, data: &str) -> Result<i64, String> {
 /// Multi-GB-Allokation aus, die bei Fehlschlag den Prozess abbricht statt
 /// einen fangbaren Fehler zu liefern.
 const MAX_READ_BYTES: i64 = 64 * 1024 * 1024;
+
+/// Bytes, wie sie sind (USB_WRITE_BYTES, BUFFER statt latin-1-Text).
+pub fn write_bytes(d: &HidDevice, data: &[u8]) -> Result<i64, String> {
+    d.write(data).map(|n| n as i64).map_err(|e| format!("USB_WRITE_BYTES: {}", e))
+}
+
+/// Bis zu `n` Bytes als BUFFER (USB_READ_BYTES).
+pub fn read_bytes(d: &HidDevice, n: i64, timeout_ms: i64) -> Result<Vec<u8>, String> {
+    if n < 0 { return Err("USB_READ_BYTES: Anzahl muss >= 0 sein".into()); }
+    if n > MAX_READ_BYTES {
+        return Err(format!("USB_READ_BYTES: Anzahl {} ueberschreitet das Limit von {} Byte", n, MAX_READ_BYTES));
+    }
+    let mut buf = vec![0u8; n as usize];
+    let t = timeout_ms.clamp(i32::MIN as i64, i32::MAX as i64) as i32;
+    let got = d.read_timeout(&mut buf, t).map_err(|e| format!("USB_READ_BYTES: {}", e))?;
+    buf.truncate(got);
+    Ok(buf)
+}
 
 pub fn read(d: &HidDevice, n: i64, timeout_ms: i64) -> Result<String, String> {
     if n < 0 {
@@ -103,7 +117,7 @@ pub fn read(d: &HidDevice, n: i64, timeout_ms: i64) -> Result<String, String> {
     // ungewollt "blockiere fuer immer" ausloesen. Stattdessen clampen.
     let timeout_i32 = timeout_ms.clamp(i32::MIN as i64, i32::MAX as i64) as i32;
     let got = d.read_timeout(&mut buf, timeout_i32).map_err(|e| format!("USB_READ: {}", e))?;
-    Ok(latin1_decode(&buf[..got]))
+    Ok(crate::kodierung::latin1_lesen(&buf[..got]))
 }
 
 pub fn product(d: &HidDevice) -> String {

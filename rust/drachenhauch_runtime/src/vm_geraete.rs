@@ -412,6 +412,20 @@ impl<'p> Vm<'p> {
             // --- Anschluesse finden ---
             "midi_in_count" => Value::Int(midi::in_count()?),
             "midi_out_count" => Value::Int(midi::out_count()?),
+            // Die Namen als ARRAY OF STRING (Bericht A16), der Index ist der
+            // fuer MIDI_IN_OPEN/MIDI_OUT_OPEN.
+            "midi_in_devices" => {
+                let n = midi::in_count()?;
+                let mut v = Vec::new();
+                for i in 0..n { v.push(midi::in_name(i)?); }
+                crate::builtins::new_string_array(v)
+            }
+            "midi_out_devices" => {
+                let n = midi::out_count()?;
+                let mut v = Vec::new();
+                for i in 0..n { v.push(midi::out_name(i)?); }
+                crate::builtins::new_string_array(v)
+            }
             "midi_in_name$" | "midi_in_name" =>
                 Value::str_rc(midi::in_name(bi_int(a, 0, "MIDI_IN_NAME$")?)?),
             "midi_out_name$" | "midi_out_name" =>
@@ -509,6 +523,9 @@ impl<'p> Vm<'p> {
         use crate::serial;
         let v = match name {
             "serial_ports" => Value::str_rc(serial::ports()),
+            // Die Liste als ARRAY OF STRING (Bericht A16; SERIAL_PORTS liefert
+            // einen Text mit ", ").
+            "serial_devices" => crate::builtins::new_string_array(serial::port_liste()),
             "serial_open" => {
                 let p = serial::open(bi_str(a, 0, "SERIAL_OPEN")?, bi_int(a, 1, "SERIAL_OPEN")?)?;
                 self.serial_ports.push(Some(p));
@@ -516,6 +533,9 @@ impl<'p> Vm<'p> {
             }
             "serial_close" => { let i = bi_int(a, 0, "SERIAL_CLOSE")? as usize; if let Some(s) = self.serial_ports.get_mut(i) { *s = None; } Value::Nil }
             "serial_is_open" => { let i = bi_int(a, 0, "SERIAL_IS_OPEN")?; Value::Bool(self.serial_ports.get(i as usize).map(|o| o.is_some()).unwrap_or(false)) }
+            // Bytes als BUFFER (Bericht A13): SERIAL_WRITE/_READ sprechen UTF-8-Text.
+            "serial_write_bytes" => { let i = bi_int(a, 0, "SERIAL_WRITE_BYTES")?; let d = crate::argument::a_bytes(a, 1, "SERIAL_WRITE_BYTES")?; Value::Int(serial::write_bytes(self.ser_port(i, name)?, &d)?) }
+            "serial_read_bytes" => { let i = bi_int(a, 0, "SERIAL_READ_BYTES")?; let n = bi_int(a, 1, "SERIAL_READ_BYTES")?; crate::argument::buffer_wert(serial::read_bytes(self.ser_port(i, name)?, n)?) }
             "serial_write" => { let i = bi_int(a, 0, "SERIAL_WRITE")?; let s = bi_str(a, 1, "SERIAL_WRITE")?.to_string(); Value::Int(serial::write(self.ser_port(i, name)?, &s)?) }
             "serial_read" => { let i = bi_int(a, 0, "SERIAL_READ")?; let n = bi_int(a, 1, "SERIAL_READ")?; Value::str_rc(serial::read(self.ser_port(i, name)?, n)?) }
             "serial_readline" => { let i = bi_int(a, 0, "SERIAL_READLINE")?; Value::str_rc(serial::readline(self.ser_port(i, name)?)?) }
@@ -1205,26 +1225,7 @@ impl<'p> Vm<'p> {
     pub(super) fn try_pins(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("gpio_") || name.starts_with("i2c_") || name.starts_with("spi_")) { return Ok(None); }
         use crate::pins;
-        fn bytes(a: &[Value], i: usize, f: &str) -> R<Vec<u8>> {
-            let roh: Vec<i64> = match a.get(i) {
-                Some(Value::Buffer(b)) => return Ok(b.borrow().clone()),
-                Some(Value::Array(arr)) => {
-                    let arr = arr.borrow();
-                    let mut out = Vec::with_capacity(arr.cells.len());
-                    for k in 0..arr.cells.len() {
-                        match arr.cells.get(k) {
-                            Value::Int(x) => out.push(x),
-                            Value::Float(v) if v.fract() == 0.0 => out.push(v as i64),
-                            v => return Err(format!("{}: im Feld steht an Stelle {} keine ganze Zahl ({})", f, k, v.type_name())),
-                        }
-                    }
-                    out
-                }
-                Some(v) => return Err(format!("{}: erwartet ein Feld aus Zahlen oder einen BUFFER, nicht {}", f, v.type_name())),
-                None => return Err(format!("{}: die Bytes fehlen", f)),
-            };
-            pins::bytes_pruefen(f, &roh)
-        }
+        fn bytes(a: &[Value], i: usize, f: &str) -> R<Vec<u8>> { crate::argument::a_bytes(a, i, f) }
         fn feld(v: Vec<u8>) -> Value {
             let n = v.len() as i64;
             let mut arr = crate::value::DhArray::new("integer".to_string(), vec![n], || Value::Int(0));
@@ -1364,25 +1365,7 @@ impl<'p> Vm<'p> {
     pub(super) fn try_firmata_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         use crate::firmata;
         // Bytes fuer I2C: ein Feld aus Zahlen oder ein BUFFER.
-        fn bytes_arg(a: &[Value], i: usize, fn_: &str) -> R<Vec<i64>> {
-            match a.get(i) {
-                Some(Value::Buffer(b)) => Ok(b.borrow().iter().map(|&x| x as i64).collect()),
-                Some(Value::Array(arr)) => {
-                    let arr = arr.borrow();
-                    let mut out = Vec::with_capacity(arr.cells.len());
-                    for k in 0..arr.cells.len() {
-                        match arr.cells.get(k) {
-                            Value::Int(x) => out.push(x),
-                            Value::Float(f) if f.fract() == 0.0 => out.push(f as i64),
-                            v => return Err(format!("{}: im Feld steht an Stelle {} keine ganze Zahl ({})", fn_, k, v.type_name())),
-                        }
-                    }
-                    Ok(out)
-                }
-                Some(v) => Err(format!("{}: erwartet ein Feld aus Zahlen oder einen BUFFER, nicht {}", fn_, v.type_name())),
-                None => Err(format!("{}: die Bytes fehlen", fn_)),
-            }
-        }
+        fn bytes_arg(a: &[Value], i: usize, fn_: &str) -> R<Vec<i64>> { crate::argument::a_zahlenfeld(a, i, fn_) }
         fn int_opt(a: &[Value], i: usize, vorgabe: i64, fn_: &str) -> R<i64> {
             if a.len() > i { bi_int(a, i, fn_) } else { Ok(vorgabe) }
         }
@@ -1527,9 +1510,13 @@ impl<'p> Vm<'p> {
         use crate::usb;
         let v = match name {
             "usb_list" => Value::str_rc(usb::list()?),
+            "usb_devices" => crate::builtins::new_string_array(usb::geraete()?),
             "usb_open" => { let d = usb::open(bi_int(a, 0, "USB_OPEN")?, bi_int(a, 1, "USB_OPEN")?)?; self.usb_devs.push(Some(d)); Value::Int((self.usb_devs.len() - 1) as i64) }
             "usb_open_path" => { let d = usb::open_path(bi_str(a, 0, "USB_OPEN_PATH")?)?; self.usb_devs.push(Some(d)); Value::Int((self.usb_devs.len() - 1) as i64) }
             "usb_close" => { let i = bi_int(a, 0, "USB_CLOSE")? as usize; if let Some(s) = self.usb_devs.get_mut(i) { *s = None; } Value::Nil }
+            // Bytes als BUFFER (Bericht A13): USB_WRITE/_READ nehmen latin-1-Text.
+            "usb_write_bytes" => { let i = bi_int(a, 0, "USB_WRITE_BYTES")?; let d = crate::argument::a_bytes(a, 1, "USB_WRITE_BYTES")?; Value::Int(usb::write_bytes(self.usb_dev(i, name)?, &d)?) }
+            "usb_read_bytes" => { let i = bi_int(a, 0, "USB_READ_BYTES")?; let n = bi_int(a, 1, "USB_READ_BYTES")?; let ms = if a.len() > 2 { bi_int(a, 2, "USB_READ_BYTES")? } else { 1000 }; crate::argument::buffer_wert(usb::read_bytes(self.usb_dev(i, name)?, n, ms)?) }
             "usb_write" => { let i = bi_int(a, 0, "USB_WRITE")?; let s = bi_str(a, 1, "USB_WRITE")?.to_string(); Value::Int(usb::write(self.usb_dev(i, name)?, &s)?) }
             "usb_read" => { let i = bi_int(a, 0, "USB_READ")?; let n = bi_int(a, 1, "USB_READ")?; let t = bi_int(a, 2, "USB_READ")?; Value::str_rc(usb::read(self.usb_dev(i, name)?, n, t)?) }
             "usb_product" => Value::str_rc(usb::product(self.usb_dev(bi_int(a, 0, "USB_PRODUCT")?, name)?)),
@@ -1559,6 +1546,8 @@ impl<'p> Vm<'p> {
             "wifi_current" => Value::str_rc(wifi::current()?),
             "wifi_signal" => Value::Int(wifi::signal()?),
             "wifi_scan" => Value::str_rc(wifi::scan()?),
+            // Dieselben Netze als ARRAY OF STRING, je eins eine Zeile (A16).
+            "wifi_networks" => crate::builtins::new_string_array(wifi::scan()?.lines().filter(|z| !z.is_empty()).map(str::to_string).collect()),
             "wifi_connect" => Value::Bool(wifi::connect(bi_str(a, 0, "WIFI_CONNECT")?, bi_str(a, 1, "WIFI_CONNECT")?)?),
             "wifi_disconnect" => Value::Bool(wifi::disconnect()?),
             "wifi_profiles" => Value::str_rc(wifi::profiles()?),
@@ -1588,12 +1577,19 @@ impl<'p> Vm<'p> {
         let v = match name {
             "bt_scan" => Value::str_rc(bt::scan(bi_num(a, 0, "BT_SCAN")?)?),
             // Die Suchdauer in ms (Regel 9); BT_SCAN bleibt bei Sekunden.
-            "bt_scan_ms" => Value::str_rc(bt::scan(bi_num(a, 0, "BT_SCAN_MS")? / 1000.0)?),
+            // Je Geraet eine Zeile "Adresse|Name|RSSI" als ARRAY OF STRING
+            // (Bericht A16: Listen sind Felder); BT_SCAN liefert sie als Text.
+            "bt_scan_ms" => {
+                let t = bt::scan(bi_num(a, 0, "BT_SCAN_MS")? / 1000.0)?;
+                crate::builtins::new_string_array(t.lines().filter(|z| !z.is_empty()).map(str::to_string).collect())
+            }
             "bt_connect" => { let p = bt::connect(bi_str(a, 0, "BT_CONNECT")?)?; self.bt_periphs.push(Some(p)); Value::Int((self.bt_periphs.len() - 1) as i64) }
             "bt_disconnect" => { let i = bi_int(a, 0, "BT_DISCONNECT")?; if Self::schon_frei(&self.bt_periphs, i) { return Ok(Some(Value::Nil)); } bt::disconnect(self.bt_periph(i, name)?)?; if let Some(s) = self.bt_periphs.get_mut(i as usize) { *s = None; } Value::Nil }
             "bt_is_connected" => { let i = bi_int(a, 0, "BT_IS_CONNECTED")?; Value::Bool(match self.bt_periphs.get(i as usize).and_then(|o| o.as_ref()) { Some(p) => bt::is_connected(p), None => false }) }
             "bt_services" => { let i = bi_int(a, 0, "BT_SERVICES")?; Value::str_rc(bt::services(self.bt_periph(i, name)?)?) }
             "bt_characteristics" => { let i = bi_int(a, 0, "BT_CHARACTERISTICS")?; let s = bi_str(a, 1, "BT_CHARACTERISTICS")?.to_string(); Value::str_rc(bt::characteristics(self.bt_periph(i, name)?, &s)?) }
+            "bt_read_bytes" => { let i = bi_int(a, 0, "BT_READ_BYTES")?; let c = bi_str(a, 1, "BT_READ_BYTES")?.to_string(); crate::argument::buffer_wert(bt::read_bytes(self.bt_periph(i, name)?, &c)?) }
+            "bt_write_bytes" => { let i = bi_int(a, 0, "BT_WRITE_BYTES")?; let c = bi_str(a, 1, "BT_WRITE_BYTES")?.to_string(); let d = crate::argument::a_bytes(a, 2, "BT_WRITE_BYTES")?; bt::write_bytes(self.bt_periph(i, name)?, &c, &d)?; Value::Nil }
             "bt_read" => { let i = bi_int(a, 0, "BT_READ")?; let c = bi_str(a, 1, "BT_READ")?.to_string(); Value::str_rc(bt::read(self.bt_periph(i, name)?, &c)?) }
             "bt_write" => { let i = bi_int(a, 0, "BT_WRITE")?; let c = bi_str(a, 1, "BT_WRITE")?.to_string(); let d = bi_str(a, 2, "BT_WRITE")?.to_string(); bt::write(self.bt_periph(i, name)?, &c, &d)?; Value::Nil }
             _ => return Ok(None),

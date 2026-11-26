@@ -2159,3 +2159,7 @@ GUI_GET_COLOR: Rolle '{}' gibt es nicht -- bg, fg, border, accent, hover oder pr
 {}: Farbe muss 0..&HFFFFFFFF sein	{}: the colour must be 0..&HFFFFFFFF
 GUI_SOUND: Lautstaerke {} muss 0..100 sein	GUI_SOUND: volume {} must be 0..100
 {}: Pakete aus dem Netz gibt es in dieser Laufzeit nicht (ohne http gebaut)	{}: packages from the net do not exist in this runtime (built without http)
+{}: STRING enthaelt Zeichen > 0xFF. Nur Bytes 0..255 sind erlaubt (latin-1) -- fuer Binaeres die _BYTES-Fassung mit BUFFER	{}: the STRING contains characters > 0xFF. Only bytes 0..255 are allowed (latin-1) -- for binary data use the _BYTES version with a BUFFER
+{}: im Feld steht an Stelle {} keine ganze Zahl ({})	{}: the array has no whole number at position {} ({})
+{}: erwartet ein Feld aus Zahlen oder einen BUFFER, nicht {}	{}: expected an array of numbers or a BUFFER, not {}
+{}: die Bytes fehlen	{}: the bytes are missing

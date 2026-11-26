@@ -113,7 +113,7 @@ pub struct ShellErgebnis {
 /// Programm starten, auf sein Ende warten, Ausgabe einsammeln -- ohne VM,
 /// laeuft also auf einem Auftrags-Thread.
 pub fn shell_arbeit(prog: String, args: Vec<String>) -> Result<ShellErgebnis, String> {
-    let out = std::process::Command::new(&prog).args(&args).output()
+    let out = crate::prozess::befehl(&prog, &args, "SHELL_START")?.output()
         .map_err(|e| format!("SHELL_START: '{}' laesst sich nicht starten: {}", prog, e))?;
     Ok(ShellErgebnis {
         // Kein Rueckgabewert (Unix: durch ein Signal beendet) -> -1, wie bei
@@ -153,6 +153,7 @@ pub fn task_arbeit(exe: std::path::PathBuf, datei: String, funktion: String,
     use std::io::Write;
     use std::process::Stdio;
     let mut cmd = std::process::Command::new(&exe);
+    crate::prozess::test_variablen_entfernen(&mut cmd);
     cmd.arg("call").arg(&datei).arg(&funktion).arg("--args-stdin")
         .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut kind = cmd.spawn().map_err(|e| format!(

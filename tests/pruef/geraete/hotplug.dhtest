@@ -93,6 +93,14 @@ DIM s AS ARRAY OF STRING : s = []
 IF SERIAL_PORTS() <> "" THEN s = SPLIT$(SERIAL_PORTS(), ", ")
 SORT(s)
 PRINT "serial gleich "; JOIN$(s, "|") = JOIN$(HOTPLUG_LIST("serial"), "|")
+' Dieselben Listen als Feld (Bericht A16: Geraetelisten sind ARRAY OF STRING).
+DIM sd AS ARRAY OF STRING : sd = SERIAL_DEVICES()
+SORT(sd)
+PRINT "serial_devices gleich "; JOIN$(sd, "|") = JOIN$(s, "|")
+DIM md AS ARRAY OF STRING : md = MIDI_IN_DEVICES()
+PRINT "midi_in_devices gleich "; LEN(md) = MIDI_IN_COUNT()
 --- erwartet
 midi_in gleich TRUE
 serial gleich TRUE
+serial_devices gleich TRUE
+midi_in_devices gleich TRUE

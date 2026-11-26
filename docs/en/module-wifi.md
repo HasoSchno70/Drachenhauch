@@ -22,6 +22,7 @@ On other platforms (BSD, ...) every call throws `DHRuntimeError` with a clear hi
 | `WIFI_CURRENT()` | STRING (current SSID, "" if not connected) | which network is the computer connected to? |
 | `WIFI_SIGNAL()` | INTEGER (0..100, -1 if not connected) | signal strength of the current connection |
 | `WIFI_SCAN()` | STRING (multi-line `ssid\|signal_pct`, sorted by signal) | search for reachable networks |
+| `WIFI_NETWORKS()` | ARRAY OF STRING | the same networks as `WIFI_SCAN`, one entry each |
 | `WIFI_CONNECT(ssid$, password$)` | BOOLEAN (create profile + issue connect command) | connect to a network -- creates a Windows profile in the process |
 | `WIFI_DISCONNECT()` | BOOLEAN | disconnect |
 | `WIFI_PROFILES()` | STRING (multi-line list of saved profiles) | which networks are saved? |

@@ -24,7 +24,9 @@ exactly the bridge this module closes.
 | Function | Effect |
 |---|---|
 | `MIDI_IN_COUNT()` → INTEGER | How many inputs there are |
+| `MIDI_IN_DEVICES()` → ARRAY OF STRING | the names of the inputs as an array; the index is the one for `MIDI_IN_OPEN` |
 | `MIDI_OUT_COUNT()` → INTEGER | How many outputs there are |
+| `MIDI_OUT_DEVICES()` → ARRAY OF STRING | the names of the outputs as an array; the index is the one for `MIDI_OUT_OPEN` |
 | `MIDI_IN_NAME$(i)` → STRING | Name of input `i` |
 | `MIDI_OUT_NAME$(i)` → STRING | Name of output `i` |
 
