@@ -1373,7 +1373,11 @@ Aufwand. Jeder Punkt hält `docs/stabilitaet.md` ein.
    - Der Compiler lernt **Zweitnamen für Parameter**: die einzige Möglichkeit,
      die uneinheitlichen Namen zu heilen, ohne die zugesagten zu brechen.
    - `dhrt pruef parameter` prüft jeden Befehl einer Zeile.
-10. **Ton aus einem Guss** (C1, C3, A8, A19).
+10. **Ton aus einem Guss** (C1, C3, A8, A19). *Teilweise umgesetzt auf `thema/lesen-verbinden`:
+    `DHRT_OHNE_AUDIO` rechnet stumm (`audio_backend.rs`, `AUDIO_IS_SILENT`), loops bei
+    PLAYSOUND/PLAYMUSIC, Loops/AUTOPAN/Warteschlange ohne FLIP, QUEUE prüft, QOA aus der
+    Doku. Offen: eine Pan-Skala und eine Lautstärke-Regel (neue Befehle, ein Entwurf),
+    `AUDIO_INIT`/`AUDIO_SET_NUM_CHANNELS` ohne Wirkung, ein WAV-Schreiber.*
     - `DH_OHNE_AUDIO` und „kein Gerät“ führen zu Kiras `MockBackend`.
     - `loops` durchreichen, endliche Loops ohne FLIP.
     - Eine Pan-Skala (-1..1) und eine Lautstärke-Regel über neue Befehle.
