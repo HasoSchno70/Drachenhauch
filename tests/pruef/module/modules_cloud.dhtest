@@ -39,6 +39,43 @@ PROCESS_KILL(VAL(srv[1]))
 TRUE
 {"gold": 42}
 
+=== ein spielername mit fragezeichen ist ein eigener spieler
+' Bis 2026.53 ging der Name ungeprueft in die URL: CLOUD_SAVE("a?b", ...)
+' speicherte unter "a" (der Rest war eine Abfrage).
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_cloud.py.)
+IMPORT "cloud"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("cloud", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+CLOUD_CONFIGURE(basis, "")
+PRINT CLOUD_SAVE("a?b", "fremd")
+PRINT "a ["; CLOUD_LOAD("a"); "]"
+PRINT "a?b ["; CLOUD_LOAD("a?b"); "]"
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/../_hilfen/gegenserver.dh
+--- erwartet
+TRUE
+a []
+a?b [fremd]
+
 === cloud load not found returns empty no error
 ' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_cloud.py.)
 IMPORT "cloud"

@@ -57,9 +57,16 @@ fn req_json(method: &str, url: &str, api_key: &str, body: Option<&serde_json::Va
     })
 }
 
+/// Ein Pfadteil (Spieler, Bestenliste) kodiert: bis 2026.53 ging er
+/// ungeprueft in die URL -- CLOUD_SAVE("a?b", ...) speicherte unter "a"
+/// (der Rest war eine Abfrage), und ein "/" darin traf eine andere Route.
+fn teil(s: &str) -> String {
+    crate::html::url_encode(s)
+}
+
 /// POST /save/<player_id> {"data": data}. Ok(()) bei Erfolg.
 pub fn save_upload(base_url: &str, api_key: &str, player_id: &str, data: &str) -> Result<(), CloudErr> {
-    let url = format!("{}/save/{}", base_url.trim_end_matches('/'), player_id);
+    let url = format!("{}/save/{}", base_url.trim_end_matches('/'), teil(player_id));
     let body = serde_json::json!({ "data": data });
     req_json("POST", &url, api_key, Some(&body), "CLOUD_SAVE")?;
     Ok(())
@@ -67,7 +74,7 @@ pub fn save_upload(base_url: &str, api_key: &str, player_id: &str, data: &str) -
 
 /// GET /save/<player_id> -> Some(data) oder None (nicht gefunden, HTTP 404).
 pub fn save_download(base_url: &str, api_key: &str, player_id: &str) -> Result<Option<String>, CloudErr> {
-    let url = format!("{}/save/{}", base_url.trim_end_matches('/'), player_id);
+    let url = format!("{}/save/{}", base_url.trim_end_matches('/'), teil(player_id));
     match req_json("GET", &url, api_key, None, "CLOUD_LOAD") {
         Ok(v) => Ok(Some(v.get("data").and_then(|d| d.as_str()).unwrap_or("").to_string())),
         Err(e) if e.status == 404 => Ok(None),
@@ -79,7 +86,7 @@ pub fn save_download(base_url: &str, api_key: &str, player_id: &str) -> Result<O
 pub fn leaderboard_submit(base_url: &str, api_key: &str, board: &str, name: &str, score: f64, best_low: bool)
     -> Result<bool, CloudErr>
 {
-    let url = format!("{}/leaderboard/{}/submit", base_url.trim_end_matches('/'), board);
+    let url = format!("{}/leaderboard/{}/submit", base_url.trim_end_matches('/'), teil(board));
     let body = serde_json::json!({ "name": name, "score": score, "best": if best_low { "low" } else { "high" } });
     let v = req_json("POST", &url, api_key, Some(&body), "LEADERBOARD_SUBMIT")?;
     Ok(v.get("updated").and_then(|b| b.as_bool()).unwrap_or(false))
@@ -95,7 +102,7 @@ pub fn leaderboard_fetch(base_url: &str, api_key: &str, board: &str, n: i64, asc
     -> Result<Vec<LeaderboardEntry>, CloudErr>
 {
     let order = if ascending { "asc" } else { "desc" };
-    let url = format!("{}/leaderboard/{}/top?n={}&order={}", base_url.trim_end_matches('/'), board, n.max(1), order);
+    let url = format!("{}/leaderboard/{}/top?n={}&order={}", base_url.trim_end_matches('/'), teil(board), n.max(1), order);
     let v = req_json("GET", &url, api_key, None, "LEADERBOARD_FETCH")?;
     let entries = v.get("entries").and_then(|e| e.as_array()).cloned().unwrap_or_default();
     Ok(entries.into_iter().map(|e| LeaderboardEntry {
