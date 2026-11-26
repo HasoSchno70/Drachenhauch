@@ -1370,7 +1370,11 @@ Aufwand. Jeder Punkt hält `docs/stabilitaet.md` ein.
    - Ein `verbinden()`, das alle Adressen probiert (`localhost` bei
      NET/WS/MQTT/SMTP).
    - `HTTP_DOWNLOAD` und cloud über `http_request`, ein TLS-Aufbau.
-9. **Der Index als eine saubere Quelle** (B6, B10, E1, E2, E4).
+9. **Der Index als eine saubere Quelle** (B6, B10, E1, E2, E4). *Teilweise umgesetzt auf
+   `thema/lesen-verbinden`: `dhrt pruef parameter` prüft jeden Befehl einer Zeile (38 Funde
+   je Sprache nachgezogen), Zweitnamen für Parameter im Compiler, `RENAME(old, new)`, die
+   Signaturen aus E2. Offen: Rückgabetypen und eine Signaturform für alle Einträge (E1,
+   B10), Vorgaben nachtragen, Kurzhilfen aus dem Index erzeugen.*
    - Eine Signaturform, Rückgabetypen und Vorgaben nachtragen. Das macht
      benannte Argumente nutzbar und Regel 5 wahr.
    - `builtin_signature` streichen, Kurzhilfen aus dem Index erzeugen.
