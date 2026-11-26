@@ -68,7 +68,7 @@ fn text_statt_zahl(fn_: &str, was: &str, nr: Option<usize>, v: &Value) -> String
 /// INTEGER: ganze Zahl oder Kommazahl ohne Nachkommastellen.
 pub(crate) fn int(v: &Value, fn_: &str, nr: Option<usize>) -> R<i64> {
     match v {
-        Value::Int(i) => Ok(*i),
+        Value::Int(i) | Value::Handle(_, i) => Ok(*i),
         Value::Float(f) => crate::builtins::glatt_int(*f).ok_or_else(||
             format!("{}{}", erwartet(fn_, "INTEGER", nr, v), crate::builtins::KEIN_GANZ_HINWEIS)),
         _ => Err(text_statt_zahl(fn_, "INTEGER", nr, v)),
@@ -80,7 +80,7 @@ pub(crate) fn int(v: &Value, fn_: &str, nr: Option<usize>) -> R<i64> {
 #[cfg_attr(not(feature = "graphics"), allow(dead_code))] // nur die Grafik
 pub(crate) fn koord(v: &Value, fn_: &str, nr: Option<usize>) -> R<i64> {
     match v {
-        Value::Int(i) => Ok(*i),
+        Value::Int(i) | Value::Handle(_, i) => Ok(*i),
         Value::Float(f) => Ok(*f as i64),
         _ => Err(text_statt_zahl(fn_, "Zahl", nr, v)),
     }

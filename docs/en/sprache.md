@@ -245,6 +245,33 @@ nobody.
 `SELECT CASE` comparisons (`CASE IS > 5`) are not affected — there the
 `IS` belongs to the `CASE`.
 
+### Handles
+
+What a module manages — a PDF, a database connection, an image, a widget —
+it hands out as a **handle**: a number that knows its kind.
+
+```basic
+IMPORT "pdf"
+IMPORT "xlsx"
+DIM p AS PDF = PDF_NEW()
+PRINT TYPEOF(p)          ' "PDF"
+PRINT p IS PDF           ' TRUE
+PRINT p = 0              ' TRUE -- calculates and compares like its number
+DIM x AS XLSX = XLSX_NEW("Blatt")
+' XLSX_SHEET_COUNT(p)    ' error: expects an XLSX handle, got a PDF handle
+```
+
+- A handle **of another kind** at a command is an error naming both;
+  `dhrt --check` reports it beforehand when the kind of the variable is
+  known. Which parameter takes which kind is in the signature
+  (`PDF_TEXT(p: PDF, …)`).
+- An **INTEGER** variable (or an `ARRAY OF INTEGER`) holds just the number —
+  that is how older programs keep their handles, and it keeps working.
+  Conversely, a number assigned to a variable of the handle type becomes a
+  handle.
+- A handle type accepts only its own kind, a number or `NIL`:
+  `DIM d AS DB_CONN = TRUE` is an error.
+
 ## What the compiler checks
 
 Types do not only apply at run time. `dhrt --check` (in the editor the yellow

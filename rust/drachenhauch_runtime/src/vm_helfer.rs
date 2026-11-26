@@ -529,7 +529,7 @@ pub(super) fn int_pair2(stack: &mut Vec<Value>, op: &str) -> R<(i64, i64)> {
     let b = vm_pop(stack)?;
     let a = vm_pop(stack)?;
     match (&a, &b) {
-        (Value::Int(x), Value::Int(y)) => Ok((*x, *y)),
+        (Value::Int(x) | Value::Handle(_, x), Value::Int(y) | Value::Handle(_, y)) => Ok((*x, *y)),
         _ => Err(format!("{} erwartet INTEGER, erhalten {} / {}", op, a.type_name(), b.type_name())),
     }
 }
@@ -571,6 +571,15 @@ pub(super) fn module_op(op: char, a: &Value, b: &Value) -> Option<R<Value>> {
     // `other` akzeptiert) NIE erreichen lassen.
     if matches!(a, Value::Str(_)) || matches!(b, Value::Str(_)) {
         return None;
+    }
+    // Ein Handle rechnet wie seine Nummer (`handle.rs`): `bild + 1` ist eine
+    // Zahl, die an einer IMAGE-Variablen wieder zum Handle wird.
+    if matches!(a, Value::Handle(..)) || matches!(b, Value::Handle(..)) {
+        let (a, b) = (a.ohne_handle(), b.ohne_handle());
+        return Some(wert_rechnen(&op.to_string(), &a, &b).ok_or_else(|| match require_number(&a, &b, &op.to_string()) {
+            Err(e) => e,
+            Ok(()) => int_overflow_msg(&op.to_string()),
+        }));
     }
     let is_mod = |v: &Value| matches!(v,
         Value::Vec2(..) | Value::Vec3(..) | Value::Vec4(..) | Value::Quat(..)
@@ -687,9 +696,10 @@ pub(crate) fn konstant_rechnen(op: &str, a: &Value, b: &Value) -> Option<Value> 
 /// Grenzen des Faltens (fuer den Wertemodus des Maschinencodes, `jit::w_op`).
 /// `None` bei einem Fehler: dann rechnet die VM und meldet ihn.
 pub(crate) fn wert_rechnen(op: &str, a: &Value, b: &Value) -> Option<Value> {
+    // Ein Handle rechnet wie seine Nummer (`handle.rs`).
+    let (a, b) = (a.ohne_handle(), b.ohne_handle());
     let schlicht = |v: &Value| matches!(v, Value::Int(_) | Value::Float(_) | Value::Str(_) | Value::Bool(_));
-    if !schlicht(a) || !schlicht(b) { return None; }
-    let (a, b) = (a.clone(), b.clone());
+    if !schlicht(&a) || !schlicht(&b) { return None; }
     let r = match op {
         "+" => match zahlen_addieren(&a, &b) {
             Some(r) => r,
@@ -900,6 +910,7 @@ pub(super) fn div(a: Value, b: Value) -> R<Value> {
 }
 
 pub(super) fn int_div(a: Value, b: Value) -> R<Value> {
+    let (a, b) = handles_weg(a, b);
     match (&a, &b) {
         (Value::Int(x), Value::Int(y)) => {
             if *y == 0 { return Err("Integer-Division durch 0".into()); }
@@ -916,6 +927,7 @@ pub(super) fn int_div(a: Value, b: Value) -> R<Value> {
 }
 
 pub(super) fn modulo(a: Value, b: Value) -> R<Value> {
+    let (a, b) = handles_weg(a, b);
     require_number(&a, &b, "MOD")?;
     match (&a, &b) {
         (Value::Int(x), Value::Int(y)) => {
@@ -929,6 +941,7 @@ pub(super) fn modulo(a: Value, b: Value) -> R<Value> {
 }
 
 pub(super) fn pow(a: Value, b: Value) -> R<Value> {
+    let (a, b) = handles_weg(a, b);
     require_number(&a, &b, "^")?;
     match (&a, &b) {
         (Value::Int(x), Value::Int(y)) if *y >= 0 => {
@@ -939,8 +952,16 @@ pub(super) fn pow(a: Value, b: Value) -> R<Value> {
     }
 }
 
+/// Handles als Nummern (fuer die Rechenbefehle ohne `module_op`).
+#[inline]
+fn handles_weg(a: Value, b: Value) -> (Value, Value) {
+    if matches!(a, Value::Handle(..)) || matches!(b, Value::Handle(..)) {
+        (a.ohne_handle(), b.ohne_handle())
+    } else { (a, b) }
+}
+
 pub(super) fn neg(v: Value) -> R<Value> {
-    match v {
+    match v.ohne_handle() {
         Value::Int(i) => i.checked_neg().map(Value::Int).ok_or_else(|| int_overflow_msg("-")),
         Value::Float(f) => Ok(Value::Float(-f)),
         Value::Geld(w) => w.checked_neg().map(Value::Geld)
@@ -950,6 +971,9 @@ pub(super) fn neg(v: Value) -> R<Value> {
 }
 
 pub(crate) fn cmp(a: &Value, b: &Value, op: char) -> R<bool> {
+    if matches!(a, Value::Handle(..)) || matches!(b, Value::Handle(..)) {
+        return cmp(&a.ohne_handle(), &b.ohne_handle(), op);
+    }
     let ord = if let (Value::Geld(x), Value::Geld(y)) = (a, b) {
         // Betraege vergleichen sich EXAKT -- das ist einer der Gruende,
         // warum es den Typ gibt.
@@ -1010,6 +1034,9 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
         "" | "any" => Ok(value),
         "integer" => match value {
             Value::Int(_) => Ok(value),
+            // Ein Handle in einer INTEGER-Variablen ist seine Nummer -- so
+            // halten Programme Handles seit jeher (`DIM b AS INTEGER = LOADIMAGE(...)`).
+            Value::Handle(_, n) => Ok(Value::Int(n)),
             Value::Float(f) => {
                 if f.fract() != 0.0 {
                     Err(format!("{}: FLOAT {} passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \\ statt / nehmen, sonst mit INT()/ROUND() runden", ctx, f))
@@ -1028,7 +1055,7 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
         },
         "float" => match value {
             Value::Float(_) => Ok(value),
-            Value::Int(i) => Ok(Value::Float(i as f64)),
+            Value::Int(i) | Value::Handle(_, i) => Ok(Value::Float(i as f64)),
             Value::Bool(_) => Err(format!("{}: Erwartet FLOAT, erhalten BOOLEAN", ctx)),
             _ => Err(format!("{}: Erwartet FLOAT, erhalten {}", ctx, value.type_name())),
         },
@@ -1075,6 +1102,7 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
         // coerce_map wie ein Feld coerce_array; eine Klasse
         // nimmt nur NIL und Instanzen ihrer selbst oder einer Unterklasse.
         _ => match target.strip_prefix("array:") {
+            None if crate::handle::art(target).is_some() => handle_annehmen(value, target, ctx),
             Some(elem) => coerce_array(value, elem, ctx),
             None if target.starts_with("map:") => coerce_map(value, &target[4..], ctx),
             None => {
@@ -1085,10 +1113,26 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
     }
 }
 
+/// Zuweisung an einen Handle-Typ (`DIM p AS PDF`): ein Handle derselben Art
+/// oder NIL; eine nackte Zahl wird zum Handle dieser Art (so lagen Handles
+/// bis 2026.53 vor, als INTEGER). Ein Handle einer anderen Art oder ein
+/// anderer Wert ist ein Fehler -- bis 2026.53 ging `DIM d AS DB_CONN = TRUE`
+/// durch (Bericht A4).
+#[cold]
+fn handle_annehmen(value: Value, target: &str, ctx: &str) -> R<Value> {
+    let art = crate::handle::art(target).expect("Handle-Art");
+    match value {
+        Value::Nil => Ok(value),
+        Value::Handle(a, _) if a == art => Ok(value),
+        Value::Int(n) => Ok(Value::Handle(art, n)),
+        v => Err(format!("{}: Erwartet {}, erhalten {}", ctx, crate::handle::name(art), v.type_name())),
+    }
+}
+
 /// Einen internen Typnamen so schreiben, wie er im Quelltext steht
 /// (`array:integer` -> `ARRAY OF INTEGER`). Gegenstueck zu
 /// `Compiler::typ_klartext` -- die interne Schreibweise sagt einem Nutzer nichts.
-pub(super) fn typ_lesbar(t: &str) -> String {
+pub(crate) fn typ_lesbar(t: &str) -> String {
     if let Some(e) = t.strip_prefix("array:") { return format!("ARRAY OF {}", typ_lesbar(e)); }
     if let Some(e) = t.strip_prefix("map:") { return format!("MAP OF {}", typ_lesbar(e)); }
     t.to_uppercase()
@@ -1442,11 +1486,11 @@ mod panik_tests {
         let prog = programm();
         let mut vm = Vm::new(&prog);
         let merk = std::cell::Cell::new(0u8);
-        let e = vm.builtin_rufen("__panik_probe", &[Value::Int(1)], &merk).err().expect("ein Fehler");
+        let e = vm.builtin_rufen("__panik_probe", &[Value::Int(1)], &merk, 0).err().expect("ein Fehler");
         assert!(e.starts_with("__PANIK_PROBE: interner Fehler der Laufzeit (index out of bounds"), "{}", e);
         assert!(e.contains("vm.rs:"), "der Ort fehlt: {}", e);
         // Danach geht es weiter wie sonst.
-        assert!(matches!(vm.builtin_rufen("abs", &[Value::Int(-2)], &merk), Ok(Value::Int(2))));
+        assert!(matches!(vm.builtin_rufen("abs", &[Value::Int(-2)], &merk, 0), Ok(Value::Int(2))));
     }
 
     #[test]

@@ -101,6 +101,7 @@ mod db;
 mod ecs;
 // Hintergrund-Auftraege (WP H) -- ungated: SHELL_START braucht kein http.
 mod hintergrund;
+mod handle;
 // Fenster als Prozess (docs/intern/entwurf-native-fenster.md, Weg B) -- ungated wie hintergrund.
 mod fenster;
 // Drucken + OPENDOC (docs/intern/entwurf-drucken.md, Wege A und C) -- ungated.
@@ -2502,7 +2503,7 @@ fn fehlende_main(namen: &[String]) -> ExitCode {
             !cfg!(feature = "graphics")
         } else {
             let merk = std::cell::Cell::new(0u8);
-            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| machine.builtin_rufen(&n, &unsinn, &merk))) {
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| machine.builtin_rufen(&n, &unsinn, &merk, 0))) {
                 Ok(Err(e)) => vm::fehlt_im_bau(&e),
                 _ => false,
             }

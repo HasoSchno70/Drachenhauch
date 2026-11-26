@@ -204,6 +204,11 @@ hand are callback timers from the `timer` module.
 | `POLYGON_OUTLINE(points[, color[, width]])` | polygon as outline only — formerly `POLYGONOUTLINE` |
 | `NGON_OUTLINE(x, y, corners, r, angle[, color[, width]])` | regular polygon as outline only; width as with LINEW — formerly `NGONOUTLINE` |
 | `PIE_OUTLINE(x, y, r, from_deg, to_deg[, color])` | circle sector as outline only, with both radii — formerly `PIEOUTLINE` |
+| `DRAW_GRADIENT_H(x1, y1, x2, y2, color1: INTEGER, color2: INTEGER)` | rectangle with a horizontal colour gradient (left→right) — formerly `GRADIENTH` |
+| `DRAW_GRADIENT_V(x1, y1, x2, y2, color1: INTEGER, color2: INTEGER)` | rectangle with a vertical colour gradient (top→bottom) — formerly `GRADIENTV` |
+| `DRAW_TEXT_ROT(x, y, s, angle[, scale = 1.0[, color]])` | text centred on (x, y), rotated about the centre (degrees, like DRAWIMAGEROT) and scaled — for score pop-ups, … — formerly `TEXTROT` |
+| `DRAW_BOX_ROT(x, y, width, height, angle[, color])` | filled rectangle centred on (x, y), rotated about its centre (degrees, clockwise like DRAWIMAGEROT) — formerly `BOXROT` |
+| `DRAW_LINE_DASHED(x1, y1, x2, y2, dash, gap[, color])` | dashed line, dash and gap length in pixels — formerly `LINEDASHED` |
 
 ### images, fonts, sound, models: `AREA_VERB`
 
@@ -226,6 +231,7 @@ hand are callback timers from the `timer` module.
 | `IMAGE_HEIGHT(image)` | height of an image in pixels — formerly `IMAGEHEIGHT` |
 | `AUDIO_SET_VOLUME(ch, v)` | volume of a channel 0..1 — formerly `AUDIO_VOLUME` |
 | `AUDIO_MUSIC_SET_VOLUME(v)` | volume of the music 0..1 — formerly `AUDIO_MUSIC_VOLUME` |
+| `FONT_LOAD_SDF(path$, size[, chars$]) AS INTEGER` | a font that stays sharp at any size (distance field) — formerly `LOADFONT_SDF` |
 
 ### files (by path), files (by handle), folders, paths
 
@@ -261,6 +267,18 @@ hand are callback timers from the `timer` module.
 | `ENV_SET(name, value)` | set an environment variable (this program + its children) — formerly `SETENV` |
 | `URL_OPEN(address: STRING)` | Opens an address in the default browser — the manual or the game's page, for instance — formerly `OPENURL` |
 | `DOC_OPEN(path$)` | Opens a local file with its default program – the PDF you have written in the viewer, the table in the … — formerly `OPENDOC` |
+| `FILE_RENAME(old, new)` | rename or move — formerly `RENAME` |
+| `FILE_TEMP$([prefix$ = "dh" [, extension$]]) AS STRING` | a free name in the temp directory, created empty — formerly `TEMPFILE$` |
+| `FILE_SEEK(file, position)` | set the position (0 = start) — formerly `SEEK` |
+| `FILE_TELL(file) AS INTEGER` | current position — formerly `TELL` |
+| `FILE_WRITE_TEXT(f, text)` | writes without \n — formerly `WRITE` |
+| `FILE_READ_BLOCK(file, count) AS BUFFER` | up to count bytes from the handle — formerly `READ_BYTES` |
+| `FILE_WRITE_BLOCK(file, buffer)` | bytes to the handle — formerly `WRITE_BYTES` |
+| `DIR_TEMP$() AS STRING` | the system's temp directory — formerly `TEMPDIR$` |
+| `DIR_CURRENT$() AS STRING` | current working directory — formerly `CWD$` |
+| `DIR_CHANGE(path)` | change the working directory — formerly `CHDIR` |
+| `DIR_CREATE(path)` | create a directory (including parents) — formerly `MKDIR` |
+| `DIR_DELETE(path$ [, with_content])` | delete a directory (empty; with TRUE including its contents) — formerly `RMDIR` |
 
 ### MAP like ARRAY_ and SET_: with underscore, the number is COUNT
 
@@ -309,6 +327,26 @@ hand are callback timers from the `timer` module.
 | `MONEY_VALUE(g: GELD)` | step out deliberately (display in charts or the like) — formerly `GELD_ZAHL` |
 | `BUFFER_FROM_POINTER(pointer, length)` | copies laenge (length) bytes behind a pointer into a new BUFFER; 0 bytes give an empty one, a null pointer … — formerly `BUFFER_AUS_ZEIGER` |
 | `TEXT_FROM_POINTER$(pointer [, wide])` | copies the text behind a pointer up to the null character (UTF-8; with breit (wide) = TRUE wchar_t, i.e. … — formerly `TEXT_AUS_ZEIGER$` |
+| `NUMBER_TEXT$(number [, digits]) AS STRING` | a number in German notation with dots between thousands and a decimal comma (400.000, 1.234.567,89); with … — formerly `ZAHL$` |
+| `BUFFER_POINTER(buffer) AS INTEGER` | the address of the bytes of a BUFFER, for a struct field that points to another buffer; an empty buffer gives … — formerly `BUFFER_ZEIGER` |
+
+### The area first: text, types, system, cloud
+
+| Name | What it does |
+|---|---|
+| `TEXT_STARTS_WITH(s, prefix) AS BOOLEAN` | does the text start like this? — formerly `STARTSWITH` |
+| `TEXT_ENDS_WITH(s, suffix) AS BOOLEAN` | does the text end like this? — formerly `ENDSWITH` |
+| `TEXT_CONTAINS(s, part) AS BOOLEAN` | substring contained? (function form of part IN s) — formerly `CONTAINS` |
+| `TEXT_COUNT(text$, part$)` | number of non-overlapping occurrences of part — formerly `COUNT` |
+| `TEXT_REMOVE_SPACES$(s$)` | remove all whitespace (spaces, tabs, line breaks) — for input like "DE89 3704 0044" — formerly `NOSPACES$` |
+| `IS_NUM(x)` | a number? (BOOLEAN is not one) — formerly `ISNUM` |
+| `IS_INT(x)` | an integer? — formerly `ISINT` |
+| `IS_STR(x)` | a text? — formerly `ISSTR` |
+| `IS_BOOL(x)` | a BOOLEAN? — formerly `ISBOOL` |
+| `IS_NUMERIC(s) AS BOOLEAN` | parseable as a number? — formerly `ISNUMERIC` |
+| `SYSTEM_EXE_PATH$() AS STRING` | path of the running program file — formerly `EXEPATH$` |
+| `CLOUD_LEADERBOARD_SUBMIT(board$, name$, score[, best_low])` | submit a score; best_low = TRUE for "lower is better" — formerly `LEADERBOARD_SUBMIT` |
+| `CLOUD_LEADERBOARD_FETCH(board$, n[, ascending]) AS ARRAY OF TUPLE` | the best n entries as (name$, score) tuples, sorted (descending by default) — formerly `LEADERBOARD_FETCH` |
 
 ### Time limits: `_SET_TIMEOUT` in milliseconds
 

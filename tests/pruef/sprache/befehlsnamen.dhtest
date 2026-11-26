@@ -186,3 +186,28 @@ bt TRUE
 mqtt TRUE
 check []
 
+
+=== der bereich steht vorn: text, typen, dateien, zeichnen
+' Bericht B3/B7: neue Namen fuer Befehle ohne Bereich oder mit deutschem
+' Namen; IMPORT "http" meint das Modul html.
+IMPORT "http"
+PRINT TEXT_STARTS_WITH("Drachen", "Dra"); " "; TEXT_ENDS_WITH("Drachen", "en"); " "; TEXT_CONTAINS("Drachen", "ach"); " "; TEXT_COUNT("banana", "an")
+PRINT TEXT_REMOVE_SPACES$("DE89 3704"); " "; IS_NUM(1.5); " "; IS_INT(2); " "; IS_STR("x"); " "; IS_BOOL(TRUE); " "; IS_NUMERIC("3,5")
+PRINT NUMBER_TEXT$(1234567.891, 2); " "; DIR_CURRENT$() = CWD$(); " "; DIR_TEMP$() = TEMPDIR$(); " "; SYSTEM_EXE_PATH$() = EXEPATH$()
+DIR_CREATE("unter/tiefer")
+PRINT DIR_EXISTS("unter/tiefer")
+FILE_WRITE("unter/a.txt", "abc")
+FILE_RENAME("unter/a.txt", "unter/b.txt")
+DIM f AS FILE = FILE_OPEN("unter/b.txt", "r")
+FILE_SEEK(f, 1)
+PRINT FILE_TELL(f); " "; BUFFER_TO_HEX$(FILE_READ_BLOCK(f, 2))
+FILE_CLOSE(f)
+DIR_DELETE("unter", TRUE)
+PRINT DIR_EXISTS("unter"); " "; URL_ENCODE("a b")
+--- erwartet
+TRUE TRUE TRUE 2
+DE893704 TRUE TRUE TRUE TRUE FALSE
+1.234.567,89 TRUE TRUE TRUE
+TRUE
+1 6263
+FALSE a%20b

@@ -204,6 +204,11 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `POLYGON_OUTLINE(points[, color[, width]])` | Polygon nur als Kontur — bisher `POLYGONOUTLINE` |
 | `NGON_OUTLINE(x, y, corners, r, angle[, color[, width]])` | regelmäßiges Vieleck nur als Kontur; width wie bei LINEW — bisher `NGONOUTLINE` |
 | `PIE_OUTLINE(x, y, r, from_deg, to_deg[, color])` | Kreisstück nur als Kontur, mit beiden Radien — bisher `PIEOUTLINE` |
+| `DRAW_GRADIENT_H(x1, y1, x2, y2, color1: INTEGER, color2: INTEGER)` | Rechteck mit horizontalem Farbverlauf (links→rechts) — bisher `GRADIENTH` |
+| `DRAW_GRADIENT_V(x1, y1, x2, y2, color1: INTEGER, color2: INTEGER)` | Rechteck mit vertikalem Farbverlauf (oben→unten) — bisher `GRADIENTV` |
+| `DRAW_TEXT_ROT(x, y, s, angle[, scale = 1.0[, color]])` | Text zentriert auf (x, y), um das Zentrum gedreht (Grad, wie DRAWIMAGEROT) und skaliert — für Score-Popups, … — bisher `TEXTROT` |
+| `DRAW_BOX_ROT(x, y, width, height, angle[, color])` | gefülltes Rechteck zentriert auf (x, y), um seine Mitte gedreht (Grad, im Uhrzeigersinn wie DRAWIMAGEROT) — bisher `BOXROT` |
+| `DRAW_LINE_DASHED(x1, y1, x2, y2, dash, gap[, color])` | gestrichelte Linie, Strich- und Lückenlänge in Punkten — bisher `LINEDASHED` |
 
 ### Bilder, Schrift, Ton, Modelle: `BEREICH_VERB`
 
@@ -226,6 +231,7 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `IMAGE_HEIGHT(image)` | Höhe eines Bildes in Pixeln — bisher `IMAGEHEIGHT` |
 | `AUDIO_SET_VOLUME(ch, v)` | Lautstärke eines Kanals 0..1 — bisher `AUDIO_VOLUME` |
 | `AUDIO_MUSIC_SET_VOLUME(v)` | Lautstärke der Musik 0..1 — bisher `AUDIO_MUSIC_VOLUME` |
+| `FONT_LOAD_SDF(path$, size[, chars$]) AS INTEGER` | eine Schrift, die bei jeder Größe scharf bleibt (Abstandsfeld) — bisher `LOADFONT_SDF` |
 
 ### Dateien (mit Pfad), Dateien (mit Handle), Ordner, Pfade
 
@@ -261,6 +267,18 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `ENV_SET(name, value)` | Umgebungsvariable setzen (dieses Programm + seine Kinder) — bisher `SETENV` |
 | `URL_OPEN(address: STRING)` | Öffnet eine Adresse im Standardbrowser – etwa die Anleitung oder die Seite des Spiels — bisher `OPENURL` |
 | `DOC_OPEN(path$)` | Öffnet eine lokale Datei mit ihrem Standardprogramm – die geschriebene PDF im Betrachter, die Tabelle in … — bisher `OPENDOC` |
+| `FILE_RENAME(old, new)` | umbenennen oder verschieben — bisher `RENAME` |
+| `FILE_TEMP$([prefix$ = "dh" [, extension$]]) AS STRING` | freier Name im Temp-Verzeichnis, leer angelegt — bisher `TEMPFILE$` |
+| `FILE_SEEK(file, position)` | Position setzen (0 = Anfang) — bisher `SEEK` |
+| `FILE_TELL(file) AS INTEGER` | aktuelle Position — bisher `TELL` |
+| `FILE_WRITE_TEXT(f, text)` | schreibt ohne \n — bisher `WRITE` |
+| `FILE_READ_BLOCK(file, count) AS BUFFER` | bis zu count Bytes vom Handle — bisher `READ_BYTES` |
+| `FILE_WRITE_BLOCK(file, buffer)` | Bytes ans Handle — bisher `WRITE_BYTES` |
+| `DIR_TEMP$() AS STRING` | das Temp-Verzeichnis des Systems — bisher `TEMPDIR$` |
+| `DIR_CURRENT$() AS STRING` | aktuelles Arbeitsverzeichnis — bisher `CWD$` |
+| `DIR_CHANGE(path)` | Arbeitsverzeichnis wechseln — bisher `CHDIR` |
+| `DIR_CREATE(path)` | Verzeichnis anlegen (inkl. Eltern) — bisher `MKDIR` |
+| `DIR_DELETE(path$ [, with_content])` | Verzeichnis löschen (leer; mit TRUE samt Inhalt) — bisher `RMDIR` |
 
 ### MAP wie ARRAY_ und SET_: mit Unterstrich, Anzahl heißt COUNT
 
@@ -309,6 +327,26 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `MONEY_VALUE(g: GELD)` | bewusst herausgehen (Anzeige in Diagrammen o. Ä.) — bisher `GELD_ZAHL` |
 | `BUFFER_FROM_POINTER(pointer, length)` | kopiert laenge Bytes hinter einem Zeiger in einen neuen BUFFER; 0 Bytes ergeben einen leeren, ein … — bisher `BUFFER_AUS_ZEIGER` |
 | `TEXT_FROM_POINTER$(pointer [, wide])` | kopiert den Text hinter einem Zeiger bis zum Nullzeichen (UTF-8; mit breit = TRUE wchar_t, also UTF-16 … — bisher `TEXT_AUS_ZEIGER$` |
+| `NUMBER_TEXT$(number [, digits]) AS STRING` | Zahl deutsch mit Tausenderpunkten und Dezimalkomma (400.000, 1.234.567,89); mit digits kaufmännisch gerundet — bisher `ZAHL$` |
+| `BUFFER_POINTER(buffer) AS INTEGER` | die Adresse der Bytes eines BUFFER, für ein Struct-Feld, das auf einen anderen Puffer zeigt; ein leerer … — bisher `BUFFER_ZEIGER` |
+
+### Der Bereich vorn: Text, Typen, System, Cloud
+
+| Name | Was es tut |
+|---|---|
+| `TEXT_STARTS_WITH(s, prefix) AS BOOLEAN` | beginnt der Text so? — bisher `STARTSWITH` |
+| `TEXT_ENDS_WITH(s, suffix) AS BOOLEAN` | endet der Text so? — bisher `ENDSWITH` |
+| `TEXT_CONTAINS(s, part) AS BOOLEAN` | Teilstring enthalten? (Funktionsform von part IN s) — bisher `CONTAINS` |
+| `TEXT_COUNT(text$, part$)` | Anzahl nicht-überlappender Vorkommen von part — bisher `COUNT` |
+| `TEXT_REMOVE_SPACES$(s$)` | jeden Leerraum entfernen (Leerzeichen, Tabulator, Umbruch) — für Eingaben wie "DE89 3704 0044" — bisher `NOSPACES$` |
+| `IS_NUM(x)` | eine Zahl? (BOOLEAN ist keine) — bisher `ISNUM` |
+| `IS_INT(x)` | eine Ganzzahl? — bisher `ISINT` |
+| `IS_STR(x)` | ein Text? — bisher `ISSTR` |
+| `IS_BOOL(x)` | ein BOOLEAN? — bisher `ISBOOL` |
+| `IS_NUMERIC(s) AS BOOLEAN` | als Zahl parsebar? — bisher `ISNUMERIC` |
+| `SYSTEM_EXE_PATH$() AS STRING` | Pfad der laufenden Programmdatei — bisher `EXEPATH$` |
+| `CLOUD_LEADERBOARD_SUBMIT(board$, name$, score[, best_low])` | Punkte einreichen; best_low = TRUE für „kleiner ist besser“ — bisher `LEADERBOARD_SUBMIT` |
+| `CLOUD_LEADERBOARD_FETCH(board$, n[, ascending]) AS ARRAY OF TUPLE` | Die besten n Einträge als (name$, score)-Tupel, sortiert (Standard absteigend) — bisher `LEADERBOARD_FETCH` |
 
 ### Fristen: `_SET_TIMEOUT` in Millisekunden
 

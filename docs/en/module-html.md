@@ -7,6 +7,9 @@ HTTP client + URL helpers + HTML parser. All native in `dhrt` (Rust, HTTP via
 IMPORT "html"
 ```
 
+`IMPORT "http"` means the same module — the name `html` dates from the time
+when it only read pages.
+
 ## Overview
 
 | Area | Function | Returns | Meaning |

@@ -380,4 +380,4 @@ UEBERSPRUNGEN -- OpenLigaDB nicht erreichbar:
 --- ersetzen DIM antwort AS STRING : antwort = HTTP_GET(URL)
 DIM antwort AS STRING : antwort = HTTP_RESULT(99)
 --- fehler
-HTTP_RESULT: Abruf 99 ist nicht fertig
+HTTP_RESULT: einen Auftrag 99 gibt es nicht

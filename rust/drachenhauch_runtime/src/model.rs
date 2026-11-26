@@ -617,6 +617,17 @@ pub(crate) struct FuncRoh {
     pub local_names: Vec<String>,
 }
 
+/// Die Art des Handles, das ein CALL_BUILTIN liefert, + 1 (0 = keines).
+fn handle_merk(op: u16, arg: &Arg) -> usize {
+    if op != op::CALL_BUILTIN { return 0; }
+    let name = match arg {
+        Arg::Call(n, _, _) => &n[..],
+        Arg::List(l) => match l.first() { Some(Arg::Str(s)) => &s[..], _ => return 0 },
+        _ => return 0,
+    };
+    crate::handle::liefert(name).map(|a| a as usize + 1).unwrap_or(0)
+}
+
 pub(crate) fn func_bauen(r: FuncRoh) -> Func {
     let mut local_defaults = r.local_defaults;
     // Mathe-Typen starten mit ihrem neutralen Element statt mit NIL. Der
@@ -631,10 +642,12 @@ pub(crate) fn func_bauen(r: FuncRoh) -> Func {
         }
     }
     let mut code: Vec<Instr> = r.code.into_iter().map(|(op, arg)| Instr {
+        // CALL_BUILTIN merkt sich in `merk`, ob der Befehl ein Handle liefert
+        // (Art + 1, `handle.rs`) -- einmal beim Laden statt je Aufruf.
+        merk: std::cell::Cell::new((std::ptr::null(), handle_merk(op, &arg))),
         op,
         arg,
         familie: std::cell::Cell::new(0),
-        merk: std::cell::Cell::new((std::ptr::null(), 0)),
         schnell: 0,
         schleife: std::cell::Cell::new(0),
     }).collect();

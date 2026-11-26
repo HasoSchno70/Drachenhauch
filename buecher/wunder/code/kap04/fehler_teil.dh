@@ -1,3 +1,3 @@
 IMPORT "time"
 DIM zeit AS INTEGER : zeit = TIME_NOW()
-PRINT TIME_PART(zeit, "hour")
+PRINT TIME_PART(zeit, "stunden")

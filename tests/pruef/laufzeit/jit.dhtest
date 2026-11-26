@@ -5266,6 +5266,8 @@ DHRT_JIT=aus
 51 11
 
 === handle schreiben bleibt in der vm und zaehlt runden (maschinencode)
+' Seit den getaggten Handles (handle.rs) haelt b ein IMAGE-Handle, keine
+' Zahl: der Maschinencode liest es, aber geschrieben wird nur in der VM.
 DIM b AS IMAGE
 DIM i AS INTEGER
 DIM s AS INTEGER
@@ -5281,9 +5283,9 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 51 11
 --- stderr
-jit: Schleife an Stelle 15 in __main__ bleibt in der VM: Platz 1 hat den Typ 'image'; mit Werten: Platz 1 hat den Typ 'image'
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: globale Variable, die keine Zahl ist; mit Werten: Platz 1 hat den Typ 'image'
 jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
-jit: 4 Runden in der VM -- Stelle 15 in __main__: Platz 1 hat den Typ 'image'; mit Werten: Platz 1 hat den Typ 'image'
+jit: 4 Runden in der VM -- Stelle 15 in __main__: globale Variable, die keine Zahl ist; mit Werten: Platz 1 hat den Typ 'image'
 
 === befehl in einem seltenen zweig wird spaet gebunden
 IMPORT "json"

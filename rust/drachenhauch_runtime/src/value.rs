@@ -107,6 +107,10 @@ pub enum Value {
     AnimFsm(Rc<RefCell<crate::animfsm::AnimFsmObj>>),
     /// Modul `chart`: Diagramm (CHART_*, Referenz-Typ -- Daten + Stil).
     Chart(Rc<RefCell<crate::chart::ChartObj>>),
+    /// Ein getaggtes Handle: die Nummer eines Dings, das ein Modul verwaltet
+    /// (PDF, Datenbank, Bild, Widget ...), mit seiner Art (`handle::ARTEN`).
+    /// Rechnet und vergleicht wie seine Nummer; siehe `handle.rs`.
+    Handle(u16, i64),
 }
 
 /// Suspendierter Zustand einer Coroutine. Der Frame (ip/locals/stack/
@@ -818,7 +822,7 @@ impl Value {
         match self {
             Value::Nil => "NIL".to_string(),
             Value::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_string(),
-            Value::Int(i) => i.to_string(),
+            Value::Int(i) | Value::Handle(_, i) => i.to_string(),
             Value::Float(f) => fmt_float(*f),
             Value::Str(s) => s.to_string(),
             Value::Tuple(items) => {
@@ -918,7 +922,7 @@ impl Value {
     pub fn truthy(&self) -> bool {
         match self {
             Value::Bool(b) => *b,
-            Value::Int(i) => *i != 0,
+            Value::Int(i) | Value::Handle(_, i) => *i != 0,
             Value::Float(f) => *f != 0.0,
             Value::Str(s) => !s.is_empty(),
             Value::Nil => false,
@@ -970,7 +974,14 @@ impl Value {
             Value::Phys2d(_) => "PHYS2D_WORLD",
             Value::AnimFsm(_) => "ANIM_FSM",
             Value::Chart(_) => "CHART",
+            Value::Handle(a, _) => crate::handle::name(*a),
         }
+    }
+
+    /// Ein Handle als seine Nummer, alles andere unveraendert (fuer die
+    /// Stellen, die rechnen oder vergleichen).
+    pub fn ohne_handle(&self) -> Value {
+        match self { Value::Handle(_, n) => Value::Int(*n), v => v.clone() }
     }
 
     /// Ein Text-Wert. Nimmt `&str` (dann eine Kopie) oder einen fertigen
@@ -1077,6 +1088,10 @@ pub fn value_eq(a: &Value, b: &Value) -> bool {
         // derselben Stelle tragen womoeglich verschiedene Werte.
         (Value::Closure(x), Value::Closure(y)) => Rc::ptr_eq(x, y),
         (Value::CompMarker, Value::CompMarker) => true,
+        // Ein Handle ist seiner Art und Nummer gleich; einer nackten Zahl
+        // gleich, wenn sie seine Nummer ist (`IF bild = 0`).
+        (Value::Handle(x, n), Value::Handle(y, m)) => x == y && n == m,
+        (Value::Handle(_, n), v) | (v, Value::Handle(_, n)) => value_eq(&Value::Int(*n), v),
         _ if is_num(a) && is_num(b) => as_f64(a) == as_f64(b),
         _ => false,
     }

@@ -547,24 +547,14 @@ pub struct Compiler {
 fn known_builtins() -> &'static std::collections::HashSet<String> {
     use std::sync::OnceLock;
     static SET: OnceLock<std::collections::HashSet<String>> = OnceLock::new();
-    SET.get_or_init(|| {
-        let raw = include_str!("../../../daten/builtin_index.json");
-        let mut s = std::collections::HashSet::new();
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
-            if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {
-                for e in arr {
-                    if let Some(n) = e.get("name").and_then(|n| n.as_str()) {
-                        s.insert(n.to_lowercase());
-                    }
-                }
-            }
-        }
-        s
-    })
+    SET.get_or_init(|| builtin_eintraege().iter().map(|(n, _, _)| n.to_lowercase()).collect())
 }
 
 /// Alle Eintraege des Index `(Name, Signatur, Modul)`, Name wie eingetragen
-/// (gross) -- fuer den Sprachserver (`lsp.rs`) und `dhrt doku`.
+/// (gross). Die EINE Stelle, die `builtin_index.json` liest -- bis 2026.53
+/// parsten ihn vier Funktionen je fuer sich (Bericht A20.2); Namen,
+/// Argumentzahl, Module, Handles (`handle.rs`), Sprachserver und `dhrt doku`
+/// gehen hierueber.
 pub(crate) fn builtin_eintraege() -> &'static Vec<(String, String, String)> {
     use std::sync::OnceLock;
     static V: OnceLock<Vec<(String, String, String)>> = OnceLock::new();
@@ -601,21 +591,9 @@ pub(crate) fn builtin_eintraege() -> &'static Vec<(String, String, String)> {
 fn builtin_arity() -> &'static std::collections::HashMap<String, (usize, usize)> {
     use std::sync::OnceLock;
     static MAP: OnceLock<std::collections::HashMap<String, (usize, usize)>> = OnceLock::new();
-    MAP.get_or_init(|| {
-        let raw = include_str!("../../../daten/builtin_index.json");
-        let mut m = std::collections::HashMap::new();
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
-            if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {
-                for e in arr {
-                    let (Some(n), Some(sig)) = (e.get("name").and_then(|n| n.as_str()),
-                                                e.get("signature").and_then(|s| s.as_str()))
-                    else { continue };
-                    if let Some(mm) = parse_arity(sig) { m.insert(n.to_lowercase(), mm); }
-                }
-            }
-        }
-        m
-    })
+    MAP.get_or_init(|| builtin_eintraege().iter()
+        .filter_map(|(n, sig, _)| parse_arity(sig).map(|mm| (n.to_lowercase(), mm)))
+        .collect())
 }
 
 /// Eine Signatur in (min, max) Argumente uebersetzen. `None` = nicht sicher
@@ -825,7 +803,8 @@ fn builtin_params_von(name: &str, kanonisch: &str) -> Option<&'static (Vec<Built
 }
 
 /// Herkunfts-Modul je Builtin (lowercase), aus `builtin_index.json`. `core`
-/// und `dhrt` bedeuten "kein IMPORT noetig" und stehen darum NICHT drin.
+/// heisst "kein IMPORT noetig" und steht darum NICHT drin (bis 2026.53 stand
+/// fuer dasselbe auch `dhrt` im Index, Bericht B7).
 ///
 /// Warum das ueberhaupt geprueft wird: dhrt kennt alle Module nativ, ein
 /// `IMPORT "vec2"` wird vom Preprocessor zu einem Kommentar. `VEC2_NEW(...)`
@@ -838,22 +817,10 @@ fn builtin_params_von(name: &str, kanonisch: &str) -> Option<&'static (Vec<Built
 fn builtin_modul() -> &'static std::collections::HashMap<String, String> {
     use std::sync::OnceLock;
     static MAP: OnceLock<std::collections::HashMap<String, String>> = OnceLock::new();
-    MAP.get_or_init(|| {
-        let raw = include_str!("../../../daten/builtin_index.json");
-        let mut m = std::collections::HashMap::new();
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
-            if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {
-                for e in arr {
-                    let (Some(n), Some(modul)) = (e.get("name").and_then(|n| n.as_str()),
-                                                  e.get("module").and_then(|s| s.as_str()))
-                    else { continue };
-                    if modul == "core" || modul == "dhrt" { continue; }
-                    m.insert(n.to_lowercase(), modul.to_lowercase());
-                }
-            }
-        }
-        m
-    })
+    MAP.get_or_init(|| builtin_eintraege().iter()
+        .filter(|(_, _, m)| m != "core")
+        .map(|(n, _, m)| (n.to_lowercase(), m.to_lowercase()))
+        .collect())
 }
 
 /// Das Modul eines Befehls laut Index (klein), ohne `core`/`dhrt` --
@@ -1601,11 +1568,10 @@ impl Compiler {
     }
 
     fn typ_klartext(t: &str) -> String {
-        // Gross geschrieben, weil der Compiler Typnamen klein ablegt, sie im
-        // Quelltext aber ueberall gross stehen (DIM x AS INTEGER).
-        if let Some(e) = t.strip_prefix("array:") { return format!("ARRAY OF {}", e.to_uppercase()); }
-        if let Some(e) = t.strip_prefix("map:") { return format!("MAP OF {}", e.to_uppercase()); }
-        t.to_uppercase()
+        // Dieselbe Schreibweise wie die Laufzeit (`vm_helfer::typ_lesbar`,
+        // rekursiv): bis 2026.53 sagte --check "ARRAY OF ARRAY:INTEGER", die
+        // Laufzeit "ARRAY OF ARRAY OF INTEGER" (Bericht A20.2).
+        crate::vm::typ_lesbar(t)
     }
 
     /// Zweites DIM desselben Namens mit ANDEREM Typ melden.
@@ -4202,6 +4168,19 @@ impl Compiler {
                         m.push_str(&crate::umstieg::text_statt_zahl(&bname, t));
                     }
                     self.spaete_fehler.push((self.ctx.cur_line, m));
+                }
+            }
+            // Ein Handle an einem Parameter einer anderen Art (ein PDF an
+            // XLSX_*): die Laufzeit bricht dort ab (`handle.rs`); kennt der
+            // Compiler die Art der Variablen schon, sagt er es vorher.
+            if let Some(hb) = crate::handle::tafel().get(&bname) {
+                for &(stelle, soll) in &hb.nimmt {
+                    let Some(arg) = args.get(stelle) else { continue };
+                    let Some(ist) = self.statischer_typ(arg).and_then(|t| crate::handle::art(&t)) else { continue };
+                    if ist != soll {
+                        self.warnings.push((self.ctx.cur_line,
+                            crate::handle::verwechselt(&anzeige, stelle, soll, ist)));
+                    }
                 }
             }
             // Gehoert der Befehl zu einem Modul, das nicht importiert ist?

@@ -66,6 +66,16 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
 
 **Handles**
 
+* **Handles tragen ihre Art** (`Value::Handle`, `handle.rs`): `TYPEOF(p)`
+  sagt `PDF` statt `INTEGER`, `p IS PDF` ist TRUE, `p IS INTEGER` FALSE.
+  Ein Handle einer anderen Art an einem Befehl ist ein Fehler
+  („XLSX_SHEET_COUNT: Argument 1 erwartet ein XLSX-Handle, erhalten ein
+  PDF-Handle“) -- bis 2026.53 traf das PDF 0 still die Mappe 0; `--check`
+  meldet es vorher. Eine INTEGER-Variable nimmt weiter die Nummer, eine Zahl
+  an einer Variable des Handle-Typs wird zum Handle; `DIM d AS DB_CONN =
+  TRUE` ist ein Fehler. Rechnen (`h + 1`) mit einem Handle ist ein Fehler,
+  vergleichen (`h = 0`, `h < 0`) geht wie mit der Nummer.
+
 * Ein freigegebenes gui-Widget oder -Fenster: Fragen geht weiter (Ereignisse
   FALSE), **Setzen ist ein Fehler** („GUI_SET_TEXT: das Widget wurde mit
   GUI_WIDGET_FREE freigegeben“); vorher ging es still durch.

@@ -141,13 +141,13 @@ alte, sehr ausführliche Tabelle samt aller Einzelheiten steht in
 
 | Bereich | Module |
 |---|---|
-| Daten | `json`, `xml`, `ini`, `csv`, `xlsx`, `zip`, `db` (SQLite, PostgreSQL, MySQL), `save`, `zeit`, `geld`, `regex`, `krypto`, `pdf` (krilla, Drucken) |
+| Daten | `json`, `xml`, `ini`, `xlsx`, `db` (SQLite, PostgreSQL, MySQL), `save`, `zeit`, `geld`, `regex`, `pdf` (krilla, Drucken); ohne IMPORT im Kern: CSV, ZIP, Prüfsummen/Krypto |
 | Spiel | `sprite`, `animfsm`, `particles`, `tiled`, `tile_collide`, `controller`, `camera`, `scene`, `astar`, `ecs`, `timer`, `tween`, `curves`, `input` |
 | Grafik | Kern-Befehle (2D, Layer, Atlas, Render-Targets, Shader/POSTFX, Bilder), `g3d` + `m3d` (3D, PBR, Schatten, Instancing), `imgfx`, `chart`, `video` |
 | Physik | `physics` (Kollisions-Mathe), `physics2d`/`physics3d` (Rapier) |
 | Ton | `audio` (Kira: Busse, Effekte, Uhr, Sampler, MOD/XM, räumlich, Modulatoren, `AUDIO_NOTE`, Mischen), `SPEAK`, Mikrofon (`MIC_*`), `midi` (+ `.mid`-Dateien) |
 | Oberfläche | `gui` (Retained-Mode: Fenster, alle Widgets, Dock, Stildatei, Dialoge, Tabellen, Bindung, Barrierefreiheit), `ui` (Immediate-Mode) |
-| Netz | `net`, `html` (HTTP), `httpd`, `websocket`, `mqtt`, `smtp`, `osc`, `mdns`, `cloud` |
+| Netz | `net`, `html` (HTTP, auch `IMPORT "http"`), `httpd`, `websocket`, `mqtt`, `smtp`, `osc`, `mdns`, `cloud` |
 | Geräte | `serial`, `firmata`, `modbus`, `usb`, `bt`, `wifi`, `gpio`/`i2c`/`spi` (Linux), `webcam`, `hotplug` |
 | System | Prozesse (`PROCESS_*`, `TASK_START`), Fenster als Prozess (`WINDOW_OPEN`), Tray, Zwischenablage, Dateisystem, FFI (`DECLARE … LIB`) |
 

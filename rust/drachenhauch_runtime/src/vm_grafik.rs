@@ -2730,7 +2730,7 @@ optional dahinter (qx, qy, qb, qh) und eine Faerbung".into());
                 let mut bilder = Vec::with_capacity(anzahl as usize);
                 for (i, x) in roh.iter().take(anzahl as usize).enumerate() {
                     match x {
-                        Value::Int(n) => bilder.push(*n),
+                        Value::Int(n) | Value::Handle(_, n) => bilder.push(*n),
                         Value::Nil => return Err(std::format!(
                             "IMAGE_SAVE_GIF: Platz {} ist leer -- mit `anzahl` sagen, \
 wie viele Plaetze gelten", i + 1)),

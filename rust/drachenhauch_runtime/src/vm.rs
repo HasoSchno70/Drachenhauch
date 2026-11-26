@@ -791,16 +791,6 @@ fn dbg_emit(ev: &serde_json::Value) {
     let _ = h.flush();
 }
 
-fn dbg_truthy(v: &Value) -> bool {
-    match v {
-        Value::Bool(b) => *b,
-        Value::Int(i) => *i != 0,
-        Value::Float(f) => *f != 0.0,
-        Value::Nil => false,
-        _ => true,
-    }
-}
-
 /// Wert fuer die Variablen-Anzeige formatieren (gekappt wie debugger._fmt_value).
 fn dbg_short(v: &Value) -> String {
     let s = v.fmt();
@@ -810,44 +800,22 @@ fn dbg_short(v: &Value) -> String {
     } else { s }
 }
 
-fn dbg_arith(a: &Value, b: &Value, f: fn(f64, f64) -> f64) -> R<Value> {
-    if !is_num(a) || !is_num(b) {
-        return Err("eval: Operanden muessen Zahlen sein".into());
-    }
-    let r = f(as_f64(a), as_f64(b));
-    if matches!(a, Value::Int(_)) && matches!(b, Value::Int(_)) {
-        Ok(Value::Int(r as i64))
-    } else {
-        Ok(Value::Float(r))
-    }
-}
-
-/// Binaerer Operator fuer den Debugger-Mini-Evaluator (Subset).
+/// Binaerer Operator fuer den Debugger-Mini-Evaluator: dieselben Regeln wie
+/// die Befehle der VM (`vm_helfer::cmp`, `wert_rechnen`), keine zweite
+/// Rechnung (CLAUDE.md). Bis 2026.53 rechnete der Debugger selbst -- ueber
+/// f64: `"apfel" < "birne"` war FALSE, `2^53 + 1` verlor die letzte Stelle,
+/// und ein Ueberlauf saettigte (Bericht A20.1).
 fn dbg_binop(op: &str, a: &Value, b: &Value) -> R<Value> {
+    let vergleich = |o: char| cmp(a, b, o).map(Value::Bool).map_err(|e| format!("eval: {}", e));
     match op {
         "=" => Ok(Value::Bool(value_eq(a, b))),
         "<>" => Ok(Value::Bool(!value_eq(a, b))),
-        "and" => Ok(Value::Bool(dbg_truthy(a) && dbg_truthy(b))),
-        "or" => Ok(Value::Bool(dbg_truthy(a) || dbg_truthy(b))),
-        "+" => {
-            if let (Value::Str(x), Value::Str(y)) = (a, b) {
-                return Ok(Value::str_rc(format!("{}{}", x, y)));
-            }
-            dbg_arith(a, b, |x, y| x + y)
-        }
-        "-" => dbg_arith(a, b, |x, y| x - y),
-        "*" => dbg_arith(a, b, |x, y| x * y),
-        "/" => {
-            if as_f64(b) == 0.0 { return Err("eval: Division durch 0".into()); }
-            Ok(Value::Float(as_f64(a) / as_f64(b)))
-        }
-        "<" => Ok(Value::Bool(as_f64(a) < as_f64(b))),
-        ">" => Ok(Value::Bool(as_f64(a) > as_f64(b))),
-        "<=" => Ok(Value::Bool(as_f64(a) <= as_f64(b))),
-        ">=" => Ok(Value::Bool(as_f64(a) >= as_f64(b))),
-        // MOD, \, ^ ... mit denselben Regeln wie die Befehle der VM -- bis
-        // 2026-09-27 kannte der Debugger sie nicht, und eine Bedingung wie
-        // `i MOD 2 = 0` hielt dann bei JEDEM Durchlauf (fail-open).
+        "and" => Ok(Value::Bool(a.truthy() && b.truthy())),
+        "or" => Ok(Value::Bool(a.truthy() || b.truthy())),
+        "<" => vergleich('<'),
+        ">" => vergleich('>'),
+        "<=" => vergleich('l'),
+        ">=" => vergleich('g'),
         _ => wert_rechnen(op, a, b)
             .ok_or_else(|| format!("eval: Operator '{}' geht mit diesen Werten nicht", op)),
     }
@@ -1644,18 +1612,13 @@ impl<'p> Vm<'p> {
     /// nur die VM kennt.
     /// Ist `kind` die Klasse `basis` oder stammt davon ab? (Gross/klein egal.)
     fn klasse_stammt_ab(&self, kind: &str, basis: &str) -> bool {
-        let mut cur: Option<String> = Some(kind.to_string());
-        let mut schritte = 0;
-        while let Some(c) = cur {
-            if c.eq_ignore_ascii_case(basis) { return true; }
-            schritte += 1;
-            if schritte > 64 { return false; }
-            cur = match self.prog.classes.get(c.as_str()) {
-                Some(ci) if !ci.parent_name.is_empty() => Some(ci.parent_name.to_string()),
-                _ => None,
-            };
-        }
-        false
+        // Aus der Lage der Klasse (`Layout::vorfahren`, beim Laden einmal
+        // gebaut) -- dieselbe Quelle wie `value::klasse_erbt`. Bis 2026.53
+        // liefen hier und in `ist_vom_typ` eigene Schleifen ueber
+        // `parent_name` (Bericht A20.2).
+        kind.eq_ignore_ascii_case(basis)
+            || self.prog.classes.get(kind).is_some_and(|ci|
+                ci.layout.vorfahren.iter().any(|v| v.eq_ignore_ascii_case(basis)))
     }
 
     fn try_typtest(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
@@ -1693,17 +1656,7 @@ impl<'p> Vm<'p> {
     fn ist_vom_typ(&self, wert: &Value, gesucht: &str) -> bool {
         if self.prog.classes.contains_key(gesucht) {
             return match wert {
-                Value::Instance(rc) => {
-                    let mut cur: Option<String> = Some(rc.borrow().class_name.to_string());
-                    while let Some(c) = cur {
-                        if c == gesucht { return true; }
-                        cur = match self.prog.classes.get(c.as_str()) {
-                            Some(ci) if !ci.parent_name.is_empty() => Some(ci.parent_name.to_string()),
-                            _ => None,
-                        };
-                    }
-                    false
-                }
+                Value::Instance(rc) => self.klasse_stammt_ab(&rc.borrow().class_name, gesucht),
                 _ => false,
             };
         }
@@ -2375,8 +2328,22 @@ impl<'p> Vm<'p> {
 
     /// Jeder Befehl laeuft unter `panik_fangen`: eine Panik in irgendeiner
     /// Familie wird ein Laufzeitfehler mit Befehlsnamen, den TRY faengt.
-    pub(crate) fn builtin_rufen(&mut self, name: &str, a: &[Value], merk: &std::cell::Cell<u8>) -> R<Value> {
-        panik_fangen(name, a.len(), || self.builtin_rufen_innen(name, a, merk))
+    ///
+    /// Handles (`handle.rs`): ein getaggtes Argument wird vorher geprueft
+    /// (Art des Parameters laut Index) und zur Zahl; `liefert` ist die Art
+    /// des Ergebnisses + 1 (0 = keine), gemerkt je Aufrufstelle
+    /// (`Instr::merk`, `model::func_bauen`).
+    pub(crate) fn builtin_rufen(&mut self, name: &str, a: &[Value], merk: &std::cell::Cell<u8>, liefert: usize) -> R<Value> {
+        let v = if a.iter().any(|v| matches!(v, Value::Handle(..))) && !crate::handle::ROH.contains(&name) {
+            let a = crate::handle::auspacken(name, a)?;
+            panik_fangen(name, a.len(), || self.builtin_rufen_innen(name, &a, merk))?
+        } else {
+            panik_fangen(name, a.len(), || self.builtin_rufen_innen(name, a, merk))?
+        };
+        match v {
+            Value::Int(n) if liefert != 0 && n >= 0 => Ok(Value::Handle((liefert - 1) as u16, n)),
+            v => Ok(v),
+        }
     }
 
     fn builtin_rufen_innen(&mut self, name: &str, a: &[Value], merk: &std::cell::Cell<u8>) -> R<Value> {
@@ -3625,7 +3592,7 @@ impl<'p> Vm<'p> {
                     }
                     let v = {
                         let bargs: &[Value] = &stack[split..];
-                        self.builtin_rufen(name, bargs, &instr.familie)?
+                        self.builtin_rufen(name, bargs, &instr.familie, instr.merk.get().1)?
                     };
                     stack.truncate(split);
                     stack.push(v);

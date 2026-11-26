@@ -312,7 +312,7 @@ impl<'p> Vm<'p> {
                 let bed_ok = match &hp.bed {
                     None => true,
                     Some(expr) => self.eval_node(expr, fn_, locals)
-                        .map(|v| dbg_truthy(&v)).unwrap_or(true),
+                        .map(|v| v.truthy()).unwrap_or(true),
                 };
                 if bed_ok {
                     hp.zaehler += 1;
@@ -589,9 +589,9 @@ impl<'p> Vm<'p> {
             Node::UnaryOp { op, operand } => {
                 let v = self.eval_node(operand, fn_, locals)?;
                 match op.as_str() {
-                    "-" => match v { Value::Int(i) => Ok(Value::Int(-i)),
-                                     _ => Ok(Value::Float(-as_f64(&v))) },
-                    "not" => Ok(Value::Bool(!dbg_truthy(&v))),
+                    "-" => crate::vm::konstant_negieren(&v)
+                        .ok_or_else(|| "eval: '-' erwartet eine Zahl".to_string()),
+                    "not" => Ok(Value::Bool(!v.truthy())),
                     _ => Err(format!("eval: unaerer Operator '{}' nicht unterstuetzt", op)),
                 }
             }

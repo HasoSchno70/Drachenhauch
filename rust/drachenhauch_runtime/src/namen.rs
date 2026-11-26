@@ -89,6 +89,11 @@ pub const NEU: &[(&str, &str)] = &[
     ("polygon_outline", "polygonoutline"),
     ("ngon_outline", "ngonoutline"),
     ("pie_outline", "pieoutline"),
+    ("draw_gradient_h", "gradienth"),
+    ("draw_gradient_v", "gradientv"),
+    ("draw_text_rot", "textrot"),
+    ("draw_box_rot", "boxrot"),
+    ("draw_line_dashed", "linedashed"),
     // ---- Bilder, Schrift, Ton, Modelle: BEREICH_VERB
     ("image_load", "loadimage"),
     ("image_get_pixel", "getpixel"),
@@ -125,6 +130,7 @@ pub const NEU: &[(&str, &str)] = &[
     ("phys3d_body_free", "phys3d_remove"),
     ("bt_close", "bt_disconnect"),
     ("mqtt_close", "mqtt_disconnect"),
+    ("font_load_sdf", "loadfont_sdf"),
     // ---- Dateien (mit Pfad), Dateien (mit Handle), Ordner, Pfade
     ("file_exists", "fileexists"),
     ("file_size", "filesize"),
@@ -156,6 +162,18 @@ pub const NEU: &[(&str, &str)] = &[
     ("env_set", "setenv"),
     ("url_open", "openurl"),
     ("doc_open", "opendoc"),
+    ("file_rename", "rename"),
+    ("file_temp$", "tempfile$"),
+    ("file_seek", "seek"),
+    ("file_tell", "tell"),
+    ("file_write_text", "write"),
+    ("file_read_block", "read_bytes"),
+    ("file_write_block", "write_bytes"),
+    ("dir_temp$", "tempdir$"),
+    ("dir_current$", "cwd$"),
+    ("dir_change", "chdir"),
+    ("dir_create", "mkdir"),
+    ("dir_delete", "rmdir"),
     // ---- MAP wie ARRAY_ und SET_: mit Unterstrich, Anzahl heisst COUNT
     ("map_get", "mapget"),
     ("map_get_or", "mapgetor"),
@@ -196,10 +214,29 @@ pub const NEU: &[(&str, &str)] = &[
     ("money_value", "geld_zahl"),
     ("buffer_from_pointer", "buffer_aus_zeiger"),
     ("text_from_pointer$", "text_aus_zeiger$"),
+    ("number_text$", "zahl$"),
+    ("buffer_pointer", "buffer_zeiger"),
+    // ---- Der Bereich vorn: Text, Typen, System, Cloud (Bericht B3, B7)
+    ("text_starts_with", "startswith"),
+    ("text_ends_with", "endswith"),
+    ("text_contains", "contains"),
+    ("text_count", "count"),
+    ("text_remove_spaces$", "nospaces$"),
+    ("is_num", "isnum"),
+    ("is_int", "isint"),
+    ("is_str", "isstr"),
+    ("is_bool", "isbool"),
+    ("is_numeric", "isnumeric"),
+    ("system_exe_path$", "exepath$"),
+    ("cloud_leaderboard_submit", "leaderboard_submit"),
+    ("cloud_leaderboard_fetch", "leaderboard_fetch"),
 ];
 
 /// Englische Modulnamen: `IMPORT "time"` ist `IMPORT "zeit"`.
-const MODULE: &[(&str, &str)] = &[("time", "zeit"), ("money", "geld")];
+const MODULE: &[(&str, &str)] = &[("time", "zeit"), ("money", "geld"),
+    // Der HTTP-Client heisst seit jeher `html` (er las anfangs nur Seiten);
+    // wer `IMPORT "http"` schreibt, meint ihn (Bericht B7).
+    ("http", "html")];
 
 /// Der bisherige Name zu einem neuen (klein). `None`: kein neuer Name.
 pub fn bisher(name: &str) -> Option<&'static str> {
@@ -277,6 +314,7 @@ mod tests {
     fn modulnamen() {
         assert_eq!(modul("time"), "zeit");
         assert_eq!(modul("money"), "geld");
+        assert_eq!(modul("http"), "html");
         assert_eq!(modul("json"), "json");
     }
 }

@@ -335,7 +335,7 @@ fn art_von_typ(t: &str) -> Option<Art> {
 
 fn art_von_wert(v: &Value) -> Option<Art> {
     match v {
-        Value::Int(_) => Some(Art::I),
+        Value::Int(_) | Value::Handle(..) => Some(Art::I),
         Value::Float(_) => Some(Art::F),
         Value::Bool(_) => Some(Art::B),
         _ => None,
@@ -538,7 +538,7 @@ extern "C" fn global_holen(k: *mut Kontext, idx: u64) {
     let art = unsafe { *k.arten.add(i) };
     let bits = match slots.get(i).and_then(|s| s.as_ref()) {
         Some(sl) => match (&sl.borrow().value, art) {
-            (Value::Int(x), 1) => *x as u64,
+            (Value::Int(x) | Value::Handle(_, x), 1) => *x as u64,
             (Value::Float(f), 2) => f.to_bits(),
             (Value::Bool(b), 3) => *b as u64,
             _ => { k.fehler = 1; return; }
@@ -556,7 +556,9 @@ extern "C" fn global_holen(k: *mut Kontext, idx: u64) {
 /// (`familie_bits`). Passt er nicht, steigt der Maschinencode aus (`fehler`).
 fn wert_bits(k: *mut Kontext, v: Option<&Value>, art: u64, lage: u64) -> i64 {
     match (art, v) {
-        (1, Some(Value::Int(x))) => *x,
+        // Ein Handle liest sich als seine Nummer (`handle.rs`); geschrieben
+        // wird ein Handle-Platz nur von der VM (`LOAD_LOCAL` unten).
+        (1, Some(Value::Int(x) | Value::Handle(_, x))) => *x,
         (3, Some(Value::Bool(b))) => *b as i64,
         (4, Some(Value::Instance(rc))) if Rc::as_ptr(&rc.borrow().layout) as u64 == lage => Rc::as_ptr(rc) as i64,
         // Eine Familie: `lage` zeigt auf [Zahl, Lage 1, Lage 2 ...] (`Klasse::pruef`).
@@ -744,7 +746,7 @@ extern "C" fn w_ablegen_f(k: *mut Kontext, x: f64, ziel: u64) { *w_platz(k, ziel
 /// andere -- auch eine Kommazahl mit Nachkommastellen -- rechnet die VM.
 extern "C" fn w_zahl_i(k: *mut Kontext, i: u64, art: u64) -> i64 {
     match (art, w_platz(k, i)) {
-        (1, Value::Int(x)) => { let x = *x; *w_platz(k, i) = Value::Nil; x }
+        (1, Value::Int(x) | Value::Handle(_, x)) => { let x = *x; *w_platz(k, i) = Value::Nil; x }
         (3, Value::Bool(b)) => { let b = *b; *w_platz(k, i) = Value::Nil; b as i64 }
         _ => { w_fehler(k); 0 }
     }
@@ -787,8 +789,10 @@ extern "C" fn w_speichern(k: *mut Kontext, von: u64, ziel: u64, typ: u64, typ_le
 /// OPERATOR, Felder, NaN ...) laesst aussteigen.
 extern "C" fn w_op(k: *mut Kontext, o: u64, a_i: u64, b_i: u64, ziel: u64, lokal: i64) -> i64 {
     let schlicht = |v: &Value| matches!(v, Value::Int(_) | Value::Float(_) | Value::Str(_) | Value::Bool(_));
-    let a = w_nehmen(k, a_i);
-    let b = w_nehmen(k, b_i);
+    // Ein Handle rechnet wie seine Nummer (`handle.rs`); die Operanden sind
+    // Zwischenwerte, die Nummer genuegt.
+    let a = match w_nehmen(k, a_i) { Value::Handle(_, n) => Value::Int(n), v => v };
+    let b = match w_nehmen(k, b_i) { Value::Handle(_, n) => Value::Int(n), v => v };
     // Der Platz gibt seinen Verweis GANZ ab (sofort fallen gelassen, sonst
     // hielten zwei den Text, und es wuerde nie angehaengt); zurueck kommt er
     // notfalls als Kopie von `a` -- es ist derselbe Text.
@@ -920,7 +924,7 @@ fn w_builtin_roh(k: *mut Kontext, ins: u64, basis: u64, argc: u64) -> Option<Val
         // etwas getan (gezeichnet, geschrieben); die VM meldet ihn an seiner
         // Stelle.
         let vm = unsafe { &mut *(*k).vm };
-        return match vm.builtin_rufen(name, args, &ins.familie) {
+        return match vm.builtin_rufen(name, args, &ins.familie, ins.merk.get().1) {
             Ok(v) => { for j in 0..argc { drop(w_nehmen(k, basis + j)); } Some(v) }
             Err(e) => { unsafe { (*k).meldung = Some(e); } w_fehler(k); None }
         };
@@ -2112,6 +2116,11 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 }
                 if a == Art::N { return Err("NIL gespeichert".into()); }
                 if matches!(a, Art::S(_)) { return Err("Signatur einer Bibliothek gespeichert".into()); }
+                // Ein Handle-Platz (IMAGE, PDF ...) nimmt nur die VM: dort wird
+                // eine Zahl wieder zum Handle seiner Art (`handle.rs`).
+                if crate::handle::art(&typen[s]).is_some() {
+                    return Err(format!("Platz {} hat den Typ '{}'", s, typen[s]));
+                }
                 if a == Art::W {
                     // In einen Platz mit Zahlentyp: dort als Zahl (geprueft);
                     // sonst bleibt es ein Wert.
