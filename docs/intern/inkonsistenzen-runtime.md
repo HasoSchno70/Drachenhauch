@@ -1340,7 +1340,10 @@ Aufwand. Jeder Punkt hält `docs/stabilitaet.md` ein.
    Compilers wird ein Fehler. Der URL-Dekodierer von httpd arbeitet auf Bytes
    (ein Dekodierer statt zwei). `.dhc` lädt mit `Result`. Ein Netzwerkpaket darf
    kein Programm beenden.
-6. **Zeit: eine Leitlinie und eine Uhr** (A5, B4 Teil).
+6. **Zeit: eine Leitlinie und eine Uhr** (A5, B4 Teil). *Umgesetzt auf `thema/lesen-verbinden`: Regel 9 in
+   `docs/builtins-namen.md`, `HTTP_SET_TIMEOUT`/`SERIAL_SET_TIMEOUT` in ms, `SMTP_`/`MODBUS_SET_TIMEOUT`,
+   gui-Fristen nach `takt`, `spieluhr.rs` für TWEEN/SHAKE/timer, SLEEP mit Komma,
+   PHYS*_STEP in Sekunden. Offen: `CHAR_UPDATE` mit dt, die Coyote-Zeit in Bildern.*
    - Zeitspannen und Timeouts in ms, Schritt-dt in Sekunden.
    - Neue `…_SET_TIMEOUT`-Namen; `HTTP_SET_TIMEOUT` als eigener Befehl in ms.
    - gui-Fristen auf `takt` statt `delta`: der Toast im Leerlauf.
