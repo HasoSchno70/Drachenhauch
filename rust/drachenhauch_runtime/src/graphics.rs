@@ -7227,8 +7227,33 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// Ist der durch den negativen Bind-Code bezeichnete Button/DPad an
     /// IRGENDEINEM verbundenen Pad gedrueckt? (wie Pythons _poll_joysticks_into)
     pub fn joy_button_down(&self, code: i64) -> bool {
+        let Some(btn) = Self::joy_code_knopf(code) else { return false };
+        let mut i = 0;
+        while pad_da(i) {
+            if self.rl.is_gamepad_button_down(i, btn) { return true; }
+            i += 1;
+        }
+        false
+    }
+    /// Flanke eines negativen Bind-Codes an IRGENDEINEM Pad: `los` = gerade
+    /// losgelassen, sonst gerade gedrueckt. Fuer KEYHIT/KEYRELEASED/KEYREPEAT
+    /// mit JOY_BUTTON_* -- bis 2026.53 lieferten die dort still FALSE
+    /// (Bericht A17), nur KEYPRESSED kannte sie.
+    fn joy_flanke(&self, code: i64, los: bool) -> bool {
+        let Some(btn) = Self::joy_code_knopf(code) else { return false };
+        let mut i = 0;
+        while pad_da(i) {
+            let ja = if los { self.rl.is_gamepad_button_released(i, btn) } else { self.rl.is_gamepad_button_pressed(i, btn) };
+            if ja { return true; }
+            i += 1;
+        }
+        false
+    }
+    /// JOY_BUTTON_*-Code (negativ, DEFAULT_KEYS joy_*) -> raylib-Knopf. EINE
+    /// Tafel fuer KEYPRESSED, die Flanken und JOYSTICK_BUTTON.
+    fn joy_code_knopf(code: i64) -> Option<raylib::consts::GamepadButton> {
         use raylib::consts::GamepadButton::*;
-        let btn = match code {
+        Some(match code {
             -100 => GAMEPAD_BUTTON_RIGHT_FACE_DOWN,
             -101 => GAMEPAD_BUTTON_RIGHT_FACE_RIGHT,
             -102 => GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
@@ -7243,14 +7268,8 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             -201 => GAMEPAD_BUTTON_LEFT_FACE_DOWN,
             -202 => GAMEPAD_BUTTON_LEFT_FACE_LEFT,
             -203 => GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
-            _ => return false,
-        };
-        let mut i = 0;
-        while pad_da(i) {
-            if self.rl.is_gamepad_button_down(i, btn) { return true; }
-            i += 1;
-        }
-        false
+            _ => return None,
+        })
     }
     // --- Core-Tastatur: INKEY$ / WAITKEY ---
     /// INKEY$: naechstes getipptes (druckbares) Zeichen oder leerer String.
@@ -7262,15 +7281,25 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         }
     }
     /// WAITKEY: blockiert bis eine Taste gedrueckt wird, liefert den raylib-
-    /// Keycode (INTEGER). -1 wenn das Fenster geschlossen wird. (Der Code-Wert
-    /// folgt raylibs KeyboardKey-Enum, nicht den SDL-Codes der KEY_*-
-    /// Konstanten -- historisch so gewachsen, dokumentiert.)
+    /// Keycode (INTEGER). -1 wenn das Fenster geschlossen wird. Sondertasten
+    /// als DH-Code (KEY_LEFT ...), Buchstaben und Ziffern als ASCII-Gross-
+    /// buchstabe.
     pub fn waitkey(&mut self) -> i64 {
         loop {
-            // window_should_close() ruft intern PollInputEvents -> fuellt die
-            // Key-Queue, ohne dass ein FLIP noetig ist.
+            // Die Fensternachrichten selbst abholen: seit raylib 6 tut es
+            // window_should_close() nicht mehr (nur EndDrawing) -- WAITKEY
+            // wartete bis 2026.53 ohne FLIP fuer immer (gefunden mit dem Fall
+            // in fenster/taste_nach_buchstabe.dhtest).
+            unsafe { raylib::ffi::PollInputEvents(); }
             if self.rl.window_should_close() { return -1; }
-            if let Some(k) = self.rl.get_key_pressed() { return k as i64; }
+            // Sondertasten als DH-Code wie KEY_LEFT & Co. (bis 2026.53 der
+            // rohe raylib-Code -- `WAITKEY() = KEY_LEFT` war nie wahr);
+            // Buchstaben und Ziffern wie bisher als ASCII-Grossbuchstabe.
+            if let Some(k) = self.rl.get_key_pressed() {
+                let v = k as u32 as i64;
+                if (65..=90).contains(&v) || (48..=57).contains(&v) { return v; }
+                return dh_key_code(k).unwrap_or(v);
+            }
             std::thread::sleep(std::time::Duration::from_millis(15));
         }
     }
@@ -7313,6 +7342,10 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// Flanken-Varianten JOYSTICK_HIT/RELEASED geteilt.
     fn joy_btn_enum(btn: i64) -> Option<raylib::consts::GamepadButton> {
         use raylib::consts::GamepadButton::*;
+        // Die Konstanten JOY_BUTTON_* (negativ) gelten hier wie in KEYPRESSED
+        // (docs/builtins-grafik.md bot sie fuer JOYSTICK_BUTTON an, bis
+        // 2026.53 lieferten sie FALSE).
+        if btn < 0 { return Self::joy_code_knopf(btn); }
         Some(match btn {
             0 => GAMEPAD_BUTTON_UNKNOWN,
             1 => GAMEPAD_BUTTON_LEFT_FACE_UP,
@@ -7446,6 +7479,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// bleibt "gehalten" -- der Name ist historisch, ihn umzudeuten wuerde
     /// bestehende Programme still kaputtmachen.
     pub fn key_hit(&self, code: i64) -> bool {
+        if code < 0 { return self.joy_flanke(code, false); }
         self.key_test(code, |k| self.t_neu(k))
     }
     /// Wurde in DIESEM Bild irgendeine Taste ausser Alt gedrueckt? Fuer
@@ -7464,11 +7498,13 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
     /// KEYRELEASED(code): in DIESEM Frame losgelassen.
     pub fn key_released_edge(&self, code: i64) -> bool {
+        if code < 0 { return self.joy_flanke(code, true); }
         self.key_test(code, |k| self.t_los(k))
     }
     /// KEYREPEAT(code): erster Druck ODER System-Auto-Repeat (Textcursor,
     /// Mengen-Eingabe) -- haelt man die Taste, feuert es wiederholt.
     pub fn key_repeat(&self, code: i64) -> bool {
+        if code < 0 { return self.joy_flanke(code, false); }
         self.key_test(code, |k| self.t_neu(k) || self.rl.is_key_pressed_repeat(k) || self.nativ_wiederholt(k as usize))
     }
 

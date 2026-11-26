@@ -5,6 +5,10 @@
 
 use super::*;
 
+/// INPUT_BIND mit einem Buchstaben: der Buchstabe steht in den unteren Bits,
+/// die Taste dazu wird je Bild nach der Belegung gesucht.
+const BUCHSTABEN_MARKE: i64 = 1 << 40;
+
 impl<'p> Vm<'p> {
     /// Eine Warnung, die ein `SHADER_SET*` hinterlassen hat, mit Datei und
     /// Zeile ausgeben -- wie die Warnungen vor dem Start (`x.dh:4: Warnung:`).
@@ -2465,7 +2469,26 @@ impl<'p> Vm<'p> {
                 if a.len() < 2 { return Err(format!("INPUT_BIND: erwartet mindestens 2 Argument(e), erhalten {}", a.len())); }
                 let action = gs(a, 0, "INPUT_BIND")?.to_lowercase();
                 let mut keys = Vec::with_capacity(a.len() - 1);
-                for i in 1..a.len() { keys.push(gi(a, i, "INPUT_BIND")?); }
+                // Ein Buchstabe oder eine Ziffer als Text wie bei KEYHIT (Bericht
+                // A17; bis 2026.53 nahm INPUT_BIND nur Codes). Ohne Fenster
+                // gilt die Taste mit diesem Zeichen nach US-Belegung.
+                for i in 1..a.len() {
+                    match &a[i] {
+                        Value::Str(t) => {
+                            let mut z = t.chars();
+                            // Gemerkt wird der BUCHSTABE (BUCHSTABEN_MARKE); welche
+                            // Taste ihn traegt, entscheidet INPUT_UPDATE nach der
+                            // Belegung -- beim Binden kennt raylib sie oft noch nicht.
+                            let k = match (z.next(), z.next()) {
+                                (Some(c), None) if c.is_ascii_alphanumeric() => BUCHSTABEN_MARKE | c.to_ascii_lowercase() as i64,
+                                _ => return Err(format!(
+                                    "INPUT_BIND: ein Text meint den Buchstaben oder die Ziffer auf der Taste -- \"{}\" ist keins (Sondertasten als Konstante: KEY_ENTER, KEY_LEFT, ...)", t)),
+                            };
+                            keys.push(k);
+                        }
+                        _ => keys.push(gi(a, i, "INPUT_BIND")?),
+                    }
+                }
                 self.input_state.actions.insert(action, keys);
                 Value::Nil
             }
@@ -2478,7 +2501,14 @@ impl<'p> Vm<'p> {
                 let keys: Vec<i64> = self.input_state.actions.values().flatten().copied().collect();
                 let mut cur = HashSet::new();
                 if let Some(g) = self.gfx.as_ref() {
-                    for k in keys { if g.key_down(k) { cur.insert(k); } }
+                    for k in keys {
+                        // Ein gebundener Buchstabe: die Taste, auf der er steht.
+                        let t = if k & BUCHSTABEN_MARKE != 0 {
+                            let c = (k & 0x7F) as u8 as char;
+                            g.taste_fuer_zeichen(c).unwrap_or(c as i64)
+                        } else { k };
+                        if g.key_down(t) { cur.insert(k); }
+                    }
                 }
                 self.input_state.prev = std::mem::replace(&mut self.input_state.cur, cur);
                 Value::Nil

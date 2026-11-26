@@ -949,7 +949,7 @@ sampler would stay black.
 | `KEY_ANY_HIT()` → INTEGER | code of the last key pressed, `-1` = none — for key-binding dialogs |
 | `KEY_NAME$(code)` → STRING | display name of a key (`LEER`, `LINKS`, `UMSCHALT`, `F5` …) |
 | `INKEY$()` → STRING | last typed character or `""` — does **not** wait, for text input during gameplay |
-| `WAITKEY()` → INTEGER | **stops** until a key arrives and returns its code (`-1` if the window is closed) |
+| `WAITKEY()` → INTEGER | **stops** until a key arrives and returns its code (`-1` if the window is closed): special keys like the constants (`WAITKEY() = KEY_LEFT`), letters and digits as ASCII capital (`ASC("A")`) |
 
 **A click between two frames is not lost.** If press and release arrive
 before the next frame begins (a tap on the touchpad, a played-back click, a
@@ -1029,7 +1029,8 @@ held” and “pressed right now”.
 | `JOYSTICK_MAPPINGS(sdl_db$)` → INTEGER | load mappings from the SDL GameControllerDB — this makes exotic devices map correctly |
 
 There are constants for the buttons (`JOY_BUTTON_A` … `JOY_BUTTON_Y`,
-`JOY_DPAD_*`). Whoever prefers working with action names instead of numbers
+`JOY_DPAD_*`); they apply in `JOYSTICK_BUTTON` as in `KEYPRESSED`, `KEYHIT`,
+`KEYRELEASED` and `KEYREPEAT` (there on any pad). Whoever prefers working with action names instead of numbers
 uses the module [`input`](module-input.md) — there it reads
 `INPUT_BIND("springen", KEY_SPACE, JOY_BUTTON_A)`.
 

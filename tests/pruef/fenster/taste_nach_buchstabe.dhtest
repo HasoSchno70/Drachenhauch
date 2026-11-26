@@ -78,3 +78,39 @@ IF KEYPRESSED(KEY_LCTRL) AND KEYHIT("z") THEN PRINT "zurueck"
 IF KEYREPEAT("x") OR KEYRELEASED("1") THEN PRINT "x"
 --- erwartet
 []
+
+=== waitkey liefert sondertasten als dh-code, input_bind nimmt buchstaben
+' WAITKEY lieferte bis 2026.53 den rohen raylib-Code -- `WAITKEY() = KEY_LEFT`
+' war nie wahr -- und wartete ohne FLIP fuer immer (raylib 6 holt in
+' WindowShouldClose keine Nachrichten mehr ab); INPUT_BIND nahm keinen
+' Buchstaben (Bericht A17).
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "taste.dh", "pause:1500|links|pause:500|buchstabe:z", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei taste.dh
+IMPORT "input"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+INPUT_BIND("sprung", "z")
+DIM k AS INTEGER : k = WAITKEY()
+PRINT "links "; k = KEY_LEFT
+' Gebunden ist der Buchstabe: die Taste dazu sucht INPUT_UPDATE nach der
+' Belegung (auf einer deutschen Tastatur liegt Z, wo die US-Tastatur Y hat).
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM gesehen AS BOOLEAN
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 4000 AND NOT gesehen
+    INPUT_UPDATE()
+    IF INPUT_HIT("sprung") THEN gesehen = TRUE
+    CLS(0) : FLIP()
+WEND
+PRINT "sprung "; gesehen
+--- system windows
+--- erwartet
+gesendet
+links TRUE
+sprung TRUE
+

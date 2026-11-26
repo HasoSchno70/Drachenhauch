@@ -953,7 +953,7 @@ Sampler bliebe schwarz.
 | `KEY_ANY_HIT()` → INTEGER | Code der zuletzt gedrückten Taste, `-1` = keine — fuer Belegungsdialoge |
 | `KEY_NAME$(code)` → STRING | Anzeigename einer Taste (`LEER`, `LINKS`, `UMSCHALT`, `F5` …) |
 | `INKEY$()` → STRING | zuletzt getipptes Zeichen oder `""` — wartet **nicht**, für Texteingabe im Spielablauf |
-| `WAITKEY()` → INTEGER | **hält an**, bis eine Taste kommt, und liefert ihren Code (`-1`, wenn das Fenster geschlossen wird) |
+| `WAITKEY()` → INTEGER | **hält an**, bis eine Taste kommt, und liefert ihren Code (`-1`, wenn das Fenster geschlossen wird): Sondertasten wie die Konstanten (`WAITKEY() = KEY_LEFT`), Buchstaben und Ziffern als ASCII-Großbuchstabe (`ASC("A")`) |
 
 **Ein Klick zwischen zwei Bildern geht nicht verloren.** Kommen Drücken und
 Loslassen an, bevor das nächste Bild beginnt (Tippen aufs Touchpad, ein
@@ -1033,7 +1033,9 @@ gehalten" und „genau jetzt gedrückt".
 | `JOYSTICK_RUMBLE(idx, left, right, duration_s)` | Vibration; die beiden Motoren getrennt (je `0.0`–`1.0`) |
 | `JOYSTICK_MAPPINGS(sdl_db$)` → INTEGER | Belegungen aus der SDL-GameControllerDB nachladen — damit werden exotische Geräte richtig zugeordnet |
 
-Für die Knöpfe gibt es Konstanten (`JOY_BUTTON_A` … `JOY_BUTTON_Y`, `JOY_DPAD_*`).
+Für die Knöpfe gibt es Konstanten (`JOY_BUTTON_A` … `JOY_BUTTON_Y`, `JOY_DPAD_*`); sie gelten in
+`JOYSTICK_BUTTON` wie in `KEYPRESSED`, `KEYHIT`, `KEYRELEASED` und `KEYREPEAT` (dort an
+irgendeinem Pad).
 Wer lieber mit Aktionsnamen statt Nummern arbeitet, nimmt das Modul
 [`input`](module-input.md) — dort heißt es dann `INPUT_BIND("springen", KEY_SPACE,
 JOY_BUTTON_A)`.

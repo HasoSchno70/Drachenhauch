@@ -96,6 +96,16 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
   statt „LEER“ auf einem englischen System), die Knöpfe von Assistent und
   Ja/Nein-Dialog, der Schriftdialog, die Wochentage im Datumswähler.
 
+**Eingabe**
+
+* `WAITKEY` liefert Sondertasten als DH-Code wie die Konstanten
+  (`WAITKEY() = KEY_LEFT` ist jetzt wahr; vorher kam der rohe raylib-Code)
+  und wartet nicht mehr für immer, wenn kein FLIP dazwischen liegt.
+* `JOY_BUTTON_*` gelten auch in `KEYHIT`, `KEYRELEASED`, `KEYREPEAT` und
+  `JOYSTICK_BUTTON` (vorher still FALSE).
+* `INPUT_BIND` nimmt einen Buchstaben oder eine Ziffer als Text, nach der
+  Belegung wie `KEYHIT("z")`.
+
 **Kindprozesse**
 
 * `SHELL`, `SHELL_OUT$`, `SHELL_START` und `TASK_START` geben `DHRT_FRAMES`,
