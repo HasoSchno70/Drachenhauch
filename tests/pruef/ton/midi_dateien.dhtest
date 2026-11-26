@@ -191,3 +191,17 @@ DIM mf AS MIDI_FILE
 mf = MIDI_FILE_NEW()
 --- erwartet
 TRUE
+
+=== eine midi-datei, die es nie gab, freizugeben ist ein fehler
+' Handle-Regel: freigeben ist still, auch doppelt -- nur eine Nummer, die es
+' nie gab, ist ein Fehler (bis 2026.53 still).
+IMPORT "midi"
+DIM m AS MIDI_FILE : m = MIDI_FILE_NEW()
+MIDI_FILE_FREE(m)
+MIDI_FILE_FREE(m)
+PRINT "doppelt still"
+MIDI_FILE_FREE(99)
+--- erwartet
+doppelt still
+--- fehler
+MIDI_FILE_FREE: ungueltiges MIDI_FILE-Handle 99

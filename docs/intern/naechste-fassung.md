@@ -64,6 +64,39 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
   `ARRAY_PUSH(a, 1e19)` in ein `ARRAY OF INTEGER` ist ein Fehler (vorher still
   9223372036854775807), eine Zahl in ein `ARRAY OF GELD` ebenso.
 
+**Handles**
+
+* Ein freigegebenes gui-Widget oder -Fenster: Fragen geht weiter (Ereignisse
+  FALSE), **Setzen ist ein Fehler** („GUI_SET_TEXT: das Widget wurde mit
+  GUI_WIDGET_FREE freigegeben“); vorher ging es still durch.
+* `MIDI_FILE_FREE` und `MQTT_IS_CONNECTED` mit einer Nummer, die es nie gab,
+  sind Fehler (vorher still bzw. FALSE).
+
+**Ton**
+
+* Eine Lautstärke über 1 ist ein Fehler (vorher still 1); nur
+  `AUDIO_SOUND_MIX` verstärkt beim Mischen bis 4. `GUI_SOUND` und die
+  Stildatei nehmen 0..100 % (vorher 0..200, über 100 ohne Wirkung).
+* Erzeugte Klänge (`AUDIO_TONE`, `AUDIO_NOISE`, `AUDIO_NOTE`, `AUDIO_SFX`,
+  `SAMPLE_NOTE`) spielen mit Lautstärke 1 -- ihre Lautstärke steckt schon im
+  Klang. Bis 2026.53 zählte sie doppelt: `AUDIO_TONE(…, 0.5)` klang wie 0.25,
+  jetzt wie 0.5.
+* `AUDIO_PITCH` hat dieselbe Grenze wie `AUDIO_MUSIC_PITCH` (> 0 und <= 64,
+  sonst ein Fehler; dort vorher still 64).
+* `AUDIO_DELAY` ohne `time_ms` nimmt die Vorgabe 300 ms (vorher blieb die
+  alte Zeit stehen).
+
+**Sprites und Partikel**
+
+* `SPRITE_COLLIDES`/`SPRITE_HIT_*` rechnen mit `SPRITE_SET_SCALE` wie
+  `SPRITE_DRAW` (vorher ohne Skala).
+* `SPRITE_TINT`, `PARTICLE_SET_COLOR`/`_END` nehmen eine Deckkraft.
+
+**gui-Farben**
+
+* Übergänge mischen die Deckkraft mit (ein Glasknopf blieb mitten im
+  Übergang deckend). Die `.dhform` liest `#RGB` wie die Stildatei.
+
 ## Neu
 
 * `GUI_TREE_COUNT`, `GUI_TREE_SET_LABEL`, `GUI_TREE_REMOVE`,
@@ -73,3 +106,10 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
 * `_FREE`/`_CLOSE`-Namen: `AUDIO_CLOCK/EMITTER/LISTENER/MOD_FREE`,
   `GUI_WIDGET_FREE`, `GUI_WINDOW_FREE`, `PHYS2D/3D_BODY_FREE`, `BT_CLOSE`,
   `MQTT_CLOSE`.
+* `ARC_DEG`, `PHYS2D_BODY_ANGLE_DEG`, `GUI_TEXTAREA_GET_VIEW`,
+  `AUDIO_SET_PAN`/`_SLIDE` (Skala -1..1), `AUDIO_PLAY_VOICE`,
+  `AUDIO_VOICE_COUNT`, `AUDIO_AUTOPAN_MS`, `BT_SCAN_MS`,
+  `SAMPLE_SET_LOOP_TIME`; `AUDIO_SFX` mit Parameternamen `attack_ms`,
+  `sustain_ms`, `decay_ms`, `vib_depth`, `vib_speed` (die alten gelten).
+* Regeln 10 bis 12 in `docs/builtins-namen.md`: Winkel, Rechtecke und
+  Strahlen, Zählen ab 0 oder 1.

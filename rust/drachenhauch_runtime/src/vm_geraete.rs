@@ -264,8 +264,13 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "midi_file_free" => {
-                let i = bi_int(a, 0, "MIDI_FILE_FREE")? as usize;
-                if let Some(x) = self.midi_dateien.get_mut(i) { *x = None; }
+                // Handle-Regel: freigeben still, auch doppelt -- nur eine
+                // Nummer, die es nie gab, ist ein Fehler (bis 2026.53 still).
+                let n = bi_int(a, 0, "MIDI_FILE_FREE")?;
+                match usize::try_from(n).ok().and_then(|i| self.midi_dateien.get_mut(i)) {
+                    Some(x) => *x = None,
+                    None => return Err(format!("MIDI_FILE_FREE: ungueltiges MIDI_FILE-Handle {}", n)),
+                }
                 Value::Nil
             }
             "midi_file_tracks" => Value::Int(datei!("MIDI_FILE_TRACKS").spuren.len() as i64),
@@ -1581,6 +1586,8 @@ impl<'p> Vm<'p> {
         use crate::bt;
         let v = match name {
             "bt_scan" => Value::str_rc(bt::scan(bi_num(a, 0, "BT_SCAN")?)?),
+            // Die Suchdauer in ms (Regel 9); BT_SCAN bleibt bei Sekunden.
+            "bt_scan_ms" => Value::str_rc(bt::scan(bi_num(a, 0, "BT_SCAN_MS")? / 1000.0)?),
             "bt_connect" => { let p = bt::connect(bi_str(a, 0, "BT_CONNECT")?)?; self.bt_periphs.push(Some(p)); Value::Int((self.bt_periphs.len() - 1) as i64) }
             "bt_disconnect" => { let i = bi_int(a, 0, "BT_DISCONNECT")?; if Self::schon_frei(&self.bt_periphs, i) { return Ok(Some(Value::Nil)); } bt::disconnect(self.bt_periph(i, name)?)?; if let Some(s) = self.bt_periphs.get_mut(i as usize) { *s = None; } Value::Nil }
             "bt_is_connected" => { let i = bi_int(a, 0, "BT_IS_CONNECTED")?; Value::Bool(match self.bt_periphs.get(i as usize).and_then(|o| o.as_ref()) { Some(p) => bt::is_connected(p), None => false }) }

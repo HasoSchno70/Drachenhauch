@@ -1596,15 +1596,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 return err(std::format!(
                     "COLOR_FROM_HEX: '{}' ist keine Farbe -- erwartet #RGB, #RRGGBB oder #AARRGGBB", t));
             }
-            // Die Kurzform verdoppelt jede Ziffer, wie im Web: #F80 = #FF8800.
-            let voll = match ziffern.len() {
-                3 => ziffern.chars().flat_map(|c| [c, c]).collect::<String>(),
-                6 | 8 => ziffern.clone(),
-                n => return err(std::format!(
-                    "COLOR_FROM_HEX: '{}' hat {} Stellen -- erlaubt sind 3, 6 oder 8", t, n)),
-            };
-            let v = i64::from_str_radix(&voll, 16)
-                .map_err(|_| std::format!("COLOR_FROM_HEX: '{}' liess sich nicht lesen", t))?;
+            // Die Kurzform verdoppelt jede Ziffer, wie im Web: #F80 = #FF8800
+            // (farbraum::hex_lesen, derselbe Leser wie Stildatei und .dhform).
+            if ![3, 6, 8].contains(&ziffern.len()) {
+                return err(std::format!(
+                    "COLOR_FROM_HEX: '{}' hat {} Stellen -- erlaubt sind 3, 6 oder 8", t, ziffern.len()));
+            }
+            let v = crate::farbraum::hex_lesen(&ziffern)
+                .ok_or_else(|| std::format!("COLOR_FROM_HEX: '{}' liess sich nicht lesen", t))?;
             Ok(Value::Int(v))
         }
         "sin" => { arity!(1); Ok(Value::Float(need_num(&a[0], "SIN")?.sin())) }
@@ -1997,8 +1996,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // Alpha-Anteil einer Farbe. Oberes Byte; 0 == deckend -> 255
             // (passend zur Zeichen-Semantik, siehe col() in graphics.rs).
             arity!(1);
-            let a0 = (need_int(&a[0], "ALPHA")? >> 24) & 0xFF;
-            Ok(Value::Int(if a0 == 0 { 255 } else { a0 }))
+            Ok(Value::Int(crate::farbraum::rgba(need_int(&a[0], "ALPHA")?)[3] as i64))
         }
         "color_lerp" => {
             arity!(3);
@@ -3108,6 +3106,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Float((if name == "phys2d_body_x" { p.0 } else { p.1 }) as f64))
         }
         #[cfg(feature = "physik")]
+        // In Grad, wie DRAWIMAGEROT sie nimmt (positiv = im Uhrzeigersinn auf
+        // dem Schirm) -- PHYS2D_BODY_ANGLE liefert Bogenmass (Regel 10).
+        "phys2d_body_angle_deg" => {
+            arity!(2);
+            let w = phys2d_h(&a[0], "PHYS2D_BODY_ANGLE_DEG")?.borrow();
+            Ok(Value::Float((w.angle(phys2d_koerper(&w, &a[1], "PHYS2D_BODY_ANGLE_DEG")?) as f64).to_degrees()))
+        }
+        #[cfg(feature = "physik")]
         "phys2d_body_angle" => {
             arity!(2);
             let w = phys2d_h(&a[0], "PHYS2D_BODY_ANGLE")?.borrow();
@@ -3259,7 +3265,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "sprite_tint" => {
             arity!(2); let c = need_int(&a[1], "SPRITE_TINT")?;
-            if c < 0 || c > 0xFFFFFF { return err("SPRITE_TINT: Farbe muss 0..0xFFFFFF sein"); }
+            // Mit Deckkraft wie jede Farbe (bis 2026.53 nur 0..0xFFFFFF).
+            if !(0..=0xFFFF_FFFF).contains(&c) { return err("SPRITE_TINT: Farbe muss 0..&HFFFFFFFF sein"); }
             spr(&a[0], "SPRITE_TINT")?.borrow_mut().tint = Some(c); Ok(Value::Nil)
         }
         "sprite_tint_clear" => { arity!(1); spr(&a[0], "SPRITE_TINT_CLEAR")?.borrow_mut().tint = None; Ok(Value::Nil) }
@@ -3288,20 +3295,27 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(2); let dt = dt_ms(&a[1], "SPRITE_UPDATE")?;
             spr(&a[0], "SPRITE_UPDATE")?.borrow_mut().update(dt); Ok(Value::Nil)
         }
+        // Treffer rechnen mit dem Kasten, den SPRITE_DRAW zeichnet: ab (x, y),
+        // Bildgroesse mal SPRITE_SET_SCALE. Bis 2026.53 ohne Skala -- ein
+        // dreifach gross gezeichneter Sprite traf nur in seiner linken oberen
+        // Ecke (Bericht A6.6).
         "sprite_collides" | "sprite_collide" => {
-            arity!(2); let a0 = spr(&a[0], "SPRITE_COLLIDES")?.borrow(); let b0 = spr(&a[1], "SPRITE_COLLIDES")?.borrow();
-            Ok(Value::Bool(a0.x < b0.x + b0.frame_w as f64 && a0.x + a0.frame_w as f64 > b0.x
-                && a0.y < b0.y + b0.frame_h as f64 && a0.y + a0.frame_h as f64 > b0.y))
+            arity!(2);
+            let (ax, ay, aw, ah) = sprite_kasten(&spr(&a[0], "SPRITE_COLLIDES")?.borrow());
+            let (bx, by, bw, bh) = sprite_kasten(&spr(&a[1], "SPRITE_COLLIDES")?.borrow());
+            Ok(Value::Bool(ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by))
         }
         "sprite_hit_box" => {
-            arity!(5); let s = spr(&a[0], "SPRITE_HIT_BOX")?.borrow();
+            arity!(5);
+            let (sx, sy, sw, sh) = sprite_kasten(&spr(&a[0], "SPRITE_HIT_BOX")?.borrow());
             let (x, y, w, h) = (need_num(&a[1], "SPRITE_HIT_BOX")?, need_num(&a[2], "SPRITE_HIT_BOX")?, need_num(&a[3], "SPRITE_HIT_BOX")?, need_num(&a[4], "SPRITE_HIT_BOX")?);
-            Ok(Value::Bool(s.x < x + w && s.x + s.frame_w as f64 > x && s.y < y + h && s.y + s.frame_h as f64 > y))
+            Ok(Value::Bool(sx < x + w && sx + sw > x && sy < y + h && sy + sh > y))
         }
         "sprite_hit_point" => {
-            arity!(3); let s = spr(&a[0], "SPRITE_HIT_POINT")?.borrow();
+            arity!(3);
+            let (sx, sy, sw, sh) = sprite_kasten(&spr(&a[0], "SPRITE_HIT_POINT")?.borrow());
             let (x, y) = (need_num(&a[1], "SPRITE_HIT_POINT")?, need_num(&a[2], "SPRITE_HIT_POINT")?);
-            Ok(Value::Bool(s.x <= x && x < s.x + s.frame_w as f64 && s.y <= y && y < s.y + s.frame_h as f64))
+            Ok(Value::Bool(sx <= x && x < sx + sw && sy <= y && y < sy + sh))
         }
 
         // ===== Modul: animfsm (Animations-State-Machine, datengetrieben) =====
@@ -5144,7 +5158,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let s = psys(&a[0], "PARTICLE_SET_LIFETIME")?; let mut s = s.borrow_mut(); s.lifetime_min = mi; s.lifetime_max = ma; Ok(Value::Nil)
         }
         "particle_set_gravity" => { arity!(3); let s = psys(&a[0], "PARTICLE_SET_GRAVITY")?; let mut s = s.borrow_mut(); s.gravity_x = need_num(&a[1], "PARTICLE_SET_GRAVITY")?; s.gravity_y = need_num(&a[2], "PARTICLE_SET_GRAVITY")?; Ok(Value::Nil) }
-        "particle_set_color" => { arity!(2); let c = need_int(&a[1], "PARTICLE_SET_COLOR")?; if c < 0 || c > 0xFFFFFF { return err("PARTICLE_SET_COLOR: Farbe muss 0..0xFFFFFF sein"); } psys(&a[0], "PARTICLE_SET_COLOR")?.borrow_mut().color = c; Ok(Value::Nil) }
+        "particle_set_color" => { arity!(2); let c = need_int(&a[1], "PARTICLE_SET_COLOR")?; if !(0..=0xFFFF_FFFF).contains(&c) { return err("PARTICLE_SET_COLOR: Farbe muss 0..&HFFFFFFFF sein"); } psys(&a[0], "PARTICLE_SET_COLOR")?.borrow_mut().color = c; Ok(Value::Nil) }
         "particle_set_size" => {
             arity!(3); let (mi, ma) = (need_int_gerundet(&a[1], "PARTICLE_SET_SIZE")? as i32, need_int_gerundet(&a[2], "PARTICLE_SET_SIZE")? as i32);
             if mi < 1 || ma < mi { return err("PARTICLE_SET_SIZE: min >= 1 und max >= min noetig"); }
@@ -5156,7 +5170,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if !matches!(m.as_str(), "circle" | "pixel" | "square" | "streak" | "glow") { return err(format!("PARTICLE_SET_MODE: unbekannter Modus '{}'", m)); }
             psys(&a[0], "PARTICLE_SET_MODE")?.borrow_mut().mode = m; Ok(Value::Nil)
         }
-        "particle_set_color_end" => { arity!(2); let c = need_int(&a[1], "PARTICLE_SET_COLOR_END")?; if c < 0 || c > 0xFFFFFF { return err("PARTICLE_SET_COLOR_END: Farbe muss 0..0xFFFFFF sein"); } let s = psys(&a[0], "PARTICLE_SET_COLOR_END")?; let mut s = s.borrow_mut(); s.color_end = c; s.has_color_end = true; Ok(Value::Nil) }
+        "particle_set_color_end" => { arity!(2); let c = need_int(&a[1], "PARTICLE_SET_COLOR_END")?; if !(0..=0xFFFF_FFFF).contains(&c) { return err("PARTICLE_SET_COLOR_END: Farbe muss 0..&HFFFFFFFF sein"); } let s = psys(&a[0], "PARTICLE_SET_COLOR_END")?; let mut s = s.borrow_mut(); s.color_end = c; s.has_color_end = true; Ok(Value::Nil) }
         "particle_emit" => {
             arity!(2); let count = need_int_gerundet(&a[1], "PARTICLE_EMIT")?;
             if count < 0 { return err("PARTICLE_EMIT: count muss >= 0 sein"); }
@@ -7189,6 +7203,12 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
 }
 
 
+
+/// Der Kasten eines Sprites, wie SPRITE_DRAW ihn zeichnet: (x, y, Breite,
+/// Hoehe) mit der Skala (Betrag -- eine negative Skala spiegelt nur).
+fn sprite_kasten(s: &crate::value::SpriteObj) -> (f64, f64, f64, f64) {
+    (s.x, s.y, s.frame_w as f64 * s.scale_x.abs(), s.frame_h as f64 * s.scale_y.abs())
+}
 /// Ein JSON-Lesefehler auf Deutsch mit Zeile und Spalte -- serde nennt ihn
 /// englisch ("expected value at line 1 column 1"), und das stand bis 2026.53
 /// so in JSON_PARSE/JSON_LOAD/SAVE_LOAD.

@@ -331,11 +331,12 @@ fn mischen(a: i64, b: i64, t: f64) -> i64 {
     // ruht, darf eine halbdurchsichtige Farbe nicht deckend machen.
     if t <= 0.0 { return a; }
     if t >= 1.0 { return b; }
-    let ch = |sh: u32| -> i64 {
-        let (ca, cb) = (((a >> sh) & 0xFF) as f64, ((b >> sh) & 0xFF) as f64);
-        ((ca + (cb - ca) * t).round() as i64).clamp(0, 255)
-    };
-    (ch(16) << 16) | (ch(8) << 8) | ch(0)
+    // Auch die Deckkraft wird gemischt (farbraum::rgba: 0 = deckend). Bis
+    // 2026.53 fiel sie zwischen den Enden weg -- ein Glasknopf (#20FF0000)
+    // war mitten im Uebergang zum Fokus deckend rot.
+    let (ca, cb) = (crate::farbraum::rgba(a), crate::farbraum::rgba(b));
+    let k = |i: usize| (ca[i] as f64 + (cb[i] as f64 - ca[i] as f64) * t).round().clamp(0.0, 255.0) as u8;
+    crate::farbraum::aus_rgba(k(0), k(1), k(2), k(3))
 }
 
 /// Welche Schrift gilt: die eigene des Widgets, sonst die global aktive.
@@ -718,6 +719,21 @@ mod verlauf_tests {
         verlauf_kuerzen(&mut v);
         assert_eq!(v.len(), 1);
         assert_eq!(v[0].1, 1);
+    }
+}
+
+#[cfg(test)]
+mod mischen_tests {
+    use super::mischen;
+    #[test]
+    fn die_deckkraft_wird_mitgemischt() {
+        // Ein Glasknopf (#20FF0000) halb zum deckenden Weiss: die Deckkraft
+        // liegt dazwischen -- bis 2026.53 war die Mitte deckend.
+        let m = mischen(0x20FF0000, 0xFFFFFF, 0.5);
+        let a = ((m as u32) >> 24) & 0xFF;
+        assert!(a > 0x20 && a < 0xFF, "{:X}", m);
+        assert_eq!(mischen(0x000000, 0xFFFFFF, 0.5), 0x808080);
+        assert_eq!(mischen(0x20FF0000, 0xFFFFFF, 0.0), 0x20FF0000);
     }
 }
 
@@ -4279,18 +4295,29 @@ impl Gui {
     fn enc_widget(win: usize, idx: usize) -> i64 { ((win as i64) << WIDGET_SHIFT) | idx as i64 }
     fn dec_widget(h: i64) -> (usize, usize) { ((h >> WIDGET_SHIFT) as usize, (h & WIDGET_MASK) as usize) }
 
+    // Die Handle-Regel fuer die gui (CLAUDE.md): ein freigegebenes Widget
+    // oder Fenster bleibt ein Grabstein, den man FRAGEN darf (Ereignisse sind
+    // FALSE -- eine Schleife fragt oft noch Knoepfe eines geschlossenen
+    // Dialogs ab), aber SETZEN ist ein Fehler, der den Befehl nennt. Bis
+    // 2026.53 ging auch GUI_SET_TEXT auf ein zerstoertes Widget still durch.
     fn win_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Window, String> {
-        self.windows.get_mut(h as usize).ok_or_else(|| format!("{}: ungueltiges GUI_WINDOW-Handle", fn_))
+        let w = self.windows.get_mut(h as usize).ok_or_else(|| format!("{}: ungueltiges GUI_WINDOW-Handle {}", fn_, h))?;
+        if !w.alive { return Err(format!("{}: das Fenster {} wurde mit GUI_WINDOW_FREE freigegeben", fn_, h)); }
+        Ok(w)
     }
     fn wdg(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
         let (w, i) = Self::dec_widget(h);
-        self.windows.get(w).and_then(|win| win.widgets.get(i))
-            .ok_or_else(|| format!("{}: ungueltiges GUI_WIDGET-Handle", fn_))
+        let win = self.windows.get(w).ok_or_else(|| format!("{}: ungueltiges GUI_WIDGET-Handle {}", fn_, h))?;
+        win.widgets.get(i).ok_or_else(|| format!("{}: ungueltiges GUI_WIDGET-Handle {}", fn_, h))
     }
     fn wdg_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
         let (w, i) = Self::dec_widget(h);
-        self.windows.get_mut(w).and_then(|win| win.widgets.get_mut(i))
-            .ok_or_else(|| format!("{}: ungueltiges GUI_WIDGET-Handle", fn_))
+        let win = self.windows.get_mut(w).ok_or_else(|| format!("{}: ungueltiges GUI_WIDGET-Handle {}", fn_, h))?;
+        let lebt = win.alive;
+        let wd = win.widgets.get_mut(i).ok_or_else(|| format!("{}: ungueltiges GUI_WIDGET-Handle {}", fn_, h))?;
+        if !wd.alive { return Err(format!("{}: das Widget wurde mit GUI_WIDGET_FREE freigegeben", fn_)); }
+        if !lebt { return Err(format!("{}: sein Fenster wurde mit GUI_WINDOW_FREE freigegeben", fn_)); }
+        Ok(wd)
     }
 
     // --- Konstruktion ---
@@ -5278,7 +5305,8 @@ impl Gui {
         // Massstab VOR dem veraenderlichen Zugriff auf `windows` -- `sk` liest
         // `self`, und beides gleichzeitig laesst der Compiler nicht zu.
         let (sx, sy, sw, sh) = (self.sk(wdg.x), self.sk(wdg.y), self.sk(wdg.w), self.sk(wdg.h));
-        let w = self.windows.get_mut(wi).ok_or_else(|| format!("{}: erwartet GUI_WINDOW", fn_))?;
+        let w = self.windows.get_mut(wi).ok_or_else(|| format!("{}: ungueltiges GUI_WINDOW-Handle {}", fn_, win))?;
+        if !w.alive { return Err(format!("{}: das Fenster {} wurde mit GUI_WINDOW_FREE freigegeben", fn_, win)); }
         // `color` wird hier BEWUSST nicht aus dem Thema gefuellt. Frueher wurde
         // die Textfarbe beim Anlegen kopiert und damit eingefroren: wer danach
         // das Thema wechselte, hatte Beschriftungen in der Farbe des alten --

@@ -88,4 +88,4 @@ hinten TRUE FALSE sofort oben unter TRUE
 nach front oben unter TRUE
 folge knopf oben unter TRUE
 wieder normal FALSE oben haupt TRUE
-GUI_WINDOW_BACKGROUND: ungueltiges GUI_WINDOW-Handle
+GUI_WINDOW_BACKGROUND: ungueltiges GUI_WINDOW-Handle 99

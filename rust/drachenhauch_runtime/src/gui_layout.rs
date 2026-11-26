@@ -866,7 +866,7 @@ impl Gui {
         // niemand entziffert. Unlesbares wird still uebergangen: eine von Hand
         // bearbeitete Form soll nicht am Farbfeld scheitern.
         if let Some(t) = wj["color_value"].as_str() {
-            if let Ok(v) = i64::from_str_radix(t.trim_start_matches('#'), 16) {
+            if let Some(v) = crate::farbraum::hex_lesen(t) {
                 let (h, sa, va) = crate::farbraum::rgb_zu_hsv(v & 0xFF_FFFF);
                 w.hsv = [h, sa, va];
             }

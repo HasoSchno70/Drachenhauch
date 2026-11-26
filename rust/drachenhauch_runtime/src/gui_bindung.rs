@@ -133,7 +133,7 @@ impl Gui {
             Kind::ColorPicker => {
                 let rgb = match v {
                     Value::Int(n) => Some(*n & 0xFF_FFFF),
-                    _ => i64::from_str_radix(text.trim().trim_start_matches('#'), 16).ok(),
+                    _ => crate::farbraum::hex_lesen(&text).map(|n| n & 0xFF_FFFF),
                 };
                 if let Some(rgb) = rgb {
                     let (h, sa, va) = crate::farbraum::rgb_zu_hsv(rgb);

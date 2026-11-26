@@ -1028,7 +1028,15 @@ impl<'p> Vm<'p> {
                 }
                 Value::Nil
             }
-            "mqtt_is_connected" => { let i = bi_int(a, 0, "MQTT_IS_CONNECTED")?; Value::Bool(self.mqtt_clients.get(i as usize).and_then(|o| o.as_ref()).map(mqtt::is_connected).unwrap_or(false)) }
+            // Geschlossen heisst nicht verbunden (FALSE); eine Nummer, die es
+            // nie gab, ist ein Fehler (Handle-Regel; bis 2026.53 FALSE).
+            "mqtt_is_connected" => {
+                let i = bi_int(a, 0, "MQTT_IS_CONNECTED")?;
+                match usize::try_from(i).ok().and_then(|k| self.mqtt_clients.get(k)) {
+                    Some(o) => Value::Bool(o.as_ref().map(mqtt::is_connected).unwrap_or(false)),
+                    None => return Err(format!("MQTT_IS_CONNECTED: ungueltiges MQTT_HANDLE {}", i)),
+                }
+            }
             "mqtt_publish" => {
                 let i = bi_int(a, 0, "MQTT_PUBLISH")?; let topic = bi_str(a, 1, "MQTT_PUBLISH")?.to_string(); let payload = bi_str(a, 2, "MQTT_PUBLISH")?.to_string();
                 let retain = if a.len() >= 4 { bi_bool(a, 3, "MQTT_PUBLISH")? } else { false };

@@ -539,23 +539,22 @@ pub(super) fn int_pair2(stack: &mut Vec<Value>, op: &str) -> R<(i64, i64)> {
 pub(super) fn particle_color(start: i64, end: i64, has_end: bool, fade: bool, age: i32, lifetime: i32) -> i64 {
     if !has_end && !fade { return start; }
     let life_t = (age as f64 / lifetime.max(1) as f64).clamp(0.0, 1.0);
-    let mut sr = ((start >> 16) & 0xFF) as f64;
-    let mut sg = ((start >> 8) & 0xFF) as f64;
-    let mut sb = (start & 0xFF) as f64;
+    // Die Deckkraft der Farben zaehlt mit (farbraum::rgba; bis 2026.53 nahmen
+    // PARTICLE_SET_COLOR/_END keine an).
+    let s = crate::farbraum::rgba(start).map(|x| x as f64);
+    let mut c = s;
     if has_end {
-        let (er, eg, eb) = (((end >> 16) & 0xFF) as f64, ((end >> 8) & 0xFF) as f64, (end & 0xFF) as f64);
+        let e = crate::farbraum::rgba(end).map(|x| x as f64);
         let inv = 1.0 - life_t;
-        sr = sr * inv + er * life_t; sg = sg * inv + eg * life_t; sb = sb * inv + eb * life_t;
+        for k in 0..4 { c[k] = s[k] * inv + e[k] * life_t; }
     }
-    // FADE senkt jetzt das ALPHA (statt RGB Richtung Schwarz zu verdunkeln) ->
+    // FADE senkt das ALPHA (statt RGB Richtung Schwarz zu verdunkeln) ->
     // funktioniert auch im additiven Glow-Modus und auf hellem Hintergrund.
-    // col() liest das obere Byte als Alpha; 0 = deckend, daher min. 1 (so wird
-    // ein fast erloschener Partikel transparent, nicht ploetzlich deckend).
-    let alpha: i64 = if fade { (((1.0 - life_t) * 255.0).round().clamp(1.0, 255.0)) as i64 } else { 255 };
-    (alpha << 24)
-        | ((sr.clamp(0.0, 255.0) as i64) << 16)
-        | ((sg.clamp(0.0, 255.0) as i64) << 8)
-        | (sb.clamp(0.0, 255.0) as i64)
+    // Ein fast erloschener Partikel wird durchsichtig, nicht ploetzlich
+    // deckend (aus_rgba macht aus 0 die 1).
+    if fade { c[3] *= 1.0 - life_t; }
+    let k = |x: f64| x.round().clamp(0.0, 255.0) as u8;
+    crate::farbraum::aus_rgba(k(c[0]), k(c[1]), k(c[2]), k(c[3]))
 }
 
 /// Modul-Operator-Dispatch (entspricht `modules.dispatch_binary_op`): vec2 +

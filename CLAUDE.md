@@ -240,6 +240,11 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   nach dem nächsten FLIP (was schon zum Zeichnen ansteht, braucht ihn noch).
 - Laden, das scheitert, ist ein Fehler -- nie ein Ersatz-Handle, 0 oder -1.
 - Jede Art mit Handle-Nummer bekommt ein `_FREE`.
+- gui: ein freigegebenes Widget/Fenster ist ein Grabstein -- Fragen geht
+  (Ereignisse FALSE, eine Schleife fragt oft Knöpfe eines geschlossenen
+  Dialogs ab), Setzen ist ein Fehler (`wdg_mut`/`win_mut`).
+- Ausnahme cloud: ein Netzdienst, der offline sein darf, meldet FALSE und
+  `CLOUD_LAST_ERROR$` statt eines Fehlers.
 
 **gui**
 - Geometrie je Widget aus EINER Quelle, die Zeichnen, Treffertest, Tastatur

@@ -117,6 +117,12 @@
    "module": "core"
   },
   {
+   "name": "ARC_DEG",
+   "kind": "graphics",
+   "signature": "ARC_DEG(x1, y1, x2, y2, from_deg, to_deg[, color = &HFFFFFF[, width]])",
+   "module": "core"
+  },
+  {
    "name": "ARG$",
    "kind": "core",
    "signature": "ARG$(number) AS STRING",
@@ -423,6 +429,12 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_AUTOPAN_MS",
+   "kind": "core",
+   "signature": "AUDIO_AUTOPAN_MS(ch, period_ms[, depth])",
+   "module": "audio"
+  },
+  {
    "name": "AUDIO_BUSY_CHANNELS",
    "kind": "core",
    "signature": "AUDIO_BUSY_CHANNELS()",
@@ -515,7 +527,7 @@
   {
    "name": "AUDIO_DELAY",
    "kind": "core",
-   "signature": "AUDIO_DELAY(bus$, mix[, feedback = 0.5[, time_ms]])",
+   "signature": "AUDIO_DELAY(bus$, mix[, feedback = 0.5[, time_ms = 300]])",
    "module": "audio"
   },
   {
@@ -813,9 +825,21 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_SET_PAN",
+   "kind": "core",
+   "signature": "AUDIO_SET_PAN(ch, pan)",
+   "module": "audio"
+  },
+  {
    "name": "AUDIO_PAN_SLIDE",
    "kind": "core",
    "signature": "AUDIO_PAN_SLIDE(ch, from, to, duration_ms[, easing$])",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_SET_PAN_SLIDE",
+   "kind": "core",
+   "signature": "AUDIO_SET_PAN_SLIDE(ch, from, to, duration_ms[, easing$])",
    "module": "audio"
   },
   {
@@ -846,6 +870,18 @@
    "name": "AUDIO_PLAY_AT",
    "kind": "core",
    "signature": "AUDIO_PLAY_AT(sound, clock, ticks[, volume = 1.0[, loops]]) -> AUDIO_CHANNEL",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_PLAY_VOICE",
+   "kind": "core",
+   "signature": "AUDIO_PLAY_VOICE(sound[, volume = 1.0[, loops = 0]])",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_VOICE_COUNT",
+   "kind": "core",
+   "signature": "AUDIO_VOICE_COUNT(sound) AS INTEGER",
    "module": "audio"
   },
   {
@@ -905,7 +941,7 @@
   {
    "name": "AUDIO_SFX",
    "kind": "core",
-   "signature": "AUDIO_SFX(wf, freq, slide, atk, sus, dec, vib_d, vib_s, vol [, stereo_width, duty, pwm_depth, pwm_speed, flt_cutoff, flt_sweep, flt_res])",
+   "signature": "AUDIO_SFX(waveform, freq, slide, attack_ms, sustain_ms, decay_ms, vib_depth, vib_speed, volume [, stereo_width, duty, pwm_depth, pwm_speed, flt_cutoff, flt_sweep, flt_res])",
    "module": "audio"
   },
   {
@@ -1140,6 +1176,12 @@
    "name": "BT_SCAN",
    "kind": "core",
    "signature": "BT_SCAN(timeout_s: Zahl)",
+   "module": "bt"
+  },
+  {
+   "name": "BT_SCAN_MS",
+   "kind": "core",
+   "signature": "BT_SCAN_MS(timeout_ms: Zahl)",
    "module": "bt"
   },
   {
@@ -7557,6 +7599,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_GET_VIEW",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_GET_VIEW(ta)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTINPUT",
    "kind": "core",
    "signature": "GUI_TEXTINPUT(win, x, y, w, h[, placeholder$])",
@@ -11379,6 +11427,12 @@
    "module": "physics2d"
   },
   {
+   "name": "PHYS2D_BODY_ANGLE_DEG",
+   "kind": "core",
+   "signature": "PHYS2D_BODY_ANGLE_DEG(w, idx) AS FLOAT",
+   "module": "physics2d"
+  },
+  {
    "name": "PHYS2D_BODY_VX",
    "kind": "core",
    "signature": "PHYS2D_BODY_VX(w, idx) AS FLOAT",
@@ -12540,6 +12594,12 @@
    "name": "SAMPLE_SET_LOOP",
    "kind": "core",
    "signature": "SAMPLE_SET_LOOP(sample, start, end[, kind$])",
+   "module": "audio"
+  },
+  {
+   "name": "SAMPLE_SET_LOOP_TIME",
+   "kind": "core",
+   "signature": "SAMPLE_SET_LOOP_TIME(sample, start_s, end_s[, kind$])",
    "module": "audio"
   },
   {

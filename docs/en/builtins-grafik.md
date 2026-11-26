@@ -23,7 +23,7 @@ When the `camera` module is active and `CAMERA_SET` has been called, all drawing
 |---|---|
 | `SCREEN(w, h[, title$[, scale]])` | opens a window with the logical size `w × h`. `scale > 1` makes every logical pixel bigger (retro look). |
 | `FLIP()` | output the frame to the screen (synchronized to 60 FPS) |
-| `CLS([color])` | fill the buffer with `color` (default: black) |
+| `CLS([color])` | fill the buffer with `color` (default: black); in a transparent window (`SCREEN_TRANSPARENT`) the top byte counts literally as opacity, 0 = see-through -- elsewhere 0 means opaque |
 | `SLEEP(ms)` | waits ms milliseconds without freezing the window |
 | `QUITREQUESTED()` → BOOLEAN | TRUE when the program should end: window X / Alt+F4, the frame limit of `DHRT_FRAMES`/`--bilder` — **and, by raylib default, also `ESC`**, EXCEPT in a program with `gui`: there `ESC` belongs to the widgets from the first `GUI_UPDATE` on (cancel a dialog, close a dropdown), otherwise every cancel would end the whole program. `WINDOW_ESC_QUIT` sets it explicitly |
 | `WINDOW_CLOSE_REQUESTED()` → BOOLEAN | TRUE when the USER wants to close the window (the X, Alt+F4, the quit key) -- without the frame limit. The window stays open: a program with unsaved work asks first and then ends itself. An event, not a state -- it holds for one frame |
@@ -302,6 +302,7 @@ Colours are given as a 24-bit INTEGER (`&HRRGGBB`), most easily via `RGB(r, g, b
 | `ELLIPSE(x1, y1, x2, y2[, color])` | filled ellipse, fitted into the bounding box |
 | `ELLIPSEOUTLINE(x1, y1, x2, y2[, color[, width]])` | ellipse as outline only |
 | `ARC(x1, y1, x2, y2, start_rad, end_rad[, color[, width]])` | arc segment in the bounding box; angles in radians, counter-clockwise. `width` (float, optional) = stroke width; without it 1px (independent of zoom), with it scaled with the `CAMERA_SET` zoom like `LINEW`/`SPLINE` |
+| `ARC_DEG(x1, y1, x2, y2, from_deg, to_deg[, color[, width]])` | the same arc in **degrees**, 0 = right, clockwise -- like `PIE` |
 | `TEXT(x, y, s$[, color])` | text at (x, y) |
 | `TEXTROT(x, y, s$, angle[, scale[, color]])` | text **centred** on (x, y), rotated about the centre (degrees, like `DRAWIMAGEROT`) and scaled — for score pop-ups, slanted labels. Uses the active font/size |
 

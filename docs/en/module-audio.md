@@ -38,6 +38,8 @@ Plays a SOUND and returns a channel handle. With it you can pause the sound, sto
 | Function | Effect |
 |---|---|
 | `AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms[, easing$]]]])` → AUDIO_CHANNEL | start a sound |
+| `AUDIO_PLAY_VOICE(sound[, volume[, loops]])` → AUDIO_CHANNEL | play the sound as a further voice -- a running one keeps sounding (`AUDIO_PLAY` cuts it off); `AUDIO_STOP` stops all |
+| `AUDIO_VOICE_COUNT(sound)` → INTEGER | how many voices of this sound are sounding right now |
 | `AUDIO_PAUSE(ch)` | pause the channel |
 | `AUDIO_RESUME(ch)` | continue |
 | `AUDIO_STOP(ch[, fade_out_ms[, easing$]])` | stop the channel, optionally fade out |
@@ -45,7 +47,7 @@ Plays a SOUND and returns a channel handle. With it you can pause the sound, sto
 | `AUDIO_IS_WAITING(sound)` → BOOLEAN | scheduled with `AUDIO_PLAY_AT`, but the clock has not reached the tick yet |
 | `AUDIO_VOLUME(ch, volume)` | set the volume 0..1 |
 | `AUDIO_GET_VOLUME(ch)` → FLOAT | current volume |
-| `AUDIO_PAN(ch, left, right)` | stereo pan (both 0..1) |
+| `AUDIO_PAN(ch, left, right)` | left and right level (both 0..1) -- this also sets the volume (the larger of the two); position only: `AUDIO_SET_PAN` |
 | `AUDIO_PITCH(ch, factor)` | pitch/speed: 1.0 = normal, 2.0 = an octave higher, 0.5 = lower |
 
 **Global pause/resume:**
@@ -99,9 +101,12 @@ frame (FLIP), non-blocking:
 
 | Function | Effect |
 |---|---|
-| `AUDIO_PAN_POS(ch, p)` | set the position directly (ends a running animation) |
+| `AUDIO_PAN_POS(ch, p)` | set the position directly, 0 = left .. 1 = right (ends a running animation) |
+| `AUDIO_SET_PAN(ch, pan)` | position on the scale -1 (left) .. 0 (centre) .. 1 (right) like `AUDIO_BUS_PAN` and `AUDIO_SOUND_MIX` |
 | `AUDIO_PAN_SLIDE(ch, from, to, duration_ms[, easing$])` | one-time move from → to; stays at the target |
+| `AUDIO_SET_PAN_SLIDE(ch, from, to, duration_ms[, easing$])` | the same move on the scale -1..1 |
 | `AUDIO_AUTOPAN(ch, period_s[, depth])` | endless swinging left↔right (starts left); `depth` 0..1 = deflection around the centre, `period_s <= 0` switches it off |
+| `AUDIO_AUTOPAN_MS(ch, period_ms[, depth])` | like `AUDIO_AUTOPAN`, the period in milliseconds |
 
 ```basic
 DIM ton AS SOUND
@@ -371,6 +376,7 @@ instrument.
 | `SAMPLE_PLAY(sample, semitones[, vol[, dur_ms]])` → AUDIO_CHANNEL | play at a relative pitch |
 | `SAMPLE_NOTE(sample, semitones, duration_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_semitones])` → SOUND | build a note as a sound (not play it), envelope like `AUDIO_NOTE` |
 | `SAMPLE_SET_LOOP(sample, start, end[, kind$])` | loop region in frames (for held notes), `kind$` = `vorwaerts` (forwards, default) or `pingpong` |
+| `SAMPLE_SET_LOOP_TIME(sample, start_s, end_s[, kind$])` | the same loop region in seconds (like `SAMPLE_LEN`) instead of frames |
 | `SAMPLE_LEN(sample)` → FLOAT | length in seconds at the original pitch |
 
 `halbtoene` is relative to the sample's original pitch: `0` = as recorded,

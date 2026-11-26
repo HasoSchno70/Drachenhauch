@@ -1247,7 +1247,7 @@ SPRITE: unbekannte Animation '{}' (definiert: [[keine]])	SPRITE: unknown animati
 {}: der Dateiname[[]] enthaelt einen Zeilenumbruch -- das waere eine zusaetzliche Kopfzeile und ist deshalb nicht erlaubt	{}: the file name contains a line break -- that would be an extra header line and is therefore not allowed
 
 # ---------------------------------------------------------------- Ton (Runde 3)
-{}: unbekannte Loop-Art '{}' (erlaubt: vorwaerts, pingpong)	{}: unknown loop kind '{}' (allowed: vorwaerts, pingpong)
+{}: unbekannte Loop-Art '{}' (erlaubt: vorwaerts/forward, pingpong)	{}: unknown loop kind '{}' (allowed: vorwaerts/forward, pingpong)
 Audio-Geraet konnte nicht initialisiert werden: {}	Audio device could not be initialized: {}
 SFX-Bus konnte nicht angelegt werden: {}	SFX bus could not be created: {}
 Musik-Bus konnte nicht angelegt werden: {}	Music bus could not be created: {}
@@ -1508,8 +1508,7 @@ GUI_SKIN: unbekannte Widget-Art '{}'	GUI_SKIN: unknown widget kind '{}'
 GUI_SET_COLOR: role muss bg/fg/border/accent/hover/pressed sein	GUI_SET_COLOR: role must be bg/fg/border/accent/hover/pressed
 GUI_STYLE_SET: prop muss bg/fg/border/accent/hover/pressed/font/font_size sein	GUI_STYLE_SET: prop must be bg/fg/border/accent/hover/pressed/font/font_size
 GUI_APPLY_STYLE: unbekannter Style '{}'	GUI_APPLY_STYLE: unknown style '{}'
-GUI_WINDOW_GET_*: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_GET_*: invalid GUI_WINDOW handle
-GUI_WINDOW_CONTENT_*: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_CONTENT_*: invalid GUI_WINDOW handle
+{}: ungueltiges GUI_WINDOW-Handle {}	{}: invalid GUI_WINDOW handle {}
 GUI_WINDOW_WIDGET_COUNT: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_WIDGET_COUNT: invalid GUI_WINDOW handle
 GUI_WINDOW_WIDGET: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_WIDGET: invalid GUI_WINDOW handle
 GUI_SET_ALIGN: '{}' unbekannt -- links, mitte oder rechts	GUI_SET_ALIGN: '{}' unknown -- links, mitte or rechts
@@ -1541,7 +1540,6 @@ GUI_SET_ACTIVE_TAB: erwartet GUI_WINDOW	GUI_SET_ACTIVE_TAB: expects a GUI_WINDOW
 GUI_WINDOW_SCROLLABLE: erwartet GUI_WINDOW	GUI_WINDOW_SCROLLABLE: expects a GUI_WINDOW
 GUI_CONTEXT_WIDGET: Menue und Widget liegen in verschiedenen Fenstern	GUI_CONTEXT_WIDGET: menu and widget are in different windows
 GUI_CONTEXT_WIDGET: erwartet ein Menue aus GUI_CONTEXT	GUI_CONTEXT_WIDGET: expects a menu from GUI_CONTEXT
-GUI_TEXTAREA_VIEW: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_VIEW: the widget is not a GUI_TEXTAREA
 {}: der Textbereich ist nicht formatiert -- erst GUI_TEXTAREA_SET(ta, "formatiert", 1)	{}: the text area is not formatted -- call GUI_TEXTAREA_SET(ta, "formatiert", 1) first
 GUI_TEXTAREA_PAIRS: erwartet je zwei Zeichen, oeffnend und schliessend (z. B. "()[]")	GUI_TEXTAREA_PAIRS: expects two characters each, opening and closing (e.g. "()[]")
 GUI_TEXTAREA_SHARE: ein Textbereich kann keine Ansicht auf sich selbst sein	GUI_TEXTAREA_SHARE: a text area cannot be a view of itself
@@ -2149,3 +2147,16 @@ SQR: erwartet eine Zahl >= 0, erhalten {}	SQR: expected a number >= 0, got {}
 GUI_TREE_SET_LABEL: beim Dateibaum heissen die Knoten wie ihre Dateien	GUI_TREE_SET_LABEL: in a file tree the nodes are named after their files
 GUI_TREE_REMOVE: der Dateibaum liest seine Knoten selbst -- GUI_FILETREE_REFRESH	GUI_TREE_REMOVE: the file tree reads its nodes itself -- GUI_FILETREE_REFRESH
 GUI_GET_COLOR: Rolle '{}' gibt es nicht -- bg, fg, border, accent, hover oder pressed	GUI_GET_COLOR: there is no role '{}' -- bg, fg, border, accent, hover or pressed
+
+{}: das Widget wurde mit GUI_WIDGET_FREE freigegeben	{}: the widget was released with GUI_WIDGET_FREE
+{}: sein Fenster wurde mit GUI_WINDOW_FREE freigegeben	{}: its window was released with GUI_WINDOW_FREE
+{}: das Fenster {} wurde mit GUI_WINDOW_FREE freigegeben	{}: window {} was released with GUI_WINDOW_FREE
+{}: ungueltiges GUI_WIDGET-Handle {}	{}: invalid GUI_WIDGET handle {}
+{}: ungueltiges MIDI_FILE-Handle {}	{}: invalid MIDI_FILE handle {}
+{}: ungueltiges MQTT_HANDLE {}	{}: invalid MQTT_HANDLE {}
+{}: die Lautstaerke ist 0..1, erhalten {}	{}: the volume is 0..1, got {}
+{}: pan ist -1..1, erhalten {}	{}: pan is -1..1, got {}
+{}: faktor muss > 0 und <= 64 sein, erhalten {}	{}: factor must be > 0 and <= 64, got {}
+{}: time_ms muss > 0 sein, erhalten {}	{}: time_ms must be > 0, got {}
+{}: Farbe muss 0..&HFFFFFFFF sein	{}: the colour must be 0..&HFFFFFFFF
+GUI_SOUND: Lautstaerke {} muss 0..100 sein	GUI_SOUND: volume {} must be 0..100

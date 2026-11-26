@@ -4033,6 +4033,7 @@ usable code field.
 | `GUI_TEXTAREA_SPANS(ta, starts, lengths, colors)` | draw characters `start … start+laenge` in `farbe` |
 | `SYNTAX_SPANS(source$)` → (starts, laengen, arten) | split Drachenhauch source code |
 | `GUI_TEXTAREA_VIEW(ta)` → (erste_zeile, zeilen, start_zeichen, laenge_zeichen) | which part is currently visible? |
+| `GUI_TEXTAREA_GET_VIEW(ta)` → (first_line, lines, start_char, length_chars) | like `GUI_TEXTAREA_VIEW`, but the first line counts from 1 as with `GUI_TEXTAREA_GOTO` |
 | `GUI_TEXTAREA_CURSOR(ta)` → (zeile, spalte) | where the cursor is (from 1, in characters) |
 | `GUI_TEXTAREA_CARET_XY(ta)` → (x, y, hoehe) | where the cursor is on the screen, in logical points like `GUI_WINDOW_SET_BOUNDS` (also without focus) -- for a suggestion list at the cursor; (-1, -1, 0) if the field is not visible |
 | `GUI_TEXTAREA_POS_AT(ta, x, y)` → (zeile, spalte) | which character lies under the screen point (from 1; the same calculation as the click). (0, 0) next to the text: outside, in the line-number column, below the last line, behind the end of the line -- for tooltips on hover and Ctrl+click |

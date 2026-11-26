@@ -55,8 +55,8 @@ CATCH e
     PRINT e
 END TRY
 --- erwartet
-AUDIO_PITCH: faktor muss > 0 sein
-AUDIO_MUSIC_PITCH: faktor muss > 0 sein
+AUDIO_PITCH: faktor muss > 0 und <= 64 sein, erhalten 0
+AUDIO_MUSIC_PITCH: faktor muss > 0 und <= 64 sein, erhalten -1
 
 === sample type compiles
 IMPORT "audio"
@@ -323,8 +323,9 @@ PRINT STR$(v) = STR$(t)
 PLAYSOUND: Sound 0 wurde freigegeben (UNLOADSOUND)
 FALSE
 
-=== lautstaerke ist linear und wird geklemmt
+=== lautstaerke ist linear und hat eine grenze
 ' Die Doku sagt '0..1' und (im Anhang) dass Kira intern in Dezibel
+' rechnet. Mehr als 1 war bis 2026.53 still 1, jetzt ein Fehler (Bericht A8).
 IMPORT "audio"
 DIM t AS SOUND
 DIM ch AS AUDIO_CHANNEL
@@ -332,12 +333,15 @@ t = AUDIO_TONE(440, 50, "sine", 0.3)
 ch = AUDIO_PLAY(t, -1, 1.0)
 AUDIO_VOLUME(ch, 0.25)
 PRINT AUDIO_GET_VOLUME(ch)
-AUDIO_VOLUME(ch, 5.0)
-PRINT AUDIO_GET_VOLUME(ch)
+TRY
+    AUDIO_VOLUME(ch, 5.0)
+CATCH e
+    PRINT e
+END TRY
 AUDIO_STOP(ch)
 --- erwartet
 0.25
-1.0
+AUDIO_VOLUME: die Lautstaerke ist 0..1, erhalten 5
 
 === loops semantik
 ' `0` spielt einmal, `-1` endlos -- gemessen an einem 60-ms-Ton.
@@ -478,3 +482,45 @@ END TRY
 DHRT_OHNE_AUDIO=1
 --- erwartet
 AUDIO_MUSIC_QUEUE: Datei 'gibtsnicht.ogg' nicht gefunden
+
+=== lautstaerke, stimmen, pan und tonhoehe nach einer regel
+' Bericht A8: Lautstaerke 0..1, mehr ist ein Fehler (bis 2026.53 still 1);
+' erzeugte Klaenge spielen mit 1 (die Lautstaerke steckt im Klang, bis 2026.53
+' zaehlte sie doppelt); AUDIO_PLAY_VOICE spielt weitere Stimmen, AUDIO_PLAY
+' schneidet ab; AUDIO_SET_PAN zaehlt -1..1; die Tonhoehe hat eine Grenze.
+IMPORT "audio"
+DIM t AS SOUND : t = AUDIO_TONE(440, 300, "sine", 0.5)
+PRINT "slot "; AUDIO_GET_VOLUME(t)
+AUDIO_PLAY_VOICE(t)
+AUDIO_PLAY_VOICE(t)
+PRINT "stimmen "; AUDIO_VOICE_COUNT(t)
+AUDIO_PLAY(t)
+PRINT "nach play "; AUDIO_VOICE_COUNT(t)
+AUDIO_SET_PAN(t, -1)
+TRY
+    AUDIO_BUS_VOLUME("sfx", 2.0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_PITCH(t, 100)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_SET_PAN(t, 2)
+CATCH e
+    PRINT e
+END TRY
+DIM s AS SOUND : s = AUDIO_SFX(waveform: "square", freq: 440, slide: 0, atk: 0, sus: 50, decay_ms: 50, vib_d: 0, vib_speed: 0, vol: 0.5)
+PRINT "sfx mit alten und neuen namen"
+--- umgebung
+DHRT_OHNE_AUDIO=1
+--- erwartet
+slot 1.0
+stimmen 2
+nach play 1
+AUDIO_BUS_VOLUME: die Lautstaerke ist 0..1, erhalten 2
+AUDIO_PITCH: faktor muss > 0 und <= 64 sein, erhalten 100
+AUDIO_SET_PAN: pan ist -1..1, erhalten 2
+sfx mit alten und neuen namen

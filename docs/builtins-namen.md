@@ -65,9 +65,41 @@ Signaturhilfe kennen beide.
    `ms` oder `…_ms`): `TWEEN_NEW`, `TIMER_AFTER`, `SLEEP`, die Fades, jedes
    `…_SET_TIMEOUT`. Der Schritt eines Bildes zählt **Sekunden** wie `DELTA()`:
    `PHYS2D_STEP`, `PHYS3D_STEP` (ein Wert ab 1 ist dort ein Fehler — das
-   wären Millisekunden). Zwei alte Befehle zählen Sekunden und bleiben dabei;
-   neben ihnen gibt es die Fassung in ms: `HTTP_TIMEOUT` → `HTTP_SET_TIMEOUT`,
-   `SERIAL_TIMEOUT` → `SERIAL_SET_TIMEOUT`.
+   wären Millisekunden), ebenso `CHAR_UPDATE` mit `dt`. Lage und Länge in
+   einem Medium (Musik, Video, Sample, MIDI-Datei) zählen **Sekunden** als
+   FLOAT (`SAMPLE_LEN`, `VIDEO_SEEK`, `MIDI_FILE_DURATION`); Noten in einer
+   MIDI-Datei schreibt man in Vierteln, der Einheit der Musik. Alte Befehle,
+   die eine Zeitspanne in Sekunden oder Bildern nehmen, bleiben dabei; neben
+   ihnen gibt es die Fassung in ms: `HTTP_TIMEOUT` → `HTTP_SET_TIMEOUT`,
+   `SERIAL_TIMEOUT` → `SERIAL_SET_TIMEOUT`, `BT_SCAN` → `BT_SCAN_MS`,
+   `AUDIO_AUTOPAN` → `AUDIO_AUTOPAN_MS`, `CHAR_SET_COYOTE_TIME` →
+   `CHAR_SET_COYOTE_MS`, `CHAR_SET_JUMP_BUFFER` → `CHAR_SET_JUMP_BUFFER_MS`;
+   `SAMPLE_SET_LOOP` (Frames) → `SAMPLE_SET_LOOP_TIME` (Sekunden wie
+   `SAMPLE_LEN`).
+10. **Winkel:** Zeichnen zählt **Grad**, 0 = rechts, **im Uhrzeigersinn**
+    auf dem Schirm (`PIE`, `DRAWIMAGEROT`, `CAMERA_SET_ROTATION`, `ARC_DEG`);
+    Mathe zählt **Bogenmaß** (`SIN`, `ATAN2`, `VEC2_ANGLE`). Die Parameter
+    heißen `…_deg` bzw. `…_rad`. Zwei alte Befehle bleiben bei Bogenmaß und
+    haben eine Gradfassung: `ARC` (gegen den Uhrzeigersinn) → `ARC_DEG`,
+    `PHYS2D_BODY_ANGLE` → `PHYS2D_BODY_ANGLE_DEG`.
+11. **Rechtecke und Strahlen:** Gezeichnete Rechtecke nennen zwei Ecken
+    (`BOX`, `IMAGE_FILL_RECT`: x1, y1, x2, y2, beide Ecken gehören dazu);
+    Ausschnitte nennen Ecke und Größe (`IMAGE_DRAW_RECT`, `SCISSOR`, alle
+    gui-Lagen); Physik nennt die Mitte und die halbe Größe (`PHYS2D_ADD_BOX`,
+    `PHYS3D_ADD_BOX`), `RAY_HIT_BOX` die Mitte und die ganze Größe. Ein „Ray“
+    in 2D ist eine Strecke, das Ergebnis der Anteil t von 0 bis 1
+    (`PHYSICS_RAY_*`); in 3D ein Strahl, das Ergebnis die Entfernung
+    (`RAY_HIT_*`). Kein Treffer ist -1; nur `PHYSICS_LINES_X` liefert dann NaN.
+12. **Zählen:** Elemente zählen ab **0**, „keins“ ist **-1** (`INSTR`,
+    `GUI_LISTBOX_SELECTED`, Feld-Indizes). Antworten von Dialogen zählen ab
+    **1**, „keine“ ist **0** (`GUI_ANSWER`, `GUI_INFOBAR_ANSWER`, dort ist das Kreuz -1). Ausnahmen, die
+    bleiben: die Dimension bei `LBOUND`/`UBOUND` zählt ab 1 (bei `DIMSIZE`
+    ab 0), die Seiten von `PDF_PREVIEW` ab 1 wie im Druck, die Zeilen eines
+    Textbereichs ab 1 wie im Editor (`GUI_TEXTAREA_GOTO`, `_SCROLL`) --
+    nur `GUI_TEXTAREA_VIEW` liefert die erste Zeile ab 0 (`GUI_TEXTAREA_GET_VIEW`
+    ab 1). Wer „keinen Gast“ annimmt, bekommt je nach Modul NIL
+    (`NET_TCP_ACCEPT`), -1 (`WS_ACCEPT`) oder FALSE (`HTTPD_ACCEPT`); `INSTR`
+    nimmt einen negativen Start als 0, `INSTRREV` liefert dann -1.
 
 ## Der empfohlene Weg je Bereich
 
@@ -77,7 +109,7 @@ Für manches gibt es mehrere Wege, die gewachsen sind. Empfohlen ist:
 |---|---|---|
 | Ton | `AUDIO_*` (Busse, Effekte, räumlich, Musik mit `AUDIO_MUSIC_*`) | `SOUND_LOAD`/`SOUND_PLAY`, `MUSIC_PLAY` als Kurzform für ein schnelles Geräusch; `SAMPLE_*` für Instrumente |
 | Eingabe | `INPUT_BIND` und `INPUT_DOWN`/`INPUT_HIT` — Tastatur und Gamepad in einem | `KEY_*`, `MOUSE_*`, `JOYSTICK_*` für rohe Abfragen |
-| Uhr | `MILLIS()` für Abläufe im Programm, `TIME_NOW()` für Datum und Uhrzeit | `TIMER()` (dieselbe Uhr in Sekunden), `GET_TIME()`, `DATE$()`, `TIME$()` |
+| Uhr | `MILLIS()` für Abläufe im Programm, `TIME_NOW()` für Datum und Uhrzeit | `TIMER()` (dieselbe Uhr in Sekunden, beide zählen ab dem Start des Programms), `GET_TIME()` (zählt erst ab `SCREEN`), `DATE$()`, `TIME$()` |
 | Dateien | `FILE_READ$`, `FILE_WRITE`, `FILE_READ_LINES` mit Pfad | `FILE_OPEN`/`FILE_READ_LINE$`/`FILE_CLOSE` mit Handle für große Dateien |
 
 `TIMER()` ist eine Uhr; die Familie `TIMER_EVERY`, `TIMER_AFTER` … dagegen

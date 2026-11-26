@@ -65,9 +65,41 @@ shows the new one; completion and signature help know both.
    `ms` or `…_ms`): `TWEEN_NEW`, `TIMER_AFTER`, `SLEEP`, the fades, every
    `…_SET_TIMEOUT`. The step of a frame counts **seconds** like `DELTA()`:
    `PHYS2D_STEP`, `PHYS3D_STEP` (a value of 1 or more is an error there — that
-   would be milliseconds). Two old commands count seconds and stay that way;
-   next to them there is the version in ms: `HTTP_TIMEOUT` → `HTTP_SET_TIMEOUT`,
-   `SERIAL_TIMEOUT` → `SERIAL_SET_TIMEOUT`.
+   would be milliseconds), likewise `CHAR_UPDATE` with `dt`. Position and
+   length in a medium (music, video, sample, MIDI file) count **seconds** as
+   FLOAT (`SAMPLE_LEN`, `VIDEO_SEEK`, `MIDI_FILE_DURATION`); notes in a MIDI
+   file are written in quarters, the unit of music. Old commands that take a
+   time span in seconds or frames stay that way; next to them there is the
+   version in ms: `HTTP_TIMEOUT` → `HTTP_SET_TIMEOUT`,
+   `SERIAL_TIMEOUT` → `SERIAL_SET_TIMEOUT`, `BT_SCAN` → `BT_SCAN_MS`,
+   `AUDIO_AUTOPAN` → `AUDIO_AUTOPAN_MS`, `CHAR_SET_COYOTE_TIME` →
+   `CHAR_SET_COYOTE_MS`, `CHAR_SET_JUMP_BUFFER` → `CHAR_SET_JUMP_BUFFER_MS`;
+   `SAMPLE_SET_LOOP` (frames) → `SAMPLE_SET_LOOP_TIME` (seconds like
+   `SAMPLE_LEN`).
+10. **Angles:** drawing counts **degrees**, 0 = right, **clockwise** on the
+    screen (`PIE`, `DRAWIMAGEROT`, `CAMERA_SET_ROTATION`, `ARC_DEG`); maths
+    counts **radians** (`SIN`, `ATAN2`, `VEC2_ANGLE`). The parameters are
+    called `…_deg` or `…_rad`. Two old commands stay with radians and have a
+    degree version: `ARC` (counter-clockwise) → `ARC_DEG`,
+    `PHYS2D_BODY_ANGLE` → `PHYS2D_BODY_ANGLE_DEG`.
+11. **Rectangles and rays:** drawn rectangles name two corners (`BOX`,
+    `IMAGE_FILL_RECT`: x1, y1, x2, y2, both corners belong to it); clippings
+    name a corner and the size (`IMAGE_DRAW_RECT`, `SCISSOR`, all gui
+    positions); physics names the centre and the half size (`PHYS2D_ADD_BOX`,
+    `PHYS3D_ADD_BOX`), `RAY_HIT_BOX` the centre and the whole size. A "ray" in
+    2D is a segment, the result the fraction t from 0 to 1 (`PHYSICS_RAY_*`);
+    in 3D a ray, the result the distance (`RAY_HIT_*`). No hit is -1; only
+    `PHYSICS_LINES_X` returns NaN then.
+12. **Counting:** elements count from **0**, "none" is **-1** (`INSTR`,
+    `GUI_LISTBOX_SELECTED`, array indices). Answers of dialogs count from
+    **1**, "none" is **0** (`GUI_ANSWER`, `GUI_INFOBAR_ANSWER`, where the cross is -1). Exceptions that
+    stay: the dimension of `LBOUND`/`UBOUND` counts from 1 (with `DIMSIZE`
+    from 0), the pages of `PDF_PREVIEW` from 1 as in print, the lines of a
+    text area from 1 as in an editor (`GUI_TEXTAREA_GOTO`, `_SCROLL`) --
+    only `GUI_TEXTAREA_VIEW` returns the first line from 0
+    (`GUI_TEXTAREA_GET_VIEW` from 1). Accepting "no guest" gives NIL
+    (`NET_TCP_ACCEPT`), -1 (`WS_ACCEPT`) or FALSE (`HTTPD_ACCEPT`) depending on
+    the module; `INSTR` takes a negative start as 0, `INSTRREV` returns -1 then.
 
 ## The recommended way per area
 
@@ -77,7 +109,7 @@ Some things can be done in several ways that grew over time. Recommended:
 |---|---|---|
 | Sound | `AUDIO_*` (buses, effects, spatial, music with `AUDIO_MUSIC_*`) | `SOUND_LOAD`/`SOUND_PLAY`, `MUSIC_PLAY` as the short form for a quick sound; `SAMPLE_*` for instruments |
 | Input | `INPUT_BIND` and `INPUT_DOWN`/`INPUT_HIT` — keyboard and gamepad in one | `KEY_*`, `MOUSE_*`, `JOYSTICK_*` for raw queries |
-| Clock | `MILLIS()` for timing inside the program, `TIME_NOW()` for date and time of day | `TIMER()` (the same clock in seconds), `GET_TIME()`, `DATE$()`, `TIME$()` |
+| Clock | `MILLIS()` for timing inside the program, `TIME_NOW()` for date and time of day | `TIMER()` (the same clock in seconds, both count from the start of the program), `GET_TIME()` (counts only from `SCREEN`), `DATE$()`, `TIME$()` |
 | Files | `FILE_READ$`, `FILE_WRITE`, `FILE_READ_LINES` by path | `FILE_OPEN`/`FILE_READ_LINE$`/`FILE_CLOSE` with a handle for large files |
 
 `TIMER()` is a clock; the family `TIMER_EVERY`, `TIMER_AFTER` … on the other

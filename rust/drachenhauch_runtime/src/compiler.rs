@@ -881,6 +881,13 @@ const PARAM_ZWEITNAMEN: &[&[&str]] = &[
     &["on", "flag"],
     &["bind_addr", "bind"],
     &["widget", "wdg"],
+    // AUDIO_SFX hiess "atk, sus, dec, vib_d, vib_s" -- "sus" ist dort eine
+    // Zeit, bei AUDIO_NOTE ein Pegel (Bericht A8.6); die alten Namen bleiben.
+    &["attack_ms", "atk"],
+    &["sustain_ms", "sus"],
+    &["decay_ms", "dec"],
+    &["vib_depth", "vib_d"],
+    &["vib_speed", "vib_s"],
 ];
 
 /// Die Stelle des Parameters, den `key` ueber einen Zweitnamen meint.

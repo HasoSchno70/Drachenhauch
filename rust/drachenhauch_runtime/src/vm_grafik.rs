@@ -67,10 +67,7 @@ impl<'p> Vm<'p> {
                 Some(Value::Int(n)) => *n,
                 _ => return Err(format!("{}: Argument {} muss eine Farbe sein", fn_, i + 1)),
             };
-            let u = v as u32;
-            let al = ((u >> 24) & 0xFF) as u8;
-            let mut c = [((u >> 16) & 0xFF) as u8, ((u >> 8) & 0xFF) as u8, (u & 0xFF) as u8,
-                         if al == 0 { 255 } else { al }];
+            let mut c = crate::farbraum::rgba(v);
             if let Some(d) = deck.and_then(|k| a.get(k)) {
                 let d = match d {
                     Value::Int(n) => *n,
@@ -485,6 +482,17 @@ impl<'p> Vm<'p> {
                 let c = if a.len() >= 5 { gi(a, 4, "ELLIPSEOUTLINE")? } else { 0xFFFFFF };
                 let breite = if a.len() >= 6 { Some(need_f(a, 5, "ELLIPSEOUTLINE")?) } else { None };
                 g!().ellipse_outline(gi(a,0,"ELLIPSEOUTLINE")? as i32, gi(a,1,"ELLIPSEOUTLINE")? as i32, gi(a,2,"ELLIPSEOUTLINE")? as i32, gi(a,3,"ELLIPSEOUTLINE")? as i32, c, breite); Value::Nil
+            }
+            // Derselbe Bogen nach der Leitlinie des Zeichnens (Regel 10):
+            // Grad, 0 = rechts, im Uhrzeigersinn -- wie PIE. ARC selbst nimmt
+            // Bogenmass gegen den Uhrzeigersinn und bleibt dabei.
+            "arc_deg" => {
+                let f = "ARC_DEG";
+                let start = -need_f(a, 4, f)?.to_radians();
+                let end = -need_f(a, 5, f)?.to_radians();
+                let c = if a.len() >= 7 { gi(a, 6, f)? } else { 0xFFFFFF };
+                let width = if a.len() >= 8 { Some(need_f(a, 7, f)?) } else { None };
+                g!().arc(gi(a,0,f)? as i32, gi(a,1,f)? as i32, gi(a,2,f)? as i32, gi(a,3,f)? as i32, start, end, width, c); Value::Nil
             }
             "arc" => {
                 let start = need_f(a, 4, "ARC")?;
@@ -1619,6 +1627,18 @@ impl<'p> Vm<'p> {
                 let path = gs(a, 0, "SAMPLE_LOAD")?.to_string();
                 Value::Int(self.audio_mut()?.sample_load(&path)?)
             }
+            // Die Loop-Region in Sekunden wie SAMPLE_LEN (SAMPLE_SET_LOOP zaehlt
+            // Frames -- die kennt ein Programm nur, wenn es die Abtastrate kennt).
+            "sample_set_loop_time" => {
+                let f = "SAMPLE_SET_LOOP_TIME";
+                let idx = gi(a, 0, f)?;
+                let (von, bis) = (need_f(a, 1, f)?, need_f(a, 2, f)?);
+                let art = if a.len() >= 4 { Some(gs(a, 3, f)?.to_string()) } else { None };
+                let au = self.audio_mut()?;
+                let sr = au.sample_rate(idx, f)?;
+                au.sample_set_loop(idx, (von * sr).round() as i64, (bis * sr).round() as i64, art.as_deref(), f)?;
+                Value::Nil
+            }
             "sample_set_loop" => {
                 // SAMPLE_SET_LOOP(sample, start, end[, art$]) -- Loop-Region in
                 // Frames; art$ = "vorwaerts" (Vorgabe) oder "pingpong".
@@ -1626,7 +1646,7 @@ impl<'p> Vm<'p> {
                 let start = gi(a, 1, "SAMPLE_SET_LOOP")?;
                 let end = gi(a, 2, "SAMPLE_SET_LOOP")?;
                 let art = if a.len() >= 4 { Some(gs(a, 3, "SAMPLE_SET_LOOP")?.to_string()) } else { None };
-                self.audio_mut()?.sample_set_loop(idx, start, end, art.as_deref())?;
+                self.audio_mut()?.sample_set_loop(idx, start, end, art.as_deref(), "SAMPLE_SET_LOOP")?;
                 Value::Nil
             }
             "sample_from_buffer" => {
@@ -1765,7 +1785,10 @@ impl<'p> Vm<'p> {
                 }
                 let mix = need_f(a, 1, "AUDIO_DELAY")?;
                 let fb = if a.len() >= 3 { need_f(a, 2, "AUDIO_DELAY")? } else { 0.5 };
-                let time_ms = if a.len() >= 4 { gi(a, 3, "AUDIO_DELAY")? } else { 0 };
+                // Fehlend heisst die Vorgabe -- wie beim feedback (bis 2026.53
+                // blieb die alte Zeit stehen).
+                let time_ms = if a.len() >= 4 { gi(a, 3, "AUDIO_DELAY")? } else { 300 };
+                if time_ms <= 0 { return Err(format!("AUDIO_DELAY: time_ms muss > 0 sein, erhalten {}", time_ms)); }
                 self.audio_mut()?.set_delay(&bus, mix, fb, time_ms)?;
                 Value::Nil
             }
@@ -1912,16 +1935,40 @@ impl<'p> Vm<'p> {
             "audio_pitch" => {
                 let i = gi(a, 0, "AUDIO_PITCH")?;
                 let f = need_f(a, 1, "AUDIO_PITCH")?;
-                if f <= 0.0 { return Err("AUDIO_PITCH: faktor muss > 0 sein".into()); }
+                // Dieselbe Grenze wie AUDIO_MUSIC_PITCH: 0 < f <= 64 (bis 2026.53
+                // hier ohne Obergrenze, dort still auf 64 geklemmt).
+                if !(f > 0.0 && f <= 64.0) { return Err(format!("AUDIO_PITCH: faktor muss > 0 und <= 64 sein, erhalten {}", f)); }
                 self.audio_mut()?.ch_pitch(i, f)?; Value::Nil
             }
             "audio_music_pitch" => {
                 let f = need_f(a, 0, "AUDIO_MUSIC_PITCH")?;
-                if f <= 0.0 { return Err("AUDIO_MUSIC_PITCH: faktor muss > 0 sein".into()); }
+                if !(f > 0.0 && f <= 64.0) { return Err(format!("AUDIO_MUSIC_PITCH: faktor muss > 0 und <= 64 sein, erhalten {}", f)); }
                 self.audio_mut()?.music_set_pitch(f); Value::Nil
             }
             "audio_music_get_pitch" => Value::Float(self.audio_mut()?.music_get_pitch()),
-            "audio_pan_pos" => { let i = gi(a, 0, "AUDIO_PAN_POS")?; let p = need_f(a, 1, "AUDIO_PAN_POS")?; self.audio_mut()?.ch_pan_pos(i, p)?; Value::Nil }
+            "audio_pan_pos" => { let i = gi(a, 0, "AUDIO_PAN_POS")?; let p = need_f(a, 1, "AUDIO_PAN_POS")?; self.audio_mut()?.ch_pan_pos(i, p, "AUDIO_PAN_POS")?; Value::Nil }
+            // Pan in der Skala -1 (links) .. 0 (Mitte) .. 1 (rechts) wie
+            // AUDIO_BUS_PAN und AUDIO_SOUND_MIX. AUDIO_PAN_POS/_SLIDE zaehlen
+            // 0..1 und bleiben dabei (Bericht A8.1; eine Skala, neue Befehle).
+            "audio_set_pan" => {
+                let f = "AUDIO_SET_PAN";
+                let i = gi(a, 0, f)?;
+                let p = need_f(a, 1, f)?;
+                if !(-1.0..=1.0).contains(&p) { return Err(format!("{}: pan ist -1..1, erhalten {}", f, p)); }
+                self.audio_mut()?.ch_pan_pos(i, (p + 1.0) / 2.0, f)?; Value::Nil
+            }
+            "audio_set_pan_slide" => {
+                let f = "AUDIO_SET_PAN_SLIDE";
+                let i = gi(a, 0, f)?;
+                let (von, nach) = (need_f(a, 1, f)?, need_f(a, 2, f)?);
+                for p in [von, nach] {
+                    if !(-1.0..=1.0).contains(&p) { return Err(format!("{}: pan ist -1..1, erhalten {}", f, p)); }
+                }
+                let dauer = gi(a, 3, f)?;
+                if dauer <= 0 { return Err(format!("{}: dauer_ms muss > 0 sein", f)); }
+                let easing = easing_name(a, 4, f)?;
+                self.audio_mut()?.ch_pan_slide(i, (von + 1.0) / 2.0, (nach + 1.0) / 2.0, dauer, &easing, f)?; Value::Nil
+            }
             "audio_pan_slide" => {
                 // AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms[, easing$]) -- Positionen 0=links..1=rechts
                 let i = gi(a, 0, "AUDIO_PAN_SLIDE")?;
@@ -1930,14 +1977,22 @@ impl<'p> Vm<'p> {
                 let dauer = gi(a, 3, "AUDIO_PAN_SLIDE")?;
                 if dauer <= 0 { return Err("AUDIO_PAN_SLIDE: dauer_ms muss > 0 sein".into()); }
                 let easing = easing_name(a, 4, "AUDIO_PAN_SLIDE")?;
-                self.audio_mut()?.ch_pan_slide(i, von, nach, dauer, &easing)?; Value::Nil
+                self.audio_mut()?.ch_pan_slide(i, von, nach, dauer, &easing, "AUDIO_PAN_SLIDE")?; Value::Nil
+            }
+            // Dieselbe Pendelbewegung mit der Periode in ms (Regel 9: Zeitspannen
+            // in ms; AUDIO_AUTOPAN bleibt bei Sekunden).
+            "audio_autopan_ms" => {
+                let i = gi(a, 0, "AUDIO_AUTOPAN_MS")?;
+                let periode = need_f(a, 1, "AUDIO_AUTOPAN_MS")? / 1000.0;
+                let tiefe = if a.len() >= 3 { need_f(a, 2, "AUDIO_AUTOPAN_MS")? } else { 1.0 };
+                self.audio_mut()?.ch_autopan(i, periode, tiefe, "AUDIO_AUTOPAN_MS")?; Value::Nil
             }
             "audio_autopan" => {
                 // AUDIO_AUTOPAN(ch, periode_s[, tiefe]) -- periode_s <= 0 = aus
                 let i = gi(a, 0, "AUDIO_AUTOPAN")?;
                 let periode = need_f(a, 1, "AUDIO_AUTOPAN")?;
                 let tiefe = if a.len() >= 3 { need_f(a, 2, "AUDIO_AUTOPAN")? } else { 1.0 };
-                self.audio_mut()?.ch_autopan(i, periode, tiefe)?; Value::Nil
+                self.audio_mut()?.ch_autopan(i, periode, tiefe, "AUDIO_AUTOPAN")?; Value::Nil
             }
             "audio_tone" => {
                 let freq = need_f(a, 0, "AUDIO_TONE")?;
@@ -2120,7 +2175,7 @@ impl<'p> Vm<'p> {
             }
             "audio_music_pause" => { self.audio_mut()?.music_pause(); Value::Nil }
             "audio_music_resume" => { self.audio_mut()?.music_resume(); Value::Nil }
-            "audio_music_volume" => { let v = need_f(a, 0, "AUDIO_MUSIC_VOLUME")?; self.audio_mut()?.music_set_volume(v); Value::Nil }
+            "audio_music_volume" => { let v = need_f(a, 0, "AUDIO_MUSIC_VOLUME")?; self.audio_mut()?.music_set_volume(v)?; Value::Nil }
             "audio_music_get_volume" => Value::Float(round_audio(self.audio_mut()?.music_get_volume())),
             "audio_music_position" => Value::Float(self.audio_mut()?.music_position()),
             "audio_music_seek" => {
@@ -2208,6 +2263,14 @@ impl<'p> Vm<'p> {
                 self.audio_mut()?.clock_set_speed(c, tps)?; Value::Nil
             }
             "audio_clock_remove" => { let c = gi(a, 0, "AUDIO_CLOCK_REMOVE")?; self.audio_mut()?.clock_remove(c)?; Value::Nil }
+            "audio_play_voice" => {
+                let f = "AUDIO_PLAY_VOICE";
+                let idx = gi(a, 0, f)?;
+                let vol = if a.len() >= 2 { need_f(a, 1, f)? } else { 1.0 };
+                let loops = if a.len() >= 3 { gi(a, 2, f)? } else { 0 };
+                Value::Int(self.audio_mut()?.ch_play_voice(idx, vol, loops)?)
+            }
+            "audio_voice_count" => { let i = gi(a, 0, "AUDIO_VOICE_COUNT")?; Value::Int(self.audio_mut()?.voice_count(i)?) }
             "audio_play_at" => {
                 // AUDIO_PLAY_AT(sound, clock, ticks[, volume[, loops]]) -- Start
                 // exakt auf Tick `ticks` der Uhr `clock` statt sofort.

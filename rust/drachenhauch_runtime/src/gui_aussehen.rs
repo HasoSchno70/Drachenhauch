@@ -129,9 +129,8 @@ pub(super) fn ablauf_lesen(rumpf: &str, kopf_zeile: usize, zeile_bei: impl Fn(us
             let t: Vec<&str> = teil.split_whitespace().collect();
             if t.is_empty() { continue; }
             if matches!(t[0].to_lowercase().as_str(), "farbe" | "color") {
-                let h = t.get(1).map(|v| v.trim_start_matches('#')).filter(|h| h.len() == 6)
-                    .and_then(|h| i64::from_str_radix(h, 16).ok())
-                    .ok_or_else(|| format!("Zeile {}: '{}' -- erwartet farbe #RRGGBB", zeile, teil.trim()))?;
+                let h = t.get(1).and_then(|v| crate::farbraum::hex_lesen(v))
+                    .ok_or_else(|| format!("Zeile {}: '{}' -- erwartet farbe #RGB oder #RRGGBB", zeile, teil.trim()))?;
                 k.farbe = [((h >> 16) & 0xFF) as f64, ((h >> 8) & 0xFF) as f64, (h & 0xFF) as f64];
                 continue;
             }

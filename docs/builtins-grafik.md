@@ -23,7 +23,7 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 |---|---|
 | `SCREEN(w, h[, title$[, scale]])` | öffnet Fenster mit logischer Größe `w × h`. `scale > 1` macht jeden logischen Pixel größer (Retro-Look). |
 | `FLIP()` | Frame an den Bildschirm ausgeben (synchronisiert auf 60 FPS) |
-| `CLS([color])` | Buffer mit `color` füllen (Default: schwarz) |
+| `CLS([color])` | Buffer mit `color` füllen (Default: schwarz); im transparenten Fenster (`SCREEN_TRANSPARENT`) zählt das oberste Byte wörtlich als Deckkraft, 0 = durchsichtig -- sonst heißt 0 deckend |
 | `SLEEP(ms)` | wartet ms Millisekunden, ohne dass das Fenster einfriert |
 | `QUITREQUESTED()` → BOOLEAN | TRUE wenn das Programm enden soll: Fenster-X / Alt+F4, das Bildlimit von `DHRT_FRAMES`/`--bilder` — **und per raylib-Default auch `ESC`**, AUSSER in einem Programm mit `gui`: dort gehoert `ESC` ab dem ersten `GUI_UPDATE` den Widgets (Dialog abbrechen, Klappliste schliessen), sonst beendete jedes Abbrechen das ganze Programm. `WINDOW_ESC_QUIT` setzt es ausdruecklich |
 | `WINDOW_CLOSE_REQUESTED()` → BOOLEAN | TRUE, wenn der NUTZER das Fenster schliessen will (Kreuz, Alt+F4, die Beenden-Taste) -- ohne das Bildlimit. Das Fenster bleibt dabei offen: ein Programm mit ungesicherter Arbeit fragt erst nach und endet dann selbst. Ein Ereignis, kein Zustand -- es gilt ein Bild lang |
@@ -303,6 +303,7 @@ Farbe wird als 24-Bit-INTEGER (`&HRRGGBB`) angegeben, am einfachsten via `RGB(r,
 | `ELLIPSE(x1, y1, x2, y2[, color])` | gefüllte Ellipse, eingepasst in die Bounding-Box |
 | `ELLIPSEOUTLINE(x1, y1, x2, y2[, color[, width]])` | Ellipse nur als Kontur |
 | `ARC(x1, y1, x2, y2, start_rad, end_rad[, color[, width]])` | Bogen-Segment in der Bounding-Box; Winkel in Radiant, gegen den Uhrzeigersinn. `width` (Float, optional) = Strichbreite; ohne Angabe 1px (zoom-unabhaengig), mit Angabe wie `LINEW`/`SPLINE` mit `CAMERA_SET`-Zoom skaliert |
+| `ARC_DEG(x1, y1, x2, y2, from_deg, to_deg[, color[, width]])` | derselbe Bogen in **Grad**, 0 = rechts, im Uhrzeigersinn -- wie `PIE` |
 | `TEXT(x, y, s$[, color])` | Text bei (x, y) |
 | `TEXTROT(x, y, s$, angle[, scale[, color]])` | Text **zentriert** auf (x, y), um das Zentrum gedreht (Grad, wie `DRAWIMAGEROT`) und skaliert — für Score-Popups, schräge Labels. Nutzt aktiven Font/Größe |
 

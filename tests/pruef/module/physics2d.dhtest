@@ -293,3 +293,20 @@ CATCH e
 END TRY
 --- erwartet
 PHYS2D_STEP: dt 16 ist in Sekunden gemeint (DELTA() liefert Sekunden) -- fuer Millisekunden durch 1000 teilen
+
+=== der drehwinkel in grad
+' PHYS2D_BODY_ANGLE liefert Bogenmass, DRAWIMAGEROT nimmt Grad (Regel 10).
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+' Eine Kiste faellt aussermittig auf eine Kugel und kippt.
+DIM kugel AS INTEGER
+kugel = PHYS2D_ADD_CIRCLE(w, 100.0, 150.0, 10.0, FALSE, 0.0)
+DIM k AS INTEGER
+k = PHYS2D_ADD_BOX(w, 108.0, 100.0, 10.0, 10.0, TRUE, 0.0)
+DIM i AS INTEGER
+FOR i = 1 TO 60 : PHYS2D_STEP(w, 1.0 / 60.0) : NEXT
+DIM r AS FLOAT : r = PHYS2D_BODY_ANGLE(w, k)
+PRINT ABS(r) > 0.01; " "; ABS(PHYS2D_BODY_ANGLE_DEG(w, k) - r * 180.0 / PI) < 0.0001
+--- erwartet
+TRUE TRUE

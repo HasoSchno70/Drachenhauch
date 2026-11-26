@@ -540,6 +540,13 @@ impl Gui {
     }
     pub fn destroy(&mut self, h: i64) -> Result<(), String> {
         let (wi, i) = Self::dec_widget(h);
+        // Freigeben ist still, auch doppelt (Handle-Regel); nur eine Nummer,
+        // die es nie gab, ist ein Fehler.
+        match self.windows.get(wi).and_then(|w| w.widgets.get(i)) {
+            None => return Err(format!("GUI_WIDGET_FREE: ungueltiges GUI_WIDGET-Handle {}", h)),
+            Some(w) if !w.alive || !self.windows[wi].alive => return Ok(()),
+            _ => {}
+        }
         let wd = self.wdg_mut(h, "GUI_DESTROY")?;
         wd.alive = false;
         // Haengende Interaktions-Referenzen auf dieses Widget loesen.
@@ -684,9 +691,9 @@ impl Gui {
         }
         Ok(())
     }
-    pub fn window_bounds(&self, h: i64) -> Result<(i32, i32, i32, i32), String> {
+    pub fn window_bounds(&self, h: i64, fn_: &str) -> Result<(i32, i32, i32, i32), String> {
         let w = self.windows.get(h as usize)
-            .ok_or("GUI_WINDOW_GET_*: ungueltiges GUI_WINDOW-Handle")?;
+            .ok_or_else(|| format!("{}: ungueltiges GUI_WINDOW-Handle {}", fn_, h))?;
         Ok((self.unsk(w.x), self.unsk(w.y), self.unsk(w.w), self.unsk(w.h)))
     }
     /// Breite und Hoehe des INHALTSbereichs -- unter Titel-, Menue- und
@@ -694,10 +701,10 @@ impl Gui {
     /// Programm mit Menue die Hoehe der Leiste raten, und die haengt an Thema
     /// und Massstab (gefunden beim Dogfooding 2026-10-09: die Statusleiste
     /// eines Notizzettels sass zu hoch).
-    pub fn window_inhalt(&self, h: i64) -> Result<(i32, i32), String> {
+    pub fn window_inhalt(&self, h: i64, fn_: &str) -> Result<(i32, i32), String> {
         let wi = h as usize;
         let w = self.windows.get(wi)
-            .ok_or("GUI_WINDOW_CONTENT_*: ungueltiges GUI_WINDOW-Handle")?;
+            .ok_or_else(|| format!("{}: ungueltiges GUI_WINDOW-Handle {}", fn_, h))?;
         Ok((self.unsk(w.w), self.unsk((w.h - self.content_top(wi)).max(0))))
     }
     /// Loest JEDE Interaktions-Referenz auf Fenster `wi` (oder ein Widget
@@ -734,6 +741,11 @@ impl Gui {
         if self.context_open.map(|(w, _, _, _)| w) == Some(wi) { self.context_open = None; }
     }
     pub fn window_destroy(&mut self, h: i64) -> Result<(), String> {
+        match self.windows.get(h as usize) {
+            None => return Err(format!("GUI_WINDOW_FREE: ungueltiges GUI_WINDOW-Handle {}", h)),
+            Some(w) if !w.alive => return Ok(()),
+            _ => {}
+        }
         let win = self.win_mut(h, "GUI_WINDOW_DESTROY")?;
         win.alive = false; win.visible = false;
         let wi = h as usize;

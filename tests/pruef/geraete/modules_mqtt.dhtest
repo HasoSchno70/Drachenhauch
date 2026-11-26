@@ -373,3 +373,11 @@ END FUNCTION
 {sammlung}/../_hilfen/mqttbroker.dh
 --- erwartet
 TRUE
+
+=== mqtt_is_connected mit einer nummer, die es nie gab, ist ein fehler
+' Geschlossen heisst nicht verbunden (FALSE), eine fremde Nummer ist ein
+' Fehler (Handle-Regel; bis 2026.53 FALSE).
+IMPORT "mqtt"
+PRINT MQTT_IS_CONNECTED(99)
+--- fehler
+MQTT_IS_CONNECTED: ungueltiges MQTT_HANDLE 99

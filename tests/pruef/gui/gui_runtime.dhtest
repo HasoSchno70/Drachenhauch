@@ -122,3 +122,30 @@ PRINT GUI_HIT_TEST(20, 40)
 --- erwartet
 -1
 
+=== ein freigegebenes widget: fragen geht, setzen ist ein fehler
+' Handle-Regel fuer die gui: der Grabstein antwortet beim Fragen (eine
+' Schleife fragt oft noch Knoepfe eines geschlossenen Dialogs ab), Setzen
+' ist ein Fehler mit dem Befehl, Freigeben doppelt still. Bis 2026.53 ging
+' GUI_SET_TEXT auf ein zerstoertes Widget still durch.
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "B", 10, 10, 80, 24)
+GUI_WIDGET_FREE(b)
+GUI_WIDGET_FREE(b)
+PRINT "fragen "; GUI_CLICKED(b)
+TRY
+    GUI_SET_TEXT(b, "tot")
+CATCH e
+    PRINT e
+END TRY
+GUI_WINDOW_FREE(w)
+GUI_WINDOW_FREE(w)
+TRY
+    DIM c AS GUI_WIDGET : c = GUI_BUTTON(w, "C", 10, 10, 80, 24)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+fragen FALSE
+GUI_SET_TEXT: das Widget wurde mit GUI_WIDGET_FREE freigegeben
+GUI_BUTTON: das Fenster 0 wurde mit GUI_WINDOW_FREE freigegeben

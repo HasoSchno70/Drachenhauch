@@ -646,6 +646,15 @@ pub(crate) fn vergangen(zuletzt: &mut Option<std::time::Instant>) -> f32 {
 
 // --- Hilfs-Konvertierungen ---------------------------------------------
 
+/// Die Regel fuer Lautstaerken (docs/module-audio.md): 0..1, mehr ist ein
+/// Fehler. Bis 2026.53 wurde mehr als 1 an sieben Stellen still zu 1
+/// (AUDIO_BUS_VOLUME("sfx", 2.0) -> 1.0), waehrend AUDIO_SOUND_MIX bis 4 nahm
+/// -- das Mischen in einen Klang bleibt die eine Ausnahme (Verstaerkung).
+pub(crate) fn lautstaerke(v: f64, fn_: &str) -> Result<f64, String> {
+    if v.is_finite() && (0.0..=1.0).contains(&v) { Ok(v) }
+    else { Err(format!("{}: die Lautstaerke ist 0..1, erhalten {}", fn_, v)) }
+}
+
 /// Lineare Lautstaerke 0..1 -> Kira-Dezibel. 0 -> Stille.
 fn db(v: f64) -> Decibels {
     let v = v.clamp(0.0, 1.0);
@@ -797,7 +806,7 @@ impl LoopArt {
         match s.to_lowercase().as_str() {
             "vorwaerts" | "forward" => Ok(LoopArt::Vorwaerts),
             "pingpong" => Ok(LoopArt::Pingpong),
-            _ => Err(format!("{}: unbekannte Loop-Art '{}' (erlaubt: vorwaerts, pingpong)", befehl, s)),
+            _ => Err(format!("{}: unbekannte Loop-Art '{}' (erlaubt: vorwaerts/forward, pingpong)", befehl, s)),
         }
     }
 }
@@ -1149,7 +1158,7 @@ impl Audio {
     /// Lautstaerke/Loop/Fade. Gemeinsamer Kern fuer PLAYSOUND + AUDIO_PLAY.
     fn start_slot(&mut self, idx: i64, fn_: &str, vol: f64, loops: i64, fade_in_ms: i64,
                   curve: FadeCurve) -> Result<(), String> {
-        let vol = vol.clamp(0.0, 1.0);
+        let vol = lautstaerke(vol, fn_)?;
         // alte Instanz(en) stoppen -- AUDIO_PLAY spielt den Klang EINMAL
         { let s = self.slot_mut(idx, fn_)?;
           if let Some(h) = s.handle.as_mut() { h.stop(tween_now()); }
@@ -1178,7 +1187,7 @@ impl Audio {
     pub fn ch_play_at(&mut self, idx: i64, clock_idx: i64, ticks: i64,
                        volume: f64, loops: i64) -> Result<i64, String> {
         let clock_id = self.clock_slot(clock_idx, "AUDIO_PLAY_AT")?.handle.id();
-        let vol = volume.clamp(0.0, 1.0);
+        let vol = lautstaerke(volume, "AUDIO_PLAY_AT")?;
         // NICHT stoppen: die vorige Instanz wartet vielleicht noch auf ihren
         // Tick (Sequencer, Tracker) oder klingt aus -- sie wird eine weitere
         { let s = self.slot_mut(idx, "AUDIO_PLAY_AT")?;
@@ -1197,6 +1206,31 @@ impl Audio {
         let s = self.slot_mut(idx, "AUDIO_PLAY_AT")?;
         s.handle = Some(handle);
         s.start = Some((clock_idx, ticks as u64));
+        s.vol = vol as f32;
+        s.loops = if loops < 0 { -1 } else { loops };
+        s.pan_anim = None;
+        Ok(idx)
+    }
+
+    /// AUDIO_PLAY_VOICE(sound[, volume[, loops]]) -- spielt den Klang als
+    /// WEITERE Stimme: eine laufende Instanz klingt weiter (AUDIO_PLAY schneidet
+    /// sie ab, ein Kanal ist der Klang selbst). Fuer Schuesse, Schritte,
+    /// Klavier -- derselbe Klang mehrmals uebereinander. AUDIO_STOP stoppt alle.
+    pub fn ch_play_voice(&mut self, idx: i64, volume: f64, loops: i64) -> Result<i64, String> {
+        let vol = lautstaerke(volume, "AUDIO_PLAY_VOICE")?;
+        { let s = self.slot_mut(idx, "AUDIO_PLAY_VOICE")?;
+          s.geplant.retain(|(h, _)| h.state() != PlaybackState::Stopped);
+          let alt_start = s.start.take();
+          if let Some(h) = s.handle.take() {
+              if h.state() != PlaybackState::Stopped { s.geplant.push((h, alt_start)); }
+          } }
+        let mut settings = StaticSoundSettings::new().volume(db(vol));
+        if loops < 0 { settings = settings.loop_region(0.0..); }
+        let data = self.spieldaten(idx, "AUDIO_PLAY_VOICE", loops < 0)?.with_settings(settings);
+        let handle = self.sfx_track.play(data)
+            .map_err(|e| format!("AUDIO_PLAY_VOICE: {}", kira_text(&e)))?;
+        let s = self.slot_mut(idx, "AUDIO_PLAY_VOICE")?;
+        s.handle = Some(handle);
         s.vol = vol as f32;
         s.loops = if loops < 0 { -1 } else { loops };
         s.pan_anim = None;
@@ -1572,7 +1606,7 @@ resonance/reverb/distortion", other)),
     pub fn ch_play_on(&mut self, idx: i64, emitter_idx: i64, loops: i64, volume: f64,
                       fade_in_ms: i64, easing: &str) -> Result<i64, String> {
         let curve = FadeCurve::parse(easing, "AUDIO_PLAY_ON")?;
-        let vol = volume.clamp(0.0, 1.0);
+        let vol = lautstaerke(volume, "AUDIO_PLAY_ON")?;
         { let s = self.slot_mut(idx, "AUDIO_PLAY_ON")?;
           if let Some(h) = s.handle.as_mut() { h.stop(tween_now()); }
           s.weitere_stoppen();
@@ -1619,7 +1653,7 @@ resonance/reverb/distortion", other)),
     /// ("sfx", "music", "master"), 0..1. Multipliziert sich mit den
     /// einzelnen Sound-/Musik-Volumes (Kira-Mixer).
     pub fn set_bus_volume(&mut self, bus: &str, v: f64) -> Result<(), String> {
-        let vol = v.clamp(0.0, 1.0);
+        let vol = lautstaerke(v, "AUDIO_BUS_VOLUME")?;
         if bus.eq_ignore_ascii_case("speech") {
             self.speech_bus = vol as f32;
             self.speech_track.set_volume(db(vol), tween_now());
@@ -1828,6 +1862,7 @@ resonance/reverb/distortion", other)),
 
     // ================= Tone-Generation =================
     pub fn tone(&mut self, freq: f64, dur_ms: i64, waveform: &str, volume: f64) -> Result<i64, String> {
+        lautstaerke(volume, "AUDIO_TONE")?;
         if freq <= 0.0 { return Err("AUDIO_TONE: freq_hz muss > 0 sein".into()); }
         if dur_ms <= 0 { return Err("AUDIO_TONE: dauer_ms muss > 0 sein".into()); }
         let wf = waveform.to_lowercase();
@@ -1844,12 +1879,13 @@ resonance/reverb/distortion", other)),
         }
         let data = self.make_data_mono(&buf, volume, sr);
         let schleife = self.mono_daten(&buf, volume, sr, false);
-        let idx = self.push_slot(data, volume.clamp(0.0, 1.0) as f32);
+        let idx = self.push_slot(data, 1.0);
         self.sounds[idx as usize].schleife = Some(schleife);
         Ok(idx)
     }
 
     pub fn noise(&mut self, dur_ms: i64, volume: f64) -> Result<i64, String> {
+        lautstaerke(volume, "AUDIO_NOISE")?;
         if dur_ms <= 0 { return Err("AUDIO_NOISE: dauer_ms muss > 0 sein".into()); }
         let sr: u32 = 44100;
         let n = (sr as f64 * dur_ms as f64 / 1000.0) as usize;
@@ -1858,7 +1894,7 @@ resonance/reverb/distortion", other)),
         for b in buf.iter_mut() { *b = rng_uniform(); }
         let data = self.make_data_mono(&buf, volume, sr);
         let schleife = self.mono_daten(&buf, volume, sr, false);
-        let idx = self.push_slot(data, volume.clamp(0.0, 1.0) as f32);
+        let idx = self.push_slot(data, 1.0);
         self.sounds[idx as usize].schleife = Some(schleife);
         Ok(idx)
     }
@@ -1894,6 +1930,7 @@ resonance/reverb/distortion", other)),
                 attack_ms: i64, decay_ms: i64, sustain: f64, release_ms: i64,
                 volume: f64, vib_depth: f64, vib_speed: f64,
                 detune_cents: f64, slide_halbtoene: f64) -> Result<i64, String> {
+        lautstaerke(volume, "AUDIO_NOTE")?;
         let wf = waveform.to_lowercase();
         if !matches!(wf.as_str(), "sine" | "square" | "saw" | "triangle" | "noise") {
             return Err(format!(
@@ -1919,7 +1956,7 @@ resonance/reverb/distortion", other)),
                                     release_ms, vib_depth, vib_speed, detune_cents,
                                     slide_halbtoene, sr);
         let data = self.make_data_mono(&buf, volume, sr);
-        Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
+        Ok(self.push_slot(data, 1.0))
     }
 
     /// AUDIO_RECORD_START([max_sekunden]) -- den fertigen Mix mitschneiden
@@ -2067,6 +2104,7 @@ resonance/reverb/distortion", other)),
                stereo_width: f64,
                duty: f64, pwm_depth: f64, pwm_speed: f64,
                flt_cutoff: f64, flt_sweep: f64, flt_res: f64) -> Result<i64, String> {
+        lautstaerke(volume, "AUDIO_SFX")?;
         let fx = SidFx { duty, pwm_depth, pwm_speed, flt_cutoff, flt_sweep, flt_res };
         let wf = waveform.to_lowercase();
         if !matches!(wf.as_str(), "sine" | "square" | "saw" | "triangle" | "noise") {
@@ -2095,7 +2133,7 @@ resonance/reverb/distortion", other)),
             };
             self.make_data_stereo(&left, &right, volume, sr)
         };
-        Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
+        Ok(self.push_slot(data, 1.0))
     }
 
     /// Signierte Spitzenwerte zum Zeichnen einer Wellenform.
@@ -2272,14 +2310,14 @@ resonance/reverb/distortion", other)),
     }
 
     pub fn sample_set_loop(&mut self, idx: i64, start: i64, end: i64,
-                           art: Option<&str>) -> Result<(), String> {
-        let modus = match art { Some(a) => Some(LoopArt::parse(a, "SAMPLE_SET_LOOP")?), None => None };
-        let i = self.sample_griff(idx, "SAMPLE_SET_LOOP")?;
+                           art: Option<&str>, fn_: &str) -> Result<(), String> {
+        let modus = match art { Some(a) => Some(LoopArt::parse(a, fn_)?), None => None };
+        let i = self.sample_griff(idx, fn_)?;
         let s = &mut self.samples[i];
         let n = s.data.len();
         let start = start.max(0) as usize;
         let end = (end.max(0) as usize).min(n);
-        if end <= start { return Err("SAMPLE_SET_LOOP: end muss > start sein".into()); }
+        if end <= start { return Err(format!("{}: end muss > start sein", fn_)); }
         s.loop_start = start; s.loop_end = end;
         s.loop_mode = modus.unwrap_or(LoopArt::Vorwaerts);
         self.sample_cache.retain(|k, _| k.0 != idx as usize);
@@ -2297,6 +2335,7 @@ resonance/reverb/distortion", other)),
     pub fn sample_note(&mut self, sidx: i64, halbtoene: f64, dauer_ms: i64,
                        attack_ms: i64, decay_ms: i64, sustain: f64, release_ms: i64,
                        volume: f64, slide_halbtoene: f64) -> Result<i64, String> {
+        lautstaerke(volume, "SAMPLE_NOTE")?;
         let i = self.sample_griff(sidx, "SAMPLE_NOTE")?;
         let s = &self.samples[i];
         if !(-120.0..=120.0).contains(&halbtoene) || !halbtoene.is_finite() {
@@ -2324,9 +2363,15 @@ resonance/reverb/distortion", other)),
         let mut buf = sample_stimme(&s.data, schritt, n_hold, n_hold + nr, slide_halbtoene, schleife);
         huellkurve(&mut buf, n_hold, attack_ms, decay_ms, sustain, sr);
         let data = self.make_data_mono(&buf, volume, sr);
-        Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
+        Ok(self.push_slot(data, 1.0))
     }
 
+    /// Abtastrate eines Samples (Frames je Sekunde) -- fuer die Befehle, die
+    /// Zeit statt Frames nehmen (SAMPLE_SET_LOOP_TIME).
+    pub fn sample_rate(&self, idx: i64, fn_: &str) -> Result<f64, String> {
+        let i = self.sample_griff(idx, fn_)?;
+        Ok(self.samples[i].sr as f64)
+    }
     pub fn sample_len(&self, idx: i64) -> Result<f64, String> {
         let i = self.sample_griff(idx, "SAMPLE_LEN")?;
         let s = &self.samples[i];
@@ -2335,6 +2380,7 @@ resonance/reverb/distortion", other)),
 
     pub fn sample_play(&mut self, sidx: i64, semitones: f64, volume: f64,
                        dur_ms: i64) -> Result<i64, String> {
+        lautstaerke(volume, "SAMPLE_PLAY")?;
         let si = self.sample_griff(sidx, "SAMPLE_PLAY")?;
         let ratio = 2f64.powf(semitones / 12.0);
         if !ratio.is_finite() || ratio <= 0.0 {
@@ -2404,7 +2450,7 @@ resonance/reverb/distortion", other)),
         }
     }
     pub fn ch_set_volume(&mut self, idx: i64, v: f64) -> Result<(), String> {
-        let vol = v.clamp(0.0, 1.0);
+        let vol = lautstaerke(v, "AUDIO_VOLUME")?;
         let s = self.slot_mut(idx, "AUDIO_VOLUME")?;
         s.vol = vol as f32;
         for h in s.alle() { h.set_volume(db(vol), tween_now()); }
@@ -2423,8 +2469,8 @@ resonance/reverb/distortion", other)),
         Ok(())
     }
     pub fn ch_pan(&mut self, idx: i64, left: f64, right: f64) -> Result<(), String> {
-        let l = left.clamp(0.0, 1.0);
-        let r = right.clamp(0.0, 1.0);
+        let l = lautstaerke(left, "AUDIO_PAN")?;
+        let r = lautstaerke(right, "AUDIO_PAN")?;
         let vol = l.max(r);
         let pos = if l + r > 0.0 { r / (l + r) } else { 0.5 };  // 0=links,1=rechts
         let s = self.slot_mut(idx, "AUDIO_PAN")?;
@@ -2436,15 +2482,15 @@ resonance/reverb/distortion", other)),
         }
         Ok(())
     }
-    pub fn ch_pan_pos(&mut self, idx: i64, p: f64) -> Result<(), String> {
-        let s = self.slot_mut(idx, "AUDIO_PAN_POS")?;
+    pub fn ch_pan_pos(&mut self, idx: i64, p: f64, fn_: &str) -> Result<(), String> {
+        let s = self.slot_mut(idx, fn_)?;
         s.pan_anim = None;
         for h in s.alle() { h.set_panning(pan_of(p), tween_now()); }
         Ok(())
     }
     pub fn ch_pan_slide(&mut self, idx: i64, from: f64, to: f64, dur_ms: i64,
-                        easing: &str) -> Result<(), String> {
-        let curve = FadeCurve::parse(easing, "AUDIO_PAN_SLIDE")?;
+                        easing: &str, fn_: &str) -> Result<(), String> {
+        let curve = FadeCurve::parse(easing, fn_)?;
         let (from, to) = (from.clamp(0.0, 1.0), to.clamp(0.0, 1.0));
         let s = self.slot_mut(idx, "AUDIO_PAN_SLIDE")?;
         s.pan_anim = None;
@@ -2454,8 +2500,8 @@ resonance/reverb/distortion", other)),
         }
         Ok(())
     }
-    pub fn ch_autopan(&mut self, idx: i64, period_s: f64, depth: f64) -> Result<(), String> {
-        let s = self.slot_mut(idx, "AUDIO_AUTOPAN")?;
+    pub fn ch_autopan(&mut self, idx: i64, period_s: f64, depth: f64, fn_: &str) -> Result<(), String> {
+        let s = self.slot_mut(idx, fn_)?;
         s.pan_anim = if period_s <= 0.0 { None } else {
             Some(Pendulum { period_s, depth: depth.clamp(0.0, 1.0), start: std::time::Instant::now() })
         };
@@ -2477,6 +2523,13 @@ resonance/reverb/distortion", other)),
     }
     pub fn set_num_channels(&mut self, n: i64) { self.num_channels = n.max(0); }
     pub fn get_num_channels(&self) -> i64 { self.num_channels }
+    /// AUDIO_VOICE_COUNT(sound): wie viele Stimmen dieses Klangs gerade
+    /// klingen (AUDIO_PLAY_VOICE und AUDIO_PLAY_AT legen weitere an).
+    pub fn voice_count(&self, idx: i64) -> Result<i64, String> {
+        let s = self.sounds.get(idx as usize).filter(|_| idx >= 0)
+            .ok_or_else(|| format!("AUDIO_VOICE_COUNT: ungueltiges Handle {}", idx))?;
+        Ok(s.instanzen().filter(|(h, st)| self.instanz_zustand(h, st) == 1).count() as i64)
+    }
     pub fn busy_channels(&self) -> i64 {
         self.sounds.iter().filter(|s| s.instanzen().any(|(h, st)| self.instanz_zustand(h, st) == 1)).count() as i64
     }
@@ -2570,7 +2623,7 @@ resonance/reverb/distortion", other)),
     }
 
     pub fn play_music(&mut self, path: &str, loops: i64, volume: f64) -> Result<(), String> {
-        self.music_vol = volume.clamp(0.0, 1.0) as f32;
+        self.music_vol = lautstaerke(volume, "PLAYMUSIC")? as f32;
         self.music_load(path)?;
         self.start_music(self.music_vol, loops, 0, FadeCurve::Linear)
     }
@@ -2613,10 +2666,11 @@ resonance/reverb/distortion", other)),
     pub fn music_resume(&mut self) {
         if let Some(h) = self.music_handle.as_mut() { mh_resume(h, tween_now()); self.music_paused = false; }
     }
-    pub fn music_set_volume(&mut self, v: f64) {
-        self.music_vol = v.clamp(0.0, 1.0) as f32;
+    pub fn music_set_volume(&mut self, v: f64) -> Result<(), String> {
+        self.music_vol = lautstaerke(v, "AUDIO_MUSIC_VOLUME")? as f32;
         let d = db(self.music_vol as f64);
         if let Some(h) = self.music_handle.as_mut() { mh_set_volume(h, d, tween_now()); }
+        Ok(())
     }
     pub fn music_get_volume(&self) -> f64 { self.music_vol as f64 }
     pub fn music_set_pitch(&mut self, factor: f64) {

@@ -200,3 +200,20 @@ PIE: es gibt noch kein Fenster
 PIE(10, 10, 5, 0)
 --- fehler
 PIE: erwartet 5 bis 6 Argumente, erhalten 4 -- Aufruf: PIE(
+
+=== arc_deg zaehlt grad im uhrzeigersinn wie pie
+' ARC nimmt Bogenmass gegen den Uhrzeigersinn; ARC_DEG die Leitlinie des
+' Zeichnens (Regel 10): 0..90 Grad ist der Viertelbogen rechts UNTEN. Mitte
+' (50, 50), Radius 40: bei 45 Grad liegt (78, 78), oben rechts (78, 22) bleibt
+' leer.
+SCREEN(100, 100, "t")
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(20, 20, 30))
+    ARC_DEG(10, 10, 90, 90, 0, 90, RGB(255, 0, 0), 5)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=2
+--- bild
+78 78 #FF0000 +-40
+78 22 #14141E +-12

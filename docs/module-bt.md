@@ -24,6 +24,7 @@ Auf Windows funktioniert das mit dem eingebauten BT-Stack ab Win 10 — Bluetoot
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
 | `BT_SCAN(timeout_s)` | STRING (multi-line `addr|name|rssi`), 0..300s | nach Geraeten in Reichweite suchen |
+| `BT_SCAN_MS(timeout_ms)` | STRING wie `BT_SCAN` | dieselbe Suche, die Dauer in Millisekunden |
 | `BT_CONNECT(address$)` | BT_HANDLE | Verbindung zu einem Geraet aufbauen |
 | `BT_DISCONNECT(handle)` | — | Verbindung trennen |
 | `BT_IS_CONNECTED(handle)` | BOOLEAN | steht die Verbindung noch? |

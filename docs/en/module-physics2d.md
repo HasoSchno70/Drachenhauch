@@ -52,6 +52,7 @@ ang = PHYS2D_BODY_ANGLE(world, box)       ' radians -> rotate the sprite
 | `PHYS2D_STEP(w, dt)` | simulate one time step (dt in s, internally clamped to 0.0001..0.05) |
 | `PHYS2D_BODY_X/Y(w, idx)` | position |
 | `PHYS2D_BODY_ANGLE(w, idx) AS FLOAT` | rotation angle in radians (for sprite rotation) |
+| `PHYS2D_BODY_ANGLE_DEG(w, idx) AS FLOAT` | the same rotation angle in degrees, as `DRAWIMAGEROT` takes it |
 | `PHYS2D_BODY_VX/VY(w, idx)` | linear velocity (e.g. "am I falling?") |
 | `PHYS2D_SET_VEL(w, idx, vx, vy)` | set the velocity |
 | `PHYS2D_APPLY_IMPULSE(w, idx, ix, iy)` | impulse (e.g. jump/shot) |

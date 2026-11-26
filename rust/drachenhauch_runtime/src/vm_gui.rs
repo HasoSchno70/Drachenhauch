@@ -1261,12 +1261,12 @@ impl<'p> Vm<'p> {
             "gui_apply_style" => { self.gui.apply_style(gi(a,0,"GUI_APPLY_STYLE")?, &gs(a,1,"GUI_APPLY_STYLE")?)?; Value::Nil }
             "gui_hit_test" => Value::Int(self.gui.hit_test(gi(a,0,"GUI_HIT_TEST")? as i32, gi(a,1,"GUI_HIT_TEST")? as i32)),
             "gui_window_set_bounds" => { self.gui.window_set_bounds(gi(a,0,"GUI_WINDOW_SET_BOUNDS")?, gi(a,1,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,2,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,3,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,4,"GUI_WINDOW_SET_BOUNDS")? as i32)?; Value::Nil }
-            "gui_window_get_x" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_X")?)?.0 as i64),
-            "gui_window_get_y" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_Y")?)?.1 as i64),
-            "gui_window_get_w" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_W")?)?.2 as i64),
-            "gui_window_get_h" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_H")?)?.3 as i64),
-            "gui_window_content_w" => Value::Int(self.gui.window_inhalt(gi(a,0,"GUI_WINDOW_CONTENT_W")?)?.0 as i64),
-            "gui_window_content_h" => Value::Int(self.gui.window_inhalt(gi(a,0,"GUI_WINDOW_CONTENT_H")?)?.1 as i64),
+            "gui_window_get_x" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_X")?, "GUI_WINDOW_GET_X")?.0 as i64),
+            "gui_window_get_y" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_Y")?, "GUI_WINDOW_GET_Y")?.1 as i64),
+            "gui_window_get_w" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_W")?, "GUI_WINDOW_GET_W")?.2 as i64),
+            "gui_window_get_h" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_H")?, "GUI_WINDOW_GET_H")?.3 as i64),
+            "gui_window_content_w" => Value::Int(self.gui.window_inhalt(gi(a,0,"GUI_WINDOW_CONTENT_W")?, "GUI_WINDOW_CONTENT_W")?.0 as i64),
+            "gui_window_content_h" => Value::Int(self.gui.window_inhalt(gi(a,0,"GUI_WINDOW_CONTENT_H")?, "GUI_WINDOW_CONTENT_H")?.1 as i64),
             "gui_window_destroy" => { self.gui.window_destroy(gi(a,0,"GUI_WINDOW_DESTROY")?)?; Value::Nil }
             "gui_window_widget_count" => Value::Int(self.gui.window_widget_count(gi(a,0,"GUI_WINDOW_WIDGET_COUNT")?)?),
             "gui_window_widget" => Value::Int(self.gui.window_widget(gi(a,0,"GUI_WINDOW_WIDGET")?, gi(a,1,"GUI_WINDOW_WIDGET")?)?),
@@ -1740,9 +1740,14 @@ impl<'p> Vm<'p> {
             }
             // Braucht die Zeilenhoehe (also die Schrift) -- darum hier bei
             // den Grafik-Builtins.
-            "gui_textarea_view" => {
-                let g = self.gfx.as_ref().ok_or("GUI_TEXTAREA_VIEW: vor SCREEN aufgerufen")?;
-                let (z0, n, von, len) = self.gui.textarea_view(g, gi(a, 0, "GUI_TEXTAREA_VIEW")?)?;
+            // GUI_TEXTAREA_GET_VIEW zaehlt die erste Zeile ab 1 wie der Rest des
+            // Textbereichs (GOTO, SCROLL); GUI_TEXTAREA_VIEW bleibt bei 0
+            // (Regel 12 in docs/builtins-namen.md).
+            "gui_textarea_view" | "gui_textarea_get_view" => {
+                let f = if name == "gui_textarea_view" { "GUI_TEXTAREA_VIEW" } else { "GUI_TEXTAREA_GET_VIEW" };
+                let g = self.gfx.as_ref().ok_or_else(|| format!("{}: vor SCREEN aufgerufen", f))?;
+                let (z0, n, von, len) = self.gui.textarea_view(g, gi(a, 0, f)?, f)?;
+                let z0 = if name == "gui_textarea_view" { z0 } else { z0 + 1 };
                 Value::Tuple(std::rc::Rc::new(vec![
                     Value::Int(z0), Value::Int(n), Value::Int(von), Value::Int(len),
                 ]))

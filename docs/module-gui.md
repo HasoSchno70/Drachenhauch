@@ -4050,6 +4050,7 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_SPANS(ta, starts, lengths, colors)` | Zeichen `start … start+laenge` in `farbe` zeichnen |
 | `SYNTAX_SPANS(source$)` → (starts, laengen, arten) | Drachenhauch-Quelltext zerlegen |
 | `GUI_TEXTAREA_VIEW(ta)` → (erste_zeile, zeilen, start_zeichen, laenge_zeichen) | welcher Ausschnitt ist gerade zu sehen? |
+| `GUI_TEXTAREA_GET_VIEW(ta)` → (erste_zeile, zeilen, start_zeichen, laenge_zeichen) | wie `GUI_TEXTAREA_VIEW`, die erste Zeile aber ab 1 wie bei `GUI_TEXTAREA_GOTO` |
 | `GUI_TEXTAREA_CURSOR(ta)` → (zeile, spalte) | wo die Schreibmarke steht (ab 1, in Zeichen) |
 | `GUI_TEXTAREA_CARET_XY(ta)` → (x, y, hoehe) | wo die Schreibmarke auf dem Bildschirm steht, in logischen Punkten wie `GUI_WINDOW_SET_BOUNDS` (auch ohne Fokus) -- fuer eine Vorschlagsliste an der Marke; (-1, -1, 0), wenn das Feld nicht zu sehen ist |
 | `GUI_TEXTAREA_POS_AT(ta, x, y)` → (zeile, spalte) | welches Zeichen unter dem Bildschirmpunkt liegt (ab 1; dieselbe Rechnung wie der Klick). (0, 0) neben dem Text: ausserhalb, in der Nummernspalte, unter der letzten Zeile, hinter dem Zeilenende -- fuer Tooltips beim Ueberfahren und Strg+Klick |

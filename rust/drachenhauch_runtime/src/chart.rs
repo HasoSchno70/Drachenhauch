@@ -368,12 +368,7 @@ pub fn apply_theme(s: &mut Style, name: &str) -> bool {
 
 /// Alpha-Anteil einer DH-Farbe als 0..255 (0 im obersten Byte = deckend).
 fn alpha_of(c: i64) -> u32 {
-    let a = ((c as u32) >> 24) & 0xFF;
-    if a == 0 {
-        255
-    } else {
-        a
-    }
+    crate::farbraum::rgba(c)[3] as u32
 }
 
 /// Deckkraft mit `f` (0..1) multiplizieren. `f >= 1` laesst die Farbe in Ruhe,

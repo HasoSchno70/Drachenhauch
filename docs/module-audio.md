@@ -38,6 +38,8 @@ Spielt einen SOUND ab und liefert einen Channel-Handle zurueck. Mit dem kann man
 | Funktion | Wirkung |
 |---|---|
 | `AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms[, easing$]]]])` → AUDIO_CHANNEL | Sound starten |
+| `AUDIO_PLAY_VOICE(sound[, volume[, loops]])` → AUDIO_CHANNEL | den Klang als weitere Stimme spielen -- eine laufende klingt weiter (`AUDIO_PLAY` schneidet sie ab); `AUDIO_STOP` stoppt alle |
+| `AUDIO_VOICE_COUNT(sound)` → INTEGER | wie viele Stimmen dieses Klangs gerade klingen |
 | `AUDIO_PAUSE(ch)` | Channel pausieren |
 | `AUDIO_RESUME(ch)` | wieder weiter |
 | `AUDIO_STOP(ch[, fade_out_ms[, easing$]])` | Channel stoppen, optional ausfaden |
@@ -45,7 +47,7 @@ Spielt einen SOUND ab und liefert einen Channel-Handle zurueck. Mit dem kann man
 | `AUDIO_IS_WAITING(sound)` → BOOLEAN | mit `AUDIO_PLAY_AT` geplant, aber die Uhr hat den Tick noch nicht erreicht |
 | `AUDIO_VOLUME(ch, volume)` | Lautstaerke 0..1 setzen |
 | `AUDIO_GET_VOLUME(ch)` → FLOAT | aktuelle Lautstaerke |
-| `AUDIO_PAN(ch, left, right)` | Stereo-Pan (beide 0..1) |
+| `AUDIO_PAN(ch, left, right)` | Pegel links und rechts (beide 0..1) -- setzt damit auch die Lautstärke (die größere der beiden); nur die Lage: `AUDIO_SET_PAN` |
 | `AUDIO_PITCH(ch, factor)` | Tonhoehe/Geschwindigkeit: 1.0 = normal, 2.0 = Oktave hoeher, 0.5 = tiefer |
 
 **Pause/Resume global:**
@@ -99,9 +101,12 @@ pro Frame (FLIP), nicht-blockierend:
 
 | Funktion | Wirkung |
 |---|---|
-| `AUDIO_PAN_POS(ch, p)` | Position direkt setzen (beendet eine laufende Animation) |
+| `AUDIO_PAN_POS(ch, p)` | Position direkt setzen, 0 = links .. 1 = rechts (beendet eine laufende Animation) |
+| `AUDIO_SET_PAN(ch, pan)` | Position in der Skala -1 (links) .. 0 (Mitte) .. 1 (rechts) wie `AUDIO_BUS_PAN` und `AUDIO_SOUND_MIX` |
 | `AUDIO_PAN_SLIDE(ch, from, to, duration_ms[, easing$])` | einmalige Wanderung von → nach; bleibt am Ziel stehen |
+| `AUDIO_SET_PAN_SLIDE(ch, from, to, duration_ms[, easing$])` | dieselbe Wanderung in der Skala -1..1 |
 | `AUDIO_AUTOPAN(ch, period_s[, depth])` | endloses Pendeln links↔rechts (startet links); `depth` 0..1 = Auslenkung um die Mitte, `period_s <= 0` schaltet ab |
+| `AUDIO_AUTOPAN_MS(ch, period_ms[, depth])` | wie `AUDIO_AUTOPAN`, die Periode in Millisekunden |
 
 ```basic
 DIM ton AS SOUND
@@ -373,6 +378,7 @@ Drum-Sample wird so ein ganzes Instrument.
 | `SAMPLE_PLAY(sample, semitones[, vol[, dur_ms]])` → AUDIO_CHANNEL | bei relativer Tonhoehe abspielen |
 | `SAMPLE_NOTE(sample, semitones, duration_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_semitones])` → SOUND | eine Note als Klang bauen (nicht abspielen), Huellkurve wie `AUDIO_NOTE` |
 | `SAMPLE_SET_LOOP(sample, start, end[, kind$])` | Loop-Region in Frames (fuer gehaltene Noten), `kind$` = `vorwaerts` (Vorgabe) oder `pingpong` |
+| `SAMPLE_SET_LOOP_TIME(sample, start_s, end_s[, kind$])` | dieselbe Loop-Region in Sekunden (wie `SAMPLE_LEN`) statt Frames |
 | `SAMPLE_LEN(sample)` → FLOAT | Laenge in Sekunden bei Originaltonhoehe |
 
 `halbtoene` ist relativ zur Originaltonhoehe des Samples: `0` = wie aufgenommen,

@@ -594,11 +594,8 @@ fn teil_lesen(s: &str, zeile: usize, ziel: bool) -> Result<Selektor, String> {
 fn farbe_lesen(wert: &str, zeile: usize, thema: &dyn Fn(&str) -> bool) -> Result<StilFarbe, String> {
     let w = wert.trim();
     if let Some(h) = w.strip_prefix('#') {
-        if !h.chars().all(|c| c.is_ascii_hexdigit()) || ![3, 6, 8].contains(&h.len()) {
-            return Err(format!("Zeile {}: '{}' ist keine Farbe -- erwartet #RGB, #RRGGBB, #AARRGGBB oder ein Name des Themas", zeile, w));
-        }
-        let voll: String = if h.len() == 3 { h.chars().flat_map(|c| [c, c]).collect() } else { h.to_string() };
-        return Ok(StilFarbe::Fest(i64::from_str_radix(&voll, 16).unwrap_or(0)));
+        return crate::farbraum::hex_lesen(h).map(StilFarbe::Fest).ok_or_else(|| format!(
+            "Zeile {}: '{}' ist keine Farbe -- erwartet #RGB, #RRGGBB, #AARRGGBB oder ein Name des Themas", zeile, w));
     }
     let name = match w.to_lowercase().as_str() { "akzent" => "accent".to_string(), x => x.to_string() };
     if thema(&name) { return Ok(StilFarbe::Thema(name)); }

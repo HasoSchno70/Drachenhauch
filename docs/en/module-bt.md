@@ -24,6 +24,7 @@ On Windows this works with the built-in BT stack from Win 10 onwards — the Blu
 | Function | Returns | Meaning |
 |---|---|---|
 | `BT_SCAN(timeout_s)` | STRING (multi-line `addr|name|rssi`), 0..300s | search for devices in range |
+| `BT_SCAN_MS(timeout_ms)` | STRING like `BT_SCAN` | the same search, the duration in milliseconds |
 | `BT_CONNECT(address$)` | BT_HANDLE | establish a connection to a device |
 | `BT_DISCONNECT(handle)` | — | disconnect |
 | `BT_IS_CONNECTED(handle)` | BOOLEAN | is the connection still up? |

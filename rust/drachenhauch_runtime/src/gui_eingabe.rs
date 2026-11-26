@@ -1917,10 +1917,10 @@ impl Gui {
     /// eines Gebildes anfangen.
     ///
     /// Die Zeichen-Angaben zaehlen wie ueberall ZEICHEN, nicht Bytes.
-    pub fn textarea_view(&self, g: &Graphics, h: i64) -> Result<(i64, i64, i64, i64), String> {
-        let wd = self.wdg(h, "GUI_TEXTAREA_VIEW")?;
+    pub fn textarea_view(&self, g: &Graphics, h: i64, fn_: &str) -> Result<(i64, i64, i64, i64), String> {
+        let wd = self.wdg(h, fn_)?;
         if wd.kind != Kind::TextArea {
-            return Err("GUI_TEXTAREA_VIEW: das Widget ist kein GUI_TEXTAREA".into());
+            return Err(format!("{}: das Widget ist kein GUI_TEXTAREA", fn_));
         }
         let z = self.ta_zerlegt(h, &wd.text);
         let (chars, starts) = (&z.0, &z.1);
