@@ -39,6 +39,7 @@ Monitor** mit Kurve (Ansicht → Serieller Monitor, Alt+4, siehe
 | `SERIAL_AVAILABLE(handle)` | INTEGER (wartende Bytes im Eingangspuffer) | wie viel liegt bereit? (ohne zu warten) |
 | `SERIAL_FLUSH(handle)` | — (Eingangs- und Ausgangspuffer leeren) | Puffer verwerfen |
 | `SERIAL_TIMEOUT(handle, seconds)` | — (Read-Timeout setzen, Default 1.0 s) | wie lange ein Lesen hoechstens wartet |
+| `SERIAL_SET_TIMEOUT(handle, ms)` | — | dieselbe Lesefrist in Millisekunden — wie jede Frist; `SERIAL_TIMEOUT` zählt Sekunden |
 
 ## Bytes ↔ STRING
 

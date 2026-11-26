@@ -1359,6 +1359,12 @@
    "module": "modbus"
   },
   {
+   "name": "MODBUS_SET_TIMEOUT",
+   "kind": "core",
+   "signature": "MODBUS_SET_TIMEOUT(m, ms)",
+   "module": "modbus"
+  },
+  {
    "name": "MODBUS_READ_COILS",
    "kind": "core",
    "signature": "MODBUS_READ_COILS(m, address, count) AS ARRAY OF BOOLEAN",
@@ -8571,6 +8577,12 @@
    "module": "html"
   },
   {
+   "name": "HTTP_SET_TIMEOUT",
+   "kind": "core",
+   "signature": "HTTP_SET_TIMEOUT(ms)",
+   "module": "html"
+  },
+  {
    "name": "HTTP_URL$",
    "kind": "core",
    "signature": "HTTP_URL$(request: INTEGER) AS STRING",
@@ -12813,6 +12825,12 @@
    "module": "serial"
   },
   {
+   "name": "SERIAL_SET_TIMEOUT",
+   "kind": "core",
+   "signature": "SERIAL_SET_TIMEOUT(handle, ms)",
+   "module": "serial"
+  },
+  {
    "name": "SERIAL_WRITE",
    "kind": "core",
    "signature": "SERIAL_WRITE(handle: ?, s: STRING)",
@@ -13212,6 +13230,12 @@
    "name": "SMTP_TIMEOUT",
    "kind": "core",
    "signature": "SMTP_TIMEOUT(m: SMTP, ms)",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_SET_TIMEOUT",
+   "kind": "core",
+   "signature": "SMTP_SET_TIMEOUT(m: SMTP, ms)",
    "module": "smtp"
   },
   {

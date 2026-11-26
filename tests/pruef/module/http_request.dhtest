@@ -1110,3 +1110,22 @@ TRUE TRUE
 TRUE
 TRUE
 0
+
+=== http_set_timeout zaehlt millisekunden
+' Leitlinie (docs/builtins-namen.md, Regel 9): Fristen in ms. HTTP_TIMEOUT
+' zaehlt Sekunden und bleibt dabei; HTTP_SET_TIMEOUT ist dieselbe Frist in ms.
+IMPORT "html"
+HTTP_SET_TIMEOUT(1500)
+TRY
+    HTTP_SET_TIMEOUT(0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    HTTP_TIMEOUT(1500)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+HTTP_SET_TIMEOUT: 0 ms liegen ausserhalb 1..600000
+HTTP_TIMEOUT: 1500 Sekunden liegen ausserhalb 1..600

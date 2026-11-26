@@ -56,6 +56,13 @@ Signaturhilfe kennen beide.
    `path`, `text`, `width`, `count`, `encoding`. Dasselbe Ding heißt in jedem
    Befehl gleich. Die Befehlstabellen im Handbuch nennen dieselben Namen wie
    `daten/builtin_index.json`; `dhrt pruef parameter` hält beide zusammen.
+9. **Zeit:** Zeitspannen und Fristen zählen **Millisekunden** (Parameter
+   `ms` oder `…_ms`): `TWEEN_NEW`, `TIMER_AFTER`, `SLEEP`, die Fades, jedes
+   `…_SET_TIMEOUT`. Der Schritt eines Bildes zählt **Sekunden** wie `DELTA()`:
+   `PHYS2D_STEP`, `PHYS3D_STEP` (ein Wert ab 1 ist dort ein Fehler — das
+   wären Millisekunden). Zwei alte Befehle zählen Sekunden und bleiben dabei;
+   neben ihnen gibt es die Fassung in ms: `HTTP_TIMEOUT` → `HTTP_SET_TIMEOUT`,
+   `SERIAL_TIMEOUT` → `SERIAL_SET_TIMEOUT`.
 
 ## Der empfohlene Weg je Bereich
 
@@ -264,3 +271,10 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `MONEY_VALUE(g: GELD)` | bewusst herausgehen (Anzeige in Diagrammen o. Ä.) — bisher `GELD_ZAHL` |
 | `BUFFER_FROM_POINTER(pointer, length)` | kopiert laenge Bytes hinter einem Zeiger in einen neuen BUFFER; 0 Bytes ergeben einen leeren, ein … — bisher `BUFFER_AUS_ZEIGER` |
 | `TEXT_FROM_POINTER$(pointer [, wide])` | kopiert den Text hinter einem Zeiger bis zum Nullzeichen (UTF-8; mit breit = TRUE wchar_t, also UTF-16 … — bisher `TEXT_AUS_ZEIGER$` |
+
+### Fristen: `_SET_TIMEOUT` in Millisekunden
+
+| Name | Was es tut |
+|---|---|
+| `SMTP_SET_TIMEOUT(m: SMTP, ms)` | Frist je Schritt beim Versand — bisher `SMTP_TIMEOUT` |
+| `MODBUS_SET_TIMEOUT(m, ms)` | wie lange auf eine Antwort gewartet wird — bisher `MODBUS_TIMEOUT` |

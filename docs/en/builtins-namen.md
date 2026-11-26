@@ -56,6 +56,13 @@ shows the new one; completion and signature help know both.
    name in every command. The command tables in the manual use the same
    names as `daten/builtin_index.json`; `dhrt pruef parameter` keeps them
    together.
+9. **Time:** time spans and time limits count **milliseconds** (parameter
+   `ms` or `…_ms`): `TWEEN_NEW`, `TIMER_AFTER`, `SLEEP`, the fades, every
+   `…_SET_TIMEOUT`. The step of a frame counts **seconds** like `DELTA()`:
+   `PHYS2D_STEP`, `PHYS3D_STEP` (a value of 1 or more is an error there — that
+   would be milliseconds). Two old commands count seconds and stay that way;
+   next to them there is the version in ms: `HTTP_TIMEOUT` → `HTTP_SET_TIMEOUT`,
+   `SERIAL_TIMEOUT` → `SERIAL_SET_TIMEOUT`.
 
 ## The recommended way per area
 
@@ -264,3 +271,10 @@ hand are callback timers from the `timer` module.
 | `MONEY_VALUE(g: GELD)` | step out deliberately (display in charts or the like) — formerly `GELD_ZAHL` |
 | `BUFFER_FROM_POINTER(pointer, length)` | copies laenge (length) bytes behind a pointer into a new BUFFER; 0 bytes give an empty one, a null pointer … — formerly `BUFFER_AUS_ZEIGER` |
 | `TEXT_FROM_POINTER$(pointer [, wide])` | copies the text behind a pointer up to the null character (UTF-8; with breit (wide) = TRUE wchar_t, i.e. … — formerly `TEXT_AUS_ZEIGER$` |
+
+### Time limits: `_SET_TIMEOUT` in milliseconds
+
+| Name | What it does |
+|---|---|
+| `SMTP_SET_TIMEOUT(m: SMTP, ms)` | time limit per step when sending — formerly `SMTP_TIMEOUT` |
+| `MODBUS_SET_TIMEOUT(m, ms)` | how long to wait for an answer — formerly `MODBUS_TIMEOUT` |

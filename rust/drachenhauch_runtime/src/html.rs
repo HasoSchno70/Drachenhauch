@@ -114,6 +114,7 @@ pub struct Anfrage {
     /// Zusaetzliche Kopfzeilen in Reihenfolge. `User-Agent` bzw.
     /// `Content-Type` hier zu setzen ueberschreibt die Vorgabe.
     pub header: Vec<(String, String)>,
+    /// Frist in ms.
     pub timeout: u64,
 }
 
@@ -124,7 +125,7 @@ impl Anfrage {
             url: url.to_string(),
             body: Vec::new(),
             header: Vec::new(),
-            timeout: TIMEOUT_SECS,
+            timeout: TIMEOUT_SECS * 1000,
         }
     }
 }
@@ -171,7 +172,7 @@ pub fn http_request(anfrage: &Anfrage) -> Result<HttpResult, HttpErr> {
         }
     }
     let mut r = ureq::request(&m, &anfrage.url)
-        .timeout(Duration::from_secs(anfrage.timeout));
+        .timeout(Duration::from_millis(anfrage.timeout));
     // Vorgabe zuerst, damit eine eigene Kopfzeile gleichen Namens sie
     // ueberschreibt (`ureq::set` ersetzt).
     r = r.set("User-Agent", USER_AGENT);
@@ -216,7 +217,7 @@ pub fn http_download(anfrage: &Anfrage, path: &str) -> Result<HttpDownloadResult
     }
     let url = anfrage.url.as_str();
     let mut r = ureq::get(url)
-        .timeout(Duration::from_secs(anfrage.timeout))
+        .timeout(Duration::from_millis(anfrage.timeout))
         .set("User-Agent", USER_AGENT);
     for (k, v) in &anfrage.header {
         r = r.set(k, v);

@@ -30,6 +30,7 @@ then subtract one or the prefix.
 | `MODBUS_RTU(port$ [, baud [, format$ [, unit]]])` → MODBUS | Modbus RTU over RS-485: `"COM4"`/`"/dev/ttyUSB0"` (feature `serial`), baud default 9600, format default `"8N1"` (`"8E1"`, `"8O1"`, `"8N2"`, ...); or `"tcp:host:port"` for an RTU converter on the network |
 | `MODBUS_UNIT(m, unit)` | device address for the following requests (0..255; with RTU, 0 means "to all", and no answer comes) |
 | `MODBUS_TIMEOUT(m, ms)` | how long to wait for an answer (10..60000, default 1000) |
+| `MODBUS_SET_TIMEOUT(m, ms)` | new name for `MODBUS_TIMEOUT` (time limits are called `_SET_TIMEOUT` and count ms) |
 | `MODBUS_CLOSE(m)` | close |
 
 Several devices on one RS-485 bus share a connection — switch `MODBUS_UNIT`

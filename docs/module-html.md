@@ -21,6 +21,7 @@ IMPORT "html"
 | HTTP | `HTTP_SET_HEADER(name$, wert$)` | — (gilt für alle folgenden Aufrufe) |  |
 | HTTP | `HTTP_CLEAR_HEADERS()` | — |  |
 | HTTP | `HTTP_TIMEOUT(sekunden)` | — |  |
+| HTTP | `HTTP_SET_TIMEOUT(ms)` | — | dieselbe Frist in Millisekunden (1..600000) — wie jede Frist; `HTTP_TIMEOUT` zählt Sekunden |
 | HTTP (Hintergrund) | `HTTP_REQUEST_START(methode$, url$ [, rumpf [, kopfzeilen]])` | INTEGER (Abruf-Nummer) |  |
 | HTTP (Hintergrund) | `HTTP_GET_START(url$)` | INTEGER (Abruf-Nummer) |  |
 | HTTP (Hintergrund) | `HTTP_READY(abruf)` | BOOLEAN |  |

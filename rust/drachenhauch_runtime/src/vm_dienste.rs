@@ -1182,7 +1182,18 @@ impl<'p> Vm<'p> {
                 if !(1..=600).contains(&s) {
                     return Err(format!("HTTP_TIMEOUT: {} Sekunden liegen ausserhalb 1..600", s));
                 }
-                self.http_timeout = s as u64;
+                self.http_timeout = s as u64 * 1000;
+                Value::Nil
+            }
+            // HTTP_SET_TIMEOUT(ms): dieselbe Frist in Millisekunden -- wie jede
+            // Frist in Drachenhauch (Leitlinie in docs/builtins-namen.md).
+            // HTTP_TIMEOUT zaehlt Sekunden und bleibt dabei.
+            "http_set_timeout" => {
+                let ms = bi_int(a, 0, "HTTP_SET_TIMEOUT")?;
+                if !(1..=600_000).contains(&ms) {
+                    return Err(format!("HTTP_SET_TIMEOUT: {} ms liegen ausserhalb 1..600000", ms));
+                }
+                self.http_timeout = ms as u64;
                 Value::Nil
             }
             "http_set_header" => {

@@ -109,6 +109,9 @@ pub const NEU: &[(&str, &str)] = &[
     ("image_height", "imageheight"),
     ("audio_set_volume", "audio_volume"),
     ("audio_music_set_volume", "audio_music_volume"),
+    // Fristen heissen _SET_TIMEOUT und zaehlen ms (beide taten das schon).
+    ("smtp_set_timeout", "smtp_timeout"),
+    ("modbus_set_timeout", "modbus_timeout"),
     // ---- Dateien (mit Pfad), Dateien (mit Handle), Ordner, Pfade
     ("file_exists", "fileexists"),
     ("file_size", "filesize"),

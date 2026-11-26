@@ -48,6 +48,7 @@ SMTP_CLOSE(m)
 | `SMTP_HTML(m, html$)` | message as HTML |
 | `SMTP_ATTACH(m, path$ [, name$])` | attach a file — can be called several times |
 | `SMTP_TIMEOUT(m, ms)` | time limit per step (default 30 000) |
+| `SMTP_SET_TIMEOUT(m, ms)` | new name for `SMTP_TIMEOUT` (time limits are called `_SET_TIMEOUT` and count ms) |
 | `SMTP_MESSAGE$(m)` → STRING | the finished message, **without** sending |
 | `SMTP_SEND(m)` | send it |
 | `SMTP_CLOSE(m)` | free the memory |

@@ -1063,6 +1063,7 @@ pub struct Vm<'p> {
     http_default_header: Vec<(String, String)>,
     // Modul html (WP C): Zeitgrenze in Sekunden fuer folgende Aufrufe.
     #[cfg(feature = "http")]
+    /// Frist der HTTP-Befehle in ms (HTTP_SET_TIMEOUT; HTTP_TIMEOUT in s).
     http_timeout: u64,
     // Modul html: Abrufe im Hintergrund (HTTP_GET_START/READY/RESULT).
     #[cfg(feature = "http")]
@@ -1307,7 +1308,7 @@ impl<'p> Vm<'p> {
             #[cfg(feature = "http")]
             http_default_header: Vec::new(),
             #[cfg(feature = "http")]
-            http_timeout: 10,
+            http_timeout: 10_000,
             #[cfg(feature = "http")]
             http_abrufe: crate::html::Abrufe::default(),
             #[cfg(feature = "midi")]

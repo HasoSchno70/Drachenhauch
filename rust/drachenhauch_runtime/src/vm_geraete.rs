@@ -515,6 +515,9 @@ impl<'p> Vm<'p> {
             "serial_readline" => { let i = bi_int(a, 0, "SERIAL_READLINE")?; Value::str_rc(serial::readline(self.ser_port(i, name)?)?) }
             "serial_available" => { let i = bi_int(a, 0, "SERIAL_AVAILABLE")?; Value::Int(serial::available(self.ser_port(i, name)?)?) }
             "serial_flush" => { let i = bi_int(a, 0, "SERIAL_FLUSH")?; serial::flush(self.ser_port(i, name)?); Value::Nil }
+            // SERIAL_SET_TIMEOUT(handle, ms): die Lesefrist in Millisekunden
+            // (SERIAL_TIMEOUT zaehlt Sekunden und bleibt dabei).
+            "serial_set_timeout" => { let i = bi_int(a, 0, "SERIAL_SET_TIMEOUT")?; let ms = bi_num(a, 1, "SERIAL_SET_TIMEOUT")?; serial::set_timeout(self.ser_port(i, name)?, ms / 1000.0); Value::Nil }
             "serial_timeout" => { let i = bi_int(a, 0, "SERIAL_TIMEOUT")?; let s = bi_num(a, 1, "SERIAL_TIMEOUT")?; serial::set_timeout(self.ser_port(i, name)?, s); Value::Nil }
             _ => return Ok(None),
         };
