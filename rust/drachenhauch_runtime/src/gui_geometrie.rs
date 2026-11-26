@@ -645,7 +645,7 @@ impl Gui {
                 if w.kind == Kind::TextArea { marken_abgleichen(w); }
             }
         }
-        let dt = g.delta();
+        let dt = self.takt_dt;
         // Lichtstreifen der Fenster weiterschieben.
         for win in self.windows.iter_mut() { win.glanz.weiter(dt as f32); }
         if self.windows.iter().any(|w| w.alive && w.visible && w.glanz.t >= 0.0) { self.bild_in(0.0); }

@@ -1262,7 +1262,7 @@ impl Gui {
             }
         }
         if s.is_empty() || gm.order.is_empty() { return false; }
-        let jetzt = g.get_time();
+        let jetzt = g.uhr_jetzt();
         let t = self.windows[wi].widgets[i].tbl.as_mut().unwrap();
         if jetzt - t.tipp_zeit > 1.0 { t.tipp.clear(); }
         t.tipp_zeit = jetzt;

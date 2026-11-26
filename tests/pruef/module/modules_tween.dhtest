@@ -205,3 +205,27 @@ IMPORT "tween"
 DIM a AS TWEEN : a = TWEEN_NEW(0.0, 1.0, 100, 7)
 --- fehler
 TWEEN_NEW: die Kurve ist ein Name wie "out_quad" oder eine Funktion, nicht INTEGER
+
+=== im testlauf laeuft tween mit den bildern wie delta
+' Mit fester Bildzahl (DHRT_FRAMES) zaehlt DELTA 1/60 s je Bild; TWEEN,
+' CAMERA_SHAKE und das timer-Modul liefen bis 2026.53 nach der Wanduhr --
+' nach 30 Bildern stand ein TWEEN von 500 ms bei 0,164 statt bei 1. Jetzt
+' gilt die Spieluhr (spieluhr.rs).
+IMPORT "tween"
+SCREEN(80, 60, "T", 1)
+FLIP()
+DIM t AS TWEEN : t = TWEEN_NEW(0.0, 100.0, 500)
+DIM n AS INTEGER
+FOR n = 1 TO 15
+    CLS(0) : FLIP()
+NEXT
+PRINT "halb "; ROUND(TWEEN_PROGRESS(t), 2)
+FOR n = 1 TO 15
+    CLS(0) : FLIP()
+NEXT
+PRINT "fertig "; TWEEN_DONE(t)
+--- umgebung
+DHRT_FRAMES=100
+--- erwartet
+halb 0.5
+fertig TRUE

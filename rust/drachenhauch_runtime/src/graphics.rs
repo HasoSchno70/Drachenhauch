@@ -1247,7 +1247,7 @@ void main()
 #[derive(Clone)]
 struct GfxState {
     cam: (f64, f64, f64, f64),
-    shake: (f64, f64, Option<std::time::Instant>, f64, f64),
+    shake: (f64, f64, Option<f64>, f64, f64),
     active_layer: usize,
     clear_color: Color,
     light_ambient: [f32; 4],
@@ -1397,7 +1397,8 @@ pub struct Graphics {
     // ab. Pro Frame EIN Offset (in flip() fuer den naechsten Frame gewuerfelt).
     shake_amp: f64,
     shake_dur_ms: f64,
-    shake_start: Option<std::time::Instant>,
+    /// Beginn in ms der Spieluhr (spieluhr.rs).
+    shake_start: Option<f64>,
     shake_x: f64,
     shake_y: f64,
     // 3D (Modul `g3d`): Befehlsliste + Perspektiv-Kamera. cmds3d wird pro
@@ -3511,13 +3512,13 @@ impl Graphics {
         }
         self.shake_amp = amp;
         self.shake_dur_ms = dur_ms;
-        self.shake_start = Some(std::time::Instant::now());
+        self.shake_start = Some(crate::spieluhr::jetzt_ms());
         self.update_shake();              // wirkt schon im aktuellen Frame
     }
     /// Pro Frame (flip-Ende) den Offset fuer den naechsten Frame wuerfeln.
     fn update_shake(&mut self) {
         if let Some(start) = self.shake_start {
-            let rem = shake_remaining(start.elapsed().as_secs_f64() * 1000.0, self.shake_dur_ms);
+            let rem = shake_remaining(crate::spieluhr::jetzt_ms() - start, self.shake_dur_ms);
             if rem <= 0.0 {
                 self.shake_start = None;
                 self.shake_x = 0.0;
@@ -8849,6 +8850,9 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         self.zeiger_anwenden();
         crate::stillfenster::zurueckgeben(fenster_handle(&mut self.rl));
         self.flips += 1;
+        // Mit fester Bildzahl laeuft die Spieluhr (TWEEN, SHAKE, timer) mit
+        // den Bildern -- wie DELTA (spieluhr.rs).
+        if self.max_frames.is_some() { crate::spieluhr::bild(self.uhr_jetzt()); }
         // Glyphen auf Zuruf: was dieses Bild ohne Glyphe aufzeichnete, wird
         // VOR dem Rendern gebacken -- das erste Bild ist dann schon richtig.
         self.ausweich_nachladen();

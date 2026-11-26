@@ -278,3 +278,18 @@ DIM m AS INTEGER : m = PHYS2D_ADD_BOX(w, 150.0, 100.0, 10.0, 10.0, TRUE, 0.0)
 PHYS2D_ADD_ROPE(w, k, m, -5)
 --- fehler
 PHYS2D_ADD_ROPE: die Laenge muss 0 oder mehr sein, nicht -5
+
+=== der schritt ist in sekunden
+' Rangliste Punkt 6: Spannen in ms, der Schritt eines Bildes in Sekunden wie
+' DELTA(). PHYS2D_STEP(w, 16) meinte Millisekunden und wurde bis 2026.53
+' still auf 0,05 s geklemmt -- die Welt lief dreimal zu langsam.
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD : w = PHYS2D_NEW()
+PHYS2D_STEP(w, 1.0 / 60.0)
+TRY
+    PHYS2D_STEP(w, 16)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+PHYS2D_STEP: dt 16 ist in Sekunden gemeint (DELTA() liefert Sekunden) -- fuer Millisekunden durch 1000 teilen

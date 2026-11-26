@@ -281,7 +281,7 @@ impl Gui {
         if ctrl && !kuerzel_weg && (g.key_pressed(K_Z) || g.key_pressed(K_Y)) {
             let ziel = self.windows[wi].widgets[i].teil_von.unwrap_or(i);
             self.text_undo(wi, ziel, g.key_pressed(K_Y) || shift);
-            self.teil_pass(g.get_time());
+            self.teil_pass(g.uhr_jetzt());
             return;
         }
         // Inline-Formate: Strg+B fett, Strg+I kursiv, Strg+U unterstrichen --
@@ -292,7 +292,7 @@ impl Gui {
             let bit = if g.key_pressed(K_B) { FETT } else if g.key_pressed(K_I) { KURSIV }
                       else if g.key_pressed(K_U) { UNTER } else { 0 };
             if bit != 0 {
-                let jetzt = g.get_time();
+                let jetzt = g.uhr_jetzt();
                 self.stil_anwenden(wi, i, bit, None, jetzt);
                 return;
             }
@@ -437,7 +437,7 @@ impl Gui {
                         // Doppelklick waehlt das Wort, Dreifachklick die Zeile
                         // (samt Umbruch) -- wie in jedem Editor. Gezaehlt wird
                         // an DIESER Stelle, in 0,4 s.
-                        let jetzt = g.get_time();
+                        let jetzt = g.uhr_jetzt();
                         let w = &mut self.windows[wi].widgets[i];
                         let n = if jetzt - w.klick_zeit < 0.4 && (idx - w.klick_idx).abs() <= 2 { w.klick_n % 3 + 1 } else { 1 };
                         w.klick_n = n; w.klick_zeit = jetzt; w.klick_idx = idx;
@@ -800,7 +800,7 @@ impl Gui {
         if self.windows[wi].widgets[i].umbruch { sx = 0; }
 
         let new_text: String = chars.iter().collect();
-        let jetzt = g.get_time();
+        let jetzt = g.uhr_jetzt();
         let w = &mut self.windows[wi].widgets[i];
         if new_text != before {
             Self::undo_merken(w, &before, caret0, jetzt);

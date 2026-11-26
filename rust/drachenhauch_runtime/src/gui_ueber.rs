@@ -549,7 +549,7 @@ impl Gui {
     /// Je Bild: Zeit weiterzaehlen, Popover an ihr Widget legen, Toasts und
     /// Infoleisten messen.
     pub(super) fn ueber_pass(&mut self, g: &Graphics, mx: i32, my: i32) {
-        let dt = g.delta();
+        let dt = self.takt_dt;
         let ue = self.m("uebergang").max(0) as f64 / 1000.0;
         let schritt = |t: f32, auf: bool| -> f32 {
             if ue <= 0.0 { return if auf { 1.0 } else { 0.0 }; }

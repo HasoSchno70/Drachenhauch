@@ -265,7 +265,7 @@ impl Gui {
         let Some(m) = self.rs_menue.take() else { return };
         let Some((text, art)) = m.eintraege.get(k) else { return };
         match art {
-            0 => self.rs_ersetzen(m.wi, m.i, m.start, m.laenge, text, g.get_time()),
+            0 => self.rs_ersetzen(m.wi, m.i, m.start, m.laenge, text, g.uhr_jetzt()),
             1 => {
                 let h = self.windows[m.wi].widgets[m.i].rs.as_ref().map(|z| z.h).unwrap_or(-1);
                 if rs::ignorieren(h, &m.wort).is_ok() {

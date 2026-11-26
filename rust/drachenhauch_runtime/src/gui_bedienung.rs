@@ -471,7 +471,7 @@ impl Gui {
             }
         }
         if s.is_empty() { return; }
-        let jetzt = g.get_time();
+        let jetzt = g.uhr_jetzt();
         let (tipp, wahl, sel) = {
             let w = &mut self.windows[wi].widgets[i];
             let n = w.items.len();
@@ -988,7 +988,7 @@ impl Gui {
             }
         }
         if s.is_empty() { return false; }
-        let jetzt = g.get_time();
+        let jetzt = g.uhr_jetzt();
         if jetzt - self.dd_tipp_zeit > 1.0 { self.dd_tipp.clear(); }
         self.dd_tipp_zeit = jetzt;
         self.dd_tipp.push_str(&s.to_lowercase());

@@ -124,10 +124,14 @@ impl<'p> Vm<'p> {
         // braucht genau das, um sich zu bremsen -- ohne SLEEP dreht die
         // Warteschleife auf 100% eines Kerns.
         if name == "sleep" {
-            let ms = bi_int(a, 0, "SLEEP")?.max(0) as u64;
+            // Millisekunden, auch mit Komma (SLEEP(1.5)) -- bis 2026.53 nur
+            // INTEGER, obwohl der Index "SLEEP(ms: Zahl)" versprach.
+            if a.len() != 1 { return Err(format!("SLEEP: erwartet 1 Argument, erhalten {}", a.len())); }
+            let ms = crate::argument::num(&a[0], "SLEEP", Some(1))?;
+            if !ms.is_finite() { return Err(format!("SLEEP: {} ist keine Dauer", ms)); }
             // Was vor der Pause ausgegeben wurde, steht waehrend der Pause da.
             self.flush_out();
-            std::thread::sleep(std::time::Duration::from_millis(ms));
+            std::thread::sleep(std::time::Duration::from_secs_f64(ms.clamp(0.0, 1e9) / 1000.0));
             return Ok(Some(Value::Nil));
         }
         // STDIN() -- die Standardeingabe als FILE-Handle. Steht hier und nicht

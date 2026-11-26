@@ -783,7 +783,7 @@ impl Gui {
     /// Text aus dem Hilfsprogramm in ein Textfeld schreiben -- durch
     /// dieselben Grenzen wie beim Tippen (Hoechstlaenge, Zahlenfilter).
     pub(super) fn a11y_text_setzen(&mut self, wi: usize, i: usize, mut neu: String, g: &Graphics) {
-        let jetzt = g.get_time();
+        let jetzt = g.uhr_jetzt();
         let w = &mut self.windows[wi].widgets[i];
         if w.nur_lesen { return; }
         if w.kind == Kind::TextInput {

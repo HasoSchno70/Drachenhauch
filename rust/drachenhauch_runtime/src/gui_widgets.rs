@@ -1434,7 +1434,7 @@ impl Gui {
             }
         }
         if s.is_empty() || vis.is_empty() { return false; }
-        let jetzt = g.get_time();
+        let jetzt = g.uhr_jetzt();
         let ziel = {
             let t = self.windows[wi].widgets[i].tree.as_mut().unwrap();
             if jetzt - t.tipp_zeit > 1.0 { t.tipp.clear(); }

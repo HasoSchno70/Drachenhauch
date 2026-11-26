@@ -4045,6 +4045,12 @@ pub struct Gui {
     /// fuer Schreibmarke und Hilfetext (bis 2026.49 zaehlten beide Bilder;
     /// schlaeft das Programm im Leerlauf, gibt es keine Bilder zu zaehlen).
     takt: f64,
+    /// Wie viel Zeit seit dem vorigen GUI_UPDATE vergangen ist, nach `takt`
+    /// -- also MIT der Wartezeit von WINDOW_WAIT_EVENTS. Bis 2026.53 zogen
+    /// die Countdowns (Toast, Suche, Rechtschreibung) `g.delta()` ab, die
+    /// Dauer des vorigen Bildes ohne den Schlaf: ein Toast von 1000 ms stand
+    /// im Leerlauf nach 12 s noch da.
+    takt_dt: f64,
     /// GUI_SET_CONTRAST: 0 = wie das System, 1 = hoch, 2 = normal; und was
     /// gerade gilt (fuer `@hochkontrast` in der Stildatei).
     kontrast_modus: u8,
@@ -4171,7 +4177,7 @@ impl Gui {
             open_menu: None, context_open: None, kontext_neu: None, rs_menue: None, sub_chain: Vec::new(), tasten_mod: (false, false),
             kuerzel_gefeuert: false, was_right_down: false, was_mitte_down: false,
             scroll_drag: None,
-            was_mouse_down: false, zug_feld: None, frame_count: 0, takt: 0.0, kontrast_modus: 0, hoch_kontrast: false, bedarf: std::cell::Cell::new(f64::INFINITY),
+            was_mouse_down: false, zug_feld: None, frame_count: 0, takt: 0.0, takt_dt: 0.0, kontrast_modus: 0, hoch_kontrast: false, bedarf: std::cell::Cell::new(f64::INFINITY),
             theme: default_theme(), metrics: default_metrics(),
             stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None), bahn_jetzt: std::cell::RefCell::new(None), nebel_jetzt: std::cell::Cell::new(None), nebel_uhr: 0.0, form_jetzt: std::cell::Cell::new(stil::FormStil::default()),
             mnemonics: false, label_zug: None, label_wahl: None, gruppen: HashMap::new(), schriftwahl: Vec::new(),

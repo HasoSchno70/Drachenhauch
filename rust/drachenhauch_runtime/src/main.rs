@@ -105,6 +105,7 @@ mod html;
 #[cfg(feature = "net")]
 mod net;
 mod verbinden;
+mod spieluhr;
 #[cfg(feature = "net")]
 mod mqtt;
 #[cfg(feature = "net")]

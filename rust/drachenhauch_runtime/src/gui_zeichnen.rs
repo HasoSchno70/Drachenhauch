@@ -1660,7 +1660,7 @@ impl Gui {
                     // fuer alles, dessen Dauer man nicht kennt.
                     let bw = (w / 3).max(8);
                     self.bild_in(0.0);
-                    let t = (g.get_time() * 0.6).fract();
+                    let t = (g.uhr_jetzt() * 0.6).fract();
                     let x0 = ax + 1 - bw + (t * (w - 2 + bw) as f64) as i32;
                     g.push_clip(ax + 1, ay + 1, (w - 2).max(0), (h - 2).max(0));
                     g.round_gradient(x0, ay + 1, x0 + bw - 1, ay + h - 2, 3, shade(acc, 24), shade(acc, -18));

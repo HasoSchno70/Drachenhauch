@@ -32,8 +32,10 @@ impl Gui {
     }
 
     pub fn update(&mut self, g: &mut Graphics) {
-        self.takt = g.uhr_jetzt();
-        if !self.ruhig { self.nebel_uhr += g.delta().clamp(0.0, 0.05); }
+        let jetzt = g.uhr_jetzt();
+        self.takt_dt = if self.takt > 0.0 { (jetzt - self.takt).max(0.0) } else { g.delta() };
+        self.takt = jetzt;
+        if !self.ruhig { self.nebel_uhr += self.takt_dt.clamp(0.0, 0.05); }
         // GUI_CHANGED: den Stand vor der Bedienung merken
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {
@@ -83,9 +85,9 @@ impl Gui {
         self.aussehen_pass(g);
         self.bewegung_pass();
         self.effekte_anlass_pass();
-        self.funken_pass(g.delta().clamp(0.0, 0.25));
+        self.funken_pass(self.takt_dt.clamp(0.0, 0.25));
         if !self.funken.is_empty() { self.bild_in(0.0); }
-        self.rs_pass(g.delta());
+        self.rs_pass(self.takt_dt);
         // Eine beobachtete Stildatei wird alle 0,5 s gelesen.
         if self.stil_beob.is_some() { self.bild_in(0.5); }
         for wi in 0..self.windows.len() {
@@ -184,11 +186,11 @@ impl Gui {
                 }
             }
         }
-        self.dateibaeume_auffrischen(g.get_time());
+        self.dateibaeume_auffrischen(g.uhr_jetzt());
         self.schnitte_laden(g);
         self.rt_pass(g);
         self.umbruch_layout(g);
-        self.akk_pass(g.delta());
+        self.akk_pass(self.takt_dt);
         self.layout_pass(g);
         self.panel_pass();
         self.tabctl_pass();
@@ -656,7 +658,7 @@ impl Gui {
             // Doppelklick: zweiter Druck innerhalb DBL_TIME an fast derselben
             // Stelle. Die Ortspruefung muss sein -- sonst gaelten zwei rasche
             // Klicks auf verschiedene Zeilen als Doppelklick.
-            let jetzt = g.get_time();
+            let jetzt = g.uhr_jetzt();
             self.dbl_click = match self.last_click {
                 Some((t0, x0, y0)) =>
                     jetzt - t0 <= DBL_TIME && (mx - x0).abs() <= self.sk(DBL_DIST) && (my - y0).abs() <= self.sk(DBL_DIST),
@@ -757,7 +759,7 @@ impl Gui {
         // Geteilte Textbereiche gleich nach dem Tippen abgleichen -- wer nach
         // GUI_UPDATE den Text des Besitzers liest (Sichern!), bekommt so den
         // Stand dieses Bildes, nicht den des vorigen.
-        self.teil_pass(g.get_time());
+        self.teil_pass(g.uhr_jetzt());
         // Tastatur-Navigation: Tab / Shift+Tab wechselt den Fokus zwischen ALLEN
         // bedienbaren Widgets des aktiven Fensters (Anlege-Reihenfolge, nur
         // sichtbare + eingeschaltete). Frueher liefen nur die Textfelder mit --
@@ -1234,7 +1236,7 @@ impl Gui {
                 if Self::in_rect(mx, my, (rx + sl, ry, (rw - sl - sr).max(0), rh)) {
                     self.zug_feld = Some((wi, i));
                     caret = idx; anchor = idx;
-                    let jetzt = g.get_time();
+                    let jetzt = g.uhr_jetzt();
                     let w = &mut self.windows[wi].widgets[i];
                     let n = if jetzt - w.klick_zeit < 0.4 && (idx - w.klick_idx).abs() <= 2 { w.klick_n % 3 + 1 } else { 1 };
                     w.klick_n = n; w.klick_zeit = jetzt; w.klick_idx = idx;
@@ -1294,7 +1296,7 @@ impl Gui {
 
         // --- Zurueckschreiben ---
         let geaendert = neu != before;
-        let jetzt = g.get_time();
+        let jetzt = g.uhr_jetzt();
         let w = &mut self.windows[wi].widgets[i];
         if geaendert { Self::undo_merken(w, &before, caret0, jetzt); }
         w.text = neu;

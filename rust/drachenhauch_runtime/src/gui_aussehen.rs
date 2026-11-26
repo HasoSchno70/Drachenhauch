@@ -338,7 +338,7 @@ impl Gui {
     /// Animation der Stildatei je Widget nachfuehren und abgelaufene
     /// beenden.
     pub(super) fn aussehen_pass(&mut self, g: &mut Graphics) {
-        self.uhr += g.delta().clamp(0.0, 0.25);
+        self.uhr += self.takt_dt.clamp(0.0, 0.25);
         let uhr = self.uhr;
         // Bildhaeute: jeder Pfad, den eine Regel nennt, einmal laden.
         if self.stil.is_some() {

@@ -452,7 +452,7 @@ impl Gui {
                         if w.kind != Kind::Label || !Self::bau(w).map(|z| z.auswaehlbar).unwrap_or(false) { continue; }
                         if !self.widget_shown(wi, w) || !Self::in_rect(mx, my, self.abs_rect(wi, w)) { continue; }
                         let k = self.label_stelle(g, wi, i, mx, my);
-                        let jetzt = g.get_time();
+                        let jetzt = g.uhr_jetzt();
                         let w = &mut self.windows[wi].widgets[i];
                         let doppelt = jetzt - w.klick_zeit < 0.4 && (k - w.klick_idx).abs() <= 2;
                         w.klick_zeit = jetzt; w.klick_idx = k;
@@ -614,7 +614,7 @@ impl Gui {
         }
         let n = 12;
         self.bild_in(0.0);
-        let kopf = ((g.get_time() * 1.2).fract() * n as f64) as i32;
+        let kopf = ((g.uhr_jetzt() * 1.2).fract() * n as f64) as i32;
         let pr = (r / 5).max(2);
         for k in 0..n {
             let a = std::f64::consts::TAU * k as f64 / n as f64 - std::f64::consts::FRAC_PI_2;

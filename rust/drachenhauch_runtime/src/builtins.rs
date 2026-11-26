@@ -219,6 +219,9 @@ fn programm_args() -> &'static [String] {
 }
 
 fn seit_start() -> std::time::Duration { programmstart().elapsed() }
+
+/// Die Wanduhr seit dem Programmstart in ms (fuer die Spieluhr).
+pub(crate) fn seit_start_ms() -> f64 { seit_start().as_secs_f64() * 1000.0 }
 fn next_rand() -> u64 {
     RNG.with(|s| {
         let mut x = s.get();
@@ -454,6 +457,20 @@ fn dt_ms(v: &Value, fn_: &str) -> Result<i64, String> {
     }
     let dt = need_int_gerundet(v, fn_)?;
     if dt < 0 { return Err(format!("{}: dt_ms muss >= 0 sein", fn_)); }
+    Ok(dt)
+}
+
+/// Der Schritt einer Physik-Welt in SEKUNDEN (wie DELTA()) -- das
+/// Gegenstueck zu `dt_ms`. Eine Zahl ab 1 ist fast sicher eine Angabe in
+/// Millisekunden (PHYS2D_STEP(w, 16)); bis 2026.53 wurde sie still auf
+/// 0,05 s geklemmt, und die Welt lief dreimal zu langsam.
+#[cfg_attr(not(feature = "physik"), allow(dead_code))]
+fn physik_dt(v: &Value, fn_: &str) -> Result<f64, String> {
+    let dt = need_num(v, fn_)?;
+    if dt >= 1.0 {
+        return Err(format!("{}: dt {} ist in Sekunden gemeint (DELTA() liefert Sekunden) -- fuer Millisekunden durch 1000 teilen", fn_, dt));
+    }
+    if !(dt >= 0.0) { return Err(format!("{}: dt muss >= 0 sein", fn_)); }
     Ok(dt)
 }
 
@@ -3016,7 +3033,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys3d_step" => {
             arity!(2);
-            phys3d_h(&a[0], "PHYS3D_STEP")?.borrow_mut().step(need_num(&a[1], "PHYS3D_STEP")? as f32);
+            phys3d_h(&a[0], "PHYS3D_STEP")?.borrow_mut().step(physik_dt(&a[1], "PHYS3D_STEP")? as f32);
             Ok(Value::Nil)
         }
         #[cfg(feature = "physik")]
@@ -3134,7 +3151,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys2d_step" => {
             arity!(2);
-            phys2d_h(&a[0], "PHYS2D_STEP")?.borrow_mut().step(need_num(&a[1], "PHYS2D_STEP")? as f32);
+            phys2d_h(&a[0], "PHYS2D_STEP")?.borrow_mut().step(physik_dt(&a[1], "PHYS2D_STEP")? as f32);
             Ok(Value::Nil)
         }
         // Jeder Befehl, der einen Koerper meint, prueft seine Nummer
@@ -6677,7 +6694,8 @@ fn tween_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<TweenObj>>, Str
 
 /// Zeitbasis der Tweens -- dieselbe monotone Uhr wie MILLIS. Mit der
 /// Systemuhr wuerde eine Animation bei einer Zeitumstellung springen.
-fn now_ms() -> i64 { seit_start().as_millis() as i64 }
+/// TWEEN laeuft nach der Spieluhr (spieluhr.rs): im Testlauf mit den Bildern.
+fn now_ms() -> i64 { crate::spieluhr::jetzt_ms() as i64 }
 
 fn elapsed(t: &TweenObj) -> i64 {
     t.paused_at.unwrap_or_else(|| now_ms() - t.start_ms)
