@@ -249,7 +249,7 @@ PRINT t; " "; MID$("abc", 0, 1); " "; ASC("A") + INSTR("abc", "c") + COUNT("aXa"
 12502545
 1.0 2.5 2
 2
-Fehler: ARRAY_PUSH: FLOAT 2.5 kann nicht ohne Verlust nach INTEGER (nutze INT())
+Fehler: ARRAY_PUSH: FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
 Fehler: ARRAY_PUSH: Erwartet INTEGER, erhalten STRING
 a
 a|cAä€

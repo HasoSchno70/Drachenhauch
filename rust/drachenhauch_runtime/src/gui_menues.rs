@@ -255,7 +255,7 @@ impl Gui {
     pub fn hovered(&self, h: i64) -> Result<bool, String> { Ok(self.wdg(h, "GUI_HOVERED")?.hovered) }
     pub fn checked(&self, h: i64) -> Result<bool, String> {
         let w = self.wdg(h, "GUI_CHECKED")?;
-        if !matches!(w.kind, Kind::Checkbox | Kind::Radio | Kind::Toggle | Kind::Eigen) { return Err("GUI_CHECKED: Widget ist keine checkbox/radio/toggle".into()); }
+        if !matches!(w.kind, Kind::Checkbox | Kind::Radio | Kind::Toggle | Kind::Eigen) { return Err("GUI_CHECKED: das Widget ist kein GUI_CHECKBOX, GUI_RADIO oder GUI_TOGGLE".into()); }
         Ok(w.checked)
     }
     pub fn value(&self, h: i64) -> Result<f64, String> {
@@ -265,7 +265,7 @@ impl Gui {
             // Logisch wie GUI_GET_X (bis 2026.53 Bildschirmpixel: bei
             // GUI_SCALE(2) sagte GUI_GET_X 100 und GUI_GET_VALUE 200).
             Kind::Splitter => Ok(self.unsk(if w.group == "v" { w.x } else { w.y }) as f64),
-            _ => Err("GUI_VALUE: Widget ist kein slider/progress/spinner/splitter/knob".into()),
+            _ => Err("GUI_VALUE: das Widget ist kein GUI_SLIDER, GUI_PROGRESS, GUI_SPINNER, GUI_SPLITTER oder GUI_KNOB".into()),
         }
     }
     pub fn text(&self, h: i64) -> Result<String, String> {
@@ -332,7 +332,7 @@ impl Gui {
     }
     pub fn set_checked(&mut self, h: i64, f: bool) -> Result<(), String> {
         let kind = self.wdg(h, "GUI_SET_CHECKED")?.kind;
-        if !matches!(kind, Kind::Checkbox | Kind::Radio | Kind::Toggle | Kind::Eigen) { return Err("GUI_SET_CHECKED: Widget ist keine checkbox/radio/toggle".into()); }
+        if !matches!(kind, Kind::Checkbox | Kind::Radio | Kind::Toggle | Kind::Eigen) { return Err("GUI_SET_CHECKED: das Widget ist kein GUI_CHECKBOX, GUI_RADIO oder GUI_TOGGLE".into()); }
         {
             let w = self.wdg_mut(h, "GUI_SET_CHECKED")?;
             w.checked = f;
@@ -356,7 +356,7 @@ impl Gui {
                 let c = px.clamp(w.min as i32, w.max as i32);
                 if w.group == "v" { w.x = c; } else { w.y = c; }
             }
-            _ => return Err("GUI_SET_VALUE: Widget ist kein slider/progress/spinner/splitter".into()),
+            _ => return Err("GUI_SET_VALUE: das Widget ist kein GUI_SLIDER, GUI_PROGRESS, GUI_SPINNER oder GUI_SPLITTER".into()),
         }
         Ok(())
     }
@@ -420,6 +420,8 @@ impl Gui {
     }
 
     pub fn set_color(&mut self, h: i64, role: String, color: i64) -> Result<(), String> {
+        // Gross/klein wie bei GUI_GET_COLOR egal (bis 2026.53 nur klein).
+        let role = role.to_lowercase();
         if !matches!(role.as_str(), "bg" | "fg" | "border" | "accent" | "hover" | "pressed") {
             return Err("GUI_SET_COLOR: role muss bg/fg/border/accent/hover/pressed sein".into());
         }
@@ -489,11 +491,14 @@ impl Gui {
     /// GUI_STYLE_GET(name$, prop$): ein Wert eines benannten Styles, -1 wenn
     /// er ihn nicht setzt. Ein unbekannter Style ist ein Fehler.
     pub fn style_get(&self, name: &str, prop: &str) -> Result<i64, String> {
+        let prop = prop.to_lowercase();
+        let prop = prop.as_str();
         let s = self.styles.get(name)
             .ok_or_else(|| format!("GUI_STYLE_GET: unbekannter Style '{}'", name))?;
         Ok(s.get(prop).copied().unwrap_or(-1))
     }
     pub fn style_set(&mut self, name: String, prop: String, value: i64) -> Result<(), String> {
+        let prop = prop.to_lowercase();
         if !matches!(prop.as_str(), "bg" | "fg" | "border" | "accent" | "hover" | "pressed" | "font" | "font_size") {
             return Err("GUI_STYLE_SET: prop muss bg/fg/border/accent/hover/pressed/font/font_size sein".into());
         }

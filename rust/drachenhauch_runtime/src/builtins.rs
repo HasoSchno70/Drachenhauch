@@ -571,40 +571,12 @@ fn parse_number(s: &str) -> Option<Value> {
     t.parse::<f64>().ok().map(Value::Float)
 }
 
-/// Element-Coercion fuer Array-Schreibzugriffe (ARRAY_FILL/PUSH/INSERT/REDIM).
-/// Identisch zur `coerce`-Logik der VM (vm.rs): INTEGER nimmt Int oder
-/// ganzzahligen Float, FLOAT nimmt Float/Int, beides lehnt Bool ab; Referenz-/
-/// sonstige Typen werden durchgereicht.
+/// Element-Coercion fuer Array-Schreibzugriffe (ARRAY_FILL/PUSH/INSERT/REDIM)
+/// -- dieselbe `coerce` wie die VM. Bis 2026.53 eine eigene Kopie: sie liess
+/// `ARRAY_PUSH(a, 1e19)` still auf i64::MAX saettigen und nahm eine Zahl in
+/// ein ARRAY OF GELD.
 fn coerce_elem(value: Value, target: &str, ctx: &str) -> R {
-    match target {
-        "integer" => match value {
-            Value::Int(_) => Ok(value),
-            Value::Float(f) => {
-                if f.fract() == 0.0 { Ok(Value::Int(f as i64)) }
-                else { Err(format!("{}: FLOAT {} kann nicht ohne Verlust nach INTEGER (nutze INT())", ctx, f)) }
-            }
-            Value::Bool(_) => Err(format!("{}: Erwartet INTEGER, erhalten BOOLEAN", ctx)),
-            _ => Err(format!("{}: Erwartet INTEGER, erhalten {}", ctx, value.type_name())),
-        },
-        "float" => match value {
-            Value::Float(_) => Ok(value),
-            Value::Int(i) => Ok(Value::Float(i as f64)),
-            Value::Bool(_) => Err(format!("{}: Erwartet FLOAT, erhalten BOOLEAN", ctx)),
-            _ => Err(format!("{}: Erwartet FLOAT, erhalten {}", ctx, value.type_name())),
-        },
-        "string" => match value {
-            Value::Str(_) => Ok(value),
-            _ => Err(format!("{}: Erwartet STRING, erhalten {}", ctx, value.type_name())),
-        },
-        "boolean" => match value {
-            Value::Bool(_) => Ok(value),
-            _ => Err(format!("{}: Erwartet BOOLEAN, erhalten {}", ctx, value.type_name())),
-        },
-        _ => {
-            crate::value::klasse_pruefen(&value, target, ctx)?;
-            Ok(value)
-        }
-    }
+    crate::vm::coerce(value, target, ctx)
 }
 
 /// STR$-Semantik (`_b_str`). `pub(crate)`, damit `EPRINT` (vm.rs `try_os`)
@@ -732,7 +704,7 @@ fn csv_aus_array(v: &Value, fn_: &str) -> Result<Vec<Vec<String>>, String> {
                 .map(|r| (0..cols).map(|c| text(arr.cells.get(r * cols + c))).collect())
                 .collect())
         }
-        n => Err(format!("{}: erwartet ein 1D- oder 2D-ARRAY, bekommen {}D", fn_, n)),
+        n => Err(format!("{}: erwartet ein 1D- oder 2D-ARRAY, erhalten {}D", fn_, n)),
     }
 }
 
@@ -1582,7 +1554,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "sqr" | "sqrt" => {   // SQRT = BASIC-Alias fuer SQR
             arity!(1);
             let x = need_num(&a[0], "SQR")?;
-            if x < 0.0 { return err("SQR von negativer Zahl".to_string()); }
+            if x < 0.0 { return err(format!("SQR: erwartet eine Zahl >= 0, erhalten {}", x)); }
             Ok(Value::Float(x.sqrt()))
         }
         "upper$" | "upper" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "UPPER$")?.to_uppercase())) }
@@ -1608,7 +1580,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(3);
             let (r, g, b) = (need_int_gerundet(&a[0], "RGB")?, need_int_gerundet(&a[1], "RGB")?,
                              need_int_gerundet(&a[2], "RGB")?);
-            for v in [r, g, b] { if v < 0 || v > 255 { return err("RGB-Werte muessen 0..255 sein".to_string()); } }
+            for v in [r, g, b] { if v < 0 || v > 255 { return err(format!("RGB: die Werte muessen 0..255 sein, erhalten {}", v)); } }
             Ok(Value::Int((r << 16) | (g << 8) | b))
         }
         "rgba" => {
@@ -1955,12 +1927,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let ns = match &a[0] {
                 Value::Namespace(n) => n.clone(),
                 v => return err(format!(
-                    "ENUM_NAME: erwartet ein ENUM als erstes Argument, bekommen {}", v.type_name())),
+                    "ENUM_NAME: erwartet ein ENUM als erstes Argument, erhalten {}", v.type_name())),
             };
             let gesucht = match &a[1] {
                 Value::Int(i) => *i,
                 v => return err(format!(
-                    "ENUM_NAME: erwartet INTEGER als Wert, bekommen {}", v.type_name())),
+                    "ENUM_NAME: erwartet INTEGER als Wert, erhalten {}", v.type_name())),
             };
             let mut treffer: Vec<&String> = ns.members.iter()
                 .filter(|(_, v)| matches!(v, Value::Int(i) if *i == gesucht))
@@ -2096,18 +2068,18 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // Count durchlaufen -> capacity-overflow-Panic beim Allozieren).
             // Jedes andere PAD-artige Builtin in dieser Datei (REPEAT$,
             // SPACE$, LEFT$, RIGHT$) clampt bereits mit `.max(0)`.
+            let fn_ = if name.starts_with("padl") { "PADL$" } else { "PADR$" };
             if a.len() < 2 || a.len() > 3 {
-                return err(format!("PAD: erwartet 2..3 Argument(e), erhalten {}", a.len()));
+                return err(format!("{}: erwartet 2..3 Argument(e), erhalten {}", fn_, a.len()));
             }
-            let s = need_str(&a[0], "PAD")?;
-            let n = need_int(&a[1], "PAD")?.max(0) as usize;
+            let s = need_str(&a[0], fn_)?;
+            let n = need_int(&a[1], fn_)?.max(0) as usize;
             let fill = if a.len() == 3 {
-                let f = need_str(&a[2], "PAD")?;
+                let f = need_str(&a[2], fn_)?;
                 f.chars().next().unwrap_or(' ')
             } else { ' ' };
             let count = s.chars().count();
             if count >= n { return Ok(Value::str_rc(s)); }
-            let fn_ = if name.starts_with("padl") { "PADL$" } else { "PADR$" };
             text_laenge_pruefen(fn_, (n - count).checked_mul(fill.len_utf8()).and_then(|p| p.checked_add(s.len())))?;
             let pad: String = std::iter::repeat(fill).take(n - count).collect();
             let left = name.starts_with("padl");
@@ -2137,7 +2109,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(3);
             if let Value::Map(m) = &a[0] {
                 let k = need_str(&a[1], "MAPPUT")?;
-                let v = coerce_map_value(&a[2], &m.borrow().value_type)?;
+                let v = coerce_map_value(&a[2], &m.borrow().value_type, "MAPPUT")?;
                 m.borrow_mut().put_str(k, v);
                 Ok(Value::Nil)
             } else { err("MAPPUT: erwartet MAP".to_string()) }
@@ -3369,7 +3341,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let resolved = resolve_asset_path(path);
             let text = text_lesen(&resolved, None, "ANIM_FSM_LOAD")?;
             let data: serde_json::Value = serde_json::from_str(&text)
-                .map_err(|e| format!("ANIM_FSM_LOAD: Parse-Fehler '{}': {}", resolved, e))?;
+                .map_err(|e| format!("ANIM_FSM_LOAD: '{}': {}", resolved, json_fehler_text(&e)))?;
             let fsm = crate::animfsm::AnimFsmObj::from_json(&data)?;
             Ok(Value::AnimFsm(std::rc::Rc::new(std::cell::RefCell::new(fsm))))
         }
@@ -3628,7 +3600,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             match &mut f.h {
                 FileH::Write(w) => {
                     let payload = if name == "writeline" { format!("{}\n", text) } else { text };
-                    let bytes = crate::kodierung::kodieren(&payload, kod, "WRITE")?;
+                    let bytes = crate::kodierung::kodieren(&payload, kod, &ruf)?;
                     // utf8bom: das BOM gehoert vor die leere Datei, nicht vor jede Zeile.
                     let bom = crate::kodierung::bom_vorn(kod);
                     if !bom.is_empty() && w.metadata().map(|m| m.len() == 0).unwrap_or(false) {
@@ -4531,9 +4503,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // ===== Modul: tween (zeitbasiert -> nicht deterministisch) =====
         "tween_new" | "tween_new_loop" | "tween_new_pingpong" => {
             if a.len() < 3 || a.len() > 4 { return err(format!("{}: 3..4 Argumente", name.to_uppercase())); }
-            let start = need_num(&a[0], "TWEEN")?;
-            let end = need_num(&a[1], "TWEEN")?;
-            let duration = need_int(&a[2], "TWEEN")?;
+            let fn_ = match name { "tween_new_loop" => "TWEEN_NEW_LOOP", "tween_new_pingpong" => "TWEEN_NEW_PINGPONG", _ => "TWEEN_NEW" };
+            let start = need_num(&a[0], fn_)?;
+            let end = need_num(&a[1], fn_)?;
+            let duration = need_int(&a[2], fn_)?;
             if duration < 0 { return err("TWEEN: dauer_ms muss >= 0 sein"); }
             let mode = match name { "tween_new_loop" => "loop", "tween_new_pingpong" => "pingpong", _ => "once" };
             if (mode == "loop" || mode == "pingpong") && duration == 0 { return err("TWEEN: dauer_ms muss > 0 sein"); }
@@ -4699,7 +4672,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "json_parse" => {
             arity!(1);
             let s = need_str(&a[0], "JSON_PARSE")?;
-            let v: serde_json::Value = serde_json::from_str(s).map_err(|e| format!("JSON_PARSE: {}", e))?;
+            let v: serde_json::Value = serde_json::from_str(s).map_err(|e| format!("JSON_PARSE: {}", json_fehler_text(&e)))?;
             Ok(json_wert(v))
         }
         "json_load" => {
@@ -4711,14 +4684,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let path = need_str(&a[0], "JSON_LOAD")?;
             let kod = match a.get(1) { Some(v) => Some(need_str(v, "JSON_LOAD")?), None => None };
             let text = text_lesen(path, kod, "JSON_LOAD")?;
-            let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("JSON_LOAD: {}: {}", path, e))?;
+            let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("JSON_LOAD: {}: {}", path, json_fehler_text(&e)))?;
             Ok(json_wert(v))
         }
         "json_stringify" => { arity!(1); Ok(Value::str_rc(serde_json::to_string(&*json_h(&a[0], "JSON_STRINGIFY")?.borrow()).unwrap_or_default())) }
         "json_pretty" => { arity!(1); Ok(Value::str_rc(serde_json::to_string_pretty(&*json_h(&a[0], "JSON_PRETTY")?.borrow()).unwrap_or_default())) }
         "json_get_string" => {
             arity!(2); let h = json_h(&a[0], "JSON_GET_STRING")?.borrow(); let v = json_resolve(&h, need_str(&a[1], "JSON_GET_STRING")?, "JSON_GET_STRING")?;
-            v.as_str().map(Value::str_rc).ok_or_else(|| format!("JSON_GET_STRING: Pfad '{}' ist kein String", need_str(&a[1], "x").unwrap_or("")))
+            v.as_str().map(Value::str_rc).ok_or_else(|| format!("JSON_GET_STRING: Pfad '{}' ist kein String", need_str(&a[1], "JSON_GET_STRING").unwrap_or("")))
         }
         "json_get_int" => {
             arity!(2); let h = json_h(&a[0], "JSON_GET_INT")?.borrow(); let v = json_resolve(&h, need_str(&a[1], "JSON_GET_INT")?, "JSON_GET_INT")?;
@@ -4953,9 +4926,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "astar_clear" => { arity!(1); astar_h(&a[0], "ASTAR_CLEAR")?.borrow_mut().clear(); Ok(Value::Nil) }
         "astar_width" => { arity!(1); Ok(Value::Int(astar_h(&a[0], "ASTAR_WIDTH")?.borrow().w as i64)) }
         "astar_height" => { arity!(1); Ok(Value::Int(astar_h(&a[0], "ASTAR_HEIGHT")?.borrow().h as i64)) }
-        "astar_set_wall" => { arity!(3); let g = astar_h(&a[0], "ASTAR_SET_WALL")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_SET_WALL")?; let (x, y) = (need_int(&a[1], "S")? as i32, need_int(&a[2], "S")? as i32); g.borrow_mut().set_wall(x, y); Ok(Value::Nil) }
-        "astar_set_passable" => { arity!(3); let g = astar_h(&a[0], "ASTAR_SET_PASSABLE")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_SET_PASSABLE")?; let (x, y) = (need_int(&a[1], "S")? as i32, need_int(&a[2], "S")? as i32); g.borrow_mut().set_passable(x, y); Ok(Value::Nil) }
-        "astar_is_wall" => { arity!(3); let g = astar_h(&a[0], "ASTAR_IS_WALL")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_IS_WALL")?; Ok(Value::Bool(g.borrow().is_wall(need_int(&a[1], "S")? as i32, need_int(&a[2], "S")? as i32))) }
+        "astar_set_wall" => { arity!(3); let g = astar_h(&a[0], "ASTAR_SET_WALL")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_SET_WALL")?; let (x, y) = (need_int(&a[1], "ASTAR_SET_WALL")? as i32, need_int(&a[2], "ASTAR_SET_WALL")? as i32); g.borrow_mut().set_wall(x, y); Ok(Value::Nil) }
+        "astar_set_passable" => { arity!(3); let g = astar_h(&a[0], "ASTAR_SET_PASSABLE")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_SET_PASSABLE")?; let (x, y) = (need_int(&a[1], "ASTAR_SET_PASSABLE")? as i32, need_int(&a[2], "ASTAR_SET_PASSABLE")? as i32); g.borrow_mut().set_passable(x, y); Ok(Value::Nil) }
+        "astar_is_wall" => { arity!(3); let g = astar_h(&a[0], "ASTAR_IS_WALL")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_IS_WALL")?; Ok(Value::Bool(g.borrow().is_wall(need_int(&a[1], "ASTAR_IS_WALL")? as i32, need_int(&a[2], "ASTAR_IS_WALL")? as i32))) }
         "astar_set_diagonal" => { arity!(2); let allow = need_flag(&a[1], "ASTAR_SET_DIAGONAL")?; astar_h(&a[0], "ASTAR_SET_DIAGONAL")?.borrow_mut().set_diagonal(allow); Ok(Value::Nil) }
         "astar_set_heuristic" => {
             arity!(2); let key = need_str(&a[1], "ASTAR_SET_HEURISTIC")?.to_lowercase();
@@ -4966,7 +4939,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "astar_find" => {
             arity!(5); let g = astar_h(&a[0], "ASTAR_FIND")?;
             { let gb = g.borrow(); astar_xy(&gb, &a[1], &a[2], "ASTAR_FIND")?; astar_xy(&gb, &a[3], &a[4], "ASTAR_FIND")?; }
-            let (sx, sy, ex, ey) = (need_int(&a[1], "S")? as i32, need_int(&a[2], "S")? as i32, need_int(&a[3], "S")? as i32, need_int(&a[4], "S")? as i32);
+            let (sx, sy, ex, ey) = (need_int(&a[1], "ASTAR_FIND")? as i32, need_int(&a[2], "ASTAR_FIND")? as i32, need_int(&a[3], "ASTAR_FIND")? as i32, need_int(&a[4], "ASTAR_FIND")? as i32);
             Ok(Value::Bool(g.borrow_mut().find(sx, sy, ex, ey)))
         }
         "astar_path_len" => { arity!(1); Ok(Value::Int(astar_h(&a[0], "ASTAR_PATH_LEN")?.borrow().path_len() as i64)) }
@@ -5186,12 +5159,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
 
         // ===== Modul: particles (RNG-Emit -> nicht deterministisch) =====
         "particle_system_new" => { arity!(2); Ok(Value::Particles(Rc::new(RefCell::new(ParticleSys::new(need_num(&a[0], "PARTICLE_SYSTEM_NEW")?, need_num(&a[1], "PARTICLE_SYSTEM_NEW")?))))) }
-        "particle_set_pos" => { arity!(3); let s = psys(&a[0], "PARTICLE_SET_POS")?; let mut s = s.borrow_mut(); s.x = need_num(&a[1], "S")?; s.y = need_num(&a[2], "S")?; Ok(Value::Nil) }
+        "particle_set_pos" => { arity!(3); let s = psys(&a[0], "PARTICLE_SET_POS")?; let mut s = s.borrow_mut(); s.x = need_num(&a[1], "PARTICLE_SET_POS")?; s.y = need_num(&a[2], "PARTICLE_SET_POS")?; Ok(Value::Nil) }
         "particle_count" => { arity!(1); Ok(Value::Int(psys(&a[0], "PARTICLE_COUNT")?.borrow().particles.len() as i64)) }
         "particle_clear" => { arity!(1); psys(&a[0], "PARTICLE_CLEAR")?.borrow_mut().particles.clear(); Ok(Value::Nil) }
         "particle_set_velocity" => {
             arity!(5); let s = psys(&a[0], "PARTICLE_SET_VELOCITY")?; let mut s = s.borrow_mut();
-            s.vx_min = need_num(&a[1], "S")?; s.vx_max = need_num(&a[2], "S")?; s.vy_min = need_num(&a[3], "S")?; s.vy_max = need_num(&a[4], "S")?;
+            s.vx_min = need_num(&a[1], "PARTICLE_SET_VELOCITY")?; s.vx_max = need_num(&a[2], "PARTICLE_SET_VELOCITY")?; s.vy_min = need_num(&a[3], "PARTICLE_SET_VELOCITY")?; s.vy_max = need_num(&a[4], "PARTICLE_SET_VELOCITY")?;
             if s.vx_max < s.vx_min || s.vy_max < s.vy_min { return err("PARTICLE_SET_VELOCITY: max muss >= min sein"); }
             Ok(Value::Nil)
         }
@@ -5200,7 +5173,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if mi < 0 || ma < mi { return err("PARTICLE_SET_LIFETIME: ms_min >= 0 und ms_max >= ms_min noetig"); }
             let s = psys(&a[0], "PARTICLE_SET_LIFETIME")?; let mut s = s.borrow_mut(); s.lifetime_min = mi; s.lifetime_max = ma; Ok(Value::Nil)
         }
-        "particle_set_gravity" => { arity!(3); let s = psys(&a[0], "PARTICLE_SET_GRAVITY")?; let mut s = s.borrow_mut(); s.gravity_x = need_num(&a[1], "S")?; s.gravity_y = need_num(&a[2], "S")?; Ok(Value::Nil) }
+        "particle_set_gravity" => { arity!(3); let s = psys(&a[0], "PARTICLE_SET_GRAVITY")?; let mut s = s.borrow_mut(); s.gravity_x = need_num(&a[1], "PARTICLE_SET_GRAVITY")?; s.gravity_y = need_num(&a[2], "PARTICLE_SET_GRAVITY")?; Ok(Value::Nil) }
         "particle_set_color" => { arity!(2); let c = need_int(&a[1], "PARTICLE_SET_COLOR")?; if c < 0 || c > 0xFFFFFF { return err("PARTICLE_SET_COLOR: Farbe muss 0..0xFFFFFF sein"); } psys(&a[0], "PARTICLE_SET_COLOR")?.borrow_mut().color = c; Ok(Value::Nil) }
         "particle_set_size" => {
             arity!(3); let (mi, ma) = (need_int_gerundet(&a[1], "PARTICLE_SET_SIZE")? as i32, need_int_gerundet(&a[2], "PARTICLE_SET_SIZE")? as i32);
@@ -5259,7 +5232,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "ecs_query3" => { arity!(4); Ok(int_array(ecs_h(&a[0], "ECS_QUERY3")?.borrow().query(&[need_str(&a[1], "Q")?, need_str(&a[2], "Q")?, need_str(&a[3], "Q")?]))) }
         "ecs_integrate_float" => { arity!(3); Ok(Value::Int(ecs_h(&a[0], "ECS_INTEGRATE_FLOAT")?.borrow_mut().integrate_float(need_str(&a[1], "I")?, need_str(&a[2], "I")?))) }
         "ecs_integrate_int" => { arity!(3); Ok(Value::Int(ecs_h(&a[0], "ECS_INTEGRATE_INT")?.borrow_mut().integrate_int(need_str(&a[1], "I")?, need_str(&a[2], "I")?))) }
-        "ecs_scale_float" => { arity!(3); Ok(Value::Int(ecs_h(&a[0], "ECS_SCALE_FLOAT")?.borrow_mut().scale_float(need_str(&a[1], "S")?, need_num(&a[2], "ECS_SCALE_FLOAT")?))) }
+        "ecs_scale_float" => { arity!(3); Ok(Value::Int(ecs_h(&a[0], "ECS_SCALE_FLOAT")?.borrow_mut().scale_float(need_str(&a[1], "ECS_SCALE_FLOAT")?, need_num(&a[2], "ECS_SCALE_FLOAT")?))) }
         "ecs_fill_float" => { arity!(3); Ok(Value::Int(ecs_h(&a[0], "ECS_FILL_FLOAT")?.borrow_mut().fill_float(need_str(&a[1], "F")?, need_num(&a[2], "ECS_FILL_FLOAT")?))) }
         "ecs_fill_int" => { arity!(3); Ok(Value::Int(ecs_h(&a[0], "ECS_FILL_INT")?.borrow_mut().fill_int(need_str(&a[1], "F")?, need_int(&a[2], "ECS_FILL_INT")?))) }
         "ecs_clamp_float" => { arity!(4); let n = ecs_h(&a[0], "ECS_CLAMP_FLOAT")?.borrow_mut().clamp_float(need_str(&a[1], "C")?, need_num(&a[2], "C")?, need_num(&a[3], "C")?)?; Ok(Value::Int(n)) }
@@ -5479,7 +5452,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(7);
             let m = tiled_h(&a[0], "TILED_FILL_RECT")?; let mut mb = m.borrow_mut();
             let li = tile_layer_idx(&mb, need_int(&a[1], "TILED_FILL_RECT")?, "TILED_FILL_RECT")?;
-            let (tx, ty, w, h, gid) = (need_int(&a[2], "T")?, need_int(&a[3], "T")?, need_int(&a[4], "T")?, need_int(&a[5], "T")?, need_int(&a[6], "T")?);
+            let (tx, ty, w, h, gid) = (need_int(&a[2], "TILED_FILL_RECT")?, need_int(&a[3], "TILED_FILL_RECT")?, need_int(&a[4], "TILED_FILL_RECT")?, need_int(&a[5], "TILED_FILL_RECT")?, need_int(&a[6], "TILED_FILL_RECT")?);
             let layer = &mut mb.layers[li];
             let (lw, lh) = (layer.width, layer.height);
             let (x0, y0) = (tx.max(0), ty.max(0));
@@ -5514,7 +5487,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(5);
             let m = tiled_h(&a[0], "TILED_FLOOD_FILL")?; let mut mb = m.borrow_mut();
             let li = tile_layer_idx(&mb, need_int(&a[1], "TILED_FLOOD_FILL")?, "TILED_FLOOD_FILL")?;
-            let (tx, ty, gid) = (need_int(&a[2], "T")?, need_int(&a[3], "T")?, need_int(&a[4], "T")?);
+            let (tx, ty, gid) = (need_int(&a[2], "TILED_FLOOD_FILL")?, need_int(&a[3], "TILED_FLOOD_FILL")?, need_int(&a[4], "TILED_FLOOD_FILL")?);
             let layer = &mut mb.layers[li];
             let (w, h) = (layer.width, layer.height);
             Ok(Value::Int(crate::tiled::flood_fill(&mut layer.tiles, w, h, tx, ty, gid)))
@@ -5522,27 +5495,27 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "tiled_tile_prop_bool" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_TILE_PROP_BOOL")?; let mb = m.borrow();
-            Ok(Value::Bool(mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).map(|p| p.as_bool()).unwrap_or(false)))
+            Ok(Value::Bool(mb.tile_property(need_int(&a[1], "TILED_TILE_PROP_BOOL")?, need_str(&a[2], "TILED_TILE_PROP_BOOL")?).map(|p| p.as_bool()).unwrap_or(false)))
         }
         "tiled_tile_prop_int" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_TILE_PROP_INT")?; let mb = m.borrow();
-            Ok(Value::Int(mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).map(|p| p.as_int()).unwrap_or(0)))
+            Ok(Value::Int(mb.tile_property(need_int(&a[1], "TILED_TILE_PROP_INT")?, need_str(&a[2], "TILED_TILE_PROP_INT")?).map(|p| p.as_int()).unwrap_or(0)))
         }
         "tiled_tile_prop_float" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_TILE_PROP_FLOAT")?; let mb = m.borrow();
-            Ok(Value::Float(mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).map(|p| p.as_float()).unwrap_or(0.0)))
+            Ok(Value::Float(mb.tile_property(need_int(&a[1], "TILED_TILE_PROP_FLOAT")?, need_str(&a[2], "TILED_TILE_PROP_FLOAT")?).map(|p| p.as_float()).unwrap_or(0.0)))
         }
         "tiled_tile_prop_string" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_TILE_PROP_STRING")?; let mb = m.borrow();
-            Ok(Value::str_rc(&mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).map(|p| p.as_string()).unwrap_or_default()))
+            Ok(Value::str_rc(&mb.tile_property(need_int(&a[1], "TILED_TILE_PROP_STRING")?, need_str(&a[2], "TILED_TILE_PROP_STRING")?).map(|p| p.as_string()).unwrap_or_default()))
         }
         "tiled_tile_has_prop" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_TILE_HAS_PROP")?; let mb = m.borrow();
-            Ok(Value::Bool(mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).is_some()))
+            Ok(Value::Bool(mb.tile_property(need_int(&a[1], "TILED_TILE_HAS_PROP")?, need_str(&a[2], "TILED_TILE_HAS_PROP")?).is_some()))
         }
         // Die Schluessel einer Kachel bzw. eines Objekts. Ohne sie liesse
         // sich nicht ANZEIGEN, was ein Tile hat -- `TILED_TILE_HAS_PROP`
@@ -5586,56 +5559,56 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "tiled_object_name" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_OBJECT_NAME")?; let mb = m.borrow();
-            Ok(Value::str_rc(&get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_NAME")?.name))
+            Ok(Value::str_rc(&get_obj(&mb, need_str(&a[1], "TILED_OBJECT_NAME")?, need_int(&a[2], "TILED_OBJECT_NAME")?, "TILED_OBJECT_NAME")?.name))
         }
         "tiled_object_type" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_OBJECT_TYPE")?; let mb = m.borrow();
-            Ok(Value::str_rc(&get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_TYPE")?.type_))
+            Ok(Value::str_rc(&get_obj(&mb, need_str(&a[1], "TILED_OBJECT_TYPE")?, need_int(&a[2], "TILED_OBJECT_TYPE")?, "TILED_OBJECT_TYPE")?.type_))
         }
         "tiled_object_x" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_OBJECT_X")?; let mb = m.borrow();
-            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_X")?.x))
+            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "TILED_OBJECT_X")?, need_int(&a[2], "TILED_OBJECT_X")?, "TILED_OBJECT_X")?.x))
         }
         "tiled_object_y" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_OBJECT_Y")?; let mb = m.borrow();
-            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_Y")?.y))
+            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "TILED_OBJECT_Y")?, need_int(&a[2], "TILED_OBJECT_Y")?, "TILED_OBJECT_Y")?.y))
         }
         "tiled_object_width" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_OBJECT_WIDTH")?; let mb = m.borrow();
-            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_WIDTH")?.width))
+            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "TILED_OBJECT_WIDTH")?, need_int(&a[2], "TILED_OBJECT_WIDTH")?, "TILED_OBJECT_WIDTH")?.width))
         }
         "tiled_object_height" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_OBJECT_HEIGHT")?; let mb = m.borrow();
-            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_HEIGHT")?.height))
+            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "TILED_OBJECT_HEIGHT")?, need_int(&a[2], "TILED_OBJECT_HEIGHT")?, "TILED_OBJECT_HEIGHT")?.height))
         }
         "tiled_object_prop_bool" => {
             arity!(4);
             let m = tiled_h(&a[0], "TILED_OBJECT_PROP_BOOL")?; let mb = m.borrow();
-            let o = get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_PROP_BOOL")?;
-            Ok(Value::Bool(o.properties.get(need_str(&a[3], "T")?).map(|p| p.as_bool()).unwrap_or(false)))
+            let o = get_obj(&mb, need_str(&a[1], "TILED_OBJECT_PROP_BOOL")?, need_int(&a[2], "TILED_OBJECT_PROP_BOOL")?, "TILED_OBJECT_PROP_BOOL")?;
+            Ok(Value::Bool(o.properties.get(need_str(&a[3], "TILED_OBJECT_PROP_BOOL")?).map(|p| p.as_bool()).unwrap_or(false)))
         }
         "tiled_object_prop_int" => {
             arity!(4);
             let m = tiled_h(&a[0], "TILED_OBJECT_PROP_INT")?; let mb = m.borrow();
-            let o = get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_PROP_INT")?;
-            Ok(Value::Int(o.properties.get(need_str(&a[3], "T")?).map(|p| p.as_int()).unwrap_or(0)))
+            let o = get_obj(&mb, need_str(&a[1], "TILED_OBJECT_PROP_INT")?, need_int(&a[2], "TILED_OBJECT_PROP_INT")?, "TILED_OBJECT_PROP_INT")?;
+            Ok(Value::Int(o.properties.get(need_str(&a[3], "TILED_OBJECT_PROP_INT")?).map(|p| p.as_int()).unwrap_or(0)))
         }
         "tiled_object_prop_float" => {
             arity!(4);
             let m = tiled_h(&a[0], "TILED_OBJECT_PROP_FLOAT")?; let mb = m.borrow();
-            let o = get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_PROP_FLOAT")?;
-            Ok(Value::Float(o.properties.get(need_str(&a[3], "T")?).map(|p| p.as_float()).unwrap_or(0.0)))
+            let o = get_obj(&mb, need_str(&a[1], "TILED_OBJECT_PROP_FLOAT")?, need_int(&a[2], "TILED_OBJECT_PROP_FLOAT")?, "TILED_OBJECT_PROP_FLOAT")?;
+            Ok(Value::Float(o.properties.get(need_str(&a[3], "TILED_OBJECT_PROP_FLOAT")?).map(|p| p.as_float()).unwrap_or(0.0)))
         }
         "tiled_object_prop_string" => {
             arity!(4);
             let m = tiled_h(&a[0], "TILED_OBJECT_PROP_STRING")?; let mb = m.borrow();
-            let o = get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_PROP_STRING")?;
-            Ok(Value::str_rc(&o.properties.get(need_str(&a[3], "T")?).map(|p| p.as_string()).unwrap_or_default()))
+            let o = get_obj(&mb, need_str(&a[1], "TILED_OBJECT_PROP_STRING")?, need_int(&a[2], "TILED_OBJECT_PROP_STRING")?, "TILED_OBJECT_PROP_STRING")?;
+            Ok(Value::str_rc(&o.properties.get(need_str(&a[3], "TILED_OBJECT_PROP_STRING")?).map(|p| p.as_string()).unwrap_or_default()))
         }
         "tiled_tileset_count" => { arity!(1); Ok(Value::Int(tiled_h(&a[0], "TILED_TILESET_COUNT")?.borrow().tilesets.len() as i64)) }
         "tiled_tileset_image" => {
@@ -6170,7 +6143,7 @@ fn save_load(path: &str) -> R {
     // Wie jede gelesene Textdatei (text_lesen): eine BOM vorn bricht das
     // JSON nicht mehr (ein Spielstand, den ein Editor mit BOM speicherte).
     let text = text_lesen(path, None, "SAVE_LOAD")?;
-    let raw: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("SAVE_LOAD: '{}' ist kein gueltiges JSON ({})", path, e))?;
+    let raw: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("SAVE_LOAD: '{}': {}", path, json_fehler_text(&e)))?;
     let obj = raw.as_object().ok_or("SAVE_LOAD: Save-Datei muss ein JSON-Objekt sein")?;
     let version = obj.get("_version").and_then(|v| v.as_i64()).unwrap_or(1);
     let mut data = Vec::new();
@@ -7072,7 +7045,7 @@ fn m3_quat_rotate_vec3(q: (f32, f32, f32, f32), v: (f32, f32, f32)) -> (f32, f32
 
 fn nums(a: &[Value], fn_: &str) -> Result<Vec<f64>, String> {
     let mut v = Vec::with_capacity(a.len());
-    for (i, x) in a.iter().enumerate() { v.push(need_num(x, fn_).map_err(|_| format!("{}: Arg {} muss Zahl sein", fn_, i + 1))?); }
+    for (i, x) in a.iter().enumerate() { v.push(crate::argument::num(x, fn_, Some(i + 1))?); }
     Ok(v)
 }
 
@@ -7227,22 +7200,10 @@ pub(crate) fn val_lesen(text: &str) -> Value {
     }
 }
 
-pub(crate) fn coerce_map_value(v: &Value, vt: &str) -> R {
-    match vt {
-        "integer" => match v {
-            Value::Int(_) => Ok(v.clone()),
-            // Ganzzahliges FLOAT akzeptieren (wie ARRAY OF INTEGER / Skalar).
-            Value::Float(f) if f.fract() == 0.0 => Ok(Value::Int(*f as i64)),
-            _ => err(format!("Map-Wert: Erwartet INTEGER, erhalten {}", v.type_name())),
-        },
-        "float" => match v { Value::Float(_) => Ok(v.clone()), Value::Int(i) => Ok(Value::Float(*i as f64)), _ => err("Map-Wert: Erwartet FLOAT".to_string()) },
-        "string" => match v { Value::Str(_) => Ok(v.clone()), _ => err("Map-Wert: Erwartet STRING".to_string()) },
-        "boolean" => match v { Value::Bool(_) => Ok(v.clone()), _ => err("Map-Wert: Erwartet BOOLEAN".to_string()) },
-        _ => {
-            crate::value::klasse_pruefen(v, vt, "Map-Wert")?;
-            Ok(v.clone())
-        }
-    }
+pub(crate) fn coerce_map_value(v: &Value, vt: &str, ctx: &str) -> R {
+    // Dieselbe `coerce` wie Variablen und Felder (bis 2026.53 eine Kopie
+    // ohne Ueberlaufpruefung, die als "Map-Wert" meldete).
+    crate::vm::coerce(v.clone(), vt, ctx)
 }
 
 /// Ordering fuer SORT (homogene Arrays).
@@ -7255,6 +7216,21 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
     } else {
         Equal
     }
+}
+
+
+/// Ein JSON-Lesefehler auf Deutsch mit Zeile und Spalte -- serde nennt ihn
+/// englisch ("expected value at line 1 column 1"), und das stand bis 2026.53
+/// so in JSON_PARSE/JSON_LOAD/SAVE_LOAD.
+pub(crate) fn json_fehler_text(e: &serde_json::Error) -> String {
+    use serde_json::error::Category;
+    let was = match e.classify() {
+        Category::Eof => "der Text endet mitten im JSON",
+        Category::Syntax => "kein gueltiges JSON",
+        Category::Data => "unpassende Daten",
+        Category::Io => "Lesefehler",
+    };
+    format!("{} (Zeile {}, Spalte {})", was, e.line(), e.column())
 }
 
 #[cfg(test)]

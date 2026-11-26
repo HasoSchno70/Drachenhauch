@@ -9,8 +9,8 @@ DIM d AS GUI_WINDOW : d = GUI_DIALOG("F", "Text?", "Speichern|Verwerfen|Abbreche
 DIM k AS GUI_WIDGET : k = GUI_WINDOW_WIDGET(d, GUI_WINDOW_WIDGET_COUNT(d) - 2)
 DIM np AS GUI_WIDGET : np = GUI_CANVAS(d, 0, 0, 1, 1)
 GUI_UPDATE()
-DIM ox AS INTEGER : ox = GUI_CANVAS_X(np)
-DIM oy AS INTEGER : oy = GUI_CANVAS_Y(np)
+DIM ox AS INTEGER : ox = GUI_CANVAS_SCREEN_X(np)
+DIM oy AS INTEGER : oy = GUI_CANVAS_SCREEN_Y(np)
 PRINT ox + GUI_GET_X(k) + GUI_GET_W(k) \ 2 ; " " ; oy + GUI_GET_Y(k) + GUI_GET_H(k) \ 2
 --- umgebung
 DHRT_FRAMES=2

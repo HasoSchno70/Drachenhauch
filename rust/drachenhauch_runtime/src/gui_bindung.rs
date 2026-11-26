@@ -433,7 +433,7 @@ impl Gui {
     }
     pub fn progress_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_PROGRESS_SET")?;
-        if w.kind != Kind::Progress { return Err("GUI_PROGRESS_SET: Widget ist kein Fortschrittsbalken".into()); }
+        if w.kind != Kind::Progress { return Err("GUI_PROGRESS_SET: das Widget ist kein GUI_PROGRESS".into()); }
         match key.to_ascii_lowercase().as_str() {
             "unbestimmt" | "indeterminate" => { w.unbestimmt = wert != 0.0; Ok(()) }
             "kreis" | "circle" => self.progress_kreis_setzen(h, wert != 0.0),
@@ -444,7 +444,7 @@ impl Gui {
         let m = bildmodus_parsen(modus).ok_or_else(|| format!(
             "GUI_IMAGE_MODE: '{}' ist kein Modus -- strecken, einpassen, fuellen, mitte oder kacheln", modus))?;
         let w = self.wdg_mut(h, "GUI_IMAGE_MODE")?;
-        if !matches!(w.kind, Kind::Image | Kind::Card) { return Err("GUI_IMAGE_MODE: Widget ist kein image und keine Kachel".into()); }
+        if !matches!(w.kind, Kind::Image | Kind::Card) { return Err("GUI_IMAGE_MODE: das Widget ist kein GUI_IMAGE oder GUI_CARD".into()); }
         w.bildmodus = m;
         Ok(())
     }
@@ -526,7 +526,7 @@ impl Gui {
                 if mx < ax + self.ta_gutter(g, w, starts.len()) { return None; }
                 if w.hinweise_klickbar && !w.hinweise.is_empty() {
                     let rows = self.ta_rows(g, w, &chars, &starts, self.ta_breite(g, w, starts.len()));
-                    let sicht = ((bh - 10) / self.ta_line_h(g, w)).max(1);
+                    let sicht = self.ta_sicht(g, w, bh);
                     if self.ta_hinweis_rects(g, wi, w, ax, ay, &chars, &starts, &rows, sicht)
                         .into_iter().any(|(_, hx, hy, hb, hh)| Self::in_rect(mx, my, (hx, hy, hb, hh))) {
                         return Some("hand");
@@ -534,7 +534,7 @@ impl Gui {
                 }
                 if !w.farbfelder.is_empty() {
                     let rows = self.ta_rows(g, w, &chars, &starts, self.ta_breite(g, w, starts.len()));
-                    let sicht = ((bh - 10) / self.ta_line_h(g, w)).max(1);
+                    let sicht = self.ta_sicht(g, w, bh);
                     if self.ta_farbfeld_rects(g, wi, w, ax, ay, &chars, &rows, starts.len(), sicht)
                         .into_iter().any(|(_, fx, fy, k)| Self::in_rect(mx, my, (fx, fy, k, k))) {
                         return Some("hand");
@@ -641,7 +641,7 @@ impl Gui {
     // --- Rollendes Panel ---
     pub(super) fn panel_pruefen(&self, h: i64, fn_: &str) -> Result<(usize, usize), String> {
         let w = self.wdg(h, fn_)?;
-        if w.kind != Kind::Panel { return Err(format!("{}: Widget ist kein Panel", fn_)); }
+        if w.kind != Kind::Panel { return Err(format!("{}: das Widget ist kein GUI_PANEL", fn_)); }
         Ok(Self::dec_widget(h))
     }
     pub fn panel_add(&mut self, h: i64, kind: i64) -> Result<(), String> {
@@ -1403,7 +1403,7 @@ impl Gui {
                 Some((cx, ay + 3, (h - 7).max(1)))
             }
             Kind::TextArea => {
-                let pad = 5;
+                let pad = self.ta_pad();
                 let lh = self.ta_line_h(g, wdg);
                 let (chars, caret_anz) = self.anzeige_mit_vorschau(wdg);
                 let starts = Self::line_starts(&chars);

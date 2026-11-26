@@ -219,9 +219,15 @@ IMPORT "gui"
 | `GUI_TREE_CLEAR(tree)` | — | delete all nodes |
 | `GUI_TREE_SELECTED(tree)` / `GUI_TREE_SET_SELECTED(tree, node)` | INT / — | read/set the selected node (-1 = none) |
 | `GUI_TREE_LABEL(tree, node)` | STRING | text of a node |
-| `GUI_TABCONTROL_ITEM_RECT(tc, page)` | TUPLE | (x, y, w, h) of a page's tab head on screen, from the same calculation as drawing and clicking -- for tests with real clicks |
-| `GUI_TREE_ITEM_RECT(tree, node)` | TUPLE | (x, y, w, h) of a node on screen, x at the start of its label; under a collapsed one (0, 0, 0, 0) -- for tests with real clicks |
+| `GUI_TREE_COUNT(tree)` | INTEGER | how many nodes the tree has (collapsed ones too) |
+| `GUI_TREE_SET_LABEL(tree, node, label)` | — | rename a node |
+| `GUI_TREE_REMOVE(tree, node)` | — | remove a node with its children; the numbers after it move up |
+| `GUI_TABCONTROL_ITEM_RECT(tc, page)` | TUPLE | (x, y, w, h) of a page's tab head, logical like `GUI_GET_X` (until 2026.53 in screen pixels) |
+| `GUI_TABCONTROL_ITEM_SCREEN_RECT(tc, page)` | TUPLE | (x, y, w, h) of a page's tab head on screen, from the same calculation as drawing and clicking -- for tests with real clicks |
+| `GUI_TREE_ITEM_RECT(tree, node)` | TUPLE | (x, y, w, h) of a node, logical like `GUI_GET_X`; under a collapsed one (0, 0, 0, 0) (until 2026.53 in screen pixels) |
+| `GUI_TREE_ITEM_SCREEN_RECT(tree, node)` | TUPLE | (x, y, w, h) of a node on screen, x at the start of its label; under a collapsed one (0, 0, 0, 0) -- for tests with real clicks |
 | `GUI_TREE_EXPAND(tree, node, flag)` | — | expand/collapse a node |
+| `GUI_TREE_EXPANDED(tree, node)` | BOOLEAN | is the node expanded? |
 | `GUI_TREE_SET(tree, key$, value)` | — | setting on the tree: `mehrfachauswahl` (multi-select), `kaestchen` (checkboxes), `bearbeitbar` (editable: F2 renames) |
 | `GUI_TREE_EDIT(tree, node)` | — | rename a node: input field over the name, everything selected (not for the file tree) |
 | `GUI_TREE_EDITED(tree)` | INTEGER | node renamed in this frame, -1 = none |
@@ -273,8 +279,8 @@ IMPORT "gui"
 | `GUI_RICHTEXT_HEADING_AT(rt)` | INTEGER | which section the top edge is in (-1 = before the first) -- for a table of contents that follows along |
 | `GUI_RICHTEXT_LINK$(rt)` | STRING | which link was clicked in this frame (empty = none) |
 | `GUI_RICHTEXT_FIND(rt, text$, from = -1)` | INTEGER | scroll to the first match; returns its y or -1 (0 = queued: right after `SET_TEXT` the search only runs once the new text is typeset) |
-| `GUI_RICHTEXT_SCROLL(rt, y)` / `GUI_RICHTEXT_SCROLL_GET(rt)` | — / INTEGER | set and read the view offset |
-| `GUI_RICHTEXT_HEIGHT(rt)` | INTEGER | how tall the typeset text has become |
+| `GUI_RICHTEXT_SCROLL(rt, y)` / `GUI_RICHTEXT_SCROLL_GET(rt)` | — / INTEGER | set and read the view offset, logical (until 2026.53 in screen pixels) |
+| `GUI_RICHTEXT_HEIGHT(rt)` | INTEGER | how tall the typeset text has become, logical |
 | `GUI_RICHTEXT_SELECTION$(rt)` | STRING | the selected text, lines separated by line breaks (empty = no selection) |
 | `GUI_RICHTEXT_SELECT_ALL(rt)` | — | select everything (like Ctrl+A) |
 | `GUI_RICHTEXT_CLEAR_SELECTION(rt)` | — | clear the selection |
@@ -324,7 +330,8 @@ IMPORT "gui"
 | `GUI_TABLE_SET_SELECTED(tbl, row)` | — | set the selection (-1 = none) |
 | `GUI_TABLE_CLICKED(tbl)` | INTEGER | row clicked in this frame (-1) |
 | `GUI_TABLE_ROW_COUNT(tbl)` | INTEGER | number of data rows |
-| `GUI_TABLE_ROW_RECT(tbl, row)` | TUPLE | where data row `row` is right now (x, y, w, h), in screen pixels like `GUI_HIT_TEST`, after sorting, filter and scrolling; filtered out (0, 0, 0, 0) -- for tests with real clicks and pictures |
+| `GUI_TABLE_ROW_RECT(tbl, row)` | TUPLE | where data row `row` is right now (x, y, w, h), logical like `GUI_GET_X`; filtered out (0, 0, 0, 0) (until 2026.53 in screen pixels) |
+| `GUI_TABLE_ROW_SCREEN_RECT(tbl, row)` | TUPLE | where data row `row` is right now (x, y, w, h), in screen pixels like `GUI_HIT_TEST`, after sorting, filter and scrolling; filtered out (0, 0, 0, 0) -- for tests with real clicks and pictures |
 | `GUI_UPDATE()` | — | **required** every frame: process mouse/keys |
 | `GUI_DRAW([on_top])` | — | draw all windows (back→front); `on_top`=FALSE leaves out the context menu and tooltip |
 | `GUI_DRAW_TOP()` | — | only what lies above all windows: open menu (bar or context), open dropdown list, tooltip |
@@ -452,7 +459,8 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_LISTBOX_DATA$(lb, i)` | STRING | read the invisible value of an entry |
 | `GUI_LISTBOX_FIND_DATA(lb, value$)` | INTEGER | first entry with this value, -1 = none |
 | `GUI_LISTBOX_DETAIL(lb, i, text$)` | — | extra text on the right of the entry, dimmed (shortcut, size, line number) |
-| `GUI_LISTBOX_ITEM_RECT(lb, i)` | TUPLE | where item i is on screen (x, y, w, h), in screen pixels like `GUI_HIT_TEST`; filtered out (0, 0, 0, 0) -- for tests with real clicks, the row height depends on font and stylesheet |
+| `GUI_LISTBOX_ITEM_RECT(lb, i)` | TUPLE | where item i is (x, y, w, h), logical like `GUI_GET_X`; filtered out (0, 0, 0, 0) (until 2026.53 in screen pixels) |
+| `GUI_LISTBOX_ITEM_SCREEN_RECT(lb, i)` | TUPLE | where item i is on screen (x, y, w, h), in screen pixels like `GUI_HIT_TEST`; filtered out (0, 0, 0, 0) -- for tests with real clicks, the row height depends on font and stylesheet |
 | `GUI_LISTBOX_TIP(lb, i, text$)` | — | tooltip per entry. Without one, an entry that does not fit the row (it ends with "...") shows its whole text when hovered |
 | `GUI_LISTBOX_ENABLE(lb, i, on)` | — | disable an entry: visible, but neither clickable nor reachable with the arrow keys |
 | `GUI_LISTBOX_ENABLED(lb, i)` | BOOLEAN | whether an entry is selectable |
@@ -477,8 +485,9 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_CARD_SET_TEXT(card, text$)` | — | set the description of a card (the title is set by `GUI_SET_TEXT`) |
 | `GUI_CARD_TEXT$(card)` | STRING | description of a card |
 | `GUI_CANVAS(win, x, y, w, h)` | GUI_WIDGET | free drawing surface -- you paint into it with the normal drawing commands, **after** `GUI_DRAW` |
-| `GUI_CANVAS_X(canvas)` / `GUI_CANVAS_Y(canvas)` | INTEGER | **absolute** screen position of the surface (moves with the window) |
-| `GUI_CANVAS_W(canvas)` / `GUI_CANVAS_H(canvas)` | INTEGER | size of the surface |
+| `GUI_CANVAS_X(canvas)` / `GUI_CANVAS_Y(canvas)` / `GUI_CANVAS_W(canvas)` / `GUI_CANVAS_H(canvas)` | INTEGER | position and size of the surface, logical like `GUI_GET_X` -- for drawing use the `_SCREEN_` form (until 2026.53 these returned pixels) |
+| `GUI_CANVAS_SCREEN_X(canvas)` / `GUI_CANVAS_SCREEN_Y(canvas)` | INTEGER | **absolute** screen position of the surface (moves with the window) |
+| `GUI_CANVAS_SCREEN_W(canvas)` / `GUI_CANVAS_SCREEN_H(canvas)` | INTEGER | size of the surface |
 | `GUI_CANVAS_BEGIN(canvas)` / `GUI_CANVAS_END()` | — | the drawing commands in between go into the surface: clipped to it, and if it is in a real window, into that window's picture |
 | `GUI_CANVAS_MOUSE(canvas)` | TUPLE | (x, y, pressed): the pointer relative to the surface and the left button -- in a real window too |
 | `GUI_SET_ENABLED(widget, on)` | — | make a widget usable or disable it (disabled = greyed out, takes no clicks) |
@@ -1340,14 +1349,15 @@ GUI_UPDATE()
 GUI_DRAW()                       ' draws the window + the canvas frame
 ' Then paint into the canvas area (absolute screen coordinates):
 DIM cx AS INTEGER : DIM cy AS INTEGER : DIM cw AS INTEGER : DIM ch AS INTEGER
-cx = GUI_CANVAS_X(cv) : cy = GUI_CANVAS_Y(cv)
-cw = GUI_CANVAS_W(cv) : ch = GUI_CANVAS_H(cv)
+cx = GUI_CANVAS_SCREEN_X(cv) : cy = GUI_CANVAS_SCREEN_Y(cv)
+cw = GUI_CANVAS_SCREEN_W(cv) : ch = GUI_CANVAS_SCREEN_H(cv)
 BOX(cx, cy, cx + cw, cy + ch, &H101820)
 CIRCLE(cx + cw/2, cy + ch/2, 30, &H30FFA0)
 FLIP()
 ```
 
-`GUI_CANVAS_X/Y/W/H` return the **absolute** content area (it follows the
+`GUI_CANVAS_SCREEN_X/Y/W/H` return the **absolute** content area in screen pixels, as the
+drawing commands need it (`GUI_CANVAS_X/Y/W/H` name the same area logically) (it follows the
 window when it is moved). You draw **after** `GUI_DRAW`.
 
 **With `GUI_CANVAS_BEGIN` and `GUI_CANVAS_END`** the drawing is clipped to the
@@ -1373,8 +1383,8 @@ WHILE NOT QUITREQUESTED()
     CLS(0)
     GUI_DRAW()
     GUI_CANVAS_BEGIN(cv)
-    BOX(GUI_CANVAS_X(cv), GUI_CANVAS_Y(cv), GUI_CANVAS_X(cv) + 280, GUI_CANVAS_Y(cv) + 180, &H101820)
-    IF unten THEN CIRCLE(GUI_CANVAS_X(cv) + x, GUI_CANVAS_Y(cv) + y, 8, &H30FFA0)
+    BOX(GUI_CANVAS_SCREEN_X(cv), GUI_CANVAS_SCREEN_Y(cv), GUI_CANVAS_SCREEN_X(cv) + 280, GUI_CANVAS_SCREEN_Y(cv) + 180, &H101820)
+    IF unten THEN CIRCLE(GUI_CANVAS_SCREEN_X(cv) + x, GUI_CANVAS_SCREEN_Y(cv) + y, 8, &H30FFA0)
     GUI_CANVAS_END()
     FLIP()
 WEND
@@ -2741,8 +2751,8 @@ WHILE NOT QUITREQUESTED()
     CLS(&H202830)
     GUI_DRAW()
     GUI_CANVAS_BEGIN(nacht)
-    DIM x AS INTEGER : x = GUI_CANVAS_X(nacht)
-    DIM y AS INTEGER : y = GUI_CANVAS_Y(nacht)
+    DIM x AS INTEGER : x = GUI_CANVAS_SCREEN_X(nacht)
+    DIM y AS INTEGER : y = GUI_CANVAS_SCREEN_Y(nacht)
     BOX(x, y, x + 158, y + 58, IIF(GUI_CHECKED(nacht), &H203060, &HE0C060))
     TEXT(x + 10, y + 20, IIF(GUI_CHECKED(nacht), "Mond", "Sonne"), WHITE)
     GUI_CANVAS_END()

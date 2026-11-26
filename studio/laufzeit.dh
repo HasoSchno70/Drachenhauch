@@ -185,7 +185,7 @@ CLASS StudioDiagramm
             CHART_SET_COLOR(Self.Diagramm, "hintergrund", bg)
             Self.studioHell = hell
         END IF
-        CHART_BOUNDS(Self.Diagramm, GUI_CANVAS_X(Self.Flaeche), GUI_CANVAS_Y(Self.Flaeche), GUI_CANVAS_W(Self.Flaeche), GUI_CANVAS_H(Self.Flaeche))
+        CHART_BOUNDS(Self.Diagramm, GUI_CANVAS_SCREEN_X(Self.Flaeche), GUI_CANVAS_SCREEN_Y(Self.Flaeche), GUI_CANVAS_SCREEN_W(Self.Flaeche), GUI_CANVAS_SCREEN_H(Self.Flaeche))
         CHART_UPDATE(Self.Diagramm, DELTA())
         studioSchriftAn()
         CHART_DRAW(Self.Diagramm)

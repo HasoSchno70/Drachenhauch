@@ -34,7 +34,7 @@ s = SAVE_LOAD_OR_NEW("kaputt.save")
 --- datei kaputt.save
 nicht echtes json
 --- fehler
-SAVE_LOAD: 'kaputt.save' ist kein gueltiges JSON (expected ident at line 1 column 2)
+SAVE_LOAD: 'kaputt.save': kein gueltiges JSON (Zeile 1, Spalte 2)
 
 === exists true for real file
 IMPORT "save"

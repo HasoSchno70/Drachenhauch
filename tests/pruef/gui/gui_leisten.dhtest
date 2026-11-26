@@ -101,7 +101,7 @@ DHRT_FRAMES=1
 --- enthaelt
 Ausrichtung 'oben' gibt es nicht
 Feld 4 gibt es nicht
-keine Pfadleiste
+kein GUI_BREADCRUMB
 
 === die pfadleiste klappt vorn ein, wenn es eng wird
 IMPORT "gui"

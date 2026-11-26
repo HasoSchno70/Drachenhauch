@@ -127,7 +127,7 @@ END TRY
 2 gruen
 4 -- wählen -- | Brot
 GUI_DROPDOWN_ITEM: Eintrag 4 gibt es nicht (die Liste hat 4)
-GUI_DROPDOWN_COUNT: Widget ist keine Klappliste
+GUI_DROPDOWN_COUNT: das Widget ist kein GUI_DROPDOWN
 
 === form widgets roundtrip
 IMPORT "gui"
@@ -162,7 +162,7 @@ DIM b AS GUI_WIDGET
 b = GUI_BUTTON(win, "x", 0, 0, 50, 20)
 PRINT GUI_DROPDOWN_SELECTED(b)
 --- fehler
-GUI_DROPDOWN_SELECTED: Widget ist kein dropdown/listbox
+GUI_DROPDOWN_SELECTED: das Widget ist kein GUI_DROPDOWN oder GUI_LISTBOX
 
 === klappliste: gui_set_text waehlt, gui_text liefert die auswahl
 ' Eine Klappliste ohne Tippen merkte sich den mit GUI_SET_TEXT gesetzten Text

@@ -219,7 +219,7 @@ impl Gui {
     pub fn layout_selected(&self, h: i64) -> Result<i64, String> {
         let (wi, _) = Self::dec_widget(h);
         let w = self.wdg(h, "GUI_LAYOUT_SELECTED")?;
-        let l = w.layout.as_ref().ok_or("GUI_LAYOUT_SELECTED: Widget ist kein Layout")?;
+        let l = w.layout.as_ref().ok_or("GUI_LAYOUT_SELECTED: das Widget ist kein GUI_LAYOUT")?;
         Ok(if l.gewaehlt >= 0 { Self::enc_widget(wi, l.gewaehlt as usize) } else { -1 })
     }
     pub fn layout_select(&mut self, h: i64, kind: i64) -> Result<(), String> {
@@ -230,7 +230,7 @@ impl Gui {
             ki as i32
         };
         let w = self.wdg_mut(h, "GUI_LAYOUT_SELECT")?;
-        let l = w.layout.as_mut().ok_or("GUI_LAYOUT_SELECT: Widget ist kein Layout")?;
+        let l = w.layout.as_mut().ok_or("GUI_LAYOUT_SELECT: das Widget ist kein GUI_LAYOUT")?;
         if k >= 0 && !l.kinder.iter().any(|&(x, _)| x == k) {
             return Err("GUI_LAYOUT_SELECT: das Widget gehoert nicht zu diesem Layout".into());
         }
@@ -342,7 +342,7 @@ impl Gui {
     // ================================================================ Beschriftung
     pub fn label_set(&mut self, h: i64, key: &str, wert: &str) -> Result<(), String> {
         let f = "GUI_LABEL_SET";
-        if self.wdg(h, f)?.kind != Kind::Label { return Err(format!("{}: Widget ist keine Beschriftung (GUI_LABEL)", f)); }
+        if self.wdg(h, f)?.kind != Kind::Label { return Err(format!("{}: das Widget ist kein GUI_LABEL", f)); }
         let z = self.bau_mut(h, f)?;
         match key.to_lowercase().as_str() {
             "kuerzen" | "ellipsize" => z.kuerzen = match wert.to_lowercase().as_str() {
@@ -497,7 +497,7 @@ impl Gui {
     // ================================================================ Regler
     pub fn slider_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let f = "GUI_SLIDER_SET";
-        if self.wdg(h, f)?.kind != Kind::Slider { return Err(format!("{}: Widget ist kein Regler (GUI_SLIDER)", f)); }
+        if self.wdg(h, f)?.kind != Kind::Slider { return Err(format!("{}: das Widget ist kein GUI_SLIDER", f)); }
         let z = self.bau_mut(h, f)?;
         match key.to_lowercase().as_str() {
             "marken" | "ticks" => {
@@ -517,7 +517,7 @@ impl Gui {
     pub fn slider_mark(&mut self, h: i64, wert: f64, text: String) -> Result<(), String> {
         let f = "GUI_SLIDER_MARK";
         let w = self.wdg(h, f)?;
-        if w.kind != Kind::Slider { return Err(format!("{}: Widget ist kein Regler (GUI_SLIDER)", f)); }
+        if w.kind != Kind::Slider { return Err(format!("{}: das Widget ist kein GUI_SLIDER", f)); }
         if wert < w.min || wert > w.max { return Err(format!("{}: {} liegt ausserhalb des Reglers ({}..{})", f, wert, w.min, w.max)); }
         let z = self.bau_mut(h, f)?;
         z.marken.retain(|(v, _)| *v != wert);
@@ -628,7 +628,7 @@ impl Gui {
 
     // ================================================================ Kalendermarken
     fn dp_bau(&mut self, h: i64, f: &str) -> Result<&mut Bauzusatz, String> {
-        if self.wdg(h, f)?.kind != Kind::DatePicker { return Err(format!("{}: Widget ist kein Datumswaehler (GUI_DATEPICKER)", f)); }
+        if self.wdg(h, f)?.kind != Kind::DatePicker { return Err(format!("{}: das Widget ist kein GUI_DATEPICKER", f)); }
         self.bau_mut(h, f)
     }
     pub fn date_mark(&mut self, h: i64, datum: &str, farbe: i64) -> Result<(), String> {

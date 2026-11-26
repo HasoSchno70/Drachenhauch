@@ -779,10 +779,10 @@ SUB minimapZeichnen()
     IF NOT minimapAn THEN kartenZug = FALSE : RETURN
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
-    DIM cx AS INTEGER : cx = GUI_CANVAS_X(karte)
-    DIM cy AS INTEGER : cy = GUI_CANVAS_Y(karte)
-    DIM cw AS INTEGER : cw = GUI_CANVAS_W(karte)
-    DIM ch AS INTEGER : ch = GUI_CANVAS_H(karte)
+    DIM cx AS INTEGER : cx = GUI_CANVAS_SCREEN_X(karte)
+    DIM cy AS INTEGER : cy = GUI_CANVAS_SCREEN_Y(karte)
+    DIM cw AS INTEGER : cw = GUI_CANVAS_SCREEN_W(karte)
+    DIM ch AS INTEGER : ch = GUI_CANVAS_SCREEN_H(karte)
     DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
     DIM n AS INTEGER : n = LEN(zeilen)
     IF n = 0 OR ch < 4 THEN RETURN

@@ -52,7 +52,7 @@ END TRY
 DHRT_FRAMES=1
 --- erwartet
 2 c
-GUI_LISTBOX_SET: das Widget ist keine Liste (GUI_LISTBOX)
+GUI_LISTBOX_SET: das Widget ist kein GUI_LISTBOX
 
 === falscher index im klartext
 IMPORT "gui"
@@ -91,7 +91,7 @@ lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
 DIM f AS INTEGER
 FOR f = 1 TO 2
     GUI_UPDATE()
-    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    PRINT "O " + STR$(GUI_CANVAS_SCREEN_X(nullpunkt)) + " " + STR$(GUI_CANVAS_SCREEN_Y(nullpunkt))
     GUI_DRAW()
     FLIP()
 NEXT
@@ -158,7 +158,7 @@ lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
 DIM f AS INTEGER
 FOR f = 1 TO 2
     GUI_UPDATE()
-    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    PRINT "O " + STR$(GUI_CANVAS_SCREEN_X(nullpunkt)) + " " + STR$(GUI_CANVAS_SCREEN_Y(nullpunkt))
     GUI_DRAW()
     FLIP()
 NEXT
@@ -216,7 +216,7 @@ lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
 DIM f AS INTEGER
 FOR f = 1 TO 2
     GUI_UPDATE()
-    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    PRINT "O " + STR$(GUI_CANVAS_SCREEN_X(nullpunkt)) + " " + STR$(GUI_CANVAS_SCREEN_Y(nullpunkt))
     GUI_DRAW()
     FLIP()
 NEXT
@@ -277,7 +277,7 @@ lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
 DIM f AS INTEGER
 FOR f = 1 TO 2
     GUI_UPDATE()
-    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    PRINT "O " + STR$(GUI_CANVAS_SCREEN_X(nullpunkt)) + " " + STR$(GUI_CANVAS_SCREEN_Y(nullpunkt))
     GUI_DRAW()
     FLIP()
 NEXT
@@ -374,7 +374,7 @@ lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
 DIM f AS INTEGER
 FOR f = 1 TO 2
     GUI_UPDATE()
-    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    PRINT "O " + STR$(GUI_CANVAS_SCREEN_X(nullpunkt)) + " " + STR$(GUI_CANVAS_SCREEN_Y(nullpunkt))
     GUI_DRAW()
     FLIP()
 NEXT

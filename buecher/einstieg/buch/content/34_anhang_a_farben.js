@@ -77,7 +77,7 @@ module.exports = (H) => [
   H.h2("Wenn etwas nicht geht"),
 
   H.table([
-    [{ text: "RGB-Werte muessen 0..255 sein", mono: true }, "Ein Anteil ist zu groß geworden. Rechne die Endwerte einmal von Hand aus — gerundet wird, aber nicht geklemmt."],
+    [{ text: "RGB: die Werte muessen 0..255 sein", mono: true }, "Ein Anteil ist zu groß geworden. Rechne die Endwerte einmal von Hand aus — gerundet wird, aber nicht geklemmt."],
     ["Die Farbe stimmt nicht", "Ein Wert über 255. Rechne die Endwerte einmal von Hand aus."],
     ["Es wird gar nichts gezeichnet", "Die Farbe ist der Hintergrund. Oder es fehlt FLIP()."],
     ["Alles sieht grau aus", "Die drei Werte liegen zu nah beieinander. Farbe entsteht aus dem Unterschied."],

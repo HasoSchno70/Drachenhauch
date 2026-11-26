@@ -685,7 +685,7 @@ SUB knotenProtokollieren()
         DIM y AS INTEGER
         DIM b AS INTEGER
         DIM h AS INTEGER
-        (x, y, b, h) = GUI_TREE_ITEM_RECT(baum, n)
+        (x, y, b, h) = GUI_TREE_ITEM_SCREEN_RECT(baum, n)
         IF h > 0 THEN protokoll("lage knoten " + pfad + " " + STR$(x + 20) + " " + STR$(y + h \ 2))
     NEXT
 END SUB
@@ -693,7 +693,7 @@ END SUB
 DIM reiterLagenWar AS STRING : reiterLagenWar = ""
 
 ' Fuer Pruefungen: Kopf und Kreuz jedes Reiters, aus der Rechnung der
-' Laufzeit (GUI_TABCONTROL_ITEM_RECT; das Kreuz sitzt 12 vor dem Ende).
+' Laufzeit (GUI_TABCONTROL_ITEM_SCREEN_RECT; das Kreuz sitzt 12 vor dem Ende).
 SUB reiterProtokollieren()
     IF logDatei = "" THEN RETURN
     DIM zeilen AS ARRAY OF STRING : zeilen = []
@@ -703,7 +703,7 @@ SUB reiterProtokollieren()
         DIM y AS INTEGER
         DIM b AS INTEGER
         DIM h AS INTEGER
-        (x, y, b, h) = GUI_TABCONTROL_ITEM_RECT(tcMitte, k)
+        (x, y, b, h) = GUI_TABCONTROL_ITEM_SCREEN_RECT(tcMitte, k)
         ARRAY_PUSH(zeilen, "lage reiter " + STR$(k) + " " + STR$(x + b \ 2 - 8) + " " + STR$(y + h \ 2))
         ARRAY_PUSH(zeilen, "lage kreuz " + STR$(k) + " " + STR$(x + b - 12) + " " + STR$(y + h \ 2 + 1))
     NEXT
@@ -1500,7 +1500,7 @@ SUB vorlagenProtokollieren()
         DIM y AS INTEGER
         DIM bb AS INTEGER
         DIM hh AS INTEGER
-        (x, y, bb, hh) = GUI_LISTBOX_ITEM_RECT(vlListe, k)
+        (x, y, bb, hh) = GUI_LISTBOX_ITEM_SCREEN_RECT(vlListe, k)
         IF hh > 0 THEN protokoll("lage vorlage " + vlTitel[k] + " " + STR$(x + bb \ 2) + " " + STR$(y + hh \ 2))
     NEXT
 END SUB

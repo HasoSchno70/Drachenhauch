@@ -9,12 +9,12 @@ impl Gui {
     // --- Tabelle ---
     pub(super) fn tbl_mut(&mut self, h: i64, fn_: &str) -> Result<&mut TableState, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::Table { return Err(format!("{}: Widget ist keine Tabelle", fn_)); }
+        if w.kind != Kind::Table { return Err(format!("{}: das Widget ist kein GUI_TABLE", fn_)); }
         Ok(w.tbl.as_mut().unwrap())
     }
     pub(super) fn tbl_ref(&self, h: i64, fn_: &str) -> Result<&TableState, String> {
         let w = self.wdg(h, fn_)?;
-        if w.kind != Kind::Table { return Err(format!("{}: Widget ist keine Tabelle", fn_)); }
+        if w.kind != Kind::Table { return Err(format!("{}: das Widget ist kein GUI_TABLE", fn_)); }
         Ok(w.tbl.as_ref().unwrap())
     }
     pub fn table(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
@@ -655,11 +655,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Geometrie, mit der gezeichnet und getroffen wird (`table_geom`), samt
     /// Sortierung, Filter und Rollen. (0, 0, 0, 0), wenn ein Filter sie
     /// ausblendet. Wie GUI_LISTBOX_ITEM_RECT und GUI_TREE_ITEM_RECT.
-    pub fn table_row_rect(&self, h: i64, row: i64) -> Result<(i32, i32, i32, i32), String> {
-        let t = self.tbl_ref(h, "GUI_TABLE_ROW_RECT")?;
+    pub fn table_row_rect(&self, h: i64, row: i64, fn_: &str) -> Result<(i32, i32, i32, i32), String> {
+        let t = self.tbl_ref(h, fn_)?;
         let n = t.zeilen_zahl() as i64;
         if row < 0 || row >= n {
-            return Err(format!("GUI_TABLE_ROW_RECT: Zeile {} ausserhalb [0..{}]", row, n - 1));
+            return Err(format!("{}: Zeile {} ausserhalb [0..{}]", fn_, row, n - 1));
         }
         let ansicht = match (0..t.ansicht_len()).find(|&r| t.ansicht(r) == Some(row as usize)) {
             Some(r) => r as i32,

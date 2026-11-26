@@ -267,7 +267,7 @@ SUB dbLagen(r AS Reiter)
         DIM y AS INTEGER
         DIM b AS INTEGER
         DIM h AS INTEGER
-        (x, y, b, h) = GUI_LISTBOX_ITEM_RECT(a.lstTab, i)
+        (x, y, b, h) = GUI_LISTBOX_ITEM_SCREEN_RECT(a.lstTab, i)
         IF h > 0 THEN protokoll("lage dbtabelle " + GUI_LISTBOX_ITEM(a.lstTab, i) + " " + STR$(x + b \ 2) + " " + STR$(y + h \ 2))
     NEXT
     dbZellLagen("sp", a.gitSp, dbSpBreiten(a, GUI_GET_W(a.gitSp)))

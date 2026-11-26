@@ -797,7 +797,7 @@ text ||
 === eine zeichenflaeche in der teilflaeche zeigt, was das programm malt
 ' Eine Zeichenflaeche in einer abgerissenen Leiste aus Widgets des
 ' Gastfensters: GUI_CANVAS_BEGIN leiht das Gastfenster aus wie das Zeichnen
-' der Teilflaeche -- dazwischen nennt GUI_CANVAS_X/Y die Lage in ihr, und
+' der Teilflaeche -- dazwischen nennt GUI_CANVAS_SCREEN_X/Y die Lage in ihr, und
 ' der rote Kasten steht bei (60, 60) in der Teilflaeche, nicht im
 ' Hauptfenster. GUI_CANVAS_MOUSE sieht den Zeiger durch die Teilflaeche.
 IMPORT "helfer.dh"
@@ -855,7 +855,7 @@ WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 7000
     CLS(&H202830)
     GUI_DRAW()
     GUI_CANVAS_BEGIN(cv)
-    BOX(GUI_CANVAS_X(cv), GUI_CANVAS_Y(cv), GUI_CANVAS_X(cv) + 600, GUI_CANVAS_Y(cv) + 600, &HFF0000)
+    BOX(GUI_CANVAS_SCREEN_X(cv), GUI_CANVAS_SCREEN_Y(cv), GUI_CANVAS_SCREEN_X(cv) + 600, GUI_CANVAS_SCREEN_Y(cv) + 600, &HFF0000)
     GUI_CANVAS_END()
     FLIP()
 WEND

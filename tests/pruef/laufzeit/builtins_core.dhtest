@@ -71,7 +71,7 @@ PRINT SIGN(7.5)
 === sqr negative raises
 PRINT SQR(-1)
 --- fehler
-SQR von negativer Zahl
+SQR: erwartet eine Zahl >= 0
 
 === abs
 PRINT ABS(-7)
@@ -95,7 +95,7 @@ PRINT RGB(255, 128, 64)
 === rgb out of range raises
 PRINT RGB(300, 0, 0)
 --- fehler
-RGB-Werte muessen 0..255 sein
+RGB: die Werte muessen 0..255 sein
 
 === rgb nimmt kommazahlen und rundet (1)
 ' RGB/RGBA runden eine Kommazahl, statt sie abzulehnen.
@@ -127,7 +127,7 @@ PRINT RGB(x * 255 / 640, 0, 0)
 ' Gerundet heisst nicht geklemmt -- 255.6 wird 256 und ist zu gross.
 PRINT RGB(255.6, 0, 0)
 --- fehler
-RGB-Werte muessen 0..255 sein
+RGB: die Werte muessen 0..255 sein
 
 === sin string raises
 PRINT SIN("nope")

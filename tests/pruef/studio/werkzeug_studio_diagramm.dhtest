@@ -98,17 +98,17 @@ f.kuchen.Hinzufuegen("Milch", 2, RGB(200, 60, 60))
 f.kuchen.Setzen("legende", "rechts")
 f.kuchen.SetzenSchalter("prozent", TRUE)
 PRINT "werte "; f.kuchen.Anzahl()
-DIM wx AS INTEGER : wx = GUI_CANVAS_X(f.kuchen.Flaeche)
-DIM wy AS INTEGER : wy = GUI_CANVAS_Y(f.kuchen.Flaeche)
-PRINT "kuchen farbig "; farben(wx, wy, GUI_CANVAS_W(f.kuchen.Flaeche), GUI_CANVAS_H(f.kuchen.Flaeche)) > 4; " | obendrauf "; f.obendrauf > 0
+DIM wx AS INTEGER : wx = GUI_CANVAS_SCREEN_X(f.kuchen.Flaeche)
+DIM wy AS INTEGER : wy = GUI_CANVAS_SCREEN_Y(f.kuchen.Flaeche)
+PRINT "kuchen farbig "; farben(wx, wy, GUI_CANVAS_SCREEN_W(f.kuchen.Flaeche), GUI_CANVAS_SCREEN_H(f.kuchen.Flaeche)) > 4; " | obendrauf "; f.obendrauf > 0
 f.teil.balken.Hinzufuegen("A", 4)
 f.teil.balken.Hinzufuegen("B", 7)
-DIM bx AS INTEGER : bx = GUI_CANVAS_X(f.teil.balken.Flaeche)
-DIM by AS INTEGER : by = GUI_CANVAS_Y(f.teil.balken.Flaeche)
+DIM bx AS INTEGER : bx = GUI_CANVAS_SCREEN_X(f.teil.balken.Flaeche)
+DIM by AS INTEGER : by = GUI_CANVAS_SCREEN_Y(f.teil.balken.Flaeche)
 PRINT "seite 0: balken "; farben(bx, by, 150, 100) > 4
 GUI_TABCONTROL_SET_PAGE(f.reiter, 1)
-bx = GUI_CANVAS_X(f.teil.balken.Flaeche)
-by = GUI_CANVAS_Y(f.teil.balken.Flaeche)
+bx = GUI_CANVAS_SCREEN_X(f.teil.balken.Flaeche)
+by = GUI_CANVAS_SCREEN_Y(f.teil.balken.Flaeche)
 PRINT "seite 1: balken "; farben(bx, by, 150, 100) > 4
 PRINT "dunkel "; f.kuchen.studioHell
 GUI_THEME_PRESET("modern_light")
@@ -308,10 +308,10 @@ DIM img AS IMAGE : img = LOADIMAGE("schirm.png")
 DIM gesehen AS ARRAY OF INTEGER : gesehen = []
 DIM px AS INTEGER
 DIM py AS INTEGER
-DIM x0 AS INTEGER : x0 = GUI_CANVAS_X(nf.kuchen.Flaeche)
-DIM y0 AS INTEGER : y0 = GUI_CANVAS_Y(nf.kuchen.Flaeche)
-FOR py = y0 TO y0 + GUI_CANVAS_H(nf.kuchen.Flaeche) - 1 STEP 3
-    FOR px = x0 TO x0 + GUI_CANVAS_W(nf.kuchen.Flaeche) - 1 STEP 3
+DIM x0 AS INTEGER : x0 = GUI_CANVAS_SCREEN_X(nf.kuchen.Flaeche)
+DIM y0 AS INTEGER : y0 = GUI_CANVAS_SCREEN_Y(nf.kuchen.Flaeche)
+FOR py = y0 TO y0 + GUI_CANVAS_SCREEN_H(nf.kuchen.Flaeche) - 1 STEP 3
+    FOR px = x0 TO x0 + GUI_CANVAS_SCREEN_W(nf.kuchen.Flaeche) - 1 STEP 3
         DIM c AS INTEGER : c = GETPIXEL(img, px, py)
         IF ARRAY_INDEXOF(gesehen, c) < 0 THEN ARRAY_PUSH(gesehen, c)
     NEXT

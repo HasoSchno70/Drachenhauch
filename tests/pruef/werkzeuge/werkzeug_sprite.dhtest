@@ -61,7 +61,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -256,7 +256,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -450,7 +450,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -649,7 +649,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -852,7 +852,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -1045,7 +1045,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -1238,7 +1238,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -1435,7 +1435,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -1631,7 +1631,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -1833,7 +1833,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -2034,7 +2034,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -2230,7 +2230,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -2452,7 +2452,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -2676,7 +2676,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -2893,7 +2893,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -3089,7 +3089,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -3323,7 +3323,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -3548,7 +3548,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -3741,7 +3741,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -3938,7 +3938,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -4144,7 +4144,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -4339,7 +4339,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -4544,7 +4544,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -4768,7 +4768,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -4989,7 +4989,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -5226,7 +5226,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -5459,7 +5459,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -5697,7 +5697,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -5933,7 +5933,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -6145,7 +6145,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -6352,7 +6352,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -6551,7 +6551,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -6750,7 +6750,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -6949,7 +6949,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -7148,7 +7148,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -7351,7 +7351,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -7546,7 +7546,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -7738,7 +7738,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -7934,7 +7934,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -8146,7 +8146,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -8362,7 +8362,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -8577,7 +8577,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -8806,7 +8806,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -9045,7 +9045,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -9268,7 +9268,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -9492,7 +9492,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -9690,7 +9690,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -9816,7 +9816,7 @@ END FUNCTION
 SUB prFall()
     prKnopf(2, GUI_GET_X(bBildNeu), prOy() + GUI_GET_Y(bBildNeu), 78)
     prKnopf(6, GUI_GET_X(bBildNeu), prOy() + GUI_GET_Y(bBildNeu), 78)
-    prKlick(12, GUI_CANVAS_X(bildLeiste) + 6 + 30, GUI_CANVAS_Y(bildLeiste) + 6 + 30)
+    prKlick(12, GUI_CANVAS_SCREEN_X(bildLeiste) + 6 + 30, GUI_CANVAS_SCREEN_Y(bildLeiste) + 6 + 30)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -9883,7 +9883,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2
@@ -10010,7 +10010,7 @@ SUB prFall()
     GUI_SET_PICKED_COLOR(cp, &H00FF00)
     prKlick(2, prMx(4), prMy(4))
     prKlick(14, prMx(8), prMy(8))
-    prKlick(22, GUI_CANVAS_X(zuletztFl) + 26 + 10, GUI_CANVAS_Y(zuletztFl) + 12)
+    prKlick(22, GUI_CANVAS_SCREEN_X(zuletztFl) + 26 + 10, GUI_CANVAS_SCREEN_Y(zuletztFl) + 12)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -10077,7 +10077,7 @@ SUB prStrg(f AS INTEGER, code AS INTEGER)
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prMx(x AS INTEGER) AS INTEGER
     RETURN ox + x * zoom + zoom \ 2

@@ -14,7 +14,7 @@ IMPORT "net"
 DIM l AS NET_LISTENER
 l = NET_TCP_LISTEN(99999)
 --- fehler
-NET_TCP_LISTEN: port out of range: 99999
+NET_TCP_LISTEN: Port 99999 liegt ausserhalb 0..65535
 
 === tcp accept non blocking returns nil
 IMPORT "net"
@@ -271,7 +271,7 @@ IMPORT "net"
 DIM s AS NET_UDP
 s = NET_UDP_BIND(70000)
 --- fehler
-NET_UDP_BIND: port out of range: 70000
+NET_UDP_BIND: Port 70000 liegt ausserhalb 0..65535
 
 === udp send validates socket
 IMPORT "net"

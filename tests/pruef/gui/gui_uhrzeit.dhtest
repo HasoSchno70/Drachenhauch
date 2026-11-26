@@ -159,4 +159,4 @@ END TRY
 --- umgebung
 DHRT_FRAMES=1
 --- enthaelt
-kein Uhrzeitwaehler
+kein GUI_TIMEPICKER

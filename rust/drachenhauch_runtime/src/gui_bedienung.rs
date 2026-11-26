@@ -1012,7 +1012,7 @@ impl Gui {
     /// Feld darf getippt werden, auch etwas, das nicht in der Liste steht.
     pub fn dropdown_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_DROPDOWN_SET")?;
-        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_SET: Widget ist keine Klappliste (GUI_DROPDOWN)".into()); }
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_SET: das Widget ist kein GUI_DROPDOWN".into()); }
         match key.to_lowercase().as_str() {
             "bearbeitbar" | "editable" => {
                 let an = wert != 0.0;
@@ -1029,7 +1029,7 @@ impl Gui {
     }
     pub fn dropdown_placeholder(&mut self, h: i64, text: String) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_DROPDOWN_PLACEHOLDER")?;
-        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_PLACEHOLDER: Widget ist keine Klappliste (GUI_DROPDOWN)".into()); }
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_PLACEHOLDER: das Widget ist kein GUI_DROPDOWN".into()); }
         w.placeholder = text;
         Ok(())
     }

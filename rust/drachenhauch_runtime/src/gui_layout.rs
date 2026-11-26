@@ -33,7 +33,7 @@ impl Gui {
     }
     pub(super) fn layout_mut(&mut self, h: i64, fn_: &str) -> Result<&mut LayoutState, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::Layout { return Err(format!("{}: das Widget ist kein Layout (GUI_LAYOUT)", fn_)); }
+        if w.kind != Kind::Layout { return Err(format!("{}: das Widget ist kein GUI_LAYOUT", fn_)); }
         w.layout.as_deref_mut().ok_or_else(|| format!("{}: Layout ohne Zustand", fn_))
     }
     /// Enthaelt Layout `li` (direkt oder tiefer) den Index `ziel`?
@@ -271,7 +271,7 @@ impl Gui {
     pub fn layout_min(&self, h: i64) -> Result<(i64, i64), String> {
         let (wi, i) = Self::dec_widget(h);
         let w = self.wdg(h, "GUI_LAYOUT_MIN_W")?;
-        if w.kind != Kind::Layout { return Err("GUI_LAYOUT_MIN_W: Widget ist kein Layout-Behaelter".into()); }
+        if w.kind != Kind::Layout { return Err("GUI_LAYOUT_MIN_W: das Widget ist kein GUI_LAYOUT".into()); }
         let (mw, mh) = self.min_mass(wi, i, 0);
         Ok((self.unsk(mw) as i64, self.unsk(mh) as i64))
     }

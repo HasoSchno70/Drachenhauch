@@ -33,7 +33,7 @@ SCHREIBEN
 === enum name verlangt ein enum
 PRINT ENUM_NAME(5, 1)
 --- fehler
-ENUM_NAME: erwartet ein ENUM als erstes Argument, bekommen INTEGER
+ENUM_NAME: erwartet ein ENUM als erstes Argument, erhalten INTEGER
 
 === schritt auf variable
 DIM i AS INTEGER

@@ -54,7 +54,7 @@ DHRT_FRAMES=1
 --- enthaelt
 Knopfart 'knallrot' gibt es nicht
 bekannt sind: standard, primaer, erfolg, warnung, gefahr, umriss, flach, link
-kein Knopf
+kein GUI_BUTTON
 hover/pressed
 
 === gefuellte arten haben ihre farbe, umriss und flach keine flaeche

@@ -170,7 +170,7 @@ e 33 1 261 0 0 0
 
 === ein klick setzt den cursor
 ' Die Zelle (1,5) liegt an einer Stelle, die erst das Fenster kennt -- die
-' Aufnahme entsteht darum im dritten Bild aus GUI_CANVAS_X/Y des Gitters.
+' Aufnahme entsteht darum im dritten Bild aus GUI_CANVAS_SCREEN_X/Y des Gitters.
 SET_WINDOW_POS(-3000, -3000)
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
 DIM prFlag AS STRING : prFlag = ""
@@ -194,8 +194,8 @@ END FUNCTION
 --- programm ../../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach FLIP()
 IF bildNr = 3 THEN
-    DIM x AS INTEGER : x = GUI_CANVAS_X(gitter) + RH_W + 1 * CELL_W + CELL_W \ 2
-    DIM y AS INTEGER : y = GUI_CANVAS_Y(gitter) + HDR_H + 5 * ROW_H + ROW_H \ 2
+    DIM x AS INTEGER : x = GUI_CANVAS_SCREEN_X(gitter) + RH_W + 1 * CELL_W + CELL_W \ 2
+    DIM y AS INTEGER : y = GUI_CANVAS_SCREEN_Y(gitter) + HDR_H + 5 * ROW_H + ROW_H \ 2
     DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c 7" + CHR$(10)
     t = t + "e 0 7 0 0 0 0" + CHR$(10)
     t = t + "e 5 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
@@ -378,8 +378,8 @@ END FUNCTION
 --- einschub nach FLIP()
 IF bildNr = 3 THEN
     CLIPBOARD_SET("Refrain")
-    DIM prOx AS INTEGER : prOx = GUI_CANVAS_X(gitter) - GUI_GET_X(gitter)
-    DIM prOy AS INTEGER : prOy = GUI_CANVAS_Y(gitter) - GUI_GET_Y(gitter)
+    DIM prOx AS INTEGER : prOx = GUI_CANVAS_SCREEN_X(gitter) - GUI_GET_X(gitter)
+    DIM prOy AS INTEGER : prOy = GUI_CANVAS_SCREEN_Y(gitter) - GUI_GET_Y(gitter)
     DIM x AS INTEGER : x = prOx + GUI_GET_X(bPatUmb) + GUI_GET_W(bPatUmb) \ 2
     DIM y AS INTEGER : y = prOy + GUI_GET_Y(bPatUmb) + GUI_GET_H(bPatUmb) \ 2
     DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c 12" + CHR$(10)
@@ -435,8 +435,8 @@ IF bildNr = 3 THEN
     order[1] = 1 : orderAnz = 2 : orderAnzeigen()
     patternWaehlen(0)
     prMerke("vorher pattern " + STR$(patAkt))
-    DIM x AS INTEGER : x = GUI_CANVAS_X(uebersicht) + 4 + 1 * (KACHEL_B + 6) + KACHEL_B \ 2
-    DIM y AS INTEGER : y = GUI_CANVAS_Y(uebersicht) + GUI_CANVAS_H(uebersicht) \ 2
+    DIM x AS INTEGER : x = GUI_CANVAS_SCREEN_X(uebersicht) + 4 + 1 * (KACHEL_B + 6) + KACHEL_B \ 2
+    DIM y AS INTEGER : y = GUI_CANVAS_SCREEN_Y(uebersicht) + GUI_CANVAS_SCREEN_H(uebersicht) \ 2
     DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c 5" + CHR$(10)
     t = t + "e 0 7 0 0 0 0" + CHR$(10)
     t = t + "e 5 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)

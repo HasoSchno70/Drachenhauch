@@ -4677,9 +4677,21 @@
    "module": "gui"
   },
   {
+   "name": "GUI_CANVAS_SCREEN_H",
+   "kind": "core",
+   "signature": "GUI_CANVAS_SCREEN_H(canvas)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_CANVAS_W",
    "kind": "core",
    "signature": "GUI_CANVAS_W(canvas)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CANVAS_SCREEN_W",
+   "kind": "core",
+   "signature": "GUI_CANVAS_SCREEN_W(canvas)",
    "module": "gui"
   },
   {
@@ -4689,9 +4701,21 @@
    "module": "gui"
   },
   {
+   "name": "GUI_CANVAS_SCREEN_X",
+   "kind": "core",
+   "signature": "GUI_CANVAS_SCREEN_X(canvas)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_CANVAS_Y",
    "kind": "core",
    "signature": "GUI_CANVAS_Y(canvas)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CANVAS_SCREEN_Y",
+   "kind": "core",
+   "signature": "GUI_CANVAS_SCREEN_Y(canvas)",
    "module": "gui"
   },
   {
@@ -6003,9 +6027,21 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABCONTROL_ITEM_SCREEN_RECT",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL_ITEM_SCREEN_RECT(tc, page) AS TUPLE",
+   "module": "gui"
+  },
+  {
    "name": "GUI_LISTBOX_ITEM_RECT",
    "kind": "core",
    "signature": "GUI_LISTBOX_ITEM_RECT(lb, i) AS TUPLE",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_ITEM_SCREEN_RECT",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_ITEM_SCREEN_RECT(lb, i) AS TUPLE",
    "module": "gui"
   },
   {
@@ -7929,6 +7965,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TREE_EXPANDED",
+   "kind": "core",
+   "signature": "GUI_TREE_EXPANDED(tree, node) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TREE_ICON",
    "kind": "core",
    "signature": "GUI_TREE_ICON(tree, node, image)",
@@ -7947,15 +7989,45 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_ROW_SCREEN_RECT",
+   "kind": "core",
+   "signature": "GUI_TABLE_ROW_SCREEN_RECT(tbl, row) AS TUPLE",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TREE_ITEM_RECT",
    "kind": "core",
    "signature": "GUI_TREE_ITEM_RECT(tree, node) AS TUPLE",
    "module": "gui"
   },
   {
+   "name": "GUI_TREE_ITEM_SCREEN_RECT",
+   "kind": "core",
+   "signature": "GUI_TREE_ITEM_SCREEN_RECT(tree, node) AS TUPLE",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TREE_LABEL",
    "kind": "core",
    "signature": "GUI_TREE_LABEL(tree, node)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_COUNT",
+   "kind": "core",
+   "signature": "GUI_TREE_COUNT(tree) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_SET_LABEL",
+   "kind": "core",
+   "signature": "GUI_TREE_SET_LABEL(tree, node, label)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_REMOVE",
+   "kind": "core",
+   "signature": "GUI_TREE_REMOVE(tree, node)",
    "module": "gui"
   },
   {

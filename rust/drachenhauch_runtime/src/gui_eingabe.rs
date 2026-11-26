@@ -1288,7 +1288,7 @@ impl Gui {
         };
         let pfeil = if self.windows[wi].widgets[i].frei { self.sk(DD_PFEIL_B) } else { 0 };
         let (sl, sr) = self.ti_rand(&self.windows[wi].widgets[i]);
-        let inner = (fw - 10 - pfeil - sl - sr).max(1);
+        let inner = (fw - 2 * self.ta_pad() - pfeil - sl - sr).max(1);
         let mut scroll = scroll;
         if caret_px - scroll > inner { scroll = caret_px - inner; }
         if caret_px - scroll < 0 { scroll = caret_px; }
@@ -1411,9 +1411,18 @@ impl Gui {
     /// Breite, auf die ein Textbereich umbricht (0 = kein Umbruch).
     /// Sichtbare Breite fuer den Text eines Textbereichs (ohne Rand,
     /// Nummernspalte und Rollbalken) -- gegen sie richtet `ta_versatz` aus.
+    /// Innenabstand des Textbereichs (logisch 5) -- EINE Quelle fuer
+    /// Zeichnen, Treffer, Rollen und Schreibmarke. Bis 2026.53 stand an rund
+    /// 15 Stellen eine rohe 5: bei GUI_SCALE(2) klebte der Text am Rand.
+    pub(super) fn ta_pad(&self) -> i32 { self.sk(5) }
+    /// Wie viele Zeilen in einen Textbereich der Hoehe `h` passen (mindestens
+    /// eine) -- EINE Quelle statt sechs nachgefuehrter Rechnungen.
+    pub(super) fn ta_sicht(&self, g: &Graphics, wdg: &Widget, h: i32) -> i32 {
+        ((h - 2 * self.ta_pad()) / self.ta_line_h(g, wdg).max(1)).max(1)
+    }
     pub(super) fn ta_innen(&self, g: &Graphics, wdg: &Widget, zeilen: usize) -> i32 {
         let gutter = self.ta_gutter(g, wdg, zeilen);
-        (wdg.w - 2 * 5 - gutter - self.sk(8)).max(self.sk(20))
+        (wdg.w - 2 * self.ta_pad() - gutter - self.sk(8)).max(self.sk(20))
     }
 
     /// Wie weit eine Zeile des Textbereichs nach rechts rueckt: rechts
@@ -1434,8 +1443,7 @@ impl Gui {
 
     pub(super) fn ta_breite(&self, g: &Graphics, wdg: &Widget, zeilen: usize) -> i32 {
         if !wdg.umbruch { return 0; }
-        let gutter = self.ta_gutter(g, wdg, zeilen);
-        (wdg.w - 2 * 5 - gutter - self.sk(8)).max(self.sk(20))
+        self.ta_innen(g, wdg, zeilen)
     }
 
     /// Was ein Textbereich ueber Einrueckung weiss -- herausgeloest, weil der
@@ -1623,7 +1631,7 @@ impl Gui {
                         -> Vec<(usize, i32, i32, i32, i32)> {
         let mut v = Vec::new();
         if wdg.hinweise.is_empty() { return v; }
-        let pad = 5;
+        let pad = self.ta_pad();
         let lh = self.ta_line_h(g, wdg);
         let gutter = self.ta_gutter(g, wdg, starts.len());
         let tx0 = ax + pad + gutter - wdg.scroll_x;
@@ -1655,7 +1663,7 @@ impl Gui {
                          -> Vec<(usize, i32, i32, i32)> {
         let mut raus = Vec::new();
         if wdg.farbfelder.is_empty() { return raus; }
-        let pad = 5;
+        let pad = self.ta_pad();
         let lh = self.ta_line_h(g, wdg);
         let gutter = self.ta_gutter(g, wdg, starts_len);
         let tx0 = ax + pad + gutter - wdg.scroll_x;
@@ -1916,11 +1924,10 @@ impl Gui {
         }
         let z = self.ta_zerlegt(h, &wd.text);
         let (chars, starts) = (&z.0, &z.1);
-        // Dieselbe Rechnung wie beim Zeichnen (pad = 5, ta_line_h) -- liefe
-        // sie auseinander, faerbte das Programm einen anderen Ausschnitt, als
-        // zu sehen ist.
-        let lh = self.ta_line_h(g, wd);
-        let sicht = ((wd.h - 2 * 5) / lh).max(1);
+        // Dieselbe Rechnung wie beim Zeichnen (ta_sicht) -- liefe sie
+        // auseinander, faerbte das Programm einen anderen Ausschnitt, als zu
+        // sehen ist.
+        let sicht = self.ta_sicht(g, wd, wd.h);
         let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
         let erste_row = wd.scroll.clamp(0, (rows.len() as i32 - 1).max(0)) as usize;
         let letzte_row = (erste_row + sicht as usize).min(rows.len());

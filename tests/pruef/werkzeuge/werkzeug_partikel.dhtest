@@ -101,8 +101,8 @@ END SUB
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
-    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
-    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prOx = GUI_CANVAS_SCREEN_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_SCREEN_Y(flaeche) - GUI_GET_Y(flaeche)
     prFall()
 END IF
 IF prStart >= 0 THEN prProbe(prBild - prStart)
@@ -205,8 +205,8 @@ END SUB
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
-    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
-    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prOx = GUI_CANVAS_SCREEN_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_SCREEN_Y(flaeche) - GUI_GET_Y(flaeche)
     prFall()
 END IF
 IF prStart >= 0 THEN prProbe(prBild - prStart)
@@ -311,8 +311,8 @@ END SUB
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
-    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
-    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prOx = GUI_CANVAS_SCREEN_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_SCREEN_Y(flaeche) - GUI_GET_Y(flaeche)
     prFall()
 END IF
 IF prStart >= 0 THEN prProbe(prBild - prStart)
@@ -419,8 +419,8 @@ END SUB
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
-    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
-    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prOx = GUI_CANVAS_SCREEN_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_SCREEN_Y(flaeche) - GUI_GET_Y(flaeche)
     prFall()
 END IF
 IF prStart >= 0 THEN prProbe(prBild - prStart)
@@ -526,8 +526,8 @@ END SUB
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
-    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
-    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prOx = GUI_CANVAS_SCREEN_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_SCREEN_Y(flaeche) - GUI_GET_Y(flaeche)
     prFall()
 END IF
 IF prStart >= 0 THEN prProbe(prBild - prStart)
@@ -632,8 +632,8 @@ END SUB
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
-    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
-    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prOx = GUI_CANVAS_SCREEN_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_SCREEN_Y(flaeche) - GUI_GET_Y(flaeche)
     prFall()
 END IF
 IF prStart >= 0 THEN prProbe(prBild - prStart)
@@ -739,8 +739,8 @@ END SUB
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
-    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
-    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prOx = GUI_CANVAS_SCREEN_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_SCREEN_Y(flaeche) - GUI_GET_Y(flaeche)
     prFall()
 END IF
 IF prStart >= 0 THEN prProbe(prBild - prStart)
@@ -841,8 +841,8 @@ END SUB
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
-    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
-    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prOx = GUI_CANVAS_SCREEN_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_SCREEN_Y(flaeche) - GUI_GET_Y(flaeche)
     prFall()
 END IF
 IF prStart >= 0 THEN prProbe(prBild - prStart)
@@ -949,8 +949,8 @@ END SUB
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
-    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
-    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prOx = GUI_CANVAS_SCREEN_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_SCREEN_Y(flaeche) - GUI_GET_Y(flaeche)
     prFall()
 END IF
 IF prStart >= 0 THEN prProbe(prBild - prStart)
@@ -1073,8 +1073,8 @@ END SUB
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
-    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
-    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prOx = GUI_CANVAS_SCREEN_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_SCREEN_Y(flaeche) - GUI_GET_Y(flaeche)
     prFall()
 END IF
 IF prStart >= 0 THEN prProbe(prBild - prStart)
@@ -1180,8 +1180,8 @@ END SUB
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN
-    prOx = GUI_CANVAS_X(flaeche) - GUI_GET_X(flaeche)
-    prOy = GUI_CANVAS_Y(flaeche) - GUI_GET_Y(flaeche)
+    prOx = GUI_CANVAS_SCREEN_X(flaeche) - GUI_GET_X(flaeche)
+    prOy = GUI_CANVAS_SCREEN_Y(flaeche) - GUI_GET_Y(flaeche)
     prFall()
 END IF
 IF prStart >= 0 THEN prProbe(prBild - prStart)

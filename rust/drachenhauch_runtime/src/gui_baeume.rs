@@ -9,12 +9,12 @@ impl Gui {
     // --- Tree (Baum-Ansicht) ------------------------------------------------
     pub(super) fn tree_mut(&mut self, h: i64, fn_: &str) -> Result<&mut TreeState, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::Tree { return Err(format!("{}: Widget ist kein Baum", fn_)); }
+        if w.kind != Kind::Tree { return Err(format!("{}: das Widget ist kein GUI_TREE", fn_)); }
         Ok(w.tree.as_mut().unwrap())
     }
     pub(super) fn tree_ref(&self, h: i64, fn_: &str) -> Result<&TreeState, String> {
         let w = self.wdg(h, fn_)?;
-        if w.kind != Kind::Tree { return Err(format!("{}: Widget ist kein Baum", fn_)); }
+        if w.kind != Kind::Tree { return Err(format!("{}: das Widget ist kein GUI_TREE", fn_)); }
         Ok(w.tree.as_ref().unwrap())
     }
     pub fn tree(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
@@ -119,6 +119,75 @@ impl Gui {
         }
         Ok(t.nodes[node as usize].label.clone())
     }
+    /// GUI_TREE_COUNT: wie viele Knoten der Baum hat (auch zugeklappte).
+    pub fn tree_count(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tree_ref(h, "GUI_TREE_COUNT")?.nodes.len() as i64)
+    }
+    /// GUI_TREE_SET_LABEL: einen Knoten umbenennen (wie F2 mit "bearbeitbar").
+    pub fn tree_set_label(&mut self, h: i64, node: i64, label: String) -> Result<(), String> {
+        let t = self.tree_mut(h, "GUI_TREE_SET_LABEL")?;
+        if t.datei.is_some() { return Err("GUI_TREE_SET_LABEL: beim Dateibaum heissen die Knoten wie ihre Dateien".into()); }
+        if node < 0 || node >= t.nodes.len() as i64 {
+            return Err(format!("GUI_TREE_SET_LABEL: ungueltige Knoten-id {}", node));
+        }
+        t.nodes[node as usize].label = label;
+        Ok(())
+    }
+    /// GUI_TREE_EXPANDED: ist der Knoten aufgeklappt?
+    pub fn tree_expanded(&self, h: i64, node: i64) -> Result<bool, String> {
+        let t = self.tree_ref(h, "GUI_TREE_EXPANDED")?;
+        if node < 0 || node >= t.nodes.len() as i64 {
+            return Err(format!("GUI_TREE_EXPANDED: ungueltige Knoten-id {}", node));
+        }
+        Ok(t.nodes[node as usize].expanded)
+    }
+    /// GUI_TREE_REMOVE: einen Knoten samt allem darunter entfernen. Die
+    /// Nummern dahinter ruecken auf (wie GUI_LISTBOX_REMOVE); Auswahl, Haken
+    /// und Aufklappen wandern mit, eine Auswahl im Entfernten faellt weg.
+    pub fn tree_remove(&mut self, h: i64, node: i64) -> Result<(), String> {
+        let t = self.tree_mut(h, "GUI_TREE_REMOVE")?;
+        if t.datei.is_some() { return Err("GUI_TREE_REMOVE: der Dateibaum liest seine Knoten selbst -- GUI_FILETREE_REFRESH".into()); }
+        let n = t.nodes.len();
+        if node < 0 || node as usize >= n {
+            return Err(format!("GUI_TREE_REMOVE: ungueltige Knoten-id {}", node));
+        }
+        // Weg: der Knoten und alles, dessen Elternkette ihn trifft. Eltern
+        // stehen immer vor ihren Kindern (GUI_TREE_ADD), ein Durchgang reicht.
+        let mut weg = vec![false; n];
+        weg[node as usize] = true;
+        for i in 0..n {
+            let p = t.nodes[i].parent;
+            if p >= 0 && weg[p as usize] { weg[i] = true; }
+        }
+        let mut neu_nr = vec![-1i32; n];
+        let mut k = 0i32;
+        for i in 0..n { if !weg[i] { neu_nr[i] = k; k += 1; } }
+        let um = |x: i32| if x >= 0 && (x as usize) < n { neu_nr[x as usize] } else { -1 };
+        let alt = std::mem::take(&mut t.nodes);
+        for (i, mut nd) in alt.into_iter().enumerate() {
+            if weg[i] { continue; }
+            nd.parent = um(nd.parent);
+            t.nodes.push(nd);
+        }
+        let behalte = |v: &mut Vec<bool>| { let a = std::mem::take(v); *v = a.into_iter().enumerate().filter(|(i, _)| *i < n && !weg[*i]).map(|(_, b)| b).collect(); };
+        behalte(&mut t.sel);
+        behalte(&mut t.checks);
+        let a = std::mem::take(&mut t.auf_t);
+        t.auf_t = a.into_iter().enumerate().filter(|(i, _)| *i < n && !weg[*i]).map(|(_, b)| b).collect();
+        t.selected = um(t.selected);
+        t.hover = um(t.hover);
+        t.anker = um(t.anker);
+        t.edit = None;
+        t.bearbeitet = None;
+        // Hat der Elternknoten noch Kinder?
+        for i in 0..t.nodes.len() { t.nodes[i].has_children = false; }
+        for i in 0..t.nodes.len() {
+            let p = t.nodes[i].parent;
+            if p >= 0 { t.nodes[p as usize].has_children = true; }
+        }
+        t.sync();
+        Ok(())
+    }
     pub fn tree_expand(&mut self, h: i64, node: i64, flag: bool) -> Result<(), String> {
         let t = self.tree_mut(h, "GUI_TREE_EXPAND")?;
         if node < 0 || node >= t.nodes.len() as i64 {
@@ -171,14 +240,14 @@ impl Gui {
     }
     pub(super) fn ft_mut(&mut self, h: i64, fn_: &str) -> Result<&mut TreeState, String> {
         let t = self.tree_mut(h, fn_)?;
-        if t.datei.is_none() { return Err(format!("{}: Widget ist kein Dateibaum (GUI_FILETREE)", fn_)); }
+        if t.datei.is_none() { return Err(format!("{}: das Widget ist kein GUI_FILETREE", fn_)); }
         Ok(t)
     }
     pub(super) fn ft_ref(&self, h: i64, fn_: &str) -> Result<(&TreeState, &DateiBaum), String> {
         let t = self.tree_ref(h, fn_)?;
         match t.datei.as_deref() {
             Some(d) => Ok((t, d)),
-            None => Err(format!("{}: Widget ist kein Dateibaum (GUI_FILETREE)", fn_)),
+            None => Err(format!("{}: das Widget ist kein GUI_FILETREE", fn_)),
         }
     }
     /// Rueckstriche zu Schraegstrichen, kein Trennzeichen am Ende -- in EINER
@@ -461,12 +530,12 @@ impl Gui {
     }
     pub(super) fn tc_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::TabControl { return Err(format!("{}: Widget ist kein Reiterwerk (GUI_TABCONTROL)", fn_)); }
+        if w.kind != Kind::TabControl { return Err(format!("{}: das Widget ist kein GUI_TABCONTROL", fn_)); }
         Ok(w)
     }
     pub(super) fn tc_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
         let w = self.wdg(h, fn_)?;
-        if w.kind != Kind::TabControl { return Err(format!("{}: Widget ist kein Reiterwerk (GUI_TABCONTROL)", fn_)); }
+        if w.kind != Kind::TabControl { return Err(format!("{}: das Widget ist kein GUI_TABCONTROL", fn_)); }
         Ok(w)
     }
     /// Eine Seite anhaengen -- liefert ihre Nummer.
@@ -546,12 +615,12 @@ impl Gui {
     }
     pub(super) fn akk_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::Accordion { return Err(format!("{}: Widget ist kein Akkordeon (GUI_ACCORDION)", fn_)); }
+        if w.kind != Kind::Accordion { return Err(format!("{}: das Widget ist kein GUI_ACCORDION", fn_)); }
         Ok(w)
     }
     pub(super) fn akk_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
         let w = self.wdg(h, fn_)?;
-        if w.kind != Kind::Accordion { return Err(format!("{}: Widget ist kein Akkordeon (GUI_ACCORDION)", fn_)); }
+        if w.kind != Kind::Accordion { return Err(format!("{}: das Widget ist kein GUI_ACCORDION", fn_)); }
         Ok(w)
     }
     pub(super) fn akk_nr(w: &Widget, i: i64, fn_: &str) -> Result<usize, String> {
@@ -767,12 +836,12 @@ impl Gui {
     }
     pub(super) fn wz_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::Wizard { return Err(format!("{}: Widget ist kein Assistent (GUI_WIZARD)", fn_)); }
+        if w.kind != Kind::Wizard { return Err(format!("{}: das Widget ist kein GUI_WIZARD", fn_)); }
         Ok(w)
     }
     pub(super) fn wz_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
         let w = self.wdg(h, fn_)?;
-        if w.kind != Kind::Wizard { return Err(format!("{}: Widget ist kein Assistent (GUI_WIZARD)", fn_)); }
+        if w.kind != Kind::Wizard { return Err(format!("{}: das Widget ist kein GUI_WIZARD", fn_)); }
         Ok(w)
     }
     pub fn wizard_add(&mut self, h: i64, titel: String) -> Result<i64, String> {
@@ -1223,13 +1292,13 @@ impl Gui {
     /// `tc_koepfe`, derselben Rechnung wie Zeichnen und Klick. Gebraucht fuer
     /// Pruefungen mit echten Klicks (das Studio protokolliert damit seine
     /// Reiter).
-    pub fn tabcontrol_item_rect(&self, h: i64, seite: i64) -> Result<(i32, i32, i32, i32), String> {
-        let w = self.wdg(h, "GUI_TABCONTROL_ITEM_RECT")?;
+    pub fn tabcontrol_item_rect(&self, h: i64, seite: i64, fn_: &str) -> Result<(i32, i32, i32, i32), String> {
+        let w = self.wdg(h, fn_)?;
         if w.kind != Kind::TabControl {
-            return Err("GUI_TABCONTROL_ITEM_RECT: Widget ist kein Reiterwerk".into());
+            return Err(format!("{}: das Widget ist kein GUI_TABCONTROL", fn_));
         }
         if seite < 0 || seite as usize >= w.items.len() {
-            return Err(format!("GUI_TABCONTROL_ITEM_RECT: Seite {} ausserhalb [0..{}]", seite, w.items.len() as i64 - 1));
+            return Err(format!("{}: Seite {} ausserhalb [0..{}]", fn_, seite, w.items.len() as i64 - 1));
         }
         let (wi, _) = Self::dec_widget(h);
         let (ax, ay, bw, _) = self.abs_rect(wi, w);
@@ -1242,11 +1311,11 @@ impl Gui {
     /// Beschriftung (hinter Einzug und Dreieck). Aus derselben Rechnung wie
     /// der Klick (`tree_press`). Ein Knoten unter einem zugeklappten liefert
     /// (0, 0, 0, 0). Gebraucht fuer Pruefungen mit echten Klicks.
-    pub fn tree_item_rect(&self, h: i64, node: i64) -> Result<(i32, i32, i32, i32), String> {
-        let w = self.wdg(h, "GUI_TREE_ITEM_RECT")?;
-        let t = match w.tree.as_ref() { Some(t) if w.kind == Kind::Tree => t, _ => return Err("GUI_TREE_ITEM_RECT: Widget ist kein Baum".into()) };
+    pub fn tree_item_rect(&self, h: i64, node: i64, fn_: &str) -> Result<(i32, i32, i32, i32), String> {
+        let w = self.wdg(h, fn_)?;
+        let t = match w.tree.as_ref() { Some(t) if w.kind == Kind::Tree => t, _ => return Err(format!("{}: das Widget ist kein GUI_TREE", fn_)) };
         if node < 0 || node as usize >= t.nodes.len() {
-            return Err(format!("GUI_TREE_ITEM_RECT: Knoten {} ausserhalb [0..{}]", node, t.nodes.len() as i64 - 1));
+            return Err(format!("{}: Knoten {} ausserhalb [0..{}]", fn_, node, t.nodes.len() as i64 - 1));
         }
         let (wi, _) = Self::dec_widget(h);
         let vis = Self::tree_visible(t);
@@ -1383,12 +1452,12 @@ impl Gui {
     }
     pub(super) fn tp_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::TimePicker { return Err(format!("{}: Widget ist kein Uhrzeitwaehler (GUI_TIMEPICKER)", fn_)); }
+        if w.kind != Kind::TimePicker { return Err(format!("{}: das Widget ist kein GUI_TIMEPICKER", fn_)); }
         Ok(w)
     }
     pub fn time_get(&self, h: i64) -> Result<String, String> {
         let w = self.wdg(h, "GUI_TIME")?;
-        if w.kind != Kind::TimePicker { return Err("GUI_TIME: Widget ist kein Uhrzeitwaehler (GUI_TIMEPICKER)".into()); }
+        if w.kind != Kind::TimePicker { return Err("GUI_TIME: das Widget ist kein GUI_TIMEPICKER".into()); }
         Ok(format!("{:02}:{:02}:{:02}", w.zeit[0], w.zeit[1], w.zeit[2]))
     }
     pub fn set_time(&mut self, h: i64, t: &str) -> Result<(), String> {

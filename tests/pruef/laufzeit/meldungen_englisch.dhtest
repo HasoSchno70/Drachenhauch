@@ -132,7 +132,7 @@ IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 Runtime error in p.dh:2: GUI_SCALE: the factor must be between 0.5 and 4.0 -- usage: GUI_SCALE(factor)
 Runtime error in p.dh:2: GUI_TEXTAREA_SET: the widget is not a GUI_TEXTAREA
-Runtime error in p.dh:2: GUI_TABLE_SORT: widget is not a table
+Runtime error in p.dh:2: GUI_TABLE_SORT: the widget is not a GUI_TABLE
 p.dh:1: Parse error (13): There is no PRINT USING -- PRINT FORMAT$(value, "%6.2f") or f"{value:.2f}"
 Runtime error in p.dh:2: Access to a global variable that has not been set yet. Is this running as a task (`dhrt call` / TASK_START)? Then that is expected: the main program does NOT run then, so no global is set -- not even a CONST whose value is only known at run time (one with a fixed value like `CONST WIDTH = 640` is inserted by the compiler). Pass the function what it needs as parameters. In a normal run this means: the DIM of 'g' has not run yet -- is it further down in the program than the place that uses it?
 

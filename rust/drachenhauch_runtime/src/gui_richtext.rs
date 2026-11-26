@@ -18,12 +18,12 @@ impl Gui {
     }
     pub(super) fn rt_mut(&mut self, h: i64, fn_: &str) -> Result<&mut RichState, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::RichText { return Err(format!("{}: Widget ist kein gesetzter Text (GUI_RICHTEXT)", fn_)); }
+        if w.kind != Kind::RichText { return Err(format!("{}: das Widget ist kein GUI_RICHTEXT", fn_)); }
         Ok(w.rich.as_mut().unwrap())
     }
     pub(super) fn rt_ref(&self, h: i64, fn_: &str) -> Result<&RichState, String> {
         let w = self.wdg(h, fn_)?;
-        if w.kind != Kind::RichText { return Err(format!("{}: Widget ist kein gesetzter Text (GUI_RICHTEXT)", fn_)); }
+        if w.kind != Kind::RichText { return Err(format!("{}: das Widget ist kein GUI_RICHTEXT", fn_)); }
         Ok(w.rich.as_ref().unwrap())
     }
     pub fn richtext_set_text(&mut self, h: i64, text: String) -> Result<(), String> {

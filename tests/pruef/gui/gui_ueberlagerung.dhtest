@@ -714,7 +714,7 @@ GUI_TOAST: Art 'rot' gibt es nicht -- bekannt sind: info, erfolg, warnung, fehle
 GUI_POPOVER: Seite 'mitte' gibt es nicht -- unten, oben, rechts oder links
 GUI_POPOVER_SHOW: dieses Fenster ist kein Popover (GUI_POPOVER)
 GUI_TEXTINPUT_ICON: ein Sinnbild 'lupe' gibt es nicht -- bekannt
-GUI_TEXTINPUT_ICON: Widget ist kein Textfeld (GUI_TEXTINPUT)
+GUI_TEXTINPUT_ICON: das Widget ist kein GUI_TEXTINPUT
 GUI_INFOBAR: hoechstens vier Knoepfe
 
 === ein toast zaehlt zeit nicht bilder auch bei zwei gui_update

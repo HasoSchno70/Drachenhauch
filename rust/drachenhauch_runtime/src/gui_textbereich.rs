@@ -74,7 +74,7 @@ impl Gui {
         let (ax, ay, fw, fh) = self.abs_rect(wi, wd);
         let (mx, my) = (x as i32, y as i32);
         if !Self::in_rect(mx, my, (ax, ay, fw, fh)) { return Ok((0, 0)); }
-        let pad = 5;
+        let pad = self.ta_pad();
         if my < ay + pad { return Ok((0, 0)); }
         let lh = self.ta_line_h(g, wd);
         let z = self.ta_zerlegt(h, &wd.text);
@@ -141,8 +141,7 @@ impl Gui {
         let wd = self.ta_wdg(h, "GUI_TEXTAREA_GOTO")?;
         let chars: Vec<char> = wd.text.chars().collect();
         let starts = Self::line_starts(&chars);
-        let lh = self.ta_line_h(g, wd);
-        let sicht = ((wd.h - 2 * 5) / lh).max(1);
+        let sicht = self.ta_sicht(g, wd, wd.h);
         let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
         let crow = Self::ta_row_of(&rows, wd.caret.max(0) as usize) as i32;
         let max_scroll = (rows.len() as i32 - sicht).max(0);
@@ -175,8 +174,7 @@ impl Gui {
         let wd = self.ta_wdg(h, "GUI_TEXTAREA_SCROLL")?;
         let chars: Vec<char> = wd.text.chars().collect();
         let starts = Self::line_starts(&chars);
-        let lh = self.ta_line_h(g, wd).max(1);
-        let sicht = ((wd.h - 2 * 5) / lh).max(1);
+        let sicht = self.ta_sicht(g, wd, wd.h);
         let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
         let ziel = (zeile - 1).max(0) as usize;
         // Die letzte Reihe, die zu einer Zeile <= ziel gehoert -- so trifft
@@ -301,7 +299,7 @@ impl Gui {
             let w = &mut self.windows[wi].widgets[i];
             if w.formatiert { stile_abgleichen(w); }
         }
-        let pad = 5;
+        let pad = self.ta_pad();
         let lh = self.ta_line_h(g, &self.windows[wi].widgets[i]);
         let (ax, ay, fw, fh) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
         let scroll = self.windows[wi].widgets[i].scroll;
@@ -843,9 +841,8 @@ impl Gui {
             let wd = &self.windows[wi].widgets[i];
             let chars: Vec<char> = wd.text.chars().collect();
             let starts = Self::line_starts(&chars);
-            let lh = self.ta_line_h(g, wd);
             let n = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len())).len() as i32;
-            (n, ((wd.h - 2 * 5) / lh).max(1))
+            (n, self.ta_sicht(g, wd, wd.h))
         };
         let max = (zeilen - sicht).max(0);
         let weich_an = self.m("uebergang") > 0;
@@ -866,13 +863,12 @@ impl Gui {
         let wd = &self.windows[wi].widgets[i];
         if wd.kind != Kind::TextArea || !self.widget_shown(wi, wd) { return None; }
         let (ax, ay, w, h) = self.abs_rect(wi, wd);
-        let lh = self.ta_line_h(g, wd).max(1);
         let chars: Vec<char> = wd.text.chars().collect();
         let starts = Self::line_starts(&chars);
-        let n = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len())).len() as i32;
-        let sicht = ((h - 2 * 5) / lh).max(1);
+        let n =self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len())).len() as i32;
+        let sicht = self.ta_sicht(g, wd, h);
         if n <= sicht { return None; }
-        let bw = 5;
+        let bw = self.ta_pad();
         // Gespiegelt steht der Balken links.
         let tx = if self.windows[wi].rtl { ax + 2 } else { ax + w - 2 - bw };
         let (ty, th) = (ay + 2, (h - 4).max(1));
@@ -888,7 +884,7 @@ impl Gui {
         let wd = &self.windows[wi].widgets[i];
         let (ax, ay, fw, fh) = self.abs_rect(wi, wd);
         if !Self::in_rect(mx, my, (ax, ay, fw, fh)) { return None; }
-        let pad = 5;
+        let pad = self.ta_pad();
         let lh = self.ta_line_h(g, wd).max(1);
         let chars: Vec<char> = wd.text.chars().collect();
         let starts = Self::line_starts(&chars);

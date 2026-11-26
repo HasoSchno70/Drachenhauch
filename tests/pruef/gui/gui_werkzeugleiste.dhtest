@@ -226,7 +226,7 @@ DHRT_FRAMES=1
 --- enthaelt
 Sinnbild 'diskette' gibt es nicht
 bekannt sind: neu, datei, oeffnen, sichern
-keine Werkzeugleiste
+kein GUI_TOOLBAR
 Eintrag 7 gibt es nicht
 
 === ein eintrag im ueberlauf hat keine lage, aber es gibt ihn

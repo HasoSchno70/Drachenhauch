@@ -18,7 +18,7 @@ LOG: erwartet 1..2 Argument(e), erhalten 0
 === too few args is clean error not crash[PRINT PADL$("x")]
 PRINT PADL$("x")
 --- fehler
-PAD: erwartet 2..3 Argument(e), erhalten 1
+PADL$: erwartet 2..3 Argument(e), erhalten 1
 
 === array equals itself
 DIM a[3] AS INTEGER
@@ -89,7 +89,7 @@ PRINT MAPGET(m, "k")
 DIM m AS MAP OF INTEGER
 MAPPUT(m, "k", 3.5)
 --- fehler
-Map-Wert: Erwartet INTEGER, erhalten FLOAT
+MAPPUT: FLOAT 3.5 passt nicht verlustfrei in INTEGER
 
 === format d rejects bool
 PRINT FORMAT$(TRUE, "%d")

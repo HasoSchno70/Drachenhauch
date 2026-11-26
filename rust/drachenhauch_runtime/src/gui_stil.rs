@@ -1170,12 +1170,18 @@ impl Gui {
     /// Thema entscheidet.
     pub fn get_color(&self, h: i64, rolle: &str) -> Result<i64, String> {
         let rolle = rolle.to_lowercase();
-        if !matches!(rolle.as_str(), "bg" | "fg" | "border" | "accent") {
-            return Err(format!("GUI_GET_COLOR: Rolle '{}' gibt es nicht -- bg, fg, border oder accent", rolle));
+        if !matches!(rolle.as_str(), "bg" | "fg" | "border" | "accent" | "hover" | "pressed") {
+            return Err(format!("GUI_GET_COLOR: Rolle '{}' gibt es nicht -- bg, fg, border, accent, hover oder pressed", rolle));
         }
         let (wi, i) = Self::dec_widget(h);
         let w = self.wdg(h, "GUI_GET_COLOR")?;
         if let Some(c) = w.ov.get(&rolle) { return Ok(*c); }
+        // hover/pressed: der Grund eines Knopfs unter der Maus bzw. gedrueckt
+        // -- dieselbe Quelle wie beim Zeichnen (knopf_hover_druck), ohne
+        // eigene Rolle und ohne Stildatei -1 (die Laufzeit hellt selbst auf).
+        // Bis 2026.53 kannte GUI_SET_COLOR die beiden, GUI_GET_COLOR nicht.
+        if rolle == "hover" { return Ok(self.stil_farbe(w, "bg", HOVER).unwrap_or(-1)); }
+        if rolle == "pressed" { return Ok(self.stil_farbe(w, "bg", AKTIV).unwrap_or(-1)); }
         let mut folge = Vec::new();
         if !w.enabled { folge.push(AUS); }
         else {
@@ -1185,6 +1191,16 @@ impl Gui {
         }
         folge.push(BASIS);
         Ok(folge.into_iter().find_map(|s| self.stil_farbe(w, &rolle, s)).unwrap_or(-1))
+    }
+    /// Grund eines Knopfs unter der Maus und gedrueckt: eigene Rolle
+    /// (GUI_SET_COLOR "hover"/"pressed"), sonst die Schicht der Stildatei,
+    /// sonst heller/dunkler. EINE Quelle fuer Zeichnen und Abmessen.
+    pub(super) fn knopf_hover_druck(&self, wdg: &Widget, bg: i64, eigener_grund: bool) -> (i64, i64) {
+        let h = wdg.ov.get("hover").copied().or_else(|| self.stil_farbe(wdg, "bg", HOVER))
+            .unwrap_or(shade(bg, if eigener_grund { 18 } else { 30 }));
+        let d = wdg.ov.get("pressed").copied().or_else(|| self.stil_farbe(wdg, "bg", AKTIV))
+            .unwrap_or(shade(bg, -30));
+        (h, d)
     }
     /// Setzt die Stildatei fuer diese Rolle in dieser Schicht etwas?
     pub(super) fn stil_hat(&self, w: &Widget, rolle: &str, s: usize) -> bool {

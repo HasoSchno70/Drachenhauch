@@ -686,10 +686,10 @@ END SUB
 '  Der Streifen: Farbe und Deckkraft ueber die Lebenszeit
 ' ============================================================
 SUB streifenZeichnen()
-    DIM sx AS INTEGER : sx = GUI_CANVAS_X(streifen)
-    DIM sy AS INTEGER : sy = GUI_CANVAS_Y(streifen)
-    DIM sb AS INTEGER : sb = GUI_CANVAS_W(streifen)
-    DIM sh AS INTEGER : sh = GUI_CANVAS_H(streifen)
+    DIM sx AS INTEGER : sx = GUI_CANVAS_SCREEN_X(streifen)
+    DIM sy AS INTEGER : sy = GUI_CANVAS_SCREEN_Y(streifen)
+    DIM sb AS INTEGER : sb = GUI_CANVAS_SCREEN_W(streifen)
+    DIM sh AS INTEGER : sh = GUI_CANVAS_SCREEN_H(streifen)
     ' Schachbrett darunter -- sonst sieht man dem Ausblenden nicht an, wo es
     ' durchsichtig wird.
     DIM i AS INTEGER
@@ -853,10 +853,10 @@ WHILE NOT beenden
     GUI_SET_ENABLED(wahl2, GUI_CHECKED(schalterEnde))
 
     ' --- Vorschau ---
-    DIM vx AS INTEGER : vx = GUI_CANVAS_X(flaeche)
-    DIM vy AS INTEGER : vy = GUI_CANVAS_Y(flaeche)
-    DIM vb AS INTEGER : vb = GUI_CANVAS_W(flaeche)
-    DIM vh AS INTEGER : vh = GUI_CANVAS_H(flaeche)
+    DIM vx AS INTEGER : vx = GUI_CANVAS_SCREEN_X(flaeche)
+    DIM vy AS INTEGER : vy = GUI_CANVAS_SCREEN_Y(flaeche)
+    DIM vb AS INTEGER : vb = GUI_CANVAS_SCREEN_W(flaeche)
+    DIM vh AS INTEGER : vh = GUI_CANVAS_SCREEN_H(flaeche)
 
     ' Quelle: Mitte der Flaeche, oder unter der Maus wenn gewuenscht.
     DIM qx AS INTEGER : qx = vx + vb \ 2

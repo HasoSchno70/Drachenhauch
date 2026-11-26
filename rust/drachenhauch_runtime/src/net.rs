@@ -135,10 +135,15 @@ fn resolve_bind_host(bind_addr: &str) -> &str {
     }
 }
 
+/// Ein Port liegt in 0..65535 (0 = das System waehlt). EINE Pruefung und
+/// ein Wortlaut fuer alle NET-Befehle (bis 2026.53 englisch).
+fn port_pruefen(port: i64, fn_: &str) -> Result<(), String> {
+    if (0..=65535).contains(&port) { Ok(()) }
+    else { Err(format!("{}: Port {} liegt ausserhalb 0..65535", fn_, port)) }
+}
+
 pub fn listen(port: i64, bind_addr: &str) -> Result<(TcpListener, i64), String> {
-    if !(0..=65535).contains(&port) {
-        return Err(format!("NET_TCP_LISTEN: port out of range: {}", port));
-    }
+    port_pruefen(port, "NET_TCP_LISTEN")?;
     let host = resolve_bind_host(bind_addr);
     let l = TcpListener::bind((host, port as u16))
         .map_err(|e| format!("NET_TCP_LISTEN: {}", e))?;
@@ -165,9 +170,7 @@ pub fn accept(l: &TcpListener) -> Result<Option<NetSock>, String> {
 }
 
 pub fn connect(host: &str, port: i64) -> Result<NetSock, String> {
-    if !(0..=65535).contains(&port) {
-        return Err(format!("NET_TCP_CONNECT: port out of range: {}", port));
-    }
+    port_pruefen(port, "NET_TCP_CONNECT")?;
     // Alle Adressen des Namens (verbinden.rs) -- bis 2026.53 nur die erste,
     // und "localhost" fand unter Windows einen Dienst auf IPv4 nicht.
     let stream = crate::verbinden::tcp(host, port as u16, Duration::from_secs(5), "NET_TCP_CONNECT")?;
@@ -257,9 +260,7 @@ pub fn is_connected(s: &NetSock) -> bool {
 }
 
 pub fn udp_bind(port: i64, bind_addr: &str) -> Result<UdpSock, String> {
-    if !(0..=65535).contains(&port) {
-        return Err(format!("NET_UDP_BIND: port out of range: {}", port));
-    }
+    port_pruefen(port, "NET_UDP_BIND")?;
     let host = resolve_bind_host(bind_addr);
     let s = UdpSocket::bind((host, port as u16)).map_err(|e| format!("NET_UDP_BIND: {}", e))?;
     s.set_nonblocking(true).ok();
@@ -290,9 +291,7 @@ pub fn udp_send_bytes(s: &UdpSock, host: &str, port: i64, bytes: &[u8]) -> Resul
     // Beispiel) haette ein antwortloser DNS-Server das Spiel bei JEDEM
     // Frame kurz eingefroren. Port wurde ausserdem gar nicht validiert
     // (NET_UDP_SEND(s,"host",70000,"x") sendete lautlos an Port 4464).
-    if !(0..=65535).contains(&port) {
-        return Err(format!("NET_UDP_SEND: port out of range: {}", port));
-    }
+    port_pruefen(port, "NET_UDP_SEND")?;
     // Eine Adresse derselben Art wie der eigene Socket: ein IPv4-Socket kann
     // nicht an `::1` senden (die erste Adresse von "localhost" unter Windows).
     let alle = crate::verbinden::adressen(host, port as u16, "NET_UDP_SEND")?;

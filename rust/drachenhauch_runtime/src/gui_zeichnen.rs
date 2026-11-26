@@ -980,10 +980,7 @@ impl Gui {
                     }
                     // Hover/Druck: eigene Rollen, sonst die Schichten der
                     // Stildatei (button:hover { bg }), sonst hell/dunkel.
-                    let bg_h = wdg.ov.get("hover").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::HOVER))
-                        .unwrap_or(shade(bg, if grund.is_some() { 18 } else { 30 }));
-                    let bg_d = wdg.ov.get("pressed").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::AKTIV))
-                        .unwrap_or(shade(bg, -30));
+                    let (bg_h, bg_d) = self.knopf_hover_druck(wdg, bg, grund.is_some());
                     // Die Grundfarbe nimmt ihre eigene Dauer, wenn die
                     // Stildatei eine nennt (`uebergang: bg 400`).
                     let (eh_bg, ed_bg) = if wdg.enabled { (Self::rolle_t(wdg, "bg", 0), Self::rolle_t(wdg, "bg", 2)) } else { (0.0, 0.0) };
@@ -1191,7 +1188,7 @@ impl Gui {
                     else if wdg.ov.contains_key("accent") { self.wcol(wdg, "accent", "accent") }
                     else { mischen(rand, self.th("accent"), self.verlauf_anteil(h).max(0.35)) };
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
-                let pad = 5;
+                let pad = self.ta_pad();
                 let lh = self.ta_line_h(g, wdg);
                 let scroll = wdg.scroll;
                 g.push_clip(ax + 2, ay + 2, (w - 4).max(0), (h - 4).max(0));

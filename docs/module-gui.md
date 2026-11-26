@@ -219,9 +219,15 @@ IMPORT "gui"
 | `GUI_TREE_CLEAR(tree)` | — | alle Knoten löschen |
 | `GUI_TREE_SELECTED(tree)` / `GUI_TREE_SET_SELECTED(tree, node)` | INT / — | gewählten Knoten lesen/setzen (-1 = keiner) |
 | `GUI_TREE_LABEL(tree, node)` | STRING | Text eines Knotens |
-| `GUI_TABCONTROL_ITEM_RECT(tc, page)` | TUPLE | (x, y, b, h) des Kopfs einer Seite auf dem Bildschirm, aus derselben Rechnung wie Zeichnen und Klick -- für Prüfungen mit echten Klicks |
-| `GUI_TREE_ITEM_RECT(tree, node)` | TUPLE | (x, y, b, h) eines Knotens auf dem Bildschirm, x am Anfang der Beschriftung; unter einem zugeklappten (0, 0, 0, 0) -- für Prüfungen mit echten Klicks |
+| `GUI_TREE_COUNT(tree)` | INTEGER | wie viele Knoten der Baum hat (auch zugeklappte) |
+| `GUI_TREE_SET_LABEL(tree, node, label)` | — | einen Knoten umbenennen |
+| `GUI_TREE_REMOVE(tree, node)` | — | einen Knoten samt Kindern entfernen; die Nummern dahinter rücken auf |
+| `GUI_TABCONTROL_ITEM_RECT(tc, page)` | TUPLE | (x, y, b, h) des Kopfs einer Seite, logisch wie `GUI_GET_X` (bis 2026.53 in Bildschirmpunkten) |
+| `GUI_TABCONTROL_ITEM_SCREEN_RECT(tc, page)` | TUPLE | (x, y, b, h) des Kopfs einer Seite auf dem Bildschirm, aus derselben Rechnung wie Zeichnen und Klick -- für Prüfungen mit echten Klicks |
+| `GUI_TREE_ITEM_RECT(tree, node)` | TUPLE | (x, y, b, h) eines Knotens, logisch wie `GUI_GET_X`; unter einem zugeklappten (0, 0, 0, 0) (bis 2026.53 in Bildschirmpunkten) |
+| `GUI_TREE_ITEM_SCREEN_RECT(tree, node)` | TUPLE | (x, y, b, h) eines Knotens auf dem Bildschirm, x am Anfang der Beschriftung; unter einem zugeklappten (0, 0, 0, 0) -- für Prüfungen mit echten Klicks |
 | `GUI_TREE_EXPAND(tree, node, flag)` | — | Knoten auf-/zuklappen |
+| `GUI_TREE_EXPANDED(tree, node)` | BOOLEAN | ist der Knoten aufgeklappt? |
 | `GUI_TREE_SET(tree, key$, value)` | — | Einstellung am Baum: `mehrfachauswahl`, `kaestchen`, `bearbeitbar` (F2 benennt um) |
 | `GUI_TREE_EDIT(tree, node)` | — | Knoten umbenennen: Eingabefeld über dem Namen, alles markiert (nicht beim Dateibaum) |
 | `GUI_TREE_EDITED(tree)` | INTEGER | in diesem Bild umbenannter Knoten, -1 = keiner |
@@ -273,8 +279,8 @@ IMPORT "gui"
 | `GUI_RICHTEXT_HEADING_AT(rt)` | INTEGER | in welchem Abschnitt der obere Rand steht (-1 = davor) -- für ein Inhaltsverzeichnis, das mitgeht |
 | `GUI_RICHTEXT_LINK$(rt)` | STRING | welcher Verweis in diesem Bild angeklickt wurde (leer = keiner) |
 | `GUI_RICHTEXT_FIND(rt, text$, from = -1)` | INTEGER | zur ersten Fundstelle rollen; liefert deren y oder -1 (0 = vorgemerkt: direkt nach `SET_TEXT` wird erst gesucht, wenn der neue Text gesetzt ist) |
-| `GUI_RICHTEXT_SCROLL(rt, y)` / `GUI_RICHTEXT_SCROLL_GET(rt)` | — / INTEGER | Blickversatz setzen und lesen |
-| `GUI_RICHTEXT_HEIGHT(rt)` | INTEGER | wie hoch der Satz geworden ist |
+| `GUI_RICHTEXT_SCROLL(rt, y)` / `GUI_RICHTEXT_SCROLL_GET(rt)` | — / INTEGER | Blickversatz setzen und lesen, logisch (bis 2026.53 in Bildschirmpunkten) |
+| `GUI_RICHTEXT_HEIGHT(rt)` | INTEGER | wie hoch der Satz geworden ist, logisch |
 | `GUI_RICHTEXT_SELECTION$(rt)` | STRING | der markierte Text, Zeilen durch Umbruch getrennt (leer = keine Auswahl) |
 | `GUI_RICHTEXT_SELECT_ALL(rt)` | — | alles markieren (wie Strg+A) |
 | `GUI_RICHTEXT_CLEAR_SELECTION(rt)` | — | Auswahl aufheben |
@@ -324,7 +330,8 @@ IMPORT "gui"
 | `GUI_TABLE_SET_SELECTED(tbl, row)` | — | Selektion setzen (-1 = keine) |
 | `GUI_TABLE_CLICKED(tbl)` | INTEGER | in diesem Frame geklickte Zeile (-1) |
 | `GUI_TABLE_ROW_COUNT(tbl)` | INTEGER | Anzahl Datenzeilen |
-| `GUI_TABLE_ROW_RECT(tbl, row)` | TUPLE | wo die Datenzeile `row` gerade steht (x, y, b, h), in Bildschirmpunkten wie `GUI_HIT_TEST`, nach Sortierung, Filter und Rollen; weggefiltert (0, 0, 0, 0) -- für Prüfungen mit echten Klicks und Bildern |
+| `GUI_TABLE_ROW_RECT(tbl, row)` | TUPLE | wo die Datenzeile `row` gerade steht (x, y, b, h), logisch wie `GUI_GET_X`; weggefiltert (0, 0, 0, 0) (bis 2026.53 in Bildschirmpunkten) |
+| `GUI_TABLE_ROW_SCREEN_RECT(tbl, row)` | TUPLE | wo die Datenzeile `row` gerade steht (x, y, b, h), in Bildschirmpunkten wie `GUI_HIT_TEST`, nach Sortierung, Filter und Rollen; weggefiltert (0, 0, 0, 0) -- für Prüfungen mit echten Klicks und Bildern |
 | `GUI_UPDATE()` | — | **Pflicht** pro Frame: Maus/Tasten verarbeiten |
 | `GUI_DRAW([on_top])` | — | alle Fenster zeichnen (hinten→vorne); `on_top`=FALSE lässt Kontextmenü und Tooltip weg |
 | `GUI_DRAW_TOP()` | — | nur was über allen Fenstern liegt: offenes Menü (Leiste oder Kontext), offene Klappliste, Tooltip |
@@ -452,7 +459,8 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_LISTBOX_DATA$(lb, i)` | STRING | den unsichtbaren Wert eines Eintrags lesen |
 | `GUI_LISTBOX_FIND_DATA(lb, value$)` | INTEGER | erster Eintrag mit diesem Wert, -1 = keiner |
 | `GUI_LISTBOX_DETAIL(lb, i, text$)` | — | Zusatztext rechts im Eintrag, gedämpft (Kürzel, Größe, Zeilennummer) |
-| `GUI_LISTBOX_ITEM_RECT(lb, i)` | TUPLE | wo Eintrag i auf dem Bildschirm steht (x, y, b, h), in Bildschirmpunkten wie `GUI_HIT_TEST`; weggefiltert (0, 0, 0, 0) -- für Prüfungen mit echten Klicks, die Zeilenhöhe hängt an Schrift und Stildatei |
+| `GUI_LISTBOX_ITEM_RECT(lb, i)` | TUPLE | wo Eintrag i steht (x, y, b, h), logisch wie `GUI_GET_X`; weggefiltert (0, 0, 0, 0) (bis 2026.53 in Bildschirmpunkten) |
+| `GUI_LISTBOX_ITEM_SCREEN_RECT(lb, i)` | TUPLE | wo Eintrag i auf dem Bildschirm steht (x, y, b, h), in Bildschirmpunkten wie `GUI_HIT_TEST`; weggefiltert (0, 0, 0, 0) -- für Prüfungen mit echten Klicks, die Zeilenhöhe hängt an Schrift und Stildatei |
 | `GUI_LISTBOX_TIP(lb, i, text$)` | — | Tooltip je Eintrag. Ohne ihn zeigt ein Eintrag, der nicht in die Zeile passt (er endet mit „...“), beim Überfahren seinen ganzen Text |
 | `GUI_LISTBOX_ENABLE(lb, i, on)` | — | Eintrag sperren: sichtbar, aber weder anklickbar noch mit Pfeilen erreichbar |
 | `GUI_LISTBOX_ENABLED(lb, i)` | BOOLEAN | ob ein Eintrag wählbar ist |
@@ -477,8 +485,9 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_CARD_SET_TEXT(card, text$)` | — | Beschreibung einer Kachel setzen (den Titel setzt `GUI_SET_TEXT`) |
 | `GUI_CARD_TEXT$(card)` | STRING | Beschreibung einer Kachel |
 | `GUI_CANVAS(win, x, y, w, h)` | GUI_WIDGET | freie Zeichenflaeche -- hinein malt man mit den normalen Zeichenbefehlen, **nach** `GUI_DRAW` |
-| `GUI_CANVAS_X(canvas)` / `GUI_CANVAS_Y(canvas)` | INTEGER | **absolute** Bildschirmposition der Flaeche (wandert mit dem Fenster) |
-| `GUI_CANVAS_W(canvas)` / `GUI_CANVAS_H(canvas)` | INTEGER | Groesse der Flaeche |
+| `GUI_CANVAS_X(canvas)` / `GUI_CANVAS_Y(canvas)` / `GUI_CANVAS_W(canvas)` / `GUI_CANVAS_H(canvas)` | INTEGER | Lage und Größe der Fläche, logisch wie `GUI_GET_X` -- zum Zeichnen die `_SCREEN_`-Fassung (bis 2026.53 lieferten diese Pixel) |
+| `GUI_CANVAS_SCREEN_X(canvas)` / `GUI_CANVAS_SCREEN_Y(canvas)` | INTEGER | **absolute** Bildschirmposition der Flaeche (wandert mit dem Fenster) |
+| `GUI_CANVAS_SCREEN_W(canvas)` / `GUI_CANVAS_SCREEN_H(canvas)` | INTEGER | Groesse der Flaeche |
 | `GUI_CANVAS_BEGIN(canvas)` / `GUI_CANVAS_END()` | — | die Zeichenbefehle dazwischen gehen in die Flaeche: zugeschnitten auf sie, und steht sie in einem echten Fenster, in dessen Bild |
 | `GUI_CANVAS_MOUSE(canvas)` | TUPLE | (x, y, gedrueckt): der Zeiger relativ zur Flaeche und die linke Taste -- auch in einem echten Fenster |
 | `GUI_SET_ENABLED(widget, on)` | — | Widget bedienbar machen oder sperren (gesperrt = ausgegraut, nimmt keine Klicks) |
@@ -1344,15 +1353,16 @@ GUI_UPDATE()
 GUI_DRAW()                       ' zeichnet das Fenster + den Canvas-Rahmen
 ' Danach in den Canvas-Bereich malen (absolute Bildschirm-Koordinaten):
 DIM cx AS INTEGER : DIM cy AS INTEGER : DIM cw AS INTEGER : DIM ch AS INTEGER
-cx = GUI_CANVAS_X(cv) : cy = GUI_CANVAS_Y(cv)
-cw = GUI_CANVAS_W(cv) : ch = GUI_CANVAS_H(cv)
+cx = GUI_CANVAS_SCREEN_X(cv) : cy = GUI_CANVAS_SCREEN_Y(cv)
+cw = GUI_CANVAS_SCREEN_W(cv) : ch = GUI_CANVAS_SCREEN_H(cv)
 BOX(cx, cy, cx + cw, cy + ch, &H101820)
 CIRCLE(cx + cw/2, cy + ch/2, 30, &H30FFA0)
 FLIP()
 ```
 
-`GUI_CANVAS_X/Y/W/H` liefern den **absoluten** Inhaltsbereich (folgt dem Fenster
-beim Verschieben). Du zeichnest **nach** `GUI_DRAW`.
+`GUI_CANVAS_SCREEN_X/Y/W/H` liefern den **absoluten** Inhaltsbereich in Bildschirmpunkten, wie
+ihn die Zeichenbefehle brauchen (folgt dem Fenster beim Verschieben); `GUI_CANVAS_X/Y/W/H`
+nennen dieselbe Fläche logisch, wie alle Lagen der gui. Du zeichnest **nach** `GUI_DRAW`.
 
 **Mit `GUI_CANVAS_BEGIN` und `GUI_CANVAS_END`** ist das Malen auf die Fläche
 zugeschnitten -- und es landet dort, wo die Fläche steht: auch in einem
@@ -1377,8 +1387,8 @@ WHILE NOT QUITREQUESTED()
     CLS(0)
     GUI_DRAW()
     GUI_CANVAS_BEGIN(cv)
-    BOX(GUI_CANVAS_X(cv), GUI_CANVAS_Y(cv), GUI_CANVAS_X(cv) + 280, GUI_CANVAS_Y(cv) + 180, &H101820)
-    IF unten THEN CIRCLE(GUI_CANVAS_X(cv) + x, GUI_CANVAS_Y(cv) + y, 8, &H30FFA0)
+    BOX(GUI_CANVAS_SCREEN_X(cv), GUI_CANVAS_SCREEN_Y(cv), GUI_CANVAS_SCREEN_X(cv) + 280, GUI_CANVAS_SCREEN_Y(cv) + 180, &H101820)
+    IF unten THEN CIRCLE(GUI_CANVAS_SCREEN_X(cv) + x, GUI_CANVAS_SCREEN_Y(cv) + y, 8, &H30FFA0)
     GUI_CANVAS_END()
     FLIP()
 WEND
@@ -2756,8 +2766,8 @@ WHILE NOT QUITREQUESTED()
     CLS(&H202830)
     GUI_DRAW()
     GUI_CANVAS_BEGIN(nacht)
-    DIM x AS INTEGER : x = GUI_CANVAS_X(nacht)
-    DIM y AS INTEGER : y = GUI_CANVAS_Y(nacht)
+    DIM x AS INTEGER : x = GUI_CANVAS_SCREEN_X(nacht)
+    DIM y AS INTEGER : y = GUI_CANVAS_SCREEN_Y(nacht)
     BOX(x, y, x + 158, y + 58, IIF(GUI_CHECKED(nacht), &H203060, &HE0C060))
     TEXT(x + 10, y + 20, IIF(GUI_CHECKED(nacht), "Mond", "Sonne"), WHITE)
     GUI_CANVAS_END()

@@ -88,11 +88,11 @@ WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
     ' Die Farbprobe nach GUI_DRAW -- sonst zeichnet das Fenster darueber.
     DIM px AS INTEGER
     DIM py AS INTEGER
-    px = GUI_CANVAS_X(probe)
-    py = GUI_CANVAS_Y(probe)
-    BOX(px, py, px + GUI_CANVAS_W(probe) - 1, py + GUI_CANVAS_H(probe) - 1, _
+    px = GUI_CANVAS_SCREEN_X(probe)
+    py = GUI_CANVAS_SCREEN_Y(probe)
+    BOX(px, py, px + GUI_CANVAS_SCREEN_W(probe) - 1, py + GUI_CANVAS_SCREEN_H(probe) - 1, _
         GUI_PICKED_COLOR(waehler))
-    RECT(px, py, px + GUI_CANVAS_W(probe) - 1, py + GUI_CANVAS_H(probe) - 1, &H2E3C50)
+    RECT(px, py, px + GUI_CANVAS_SCREEN_W(probe) - 1, py + GUI_CANVAS_SCREEN_H(probe) - 1, &H2E3C50)
 
     ' Ein Balken in der gewaehlten Farbe -- so sieht man, wozu sie taugt.
     IF eintraege <> "" THEN

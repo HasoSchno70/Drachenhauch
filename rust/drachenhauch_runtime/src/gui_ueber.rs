@@ -306,7 +306,7 @@ impl Gui {
     }
     fn feld_mut(&mut self, h: i64, f: &str) -> Result<&mut FeldZusatz, String> {
         let w = self.wdg_mut(h, f)?;
-        if w.kind != Kind::TextInput { return Err(format!("{}: Widget ist kein Textfeld (GUI_TEXTINPUT)", f)); }
+        if w.kind != Kind::TextInput { return Err(format!("{}: das Widget ist kein GUI_TEXTINPUT", f)); }
         Ok(w.feld.get_or_insert_with(|| Box::new(FeldZusatz::neu())))
     }
     /// GUI_TEXTINPUT_ICON(tf, links$, rechts$): ein Sinnbild links und rechts
@@ -373,11 +373,13 @@ impl Gui {
     pub(super) fn ti_text_lage(&self, wi: usize, wdg: &Widget, ax: i32, w: i32, tw: i32) -> (i32, i32) {
         let (sl, sr) = self.ti_rand(wdg);
         let rechts = if wdg.frei { self.sk(DD_PFEIL_B) } else { 0 };
-        let inner = (w - 10 - rechts - sl - sr).max(1);
+        // Derselbe Innenabstand wie im Textbereich (ta_pad, skaliert).
+        let pad = self.ta_pad();
+        let inner = (w - 2 * pad - rechts - sl - sr).max(1);
         let align = self.ti_ausrichtung(wi, wdg);
         if align >= 1 && tw <= inner {
-            (if align == 1 { ax + 5 + sl + (inner - tw) / 2 } else { ax + 5 + sl + inner - tw }, 0)
-        } else { (ax + 5 + sl, wdg.scroll) }
+            (if align == 1 { ax + pad + sl + (inner - tw) / 2 } else { ax + pad + sl + inner - tw }, 0)
+        } else { (ax + pad + sl, wdg.scroll) }
     }
     /// Die wirksame Ausrichtung: GUI_SET_ALIGN, sonst rechts im gespiegelten Fenster.
     pub(super) fn ti_ausrichtung(&self, wi: usize, wdg: &Widget) -> i32 {

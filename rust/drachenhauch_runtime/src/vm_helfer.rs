@@ -315,7 +315,7 @@ pub(crate) fn store_index(arr: &Value, idx_vals: &[Value], v: Value) -> R<()> {
                 x => return Err(format!("MAP-Schluessel muss STRING sein, erhalten {}", x.type_name())),
             };
             let vt = m.borrow().value_type.clone();
-            let cv = crate::builtins::coerce_map_value(&v, &vt)?;
+            let cv = crate::builtins::coerce_map_value(&v, &vt, "Zuweisung in die MAP")?;
             m.borrow_mut().put(k, cv);
             Ok(())
         }

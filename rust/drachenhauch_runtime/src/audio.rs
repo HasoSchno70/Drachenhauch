@@ -439,7 +439,28 @@ fn mh_set_rate(h: &mut MusicHandle, r: f64, t: Tween) {
 fn static_von_pfad(pfad: &str) -> Result<StaticSoundData, String> {
     let bytes = std::fs::read(pfad).map_err(|e| format!("{}: {}", pfad, e))?;
     StaticSoundData::from_cursor(std::io::Cursor::new(bytes))
-        .map_err(|e| format!("{:?}", e))
+        .map_err(|e| format!("{}: {}", pfad, kira_text(&e)))
+}
+
+/// Ein Fehler der Ton-Bibliothek (Kira, Symphonia) auf Deutsch. Bis 2026.53
+/// stand er roh als Debug-Text in der Meldung ("LOADSOUND: NoDefaultTrack",
+/// "SoundLimitReached"); was hier nicht erkannt wird, bleibt lesbar dahinter.
+pub(crate) fn kira_text(e: &dyn std::fmt::Debug) -> String {
+    let roh = format!("{:?}", e);
+    let was = if roh.contains("SoundLimitReached") || roh.contains("ResourceLimitReached")
+        || roh.contains("CommandQueueFull") || roh.contains("Limit") {
+        "zu viele gleichzeitige Klaenge oder Objekte (Grenze erreicht)"
+    } else if roh.contains("UnsupportedChannelConfiguration") {
+        "diese Kanalanordnung wird nicht unterstuetzt"
+    } else if roh.contains("NoDefaultTrack") || roh.contains("UnknownSampleRate")
+        || roh.contains("Unsupported") || roh.contains("SymphoniaError") || roh.contains("Decode") {
+        "das Format wird nicht unterstuetzt oder die Datei ist beschaedigt"
+    } else if roh.contains("IoError") || roh.starts_with("Io(") {
+        "die Datei liess sich nicht lesen"
+    } else {
+        return format!("die Ton-Bibliothek meldet: {}", roh);
+    };
+    was.to_string()
 }
 
 /// Eine Musikdatei zum Streamen oeffnen. FLAC geht ueber den eigenen Dekoder
@@ -1081,7 +1102,7 @@ impl Audio {
         let data = self.slot(idx, "SPEAK")?.data.as_ref()
             .ok_or_else(|| "SPEAK: Klang wurde freigegeben (UNLOADSOUND)".to_string())?
             .clone().with_settings(settings);
-        let handle = self.speech_track.play(data).map_err(|e| format!("SPEAK: {:?}", e))?;
+        let handle = self.speech_track.play(data).map_err(|e| format!("SPEAK: {}", kira_text(&e)))?;
         self.speech_handles.retain(|h| h.state() != PlaybackState::Stopped);
         self.speech_handles.push(handle);
         Ok(())
@@ -1139,7 +1160,7 @@ impl Audio {
         settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
         let data = self.spieldaten(idx, fn_, loops < 0)?.with_settings(settings);
         let mut handle = self.sfx_track.play(data)   // SFX-Bus
-            .map_err(|e| format!("{}: {:?}", fn_, e))?;
+            .map_err(|e| format!("{}: {}", fn_, kira_text(&e)))?;
         if fade_in_ms > 0 { handle.set_volume(db(vol), tween_ms_eased(fade_in_ms, curve)); }
         let s = self.slot_mut(idx, fn_)?;
         s.handle = Some(handle);
@@ -1172,7 +1193,7 @@ impl Audio {
         if loops < 0 { settings = settings.loop_region(0.0..); }
         let data = self.spieldaten(idx, "AUDIO_PLAY_AT", loops < 0)?.with_settings(settings);
         let handle = self.sfx_track.play(data)
-            .map_err(|e| format!("AUDIO_PLAY_AT: {:?}", e))?;
+            .map_err(|e| format!("AUDIO_PLAY_AT: {}", kira_text(&e)))?;
         let s = self.slot_mut(idx, "AUDIO_PLAY_AT")?;
         s.handle = Some(handle);
         s.start = Some((clock_idx, ticks as u64));
@@ -1224,7 +1245,7 @@ impl Audio {
                 .frequency(finite(hz, 1.0).max(0.0))
                 .amplitude(finite(amp, 1.0))
                 .offset(finite(offset, 0.0)))
-            .map_err(|e| format!("AUDIO_LFO_NEW: Modulator-Limit erreicht: {:?}", e))?;
+            .map_err(|e| format!("AUDIO_LFO_NEW: Modulator-Limit erreicht: {}", kira_text(&e)))?;
         self.mods.push(Some(ModSlot::Lfo(h)));
         Ok((self.mods.len() - 1) as i64)
     }
@@ -1234,7 +1255,7 @@ impl Audio {
     /// getimt sein muessen (Duck beim Dialog, Filter-Sweep beim Levelwechsel).
     pub fn tweener_new(&mut self, start: f64) -> Result<i64, String> {
         let h = self.manager.add_modulator(TweenerBuilder { initial_value: finite(start, 0.0) })
-            .map_err(|e| format!("AUDIO_TWEENER_NEW: Modulator-Limit erreicht: {:?}", e))?;
+            .map_err(|e| format!("AUDIO_TWEENER_NEW: Modulator-Limit erreicht: {}", kira_text(&e)))?;
         self.mods.push(Some(ModSlot::Tweener(h)));
         Ok((self.mods.len() - 1) as i64)
     }
@@ -1415,7 +1436,7 @@ resonance/reverb/distortion", other)),
     pub fn clock_new(&mut self, ticks_per_second: f64) -> Result<i64, String> {
         let handle = self.manager.add_clock(ClockSpeed::TicksPerSecond(ticks_per_second))
             .map_err(|e| format!(
-                "AUDIO_CLOCK_NEW: Uhr konnte nicht angelegt werden (Limit erreicht?): {:?}", e))?;
+                "AUDIO_CLOCK_NEW: Uhr konnte nicht angelegt werden (Limit erreicht?): {}", kira_text(&e)))?;
         self.clocks.push(Some(ClockSlot { handle, ticking: false }));
         Ok((self.clocks.len() - 1) as i64)
     }
@@ -1485,7 +1506,7 @@ resonance/reverb/distortion", other)),
     pub fn listener_new(&mut self, x: f64, y: f64, z: f64) -> Result<i64, String> {
         let handle = self.manager.add_listener(vec3(x, y, z), yaw_quat(0.0))
             .map_err(|e| format!(
-                "AUDIO_LISTENER_NEW: Listener konnte nicht angelegt werden (Limit erreicht?): {:?}", e))?;
+                "AUDIO_LISTENER_NEW: Listener konnte nicht angelegt werden (Limit erreicht?): {}", kira_text(&e)))?;
         self.listeners.push(Some(handle));
         Ok((self.listeners.len() - 1) as i64)
     }
@@ -1524,7 +1545,7 @@ resonance/reverb/distortion", other)),
             .distances((min_dist as f32, max_dist.max(min_dist + 0.01) as f32));
         let handle = self.sfx_track.add_spatial_sub_track(listener_id, vec3(x, y, z), builder)
             .map_err(|e| format!(
-                "AUDIO_EMITTER_NEW: Emitter konnte nicht angelegt werden (Limit erreicht?): {:?}", e))?;
+                "AUDIO_EMITTER_NEW: Emitter konnte nicht angelegt werden (Limit erreicht?): {}", kira_text(&e)))?;
         self.emitters.push(Some(handle));
         Ok((self.emitters.len() - 1) as i64)
     }
@@ -1561,7 +1582,7 @@ resonance/reverb/distortion", other)),
         settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
         let data = self.spieldaten(idx, "AUDIO_PLAY_ON", loops < 0)?.with_settings(settings);
         let emitter = self.emitter_slot_mut(emitter_idx, "AUDIO_PLAY_ON")?;
-        let mut handle = emitter.play(data).map_err(|e| format!("AUDIO_PLAY_ON: {:?}", e))?;
+        let mut handle = emitter.play(data).map_err(|e| format!("AUDIO_PLAY_ON: {}", kira_text(&e)))?;
         if fade_in_ms > 0 { handle.set_volume(db(vol), tween_ms_eased(fade_in_ms, curve)); }
         let s = self.slot_mut(idx, "AUDIO_PLAY_ON")?;
         s.handle = Some(handle);
@@ -1791,7 +1812,7 @@ resonance/reverb/distortion", other)),
         let resolved = crate::builtins::resolve_asset_path(path);
         crate::builtins::datei_da(&resolved, "LOADSOUND")?;
         let data = static_von_pfad(&resolved)
-            .map_err(|e| format!("LOADSOUND: {:?}", e))?;
+            .map_err(|e| format!("LOADSOUND: {}", e))?;
         Ok(self.push_slot(data, 1.0))
     }
 
@@ -2179,7 +2200,7 @@ resonance/reverb/distortion", other)),
         crate::builtins::datei_da(&resolved, "SAMPLE_LOAD")?;
         // Kira dekodiert die Datei; wir lesen die Frames als mono f32.
         let data = static_von_pfad(&resolved)
-            .map_err(|e| format!("SAMPLE_LOAD: {:?}", e))?;
+            .map_err(|e| format!("SAMPLE_LOAD: {}", e))?;
         let sr = data.sample_rate;
         let mono: Vec<f32> = data.frames.iter().map(|f| (f.left + f.right) * 0.5).collect();
         if mono.is_empty() { return Err("SAMPLE_LOAD: Sample ist leer".into()); }
@@ -2473,12 +2494,12 @@ resonance/reverb/distortion", other)),
             let bytes = std::fs::read(&resolved)
                 .map_err(|e| format!("AUDIO_MUSIC_LOAD: {}", e))?;
             // Einmal parsen, um Fehler frueh zu melden; gespielt wird aus den Bytes.
-            Module::load(&bytes).map_err(|e| format!("AUDIO_MUSIC_LOAD: {:?}", e))?;
+            Module::load(&bytes).map_err(|e| format!("AUDIO_MUSIC_LOAD: {}", kira_text(&e)))?;
             MusicSource::Module(bytes)
         } else {
             // Testweise oeffnen, um Fehler frueh zu melden.
             #[cfg(not(target_arch = "wasm32"))]
-            musik_strom(&resolved).map_err(|e| format!("AUDIO_MUSIC_LOAD: {:?}", e))?;
+            musik_strom(&resolved).map_err(|e| format!("AUDIO_MUSIC_LOAD: {}", kira_text(&e)))?;
             #[cfg(target_arch = "wasm32")]
             static_von_pfad(&resolved).map_err(|e| format!("AUDIO_MUSIC_LOAD: {}", e))?;
             MusicSource::Stream(resolved)
@@ -2502,11 +2523,11 @@ resonance/reverb/distortion", other)),
             #[cfg(not(target_arch = "wasm32"))]
             Some(MusicSource::Stream(path)) => {
                 let mut data = musik_strom(path)
-                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?;
+                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {}", kira_text(&e)))?;
                 if endless { data = data.loop_region(0.0..); }
                 data = data.volume(vol_db).playback_rate(pitch);
                 MusicHandle::Stream(self.music_track.play(data)   // Musik-Bus
-                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?)
+                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {}", kira_text(&e)))?)
             }
             // Web: kein Streaming -> das Stueck einmal ganz laden. Fuer die
             // ueblichen Groessen (ein paar hundert KB) ist das unauffaellig.
@@ -2517,13 +2538,13 @@ resonance/reverb/distortion", other)),
                 if endless { data = data.loop_region(0.0..); }
                 data = data.volume(vol_db).playback_rate(pitch);
                 MusicHandle::Static(self.music_track.play(data)
-                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?)
+                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {}", kira_text(&e)))?)
             }
             Some(MusicSource::Module(bytes)) => {
                 // Modul frisch parsen + leaken -> 'static-Borrow fuer den
                 // Player; der ModuleSound gibt das Modul im Drop frei.
                 let module = Module::load(bytes)
-                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?;
+                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {}", kira_text(&e)))?;
                 let module_ptr = Box::into_raw(Box::new(module));
                 let loop_max = if endless { 0 } else { (loops as usize) + 1 };
                 // Fade-in: bei 0 starten und im Sound hochrampen.

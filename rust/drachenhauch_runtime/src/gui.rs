@@ -1693,8 +1693,9 @@ pub struct TreeState {
 
 impl TreeState {
     /// Die Auswahl-Liste auf die Knotenzahl bringen. Knoten kommen nur ueber
-    /// GUI_TREE_ADD dazu, verschwinden nur mit GUI_TREE_CLEAR -- ein
-    /// Nachziehen an jedem Abruf kostet also nichts und kann nie zu kurz sein.
+    /// GUI_TREE_ADD dazu, verschwinden nur mit GUI_TREE_CLEAR und
+    /// GUI_TREE_REMOVE (das die Listen selbst mitnimmt) -- ein Nachziehen an
+    /// jedem Abruf kostet also nichts und kann nie zu kurz sein.
     /// Beim DATEIbaum wird die Liste dagegen neu gebaut, sobald sich ein Ordner
     /// oeffnet; dort haengen Auswahl und Haken am WEG, nicht an der Nummer.
     fn sync(&mut self) {
@@ -4265,6 +4266,14 @@ impl Gui {
         if self.scale == 1.0 { return n; }
         (n as f64 / self.scale).round() as i32
     }
+    /// Ein Rechteck in Bildschirmpunkten logisch machen -- fuer die Abfragen,
+    /// die es in beiden Formen gibt (`GUI_LISTBOX_ITEM_RECT` logisch,
+    /// `GUI_LISTBOX_ITEM_SCREEN_RECT` in Pixeln wie GUI_HIT_TEST).
+    pub fn rect_logisch(&self, r: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
+        (self.unsk(r.0), self.unsk(r.1), self.unsk(r.2), self.unsk(r.3))
+    }
+    pub fn logisch(&self, n: i64) -> i64 { if n < 0 { n } else { self.unsk(n as i32) as i64 } }
+    pub fn pixel(&self, n: i64) -> i64 { if n < 0 { n } else { self.sk(n as i32) as i64 } }
 
     // --- Handles ---
     fn enc_widget(win: usize, idx: usize) -> i64 { ((win as i64) << WIDGET_SHIFT) | idx as i64 }
@@ -5000,7 +5009,7 @@ impl Gui {
         let gut = self.ta_gutter(g, wd, starts.len());
         if gut == 0 { return None; }
         let (ax, ay, _, fh) = self.abs_rect(wi, wd);
-        let pad = 5;
+        let pad = self.ta_pad();
         if mx < ax || mx >= ax + pad + gut - self.sk(4) { return None; }
         if my < ay + pad || my >= ay + fh - pad { return None; }
         if let Some((fx, fbw)) = self.ta_falt_spalte(g, wd, ax, starts.len()) {
@@ -5248,7 +5257,7 @@ impl Gui {
         if fw == 0 { return None; }
         let gutter = self.ta_gutter(g, wdg, zeilen);
         if gutter == 0 { return None; }
-        Some((ax + 5 + gutter - self.sk(4) - fw, fw))
+        Some((ax + self.ta_pad() + gutter - self.sk(4) - fw, fw))
     }
 
     /// Breite der Nummernspalte (0 = aus).

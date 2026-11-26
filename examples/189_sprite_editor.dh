@@ -2005,15 +2005,15 @@ DIM statDlg AS GUI_WINDOW
 
 ' Das erste Bild, das die Leiste zeigt: so, dass das aktuelle mittig steht.
 FUNCTION leisteErstes() AS INTEGER
-    DIM n AS INTEGER : n = MAX(1, (GUI_CANVAS_W(bildLeiste) - 12) \ 74)
+    DIM n AS INTEGER : n = MAX(1, (GUI_CANVAS_SCREEN_W(bildLeiste) - 12) \ 74)
     RETURN MAX(0, MIN(aktBild - n \ 2, anzBild - n))
 END FUNCTION
 
 SUB leisteZeichnen()
-    DIM lx AS INTEGER : lx = GUI_CANVAS_X(bildLeiste)
-    DIM ly AS INTEGER : ly = GUI_CANVAS_Y(bildLeiste)
-    DIM lb AS INTEGER : lb = GUI_CANVAS_W(bildLeiste)
-    DIM lh AS INTEGER : lh = GUI_CANVAS_H(bildLeiste)
+    DIM lx AS INTEGER : lx = GUI_CANVAS_SCREEN_X(bildLeiste)
+    DIM ly AS INTEGER : ly = GUI_CANVAS_SCREEN_Y(bildLeiste)
+    DIM lb AS INTEGER : lb = GUI_CANVAS_SCREEN_W(bildLeiste)
+    DIM lh AS INTEGER : lh = GUI_CANVAS_SCREEN_H(bildLeiste)
     BOXROUND(lx, ly, lx + lb - 1, ly + lh - 1, 6, &H0B1018)
     DIM n AS INTEGER : n = MAX(1, (lb - 12) \ 74)
     DIM f0 AS INTEGER : f0 = leisteErstes()
@@ -2619,10 +2619,10 @@ WHILE NOT beenden
     GUI_SET_TEXT(lblDeck, STR$(deckJetzt) + " %")
 
     ' ------------------------------------------------------------- Maus
-    DIM cx AS INTEGER : cx = GUI_CANVAS_X(leinwand)
-    DIM cy AS INTEGER : cy = GUI_CANVAS_Y(leinwand)
-    DIM cw AS INTEGER : cw = GUI_CANVAS_W(leinwand)
-    DIM ch AS INTEGER : ch = GUI_CANVAS_H(leinwand)
+    DIM cx AS INTEGER : cx = GUI_CANVAS_SCREEN_X(leinwand)
+    DIM cy AS INTEGER : cy = GUI_CANVAS_SCREEN_Y(leinwand)
+    DIM cw AS INTEGER : cw = GUI_CANVAS_SCREEN_W(leinwand)
+    DIM ch AS INTEGER : ch = GUI_CANVAS_SCREEN_H(leinwand)
     DIM mx AS INTEGER : mx = MOUSEX()
     DIM my AS INTEGER : my = MOUSEY()
     ' Das Sprite liegt mittig in der Flaeche; panX/panY verschiebt es.
@@ -2661,8 +2661,8 @@ WHILE NOT beenden
     END IF
 
     ' -------------------------------------------------------- Palette
-    DIM px2 AS INTEGER : px2 = GUI_CANVAS_X(palette)
-    DIM py2 AS INTEGER : py2 = GUI_CANVAS_Y(palette)
+    DIM px2 AS INTEGER : px2 = GUI_CANVAS_SCREEN_X(palette)
+    DIM py2 AS INTEGER : py2 = GUI_CANVAS_SCREEN_Y(palette)
     IF MOUSE_HIT(0) AND NOT sperre THEN
         ' Nicht `pi` nennen -- das ist die eingebaute Kreiszahl, und die
         ' Kollision meldet sich erst zur LAUFZEIT, nicht beim Uebersetzen.
@@ -2673,9 +2673,9 @@ WHILE NOT beenden
             GUI_SET_PICKED_COLOR(cp, farbe)
         END IF
         ' Die zuletzt benutzten Farben
-        DIM zfx AS INTEGER : zfx = GUI_CANVAS_X(zuletztFl)
-        DIM zfy AS INTEGER : zfy = GUI_CANVAS_Y(zuletztFl)
-        IF mx >= zfx AND my >= zfy AND my < zfy + GUI_CANVAS_H(zuletztFl) THEN
+        DIM zfx AS INTEGER : zfx = GUI_CANVAS_SCREEN_X(zuletztFl)
+        DIM zfy AS INTEGER : zfy = GUI_CANVAS_SCREEN_Y(zuletztFl)
+        IF mx >= zfx AND my >= zfy AND my < zfy + GUI_CANVAS_SCREEN_H(zuletztFl) THEN
             DIM zfi AS INTEGER : zfi = (mx - zfx) \ 26
             IF zfi < LEN(zuFarben) THEN
                 farbe = zuFarben[zfi]
@@ -2683,9 +2683,9 @@ WHILE NOT beenden
             END IF
         END IF
         ' Die Bildleiste
-        DIM blx AS INTEGER : blx = GUI_CANVAS_X(bildLeiste)
-        DIM bly AS INTEGER : bly = GUI_CANVAS_Y(bildLeiste)
-        IF mx >= blx AND mx < blx + GUI_CANVAS_W(bildLeiste) AND my >= bly AND my < bly + GUI_CANVAS_H(bildLeiste) THEN
+        DIM blx AS INTEGER : blx = GUI_CANVAS_SCREEN_X(bildLeiste)
+        DIM bly AS INTEGER : bly = GUI_CANVAS_SCREEN_Y(bildLeiste)
+        IF mx >= blx AND mx < blx + GUI_CANVAS_SCREEN_W(bildLeiste) AND my >= bly AND my < bly + GUI_CANVAS_SCREEN_H(bildLeiste) THEN
             DIM bli AS INTEGER : bli = leisteErstes() + (mx - blx - 6) \ 74
             IF bli >= 0 AND bli < anzBild AND (mx - blx - 6) MOD 74 < 68 THEN GUI_LISTBOX_SET_SELECTED(lstBild, bli)
         END IF
@@ -2865,8 +2865,8 @@ WHILE NOT beenden
         IF pal[i] = farbe THEN RECTROUND(qx - 1, qy - 1, qx + 31, qy + 31, 5, &HFFFFFF)
     NEXT
     ' Zuletzt benutzt
-    DIM zlx AS INTEGER : zlx = GUI_CANVAS_X(zuletztFl)
-    DIM zly AS INTEGER : zly = GUI_CANVAS_Y(zuletztFl)
+    DIM zlx AS INTEGER : zlx = GUI_CANVAS_SCREEN_X(zuletztFl)
+    DIM zly AS INTEGER : zly = GUI_CANVAS_SCREEN_Y(zuletztFl)
     FOR i = 0 TO 7
         IF i < LEN(zuFarben) THEN
             BOXROUND(zlx + i * 26, zly + 2, zlx + i * 26 + 21, zly + 23, 4, zuFarben[i])
@@ -2878,7 +2878,7 @@ WHILE NOT beenden
     leisteZeichnen()
     ' Das gewaehlte Werkzeug in der Spalte: ein Rahmen in der Akzentfarbe.
     ' Sinnbild-Knoepfe sind flach, ein Farbton allein faellt kaum auf.
-    DIM wzOy AS INTEGER : wzOy = GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    DIM wzOy AS INTEGER : wzOy = GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
     DIM wzX AS INTEGER : wzX = GUI_GET_X(wzKnopf[werkzeug])
     DIM wzY AS INTEGER : wzY = GUI_GET_Y(wzKnopf[werkzeug]) + wzOy
     BOXROUND(wzX, wzY, wzX + GUI_GET_W(wzKnopf[werkzeug]) - 1, wzY + GUI_GET_H(wzKnopf[werkzeug]) - 1, 6, &H402BC4E8)
@@ -3057,10 +3057,10 @@ WHILE NOT beenden
     SCISSOR_END()
 
     ' ---------------------------------------------------------- Vorschau
-    DIM vx AS INTEGER : vx = GUI_CANVAS_X(vorschau)
-    DIM vy AS INTEGER : vy = GUI_CANVAS_Y(vorschau)
-    DIM vw AS INTEGER : vw = GUI_CANVAS_W(vorschau)
-    DIM vh AS INTEGER : vh = GUI_CANVAS_H(vorschau)
+    DIM vx AS INTEGER : vx = GUI_CANVAS_SCREEN_X(vorschau)
+    DIM vy AS INTEGER : vy = GUI_CANVAS_SCREEN_Y(vorschau)
+    DIM vw AS INTEGER : vw = GUI_CANVAS_SCREEN_W(vorschau)
+    DIM vh AS INTEGER : vh = GUI_CANVAS_SCREEN_H(vorschau)
     BOX(vx, vy, vx + vw - 1, vy + vh - 1, &H070A0F)
     DIM vz AS INTEGER : vz = MAX(1, MIN((vw - 8) \ gw, (vh - 8) \ gh))
     DIM vox AS INTEGER : vox = vx + (vw - gw * vz) \ 2

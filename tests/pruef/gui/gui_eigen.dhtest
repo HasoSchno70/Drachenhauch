@@ -59,7 +59,7 @@ FOR n = 1 TO 20
     END IF
     CLS(0) : GUI_DRAW()
     GUI_CANVAS_BEGIN(c)
-    BOX(GUI_CANVAS_X(c), GUI_CANVAS_Y(c), GUI_CANVAS_X(c) + 20, GUI_CANVAS_Y(c) + 20, IIF(GUI_CHECKED(c), &H00FF00, &HFF0000))
+    BOX(GUI_CANVAS_SCREEN_X(c), GUI_CANVAS_SCREEN_Y(c), GUI_CANVAS_SCREEN_X(c) + 20, GUI_CANVAS_SCREEN_Y(c) + 20, IIF(GUI_CHECKED(c), &H00FF00, &HFF0000))
     GUI_CANVAS_END()
     FLIP()
 NEXT
@@ -99,4 +99,4 @@ CATCH e2
 END TRY
 --- enthaelt
 GUI_CUSTOM: Rolle 'kreisel' -- button, checkbox oder slider
-GUI_CUSTOM_KEY: Widget ist kein GUI_CUSTOM
+GUI_CUSTOM_KEY: das Widget ist kein GUI_CUSTOM

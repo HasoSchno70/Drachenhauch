@@ -622,10 +622,7 @@ TASK_START: dieses Lambda traegt Werte aus seiner Umgebung mit, und ein Auftrag 
 {} auf NIL -- die Variable hat noch keinen Wert	{} on NIL -- the variable has no value yet
 {}: erwartet 1D-ARRAY	{}: expected a 1D ARRAY
 {}: erwartet 1D-ARRAY von Zahlen	{}: expected a 1D ARRAY of numbers
-{}: erwartet ein 1D- oder 2D-ARRAY, bekommen {}D	{}: expected a 1D or 2D ARRAY, got {}D
 {}: erwartet ein ARRAY OF STRING	{}: expected an ARRAY OF STRING
-{}: erwartet ein ENUM als erstes Argument, bekommen {}	{}: expected an ENUM as the first argument, got {}
-{}: erwartet INTEGER als Wert, bekommen {}	{}: expected INTEGER as the value, got {}
 {}: erwartet STRING oder BUFFER, erhalten {}	{}: expected STRING or BUFFER, got {}
 {}: erwartet BOOLEAN als 3. Argument	{}: expected BOOLEAN as the 3rd argument
 {}: erwartet eine Datei aus OPENFILE, erhalten {}	{}: expected a file from OPENFILE, got {}
@@ -688,7 +685,6 @@ __closure: erwartet den Funktionsnamen	__closure: expected the function name
 {}: Ganzzahl-Ueberlauf (INTEGER ist 64-bit)	{}: integer overflow (INTEGER is 64-bit)
 {}: {},{} ist zu gross (INTEGER ist 64-bit)	{}: {},{} is too large (INTEGER is 64-bit)
 {}: {} passt nicht in eine ganze Zahl	{}: {} does not fit into a whole number
-{}: FLOAT {} kann nicht ohne Verlust nach INTEGER (nutze INT())	{}: FLOAT {} cannot be turned into INTEGER without loss (use INT())
 {}: Argument muss > 0 sein	{}: the argument must be > 0
 {}: Argument muss in [-1, 1] liegen	{}: the argument must be in [-1, 1]
 {}: Basis muss > 0 und <> 1 sein	{}: the base must be > 0 and <> 1
@@ -749,7 +745,6 @@ Ungueltige Regex '{}': {}	Invalid regex '{}': {}
 {}: keine gueltigen {}-Daten	{}: not valid {} data
 
 # ---------------------------------------------------------------- JSON, XML, Speicherstaende
-{}: '{}' ist kein gueltiges JSON ({})	{}: '{}' is not valid JSON ({})
 {}: Pfad '{}' nicht aufloesbar	{}: path '{}' cannot be resolved
 {}: Pfad '{}' ist kein String	{}: path '{}' is not a string
 {}: '{}' ist {}, kein Array	{}: '{}' is {}, not an array
@@ -869,8 +864,6 @@ erhalten {}, erwartet {}	got {}, expected {}
 {}: value muss INTEGER sein	{}: value must be INTEGER
 {}: value muss STRING sein	{}: value must be STRING
 {}: value muss Zahl sein	{}: value must be a number
-{}: start muss Zahl sein	{}: start must be a number
-{}: end muss Zahl sein	{}: end must be a number
 {}: id muss STRING sein	{}: id must be a STRING
 {}: handler muss FUNCREF sein	{}: handler must be a FUNCREF
 {}: color muss INTEGER oder ARRAY sein	{}: color must be INTEGER or ARRAY
@@ -1450,33 +1443,17 @@ GUI_WINDOW_ZOOM: nur fuer ein Fenster im Entwurfsmodus (GUI_WINDOW_DESIGN) -- es
 GUI_WINDOW_GET_ZOOM: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_GET_ZOOM: invalid GUI_WINDOW handle
 GUI_WINDOW_CLOSED: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_CLOSED: invalid GUI_WINDOW handle
 GUI_SPLITTER: orientation muss "v"/"vertical" oder "h"/"horizontal" sein	GUI_SPLITTER: orientation must be "v"/"vertical" or "h"/"horizontal"
-GUI_RADIO_SELECTED: Widget ist kein radio	GUI_RADIO_SELECTED: widget is not a radio button
-GUI_SET_IMAGE: Widget ist kein image und keine Kachel	GUI_SET_IMAGE: widget is neither an image nor a card
-GUI_CARD_SET_TEXT: Widget ist keine Kachel (GUI_CARD)	GUI_CARD_SET_TEXT: widget is not a card (GUI_CARD)
-GUI_CARD_TEXT$: Widget ist keine Kachel (GUI_CARD)	GUI_CARD_TEXT$: widget is not a card (GUI_CARD)
-GUI_SET_ICON: Widget ist kein button	GUI_SET_ICON: widget is not a button
-{}: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)	{}: widget is not a toolbar (GUI_TOOLBAR)
 {}: Eintrag {} gibt es nicht ({} Eintraege)	{}: there is no entry {} ({} entries)
 GUI_TOOLBAR_CHECKABLE: Eintrag {} ist kein Knopf	GUI_TOOLBAR_CHECKABLE: entry {} is not a button
 GUI_TOOLBAR_SET_CHECKED: Eintrag {} ist nicht kippbar (erst GUI_TOOLBAR_CHECKABLE)	GUI_TOOLBAR_SET_CHECKED: entry {} cannot be toggled (call GUI_TOOLBAR_CHECKABLE first)
 GUI_TOOLBAR_SET: unbekannte Einstellung '{}' -- bekannt sind: beschriftung, symbolgroesse	GUI_TOOLBAR_SET: unknown setting '{}' -- known are: beschriftung, symbolgroesse
-GUI_TOOLBAR_ITEM_X: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)	GUI_TOOLBAR_ITEM_X: widget is not a toolbar (GUI_TOOLBAR)
 GUI_TOOLBAR_ITEM_X: Eintrag {} gibt es nicht	GUI_TOOLBAR_ITEM_X: there is no entry {}
 GUI_TOOLBAR_ITEM_X: Eintrag {} steht im Ueberlauf (>>), die Leiste ist zu schmal fuer ihn -- GUI_TOOLBAR_OVERFLOW sagt, wie viele dort stehen	GUI_TOOLBAR_ITEM_X: entry {} is in the overflow (>>), the toolbar is too narrow for it -- GUI_TOOLBAR_OVERFLOW tells how many are there
-GUI_TOOLBAR_OVERFLOW: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)	GUI_TOOLBAR_OVERFLOW: widget is not a toolbar (GUI_TOOLBAR)
-{}: Widget ist keine Statusleiste (GUI_STATUSBAR)	{}: widget is not a status bar (GUI_STATUSBAR)
 {}: Feld {} gibt es nicht ({} Felder)	{}: there is no field {} ({} fields)
 {}: Ausrichtung '{}' gibt es nicht -- links, mitte, rechts	{}: there is no alignment '{}' -- links, mitte, rechts
 GUI_STATUSBAR_ADD: Breite muss >= 0 sein (0 = teilt sich den Rest)	GUI_STATUSBAR_ADD: width must be >= 0 (0 = shares the rest)
-GUI_STATUSBAR_FIELD_X: Widget ist keine Statusleiste (GUI_STATUSBAR)	GUI_STATUSBAR_FIELD_X: widget is not a status bar (GUI_STATUSBAR)
 GUI_STATUSBAR_FIELD_X: Feld {} gibt es nicht	GUI_STATUSBAR_FIELD_X: there is no field {}
-{}: Widget ist keine Pfadleiste (GUI_BREADCRUMB)	{}: widget is not a breadcrumb bar (GUI_BREADCRUMB)
 {}: Teil {} gibt es nicht ({} Teile)	{}: there is no part {} ({} parts)
-GUI_BREADCRUMB_FIRST_VISIBLE: Widget ist keine Pfadleiste (GUI_BREADCRUMB)	GUI_BREADCRUMB_FIRST_VISIBLE: widget is not a breadcrumb bar (GUI_BREADCRUMB)
-GUI_CANVAS_*: Widget ist kein canvas	GUI_CANVAS_*: widget is not a canvas
-{}: Widget ist kein dropdown/listbox	{}: widget is not a dropdown/listbox
-{}: das Widget ist keine Liste (GUI_LISTBOX)	{}: the widget is not a list (GUI_LISTBOX)
-{}: das Widget ist keine Liste und keine Klappliste	{}: the widget is neither a list nor a dropdown
 {}: Eintrag {} gibt es nicht (die Liste hat {})	{}: there is no entry {} (the list has {})
 GUI_DOUBLE_CLICKED: nur fuer Listen, Tabellen und Baeume (GUI_LISTBOX, GUI_TABLE, GUI_TREE)	GUI_DOUBLE_CLICKED: only for lists, tables and trees (GUI_LISTBOX, GUI_TABLE, GUI_TREE)
 {}: starts, laengen und farben muessen gleich lang sein ({}, {}, {})	{}: starts, lengths and colors must have the same length ({}, {}, {})
@@ -1484,8 +1461,6 @@ GUI_DOUBLE_CLICKED: nur fuer Listen, Tabellen und Baeume (GUI_LISTBOX, GUI_TABLE
 {}: Knoten {} gibt es nicht	{}: there is no node {}
 {}: Knoten {} ist zugeklappt -- erst GUI_TREE_EXPAND auf seine Eltern	{}: node {} is collapsed -- call GUI_TREE_EXPAND on its parents first
 GUI_BUTTON_VARIANT: Knopfart '{}' gibt es nicht -- bekannt sind: {}	GUI_BUTTON_VARIANT: there is no button kind '{}' -- known are: {}
-GUI_BUTTON_VARIANT: Widget ist kein Knopf	GUI_BUTTON_VARIANT: widget is not a button
-{}: Widget ist keine Tabelle	{}: widget is not a table
 {}: Zeile {} gibt es nicht (0..{})	{}: there is no row {} (0..{})
 {}: Spalte {} gibt es nicht (0..{})	{}: there is no column {} (0..{})
 GUI_TABLE_CELL_ALIGN: '{}' unbekannt -- links, mitte oder rechts	GUI_TABLE_CELL_ALIGN: '{}' unknown -- links, mitte or rechts
@@ -1502,7 +1477,6 @@ GUI_TABLE_MOVE_COL: Position ausserhalb 0..{}	GUI_TABLE_MOVE_COL: position outsi
 GUI_TABLE_SELECT: Zeile {} gibt es nicht (0..{})	GUI_TABLE_SELECT: there is no row {} (0..{})
 GUI_TABLE_COL_EDIT: Spalte darf nicht negativ sein	GUI_TABLE_COL_EDIT: column must not be negative
 GUI_TABLE_FILTER: Spalte darf nicht negativ sein	GUI_TABLE_FILTER: column must not be negative
-{}: Widget ist kein Baum	{}: widget is not a tree
 GUI_TREE_ADD: ungueltiger parent {}	GUI_TREE_ADD: invalid parent {}
 GUI_TREE_SET: unbekannte Einstellung '{}' (gueltig: mehrfachauswahl, kaestchen, bearbeitbar)	GUI_TREE_SET: unknown setting '{}' (valid: mehrfachauswahl, kaestchen, bearbeitbar)
 GUI_TREE_SELECT: ungueltige Knoten-id {}	GUI_TREE_SELECT: invalid node id {}
@@ -1510,20 +1484,16 @@ GUI_TREE_LABEL: ungueltige Knoten-id {}	GUI_TREE_LABEL: invalid node id {}
 GUI_TREE_EXPAND: ungueltige Knoten-id {}	GUI_TREE_EXPAND: invalid node id {}
 GUI_TREE_CHECKED: ungueltige Knoten-id {}	GUI_TREE_CHECKED: invalid node id {}
 GUI_TREE_SET_CHECKED: ungueltige Knoten-id {}	GUI_TREE_SET_CHECKED: invalid node id {}
-{}: Widget ist kein Dateibaum (GUI_FILETREE)	{}: widget is not a file tree (GUI_FILETREE)
 GUI_FILETREE_SET: unbekannte Einstellung '{}' (gueltig: ordner_zuerst, verborgene, nur_ordner, nach_art, klick_klappt, mehrfachauswahl, kaestchen, auffrischen)	GUI_FILETREE_SET: unknown setting '{}' (valid: ordner_zuerst, verborgene, nur_ordner, nach_art, klick_klappt, mehrfachauswahl, kaestchen, auffrischen)
-{}: Widget ist kein Reiterwerk (GUI_TABCONTROL)	{}: widget is not a tab control (GUI_TABCONTROL)
 GUI_TABCONTROL_SET_PAGE: Seite {} gibt es nicht	GUI_TABCONTROL_SET_PAGE: there is no page {}
 GUI_TABCONTROL_SET_TITLE: Seite {} gibt es nicht	GUI_TABCONTROL_SET_TITLE: there is no page {}
 GUI_TABCONTROL_ADD_WIDGET: das Reiterwerk kann nicht sein eigenes Kind sein	GUI_TABCONTROL_ADD_WIDGET: the tab control cannot be its own child
 GUI_TABCONTROL_ADD_WIDGET: Seite {} gibt es nicht (erst GUI_TABCONTROL_ADD)	GUI_TABCONTROL_ADD_WIDGET: there is no page {} (call GUI_TABCONTROL_ADD first)
 GUI_TABCONTROL_REMOVE: Seite {} gibt es nicht	GUI_TABCONTROL_REMOVE: there is no page {}
-{}: Widget ist kein Akkordeon (GUI_ACCORDION)	{}: widget is not an accordion (GUI_ACCORDION)
 {}: Abschnitt {} gibt es nicht (erst GUI_ACCORDION_ADD)	{}: there is no section {} (call GUI_ACCORDION_ADD first)
 {}: das Akkordeon kann nicht sein eigenes Kind sein	{}: the accordion cannot be its own child
 {}: das Kind muss NACH dem Akkordeon angelegt sein, sonst zeichnet es darunter	{}: the child must be created AFTER the accordion, otherwise it is drawn underneath
 GUI_ACCORDION_SET: unbekannter Schluessel '{}' (erlaubt: mehrere)	GUI_ACCORDION_SET: unknown key '{}' (allowed: mehrere)
-{}: Widget ist kein Assistent (GUI_WIZARD)	{}: widget is not a wizard (GUI_WIZARD)
 GUI_WIZARD_SET_STEP: Schritt {} gibt es nicht	GUI_WIZARD_SET_STEP: there is no step {}
 {}: der Assistent kann nicht sein eigenes Kind sein	{}: the wizard cannot be its own child
 {}: Schritt {} gibt es nicht (erst GUI_WIZARD_ADD)	{}: there is no step {} (call GUI_WIZARD_ADD first)
@@ -1531,12 +1501,9 @@ GUI_WIZARD_SET: unbekannter Schluessel '{}' (erlaubt: pruefen)	GUI_WIZARD_SET: u
 {}: Tabelle ist kein Baum (GUI_TREETABLE oder GUI_TABLE_SET(t, "baum", 1))	{}: the table is not a tree (GUI_TREETABLE or GUI_TABLE_SET(t, "baum", 1))
 {}: Zeile {} gibt es nicht	{}: there is no row {}
 {}: Zeile {} kann nicht unter sich selbst oder ihren Nachkommen haengen	{}: row {} cannot hang under itself or its descendants
-{}: Widget ist kein Uhrzeitwaehler (GUI_TIMEPICKER)	{}: widget is not a time picker (GUI_TIMEPICKER)
-GUI_TIME: Widget ist kein Uhrzeitwaehler (GUI_TIMEPICKER)	GUI_TIME: widget is not a time picker (GUI_TIMEPICKER)
 GUI_SET_TIME: '{}' ist keine Uhrzeit (HH:MM oder HH:MM:SS)	GUI_SET_TIME: '{}' is not a time of day (HH:MM or HH:MM:SS)
 GUI_SET_TIME: '{}' liegt ausserhalb von 00:00:00 bis 23:59:59	GUI_SET_TIME: '{}' is outside 00:00:00 to 23:59:59
 GUI_TIMEPICKER_SET: unbekannte Einstellung '{}' (gueltig: sekunden, schritt)	GUI_TIMEPICKER_SET: unknown setting '{}' (valid: sekunden, schritt)
-{}: Widget ist kein gesetzter Text (GUI_RICHTEXT)	{}: widget is not a rich text (GUI_RICHTEXT)
 GUI_RICHTEXT_SET: unbekannte Einstellung '{}' (gueltig: groesse, codeschrift, {})	GUI_RICHTEXT_SET: unknown setting '{}' (valid: groesse, codeschrift, {})
 {}: erwartet GUI_MENU/GUI_CONTEXT	{}: expects GUI_MENU/GUI_CONTEXT
 {}: ungueltiges Menue-Handle	{}: invalid menu handle
@@ -1545,10 +1512,6 @@ GUI_RICHTEXT_SET: unbekannte Einstellung '{}' (gueltig: groesse, codeschrift, {}
 GUI_MENU_ENABLE: eine Trennlinie laesst sich nicht schalten	GUI_MENU_ENABLE: a separator cannot be switched
 GUI_MENU_CHECKED: erwartet einen Menue-Eintrag	GUI_MENU_CHECKED: expects a menu item
 GUI_MENU_CHECKED: ungueltiges Eintrags-Handle	GUI_MENU_CHECKED: invalid item handle
-GUI_CHECKED: Widget ist keine checkbox/radio/toggle	GUI_CHECKED: widget is not a checkbox/radio/toggle
-GUI_VALUE: Widget ist kein slider/progress/spinner/splitter/knob	GUI_VALUE: widget is not a slider/progress/spinner/splitter/knob
-GUI_SET_CHECKED: Widget ist keine checkbox/radio/toggle	GUI_SET_CHECKED: widget is not a checkbox/radio/toggle
-GUI_SET_VALUE: Widget ist kein slider/progress/spinner/splitter	GUI_SET_VALUE: widget is not a slider/progress/spinner/splitter
 GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner, splitter oder tree	GUI_ON_CHANGE: only for slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner, splitter or tree
 GUI_SKIN: unbekannte Widget-Art '{}'	GUI_SKIN: unknown widget kind '{}'
 GUI_SET_COLOR: role muss bg/fg/border/accent/hover/pressed sein	GUI_SET_COLOR: role must be bg/fg/border/accent/hover/pressed
@@ -1570,11 +1533,9 @@ GUI_ON_ENTER: nur ein Textfeld (GUI_TEXTINPUT) meldet Enter	GUI_ON_ENTER: only a
 {}: ungueltiges Widget-Handle {}	{}: invalid widget handle {}
 {}: nur ein Knopf (GUI_BUTTON) kann Standard- oder Abbrechen-Knopf sein	{}: only a button (GUI_BUTTON) can be the default or cancel button
 GUI_LAYOUT: '{}' ist keine Art -- zeile, spalte, fluss oder raster:N	GUI_LAYOUT: '{}' is not a kind -- zeile, spalte, fluss or raster:N
-{}: das Widget ist kein Layout (GUI_LAYOUT)	{}: the widget is not a layout (GUI_LAYOUT)
 GUI_LAYOUT_ADD: ein Layout kann sich nicht selbst aufnehmen	GUI_LAYOUT_ADD: a layout cannot contain itself
 GUI_LAYOUT_ADD: das Widget ist ein Behaelter, in dem dieses Layout schon steckt	GUI_LAYOUT_ADD: the widget is a container this layout is already in
 GUI_LAYOUT_SET: ausrichtung ist 0 (Anfang), 1 (Mitte) oder 2 (Ende)	GUI_LAYOUT_SET: ausrichtung is 0 (start), 1 (middle) or 2 (end)
-GUI_LAYOUT_MIN_W: Widget ist kein Layout-Behaelter	GUI_LAYOUT_MIN_W: widget is not a layout container
 GUI_LOAD: unbekannter Widget-Typ '{}'	GUI_LOAD: unknown widget type '{}'
 GUI_SAVE/GUI_TO_JSON: ungueltiges GUI_WINDOW-Handle	GUI_SAVE/GUI_TO_JSON: invalid GUI_WINDOW handle
 GUI_LOAD: ungueltiges JSON: {}	GUI_LOAD: invalid JSON: {}
@@ -1594,9 +1555,7 @@ GUI_TEXTAREA_VIEW: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_VIEW: the widge
 GUI_TEXTAREA_PAIRS: erwartet je zwei Zeichen, oeffnend und schliessend (z. B. "()[]")	GUI_TEXTAREA_PAIRS: expects two characters each, opening and closing (e.g. "()[]")
 GUI_TEXTAREA_SHARE: ein Textbereich kann keine Ansicht auf sich selbst sein	GUI_TEXTAREA_SHARE: a text area cannot be a view of itself
 GUI_TEXTAREA_SHARE: `von` ist selbst eine Ansicht -- nimm dessen Besitzer	GUI_TEXTAREA_SHARE: `von` is itself a view -- take its owner
-GUI_DROPDOWN_SET: Widget ist keine Klappliste (GUI_DROPDOWN)	GUI_DROPDOWN_SET: widget is not a dropdown (GUI_DROPDOWN)
 GUI_DROPDOWN_SET: unbekannter Schluessel '{}' (bekannt: bearbeitbar)	GUI_DROPDOWN_SET: unknown key '{}' (known: bearbeitbar)
-GUI_DROPDOWN_PLACEHOLDER: Widget ist keine Klappliste (GUI_DROPDOWN)	GUI_DROPDOWN_PLACEHOLDER: widget is not a dropdown (GUI_DROPDOWN)
 GUI_BIND: der Schluessel darf nur Buchstaben, Ziffern und _ enthalten -- er wird ein Spaltenname	GUI_BIND: the key may only contain letters, digits and _ -- it becomes a column name
 GUI_BIND: dieses Widget traegt keinen Wert (Textfeld, Kaestchen, Klappliste, Regler, Datum, Farbe)	GUI_BIND: this widget carries no value (text field, check box, dropdown, slider, date, color)
 GUI_FORM_GET: erwartet GUI_WINDOW	GUI_FORM_GET: expects a GUI_WINDOW
@@ -1613,14 +1572,11 @@ GUI_RULE: an Klappliste und Kaestchen geht nur 'pflicht'	GUI_RULE: dropdowns and
 GUI_RULE: Regeln gehen an Textfeld, Textbereich, Klappliste und Kaestchen	GUI_RULE: rules apply to text fields, text areas, dropdowns and check boxes
 GUI_ERROR_LABEL: das zweite Widget muss eine Beschriftung sein	GUI_ERROR_LABEL: the second widget must be a label
 GUI_ERROR_LABEL: Feld und Beschriftung liegen in verschiedenen Fenstern	GUI_ERROR_LABEL: field and label are in different windows
-GUI_PROGRESS_SET: Widget ist kein Fortschrittsbalken	GUI_PROGRESS_SET: widget is not a progress bar
 GUI_PROGRESS_SET: unbekannter Schluessel '{}' -- erwartet unbestimmt	GUI_PROGRESS_SET: unknown key '{}' -- expected unbestimmt
 GUI_IMAGE_MODE: '{}' ist kein Modus -- strecken, einpassen, fuellen, mitte oder kacheln	GUI_IMAGE_MODE: '{}' is not a mode -- strecken, einpassen, fuellen, mitte or kacheln
-GUI_IMAGE_MODE: Widget ist kein image und keine Kachel	GUI_IMAGE_MODE: widget is neither an image nor a card
 GUI_SET_CURSOR: unbekannte Form '{}' -- erwartet {} oder auto	GUI_SET_CURSOR: unknown shape '{}' -- expected {} or auto
 GUI_TREE_ICON: ungueltige Knoten-id {}	GUI_TREE_ICON: invalid node id {}
 GUI_TREE_COLOR: ungueltige Knoten-id {}	GUI_TREE_COLOR: invalid node id {}
-{}: Widget ist kein Panel	{}: widget is not a panel
 GUI_PANEL_ADD: ungueltiges GUI_WIDGET-Handle	GUI_PANEL_ADD: invalid GUI_WIDGET handle
 GUI_PANEL_ADD: ein Panel kann sich nicht selbst aufnehmen	GUI_PANEL_ADD: a panel cannot contain itself
 GUI_PANEL_ADD: ein rollendes Panel in einem rollenden Panel gibt es nicht	GUI_PANEL_ADD: there is no scrolling panel inside a scrolling panel
@@ -2186,3 +2142,23 @@ jit: {} Runden in der VM -- {}	jit: {} rounds in the VM -- {}
 CHAR_UPDATE: erwartet 3 oder 4 Argumente, erhalten {}	CHAR_UPDATE: expected 3 or 4 arguments, got {}
 CHAR_UPDATE: dt muss eine Zahl >= 0 sein (Sekunden), erhalten {}	CHAR_UPDATE: dt must be a number >= 0 (seconds), got {}
 CHAR_UPDATE: dt ist in Sekunden (wie DELTA) -- {} sieht nach Millisekunden aus	CHAR_UPDATE: dt is in seconds (like DELTA) -- {} looks like milliseconds
+{}: das Widget ist kein {}	{}: the widget is not a {}
+RGB: die Werte muessen 0..255 sein, erhalten {}	RGB: the values must be 0..255, got {}
+SQR: erwartet eine Zahl >= 0, erhalten {}	SQR: expected a number >= 0, got {}
+{}: erwartet INTEGER als Wert, erhalten {}	{}: expected INTEGER as the value, got {}
+{}: erwartet ein ENUM als erstes Argument, erhalten {}	{}: expected an ENUM as the first argument, got {}
+{}: erwartet ein 1D- oder 2D-ARRAY, erhalten {}D	{}: expected a 1D or 2D ARRAY, got {}D
+{}: Port {} liegt ausserhalb 0..65535	{}: port {} is outside 0..65535
+{}: [[kein gueltiges JSON]] (Zeile {}, Spalte {})	{}: not valid JSON (line {}, column {})
+{}: [[der Text endet mitten im JSON]] (Zeile {}, Spalte {})	{}: the text ends in the middle of the JSON (line {}, column {})
+{}: '{}': [[kein gueltiges JSON]] (Zeile {}, Spalte {})	{}: '{}': not valid JSON (line {}, column {})
+{}: '{}': [[der Text endet mitten im JSON]] (Zeile {}, Spalte {})	{}: '{}': the text ends in the middle of the JSON (line {}, column {})
+{}: [[zu viele gleichzeitige Klaenge oder Objekte (Grenze erreicht)]]	{}: too many simultaneous sounds or objects (limit reached)
+{}: [[das Format wird nicht unterstuetzt oder die Datei ist beschaedigt]]	{}: the format is not supported or the file is damaged
+{}: {}: [[das Format wird nicht unterstuetzt oder die Datei ist beschaedigt]]	{}: {}: the format is not supported or the file is damaged
+{}: [[die Datei liess sich nicht lesen]]	{}: the file could not be read
+{}: [[]]die Ton-Bibliothek meldet: {}	{}: the sound library reports: {}
+{}: [[diese Kanalanordnung wird nicht unterstuetzt]]	{}: this channel layout is not supported
+GUI_TREE_SET_LABEL: beim Dateibaum heissen die Knoten wie ihre Dateien	GUI_TREE_SET_LABEL: in a file tree the nodes are named after their files
+GUI_TREE_REMOVE: der Dateibaum liest seine Knoten selbst -- GUI_FILETREE_REFRESH	GUI_TREE_REMOVE: the file tree reads its nodes itself -- GUI_FILETREE_REFRESH
+GUI_GET_COLOR: Rolle '{}' gibt es nicht -- bg, fg, border, accent, hover oder pressed	GUI_GET_COLOR: there is no role '{}' -- bg, fg, border, accent, hover or pressed

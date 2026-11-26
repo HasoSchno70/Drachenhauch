@@ -354,19 +354,19 @@ impl<'p> Vm<'p> {
             "gui_dropdown" => Value::Int(self.gui.dropdown(gi(a,0,"GUI_DROPDOWN")?, gi(a,1,"GUI_DROPDOWN")? as i32,
                 gi(a,2,"GUI_DROPDOWN")? as i32, gi(a,3,"GUI_DROPDOWN")? as i32, gi(a,4,"GUI_DROPDOWN")? as i32,
                 gstrs(a,5,"GUI_DROPDOWN")?)?),
-            "gui_dropdown_selected" => Value::Int(self.gui.dropdown_selected(gi(a,0,"GUI_DROPDOWN_SELECTED")?)?),
-            "gui_dropdown_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_DROPDOWN_TEXT")?)?),
+            "gui_dropdown_selected" => Value::Int(self.gui.dropdown_selected(gi(a,0,"GUI_DROPDOWN_SELECTED")?, "GUI_DROPDOWN_SELECTED")?),
+            "gui_dropdown_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_DROPDOWN_TEXT")?, "GUI_DROPDOWN_TEXT")?),
             "gui_dropdown_count" => Value::Int(self.gui.dropdown_count(gi(a,0,"GUI_DROPDOWN_COUNT")?)?),
             "gui_dropdown_item" => Value::str_rc(&self.gui.dropdown_item(gi(a,0,"GUI_DROPDOWN_ITEM")?, gi(a,1,"GUI_DROPDOWN_ITEM")?)?),
-            "gui_dropdown_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_DROPDOWN_SET_SELECTED")?, gi(a,1,"GUI_DROPDOWN_SET_SELECTED")?)?; Value::Nil }
+            "gui_dropdown_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_DROPDOWN_SET_SELECTED")?, gi(a,1,"GUI_DROPDOWN_SET_SELECTED")?, "GUI_DROPDOWN_SET_SELECTED")?; Value::Nil }
             "gui_set_dropdown" => { self.gui.set_dropdown_items(gi(a,0,"GUI_SET_DROPDOWN")?, gstrs(a,1,"GUI_SET_DROPDOWN")?)?; Value::Nil }
             // --- ListBox (teilt die item-Logik mit Dropdown) ---
             "gui_listbox" => Value::Int(self.gui.listbox(gi(a,0,"GUI_LISTBOX")?, gi(a,1,"GUI_LISTBOX")? as i32,
                 gi(a,2,"GUI_LISTBOX")? as i32, gi(a,3,"GUI_LISTBOX")? as i32, gi(a,4,"GUI_LISTBOX")? as i32,
                 gstrs(a,5,"GUI_LISTBOX")?)?),
-            "gui_listbox_selected" => Value::Int(self.gui.dropdown_selected(gi(a,0,"GUI_LISTBOX_SELECTED")?)?),
-            "gui_listbox_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_LISTBOX_TEXT")?)?),
-            "gui_listbox_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_LISTBOX_SET_SELECTED")?, gi(a,1,"GUI_LISTBOX_SET_SELECTED")?)?; Value::Nil }
+            "gui_listbox_selected" => Value::Int(self.gui.dropdown_selected(gi(a,0,"GUI_LISTBOX_SELECTED")?, "GUI_LISTBOX_SELECTED")?),
+            "gui_listbox_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_LISTBOX_TEXT")?, "GUI_LISTBOX_TEXT")?),
+            "gui_listbox_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_LISTBOX_SET_SELECTED")?, gi(a,1,"GUI_LISTBOX_SET_SELECTED")?, "GUI_LISTBOX_SET_SELECTED")?; Value::Nil }
             "gui_set_listbox" => { self.gui.set_dropdown_items(gi(a,0,"GUI_SET_LISTBOX")?, gstrs(a,1,"GUI_SET_LISTBOX")?)?; Value::Nil }
             "gui_listbox_add" => {
                 let pos = if a.len() > 2 { gi(a,2,"GUI_LISTBOX_ADD")? } else { -1 };
@@ -417,8 +417,12 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "gui_listbox_detail" => { self.gui.list_detail(gi(a,0,"GUI_LISTBOX_DETAIL")?, gi(a,1,"GUI_LISTBOX_DETAIL")?, gs(a,2,"GUI_LISTBOX_DETAIL")?)?; Value::Nil }
-            "gui_listbox_item_rect" => {
-                let (x, y, w, h) = self.gui.list_item_rect(gi(a,0,"GUI_LISTBOX_ITEM_RECT")?, gi(a,1,"GUI_LISTBOX_ITEM_RECT")?)?;
+            // Logisch wie alle Lagen nach aussen; in Bildschirmpixeln (wie
+            // GUI_HIT_TEST, fuer echte Klicks) unter dem _SCREEN_-Namen.
+            // Bis 2026.53 lieferte der alte Name Pixel.
+            "gui_listbox_item_rect" | "gui_listbox_item_screen_rect" => {
+                let r = self.gui.list_item_rect(gi(a,0,name)?, gi(a,1,name)?, &name.to_uppercase())?;
+                let (x, y, w, h) = if name.contains("_screen_") { r } else { self.gui.rect_logisch(r) };
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
             }
             "gui_listbox_tip" => { self.gui.list_tip(gi(a,0,"GUI_LISTBOX_TIP")?, gi(a,1,"GUI_LISTBOX_TIP")?, gs(a,2,"GUI_LISTBOX_TIP")?)?; Value::Nil }
@@ -441,16 +445,28 @@ impl<'p> Vm<'p> {
             "gui_listbox_scroll_to" => { self.gui.list_scroll_to(gi(a,0,"GUI_LISTBOX_SCROLL_TO")?, gi(a,1,"GUI_LISTBOX_SCROLL_TO")?)?; Value::Nil }
             "gui_dropdown_set" => { self.gui.dropdown_set(gi(a,0,"GUI_DROPDOWN_SET")?, &gs(a,1,"GUI_DROPDOWN_SET")?, gnum(a,2,"GUI_DROPDOWN_SET")?)?; Value::Nil }
             "gui_dropdown_placeholder" => { self.gui.dropdown_placeholder(gi(a,0,"GUI_DROPDOWN_PLACEHOLDER")?, gs(a,1,"GUI_DROPDOWN_PLACEHOLDER")?.to_string())?; Value::Nil }
-            "gui_tabcontrol_item_rect" => {
-                let (x, y, w, h) = self.gui.tabcontrol_item_rect(gi(a,0,"GUI_TABCONTROL_ITEM_RECT")?, gi(a,1,"GUI_TABCONTROL_ITEM_RECT")?)?;
+            // Logisch wie alle Lagen nach aussen; in Bildschirmpixeln (wie
+            // GUI_HIT_TEST, fuer echte Klicks) unter dem _SCREEN_-Namen.
+            // Bis 2026.53 lieferte der alte Name Pixel.
+            "gui_tabcontrol_item_rect" | "gui_tabcontrol_item_screen_rect" => {
+                let r = self.gui.tabcontrol_item_rect(gi(a,0,name)?, gi(a,1,name)?, &name.to_uppercase())?;
+                let (x, y, w, h) = if name.contains("_screen_") { r } else { self.gui.rect_logisch(r) };
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
             }
-            "gui_table_row_rect" => {
-                let (x, y, w, h) = self.gui.table_row_rect(gi(a,0,"GUI_TABLE_ROW_RECT")?, gi(a,1,"GUI_TABLE_ROW_RECT")?)?;
+            // Logisch wie alle Lagen nach aussen; in Bildschirmpixeln (wie
+            // GUI_HIT_TEST, fuer echte Klicks) unter dem _SCREEN_-Namen.
+            // Bis 2026.53 lieferte der alte Name Pixel.
+            "gui_table_row_rect" | "gui_table_row_screen_rect" => {
+                let r = self.gui.table_row_rect(gi(a,0,name)?, gi(a,1,name)?, &name.to_uppercase())?;
+                let (x, y, w, h) = if name.contains("_screen_") { r } else { self.gui.rect_logisch(r) };
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
             }
-            "gui_tree_item_rect" => {
-                let (x, y, w, h) = self.gui.tree_item_rect(gi(a,0,"GUI_TREE_ITEM_RECT")?, gi(a,1,"GUI_TREE_ITEM_RECT")?)?;
+            // Logisch wie alle Lagen nach aussen; in Bildschirmpixeln (wie
+            // GUI_HIT_TEST, fuer echte Klicks) unter dem _SCREEN_-Namen.
+            // Bis 2026.53 lieferte der alte Name Pixel.
+            "gui_tree_item_rect" | "gui_tree_item_screen_rect" => {
+                let r = self.gui.tree_item_rect(gi(a,0,name)?, gi(a,1,name)?, &name.to_uppercase())?;
+                let (x, y, w, h) = if name.contains("_screen_") { r } else { self.gui.rect_logisch(r) };
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
             }
             "gui_tree_edit" => { self.gui.tree_edit(gi(a,0,"GUI_TREE_EDIT")?, gi(a,1,"GUI_TREE_EDIT")?)?; Value::Nil }
@@ -464,8 +480,8 @@ impl<'p> Vm<'p> {
             "gui_richtext_selection$" | "gui_richtext_selection" => Value::str_rc(&self.gui.richtext_selection(gi(a,0,"GUI_RICHTEXT_SELECTION")?)?),
             "gui_richtext_select_all" => { self.gui.richtext_select_all(gi(a,0,"GUI_RICHTEXT_SELECT_ALL")?)?; Value::Nil }
             "gui_richtext_clear_selection" => { self.gui.richtext_clear_selection(gi(a,0,"GUI_RICHTEXT_CLEAR_SELECTION")?)?; Value::Nil }
-            "gui_richtext_find_next" => Value::Int(self.gui.richtext_find_step(gi(a,0,"GUI_RICHTEXT_FIND_NEXT")?, &gs(a,1,"GUI_RICHTEXT_FIND_NEXT")?, true)?),
-            "gui_richtext_find_prev" => Value::Int(self.gui.richtext_find_step(gi(a,0,"GUI_RICHTEXT_FIND_PREV")?, &gs(a,1,"GUI_RICHTEXT_FIND_PREV")?, false)?),
+            "gui_richtext_find_next" => { let y = self.gui.richtext_find_step(gi(a,0,"GUI_RICHTEXT_FIND_NEXT")?, &gs(a,1,"GUI_RICHTEXT_FIND_NEXT")?, true)?; Value::Int(self.gui.logisch(y)) }
+            "gui_richtext_find_prev" => { let y = self.gui.richtext_find_step(gi(a,0,"GUI_RICHTEXT_FIND_PREV")?, &gs(a,1,"GUI_RICHTEXT_FIND_PREV")?, false)?; Value::Int(self.gui.logisch(y)) }
             "gui_richtext_mark_all" => Value::Int(self.gui.richtext_mark_all(gi(a,0,"GUI_RICHTEXT_MARK_ALL")?, &gs(a,1,"GUI_RICHTEXT_MARK_ALL")?)?),
             // --- Stufe 28: Statusleiste, Pfadleiste, Ueberlauf ---
             "gui_statusbar" => {
@@ -830,10 +846,15 @@ impl<'p> Vm<'p> {
                 gi(a,2,"GUI_TOOLBAR")? as i32, gi(a,3,"GUI_TOOLBAR")? as i32, gi(a,4,"GUI_TOOLBAR")? as i32)?),
             "gui_canvas" => Value::Int(self.gui.canvas(gi(a,0,"GUI_CANVAS")?, gi(a,1,"GUI_CANVAS")? as i32,
                 gi(a,2,"GUI_CANVAS")? as i32, gi(a,3,"GUI_CANVAS")? as i32, gi(a,4,"GUI_CANVAS")? as i32)?),
-            "gui_canvas_x" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_X")?)?.0 as i64),
-            "gui_canvas_y" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_Y")?)?.1 as i64),
-            "gui_canvas_w" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_W")?)?.2 as i64),
-            "gui_canvas_h" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_H")?)?.3 as i64),
+            // Die Zeichenflaeche: logisch unter dem alten Namen, in
+            // Bildschirmpixeln (fuer die Zeichenbefehle) als GUI_CANVAS_SCREEN_*.
+            // Bis 2026.53 lieferte der alte Name Pixel.
+            "gui_canvas_x" | "gui_canvas_y" | "gui_canvas_w" | "gui_canvas_h"
+            | "gui_canvas_screen_x" | "gui_canvas_screen_y" | "gui_canvas_screen_w" | "gui_canvas_screen_h" => {
+                let r = self.gui.canvas_rect(gi(a,0,name)?, &name.to_uppercase())?;
+                let r = if name.contains("_screen_") { r } else { self.gui.rect_logisch(r) };
+                Value::Int(match name.as_bytes()[name.len() - 1] { b'x' => r.0, b'y' => r.1, b'w' => r.2, _ => r.3 } as i64)
+            }
             "gui_clicked" => Value::Bool(self.gui.clicked(gi(a,0,"GUI_CLICKED")?)?),
             "gui_menu" => Value::Int(self.gui.add_menu(gi(a,0,"GUI_MENU")?, gs(a,1,"GUI_MENU")?.to_string())?),
             "gui_context" => Value::Int(self.gui.add_context(gi(a,0,"GUI_CONTEXT")?)?),
@@ -1371,6 +1392,10 @@ impl<'p> Vm<'p> {
             "gui_tree_clear" => { self.gui.tree_clear(gi(a,0,"GUI_TREE_CLEAR")?)?; Value::Nil }
             "gui_tree_selected" => Value::Int(self.gui.tree_selected(gi(a,0,"GUI_TREE_SELECTED")?)?),
             "gui_tree_set_selected" => { self.gui.tree_set_selected(gi(a,0,"GUI_TREE_SET_SELECTED")?, gi(a,1,"GUI_TREE_SET_SELECTED")?)?; Value::Nil }
+            "gui_tree_count" => Value::Int(self.gui.tree_count(gi(a,0,"GUI_TREE_COUNT")?)?),
+            "gui_tree_set_label" => { self.gui.tree_set_label(gi(a,0,"GUI_TREE_SET_LABEL")?, gi(a,1,"GUI_TREE_SET_LABEL")?, gs(a,2,"GUI_TREE_SET_LABEL")?.to_string())?; Value::Nil }
+            "gui_tree_expanded" => Value::Bool(self.gui.tree_expanded(gi(a,0,"GUI_TREE_EXPANDED")?, gi(a,1,"GUI_TREE_EXPANDED")?)?),
+            "gui_tree_remove" => { self.gui.tree_remove(gi(a,0,"GUI_TREE_REMOVE")?, gi(a,1,"GUI_TREE_REMOVE")?)?; Value::Nil }
             "gui_tree_label" => Value::str_rc(&self.gui.tree_label(gi(a,0,"GUI_TREE_LABEL")?, gi(a,1,"GUI_TREE_LABEL")?)?),
             "gui_tree_set" => { self.gui.tree_set(gi(a,0,"GUI_TREE_SET")?, &gs(a,1,"GUI_TREE_SET")?, gnum(a,2,"GUI_TREE_SET")?)?; Value::Nil }
             "gui_tree_sel_count" => Value::Int(self.gui.tree_sel_count(gi(a,0,"GUI_TREE_SEL_COUNT")?)?),
@@ -1436,12 +1461,17 @@ impl<'p> Vm<'p> {
             "gui_richtext_code$" | "gui_richtext_code" => Value::str_rc(self.gui.richtext_code(gi(a,0,"GUI_RICHTEXT_CODE$")?)?),
             "gui_richtext_goto_heading" => { self.gui.richtext_goto_heading(gi(a,0,"GUI_RICHTEXT_GOTO_HEADING")?, gi(a,1,"GUI_RICHTEXT_GOTO_HEADING")?)?; Value::Nil }
             "gui_richtext_heading_at" => Value::Int(self.gui.richtext_heading_at(gi(a,0,"GUI_RICHTEXT_HEADING_AT")?)?),
-            "gui_richtext_scroll" => { self.gui.richtext_scroll(gi(a,0,"GUI_RICHTEXT_SCROLL")?, gi(a,1,"GUI_RICHTEXT_SCROLL")?)?; Value::Nil }
-            "gui_richtext_scroll_get" => Value::Int(self.gui.richtext_scroll_get(gi(a,0,"GUI_RICHTEXT_SCROLL_GET")?)?),
-            "gui_richtext_height" => Value::Int(self.gui.richtext_height(gi(a,0,"GUI_RICHTEXT_HEIGHT")?)?),
+            // Blickversatz, Inhaltshoehe und gefundene y sind logisch wie alle
+            // Lagen nach aussen (bis 2026.53 Pixel: bei GUI_SCALE(2) das Doppelte).
+            "gui_richtext_scroll" => { let y = self.gui.pixel(gi(a,1,"GUI_RICHTEXT_SCROLL")?); self.gui.richtext_scroll(gi(a,0,"GUI_RICHTEXT_SCROLL")?, y)?; Value::Nil }
+            "gui_richtext_scroll_get" => Value::Int(self.gui.logisch(self.gui.richtext_scroll_get(gi(a,0,"GUI_RICHTEXT_SCROLL_GET")?)?)),
+            "gui_richtext_height" => Value::Int(self.gui.logisch(self.gui.richtext_height(gi(a,0,"GUI_RICHTEXT_HEIGHT")?)?)),
             "gui_richtext_link$" | "gui_richtext_link" => Value::str_rc(&self.gui.richtext_link(gi(a,0,"GUI_RICHTEXT_LINK")?)?),
-            "gui_richtext_find" => Value::Int(self.gui.richtext_find(gi(a,0,"GUI_RICHTEXT_FIND")?, &gs(a,1,"GUI_RICHTEXT_FIND")?,
-                if a.len() > 2 { gi(a,2,"GUI_RICHTEXT_FIND")? } else { -1 })?),
+            "gui_richtext_find" => {
+                let ab = if a.len() > 2 { self.gui.pixel(gi(a,2,"GUI_RICHTEXT_FIND")?) } else { -1 };
+                let y = self.gui.richtext_find(gi(a,0,"GUI_RICHTEXT_FIND")?, &gs(a,1,"GUI_RICHTEXT_FIND")?, ab)?;
+                Value::Int(self.gui.logisch(y))
+            }
             // --- Reiter im Fenster ---
             "gui_tabcontrol" => Value::Int(self.gui.tabcontrol(gi(a,0,"GUI_TABCONTROL")?, gi(a,1,"GUI_TABCONTROL")? as i32,
                 gi(a,2,"GUI_TABCONTROL")? as i32, gi(a,3,"GUI_TABCONTROL")? as i32, gi(a,4,"GUI_TABCONTROL")? as i32)?),

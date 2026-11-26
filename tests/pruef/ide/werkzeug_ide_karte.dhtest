@@ -11,9 +11,9 @@ DIM prP AS INTEGER : prP = 1
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 60 THEN
-    DIM prCx AS INTEGER : prCx = GUI_CANVAS_X(karte)
-    DIM prCy AS INTEGER : prCy = GUI_CANVAS_Y(karte)
-    DIM prCh AS INTEGER : prCh = GUI_CANVAS_H(karte)
+    DIM prCx AS INTEGER : prCx = GUI_CANVAS_SCREEN_X(karte)
+    DIM prCy AS INTEGER : prCy = GUI_CANVAS_SCREEN_Y(karte)
+    DIM prCh AS INTEGER : prCh = GUI_CANVAS_SCREEN_H(karte)
     prP = MAX(1, (400 + prCh - 1) \ prCh)
     protokoll("pr karte sichtbar " + STR$(GUI_VISIBLE(karte)))
     DIM prEv AS STRING : prEv = "c 3" + NL
@@ -79,9 +79,9 @@ DIM prP AS INTEGER : prP = 1
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 60 THEN
-    DIM prCx AS INTEGER : prCx = GUI_CANVAS_X(karte)
-    DIM prCy AS INTEGER : prCy = GUI_CANVAS_Y(karte)
-    DIM prCh AS INTEGER : prCh = GUI_CANVAS_H(karte)
+    DIM prCx AS INTEGER : prCx = GUI_CANVAS_SCREEN_X(karte)
+    DIM prCy AS INTEGER : prCy = GUI_CANVAS_SCREEN_Y(karte)
+    DIM prCh AS INTEGER : prCh = GUI_CANVAS_SCREEN_H(karte)
     prP = MAX(1, (400 + prCh - 1) \ prCh)
     DIM prEv AS STRING : prEv = "c 7" + NL
     prEv = prEv + "e 0 7 " + STR$(prCx + 20) + " " + STR$(prCy + 10) + " 0 0" + NL

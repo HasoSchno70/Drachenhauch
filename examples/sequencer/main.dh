@@ -323,8 +323,8 @@ END SUB
 
 ' --- Raster ----------------------------------------------------------------
 SUB rasterZeichnen()
-    DIM ox AS INTEGER : ox = GUI_CANVAS_X(raster)
-    DIM oy AS INTEGER : oy = GUI_CANVAS_Y(raster)
+    DIM ox AS INTEGER : ox = GUI_CANVAS_SCREEN_X(raster)
+    DIM oy AS INTEGER : oy = GUI_CANVAS_SCREEN_Y(raster)
     DIM jetzt AS INTEGER : jetzt = aktuellerSchritt()
     DIM sp AS INTEGER, s AS INTEGER
     FOR sp = 0 TO SPUREN - 1
@@ -347,8 +347,8 @@ SUB rasterZeichnen()
 END SUB
 
 FUNCTION feldUnterMaus(BYREF sp AS INTEGER, BYREF s AS INTEGER) AS BOOLEAN
-    DIM mx AS INTEGER : mx = MOUSEX() - GUI_CANVAS_X(raster)
-    DIM my AS INTEGER : my = MOUSEY() - GUI_CANVAS_Y(raster)
+    DIM mx AS INTEGER : mx = MOUSEX() - GUI_CANVAS_SCREEN_X(raster)
+    DIM my AS INTEGER : my = MOUSEY() - GUI_CANVAS_SCREEN_Y(raster)
     IF mx < 0 OR my < 0 OR mx >= SCHRITTE * FELD OR my >= SPUREN * FELD THEN RETURN FALSE
     s = mx \ FELD
     sp = my \ FELD

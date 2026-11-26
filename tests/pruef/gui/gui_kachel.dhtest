@@ -104,7 +104,7 @@ DIM w AS GUI_WINDOW : w = GUI_WINDOW("Kasten", 10, 10, 300, 220)
 DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Knopf", 10, 10, 80, 30)
 GUI_CARD_SET_TEXT(b, "x")
 --- fehler
-GUI_CARD_SET_TEXT: Widget ist keine Kachel
+GUI_CARD_SET_TEXT: das Widget ist kein GUI_CARD
 
 === das bild fuellt den oberen teil, der text steht darunter
 ' Rotes Bild: im oberen Teil der Kachel rot, unten (Titel und Text) nicht.

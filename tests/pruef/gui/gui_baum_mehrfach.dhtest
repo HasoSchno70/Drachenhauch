@@ -157,4 +157,4 @@ END TRY
 DHRT_FRAMES=1
 --- erwartet
 GUI_TREE_SET: unbekannte Einstellung 'zeilenhoehe' (gueltig: mehrfachauswahl, kaestchen, bearbeitbar)
-GUI_TREE_SET: Widget ist kein Baum
+GUI_TREE_SET: das Widget ist kein GUI_TREE
