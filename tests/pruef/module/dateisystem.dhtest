@@ -411,3 +411,21 @@ PRINT ZIP_READ$("l.zip", "latin.txt", "latin1")
 --- erwartet
 ZIP_READ$: latin.txt: Zeile 1 ist kein UTF-8 (B
 café
+
+=== loeschen und umbenennen nennen den pfad
+' DELETEFILE und RENAME sagten bis 2026.53 nur "os error 2" ohne Datei; jetzt
+' derselbe Satz wie READALL$ (datei_fehler, Bericht A11.1).
+TRY
+    DELETEFILE("gibtsnicht.txt")
+CATCH e
+    PRINT LEFT$(e, 47)
+END TRY
+TRY
+    RENAME("gibtsnicht.txt", "neu.txt")
+CATCH e
+    PRINT LEFT$(e, 43)
+END TRY
+--- erwartet
+DELETEFILE: Datei 'gibtsnicht.txt' nicht gefund
+RENAME: Datei 'gibtsnicht.txt' nicht gefund
+

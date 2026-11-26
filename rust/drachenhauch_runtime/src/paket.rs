@@ -177,7 +177,7 @@ fn laden(url: &str, datei: &Path) -> Result<(), String> {
     #[cfg(not(feature = "http"))]
     {
         let _ = datei;
-        Err(format!("{}: diese Fassung von dhrt ist ohne das Feature `http` gebaut", url))
+        Err(format!("{}: Pakete aus dem Netz gibt es in dieser Laufzeit nicht (ohne http gebaut)", url))
     }
 }
 

@@ -547,7 +547,7 @@ mod imp {
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 mod imp {
     fn unsupported<T>() -> Result<T, String> {
-        Err("Modul WIFI: nur unter Windows/Linux/macOS unterstuetzt.".into())
+        Err("WIFI: gibt es auf diesem System nicht (nur Windows, Linux und macOS)".into())
     }
     pub fn available() -> bool { false }
     pub fn current() -> Result<String, String> { unsupported() }

@@ -43,8 +43,9 @@ impl<'p> Vm<'p> {
         if !name.starts_with("video_") { return Ok(None); }
         #[cfg(all(feature = "video", feature = "graphics"))]
         { return self.try_video_impl(name, a); }
-        // Ohne das Feature: unbekannter Befehl -- "im Rust-Kern noch nicht
-        // verfuegbar", wie jeder andere, den dieser Bau nicht hat.
+        // Ohne das Feature: niemand antwortet -- "gibt es in dieser Laufzeit
+        // nicht (ohne video gebaut)" (bau.rs), wie jeder andere, den dieser
+        // Bau nicht hat.
         #[allow(unreachable_code)]
         { let _ = a; Ok(None) }
     }

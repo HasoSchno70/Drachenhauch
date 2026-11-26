@@ -519,7 +519,6 @@ maschinencode	machine code
 schriften	fonts
 seriell	serial
 wlan	wifi
-{}: diese Fassung von dhrt ist ohne das Feature `{}` gebaut	{}: this version of dhrt is built without the feature `{}`
 ASSERT fehlgeschlagen: {}	ASSERT failed: {}
 Bedingung nicht erfuellt	condition not met
 Kein Fenster moeglich[[]] -- das System stellt kein passendes OpenGL (3.3) bereit (Einzelheiten in den GLFW-Warnungen davor, falls es welche gibt).[[]] Ein Fenster brauchen SCREEN und alle Zeichen-, Bild- und gui-Befehle; PRINT, Dateien, Netz und Datenbank gehen ohne.	No window possible -- the system does not provide a suitable OpenGL (3.3) (details in the GLFW warnings before, if there are any). SCREEN and all drawing, image and gui commands need a window; PRINT, files, network and database work without one.
@@ -952,7 +951,6 @@ Action '{}' nicht gebunden	action '{}' is not bound
 {}: Text konnte nicht in die Zwischenablage gelegt werden -- ein anderes Programm haelt sie offen, oder der Text enthaelt ein Nullbyte	{}: the text could not be put into the clipboard -- another program holds it open, or the text contains a null byte
 {} muss die ERSTE Grafik-Anweisung sein (vor LOADIMAGE/SCREEN/... -- Transparenz kann nicht nachtraeglich gesetzt werden)	{} must be the FIRST graphics statement (before LOADIMAGE/SCREEN/... -- transparency cannot be set afterwards)
 {}: braucht ein Fenster (SCREEN) -- die Vorschau ist ein IMAGE	{}: needs a window (SCREEN) -- the preview is an IMAGE
-httpd: dieser dhrt-Build hat das Netz-Feature nicht (neu bauen mit python rust/build_runtime.py)	httpd: this dhrt build does not have the network feature (rebuild with python rust/build_runtime.py)
 GUI_FORM_LOAD/SAVE: dieser Bau hat kein db-Modul	GUI_FORM_LOAD/SAVE: this build has no db module
 {}: CLOUD_CONFIGURE(base_url, api_key) muss zuerst aufgerufen werden	{}: CLOUD_CONFIGURE(base_url, api_key) must be called first
 {}: es liegt keine Anfrage an -- erst HTTPD_ACCEPT abfragen	{}: there is no pending request -- ask HTTPD_ACCEPT first
@@ -1221,7 +1219,7 @@ WIFI_DELETE_PROFILE: Name darf nicht leer sein	WIFI_DELETE_PROFILE: the name mus
 WIFI: 'nmcli' nicht gefunden (NetworkManager installiert?)	WIFI: 'nmcli' not found (is NetworkManager installed?)
 WIFI: '{}' nicht ausfuehrbar: {}	WIFI: '{}' cannot be run: {}
 WIFI: kein Wi-Fi-Hardware-Port gefunden	WIFI: no Wi-Fi hardware port found
-Modul WIFI: nur unter Windows/Linux/macOS unterstuetzt.	module WIFI: only supported on Windows/Linux/macOS.
+WIFI: gibt es auf diesem System nicht (nur Windows, Linux und macOS)	WIFI: does not exist on this system (only Windows, Linux and macOS)
 OpenAL: kein Ausgabegeraet	OpenAL: no output device
 OpenAL: kein Kontext	OpenAL: no context
 
@@ -2160,3 +2158,4 @@ GUI_GET_COLOR: Rolle '{}' gibt es nicht -- bg, fg, border, accent, hover oder pr
 {}: time_ms muss > 0 sein, erhalten {}	{}: time_ms must be > 0, got {}
 {}: Farbe muss 0..&HFFFFFFFF sein	{}: the colour must be 0..&HFFFFFFFF
 GUI_SOUND: Lautstaerke {} muss 0..100 sein	GUI_SOUND: volume {} must be 0..100
+{}: Pakete aus dem Netz gibt es in dieser Laufzeit nicht (ohne http gebaut)	{}: packages from the net do not exist in this runtime (built without http)

@@ -103,17 +103,12 @@ pub fn wochentag(t: i64) -> i64 {
     (t.div_euclid(SEK_PRO_TAG) + 3).rem_euclid(7) + 1
 }
 
-fn ist_schaltjahr(jahr: i64) -> bool {
-    (jahr % 4 == 0 && jahr % 100 != 0) || jahr % 400 == 0
-}
-
+/// Tage im Monat -- die Rechnung steht EINMAL, in `kalender.rs` (bis
+/// 2026.53 hier eine Kopie samt eigenem Schaltjahr). Das Jahr ist hier i64;
+/// der Kalender rechnet nur das Schaltjahr, dafuer reicht der Rest zu 400.
 fn tage_im_monat(jahr: i64, monat: i64) -> i64 {
-    match monat {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 => if ist_schaltjahr(jahr) { 29 } else { 28 },
-        _ => 0,
-    }
+    // Der gregorianische Kalender wiederholt sich alle 400 Jahre.
+    crate::kalender::tage_im_monat(2000 + jahr.rem_euclid(400) as i32, monat as i32) as i64
 }
 
 /// Liest einen Zeitpunkt aus Text.

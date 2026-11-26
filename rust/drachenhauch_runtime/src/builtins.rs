@@ -562,13 +562,26 @@ fn type_default(t: &str) -> Value {
 
 /// Parst einen String robust zu INTEGER (ganzzahlig, kein '.'/'e') oder FLOAT,
 /// sonst None. Basis fuer ISNUMERIC (.is_some()) und TRYVAL (.unwrap_or(default)).
+/// Ist der GANZE Text eine Zahl (ISNUMERIC, TRYVAL)? Dieselben Schreibweisen
+/// wie VAL -- auch `&HFF`, `&O17`, `&B101`, `0x`, `0b` --, aber keine
+/// "inf"/"NaN" (Rusts f64-Leser nahm sie bis 2026.53 an, VAL nicht).
 fn parse_number(s: &str) -> Option<Value> {
     let t = s.trim();
     if t.is_empty() { return None; }
+    let (neg, rest) = match t.as_bytes()[0] { b'-' => (true, &t[1..]), b'+' => (false, &t[1..]), _ => (false, t) };
+    let klein = rest.to_ascii_lowercase();
+    for (vor, basis) in [("&h", 16), ("0x", 16), ("&o", 8), ("&b", 2), ("0b", 2)] {
+        if let Some(z) = klein.strip_prefix(vor) {
+            let z: String = z.chars().filter(|c| *c != '_').collect();
+            if z.is_empty() { return None; }
+            return i64::from_str_radix(&z, basis).ok().map(|n| Value::Int(if neg { -n } else { n }));
+        }
+    }
     if !t.contains('.') && !t.contains('e') && !t.contains('E') {
         if let Ok(i) = t.parse::<i64>() { return Some(Value::Int(i)); }
     }
-    t.parse::<f64>().ok().map(Value::Float)
+    if rest.chars().any(|c| c.is_alphabetic() && c != 'e' && c != 'E') { return None; }
+    t.parse::<f64>().ok().filter(|f| f.is_finite()).map(Value::Float)
 }
 
 /// Element-Coercion fuer Array-Schreibzugriffe (ARRAY_FILL/PUSH/INSERT/REDIM)
@@ -3722,14 +3735,19 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             std::fs::create_dir_all(need_str(&a[0], "MKDIR")?).map_err(|e| format!("MKDIR: {}", e))?;
             Ok(Value::Nil)
         }
+        // Derselbe Pfad wie beim Lesen (resolve_asset_path) und dieselbe
+        // Meldung mit Pfad und Suchort (datei_fehler) -- bis 2026.53 sagten
+        // beide nur "os error 2" ohne Datei (Bericht A11.1).
         "deletefile" => {
             arity!(1);
-            std::fs::remove_file(need_str(&a[0], "DELETEFILE")?).map_err(|e| format!("DELETEFILE: {}", e))?;
+            let pfad = resolve_asset_path(need_str(&a[0], "DELETEFILE")?);
+            std::fs::remove_file(&pfad).map_err(|e| datei_fehler("DELETEFILE", &pfad, &e))?;
             Ok(Value::Nil)
         }
         "rename" => {
             arity!(2);
-            std::fs::rename(need_str(&a[0], "RENAME")?, need_str(&a[1], "RENAME")?).map_err(|e| format!("RENAME: {}", e))?;
+            let von = resolve_asset_path(need_str(&a[0], "RENAME")?);
+            std::fs::rename(&von, need_str(&a[1], "RENAME")?).map_err(|e| datei_fehler("RENAME", &von, &e))?;
             Ok(Value::Nil)
         }
         "writeall" => {
