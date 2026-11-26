@@ -131,7 +131,20 @@ impl<'p> Vm<'p> {
             if !ms.is_finite() { return Err(format!("SLEEP: {} ist keine Dauer", ms)); }
             // Was vor der Pause ausgegeben wurde, steht waehrend der Pause da.
             self.flush_out();
-            std::thread::sleep(std::time::Duration::from_secs_f64(ms.clamp(0.0, 1e9) / 1000.0));
+            let ende = std::time::Instant::now() + std::time::Duration::from_secs_f64(ms.clamp(0.0, 1e9) / 1000.0);
+            loop {
+                let jetzt = std::time::Instant::now();
+                if jetzt >= ende { break; }
+                // Hoechstens 20 ms am Stueck, wenn Ton laeuft: endliche Loops,
+                // AUTOPAN und die Musik-Warteschlange brauchen ihren Takt.
+                #[cfg(feature = "graphics")]
+                let stueck = if self.audio.is_some() { std::time::Duration::from_millis(20) } else { ende - jetzt };
+                #[cfg(not(feature = "graphics"))]
+                let stueck = ende - jetzt;
+                std::thread::sleep(stueck.min(ende - jetzt));
+                #[cfg(feature = "graphics")]
+                if let Some(a) = self.audio.as_mut() { a.update(); }
+            }
             return Ok(Some(Value::Nil));
         }
         // STDIN() -- die Standardeingabe als FILE-Handle. Steht hier und nicht

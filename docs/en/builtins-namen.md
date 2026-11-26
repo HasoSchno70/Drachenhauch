@@ -182,7 +182,7 @@ hand are callback timers from the `timer` module.
 | `SOUND_PLAY(s[, loops[, volume]])` | play, default loops=0, volume=1.0 — formerly `PLAYSOUND` |
 | `SOUND_STOP(s)` | formerly `STOPSOUND` |
 | `SOUND_FREE(s)` | stop the sound and free its buffer — against buffers piling up with many AUDIO_TONE/AUDIO_SFX/AUDIO_NOISE … — formerly `UNLOADSOUND` |
-| `MUSIC_PLAY(path$[, loops[, volume]])` | stream a longer file (.ogg/.mp3/.qoa + tracker modules .mod/.xm — real Amiga sound), default loops=-1 … — formerly `PLAYMUSIC` |
+| `MUSIC_PLAY(path$[, loops[, volume]])` | stream a longer file (.ogg/.mp3/.flac + tracker modules .mod/.xm — real Amiga sound), default loops=-1 … — formerly `PLAYMUSIC` |
 | `MUSIC_STOP()` | one stream at a time. Refilling happens on the audio thread, not in the game loop: there is no … — formerly `STOPMUSIC` |
 | `MODEL_LOAD(path$: STRING)` | INTEGER — load a model from a file (OBJ, GLTF, IQM …) — formerly `LOADMODEL` |
 | `IMAGE_WIDTH(image)` | width of an image in pixels — formerly `IMAGEWIDTH` |

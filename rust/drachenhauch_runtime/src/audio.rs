@@ -18,7 +18,7 @@ use std::time::Duration;
 use kira::sound::{Sound, SoundData};
 
 use kira::{
-    AudioManager, AudioManagerSettings, DefaultBackend, Decibels, Easing, Frame, Mix, Panning, Tween,
+    AudioManager, AudioManagerSettings, Decibels, Easing, Frame, Mix, Panning, Tween,
     clock::{ClockHandle, ClockSpeed, ClockTime},
     effect::{Effect, EffectBuilder},
     effect::filter::{FilterBuilder, FilterHandle},
@@ -857,8 +857,10 @@ impl Default for BusValues {
 // sich von selbst in Echtzeit (siehe web_audio.rs).
 #[cfg(target_os = "emscripten")]
 type Backend = crate::web_audio::WebBackend;
+// Auf dem Desktop das Geraet -- oder stumm, wenn DHRT_OHNE_AUDIO gesetzt ist
+// (audio_backend.rs).
 #[cfg(not(target_os = "emscripten"))]
-type Backend = DefaultBackend;
+type Backend = crate::audio_backend::WahlBackend;
 
 /// Abtastrate im Browser.
 #[cfg(target_os = "emscripten")]
@@ -929,6 +931,8 @@ pub struct Audio {
     music_loops: i64,         // verbleibende Wiederholungen; -1 endlos
     music_queue: Option<String>,
     music_paused: bool,
+    /// Laeuft der Ton stumm (DHRT_OHNE_AUDIO, audio_backend.rs)?
+    pub stumm: bool,
 }
 
 impl Audio {
@@ -943,8 +947,13 @@ impl Audio {
             main_track_builder: main, ..Default::default() };
         #[cfg(target_os = "emscripten")]
         { settings.backend_settings = WEB_SR; }
+        #[cfg(not(target_os = "emscripten"))]
+        { settings.backend_settings = crate::audio_backend::stumm_gewuenscht(); }
         let mut manager = AudioManager::<Backend>::new(settings)
             .map_err(|e| format!("Audio-Geraet konnte nicht initialisiert werden: {e:?}"))?;
+        // Welches Backend wirklich laeuft (fuer AUDIO_IS_SILENT).
+        #[cfg(not(target_os = "emscripten"))]
+        let stumm = matches!(manager.backend_mut(), crate::audio_backend::WahlBackend::Stumm { .. });
         let mut sfx_b = TrackBuilder::new();
         let sfx_fx = attach_bus_fx!(sfx_b);
         let sfx_track = manager.add_sub_track(sfx_b)
@@ -967,6 +976,10 @@ impl Audio {
             lofi: false, lofi_bits: 8, lofi_cutoff: 3300.0,
             music_source: None, music_handle: None, music_vol: 1.0, music_pitch: 1.0,
             music_loops: -1, music_queue: None, music_paused: false,
+            #[cfg(not(target_os = "emscripten"))]
+            stumm,
+            #[cfg(target_os = "emscripten")]
+            stumm: false,
         })
     }
 
@@ -1782,8 +1795,8 @@ resonance/reverb/distortion", other)),
         Ok(self.push_slot(data, 1.0))
     }
 
-    pub fn play_sound(&mut self, idx: i64, volume: f64) -> Result<(), String> {
-        self.start_slot(idx, "PLAYSOUND", volume, 0, 0, FadeCurve::Linear)
+    pub fn play_sound(&mut self, idx: i64, loops: i64, volume: f64) -> Result<(), String> {
+        self.start_slot(idx, "PLAYSOUND", volume, loops, 0, FadeCurve::Linear)
     }
 
     pub fn stop_sound(&mut self, idx: i64) -> Result<(), String> {
@@ -2535,10 +2548,10 @@ resonance/reverb/distortion", other)),
         Ok(())
     }
 
-    pub fn play_music(&mut self, path: &str, volume: f64) -> Result<(), String> {
+    pub fn play_music(&mut self, path: &str, loops: i64, volume: f64) -> Result<(), String> {
         self.music_vol = volume.clamp(0.0, 1.0) as f32;
         self.music_load(path)?;
-        self.start_music(self.music_vol, -1, 0, FadeCurve::Linear)
+        self.start_music(self.music_vol, loops, 0, FadeCurve::Linear)
     }
     pub fn stop_music(&mut self) {
         if let Some(h) = self.music_handle.as_mut() { mh_stop(h, tween_now()); }
@@ -2652,7 +2665,15 @@ resonance/reverb/distortion", other)),
     pub fn music_busy(&self) -> bool {
         matches!(self.music_handle.as_ref().map(mh_state), Some(PlaybackState::Playing))
     }
-    pub fn music_queue(&mut self, path: &str) { self.music_queue = Some(path.to_string()); }
+    /// AUDIO_MUSIC_QUEUE: die Datei muss es geben -- bis 2026.53 merkte
+    /// sich die Warteschlange jeden Pfad, und ein vertippter Name fiel erst
+    /// am Ende des laufenden Stuecks still unter den Tisch.
+    pub fn music_queue(&mut self, path: &str) -> Result<(), String> {
+        let gefunden = crate::builtins::resolve_asset_path(path);
+        crate::builtins::datei_da(&gefunden, "AUDIO_MUSIC_QUEUE")?;
+        self.music_queue = Some(gefunden);
+        Ok(())
+    }
 
     /// Web: die Ausgabe-Warteschlange nachfuellen (siehe web_audio.rs).
     ///

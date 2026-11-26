@@ -982,6 +982,11 @@ pub struct Vm<'p> {
     // Audio-Geraet (lazy bei erstem LOADSOUND/PLAYSOUND/PLAYMUSIC initialisiert).
     #[cfg(feature = "graphics")]
     audio: Option<crate::audio::Audio>,
+    /// Liess sich das Audio-Geraet nicht starten, die Meldung -- jeder
+    /// weitere Ton-Befehl meldet sie, statt es neu zu versuchen (bis 2026.53
+    /// startete ohne Soundkarte JEDER Ton-Befehl den Aufbau von vorn).
+    #[cfg(feature = "graphics")]
+    audio_fehler: Option<String>,
     /// Klaenge der gui (vm_gui.rs `gui_klaenge_spielen`): Name/Pfad -> Slot
     /// (-1 = liess sich nicht laden), und ob es gar kein Audio gibt.
     #[cfg(feature = "graphics")]
@@ -1258,6 +1263,8 @@ impl<'p> Vm<'p> {
             gfx: None,
             #[cfg(feature = "graphics")]
             audio: None,
+            #[cfg(feature = "graphics")]
+            audio_fehler: None,
             #[cfg(feature = "graphics")]
             gui_klang_slots: std::collections::HashMap::new(),
             #[cfg(feature = "graphics")]

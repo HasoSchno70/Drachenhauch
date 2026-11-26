@@ -418,3 +418,67 @@ DIM sp AS ARRAY OF FLOAT
 AUDIO_FFT(sp)
 --- fehler
 AUDIO_FFT: das Feld hat keine Plaetze
+
+=== dhrt_ohne_audio schaltet stumm
+' DHRT_OHNE_AUDIO=1 (Rangliste Punkt 10): der Mix wird in Echtzeit gerechnet
+' und verworfen -- Positionen und Laengen laufen wie mit Soundkarte, man hoert
+' nur nichts. Bis 2026.53 las keine Zeile Rust die Variable.
+IMPORT "audio"
+PRINT "stumm "; AUDIO_IS_SILENT()
+--- umgebung
+DHRT_OHNE_AUDIO=1
+--- erwartet
+stumm TRUE
+
+=== der alte name dh_ohne_audio gilt weiter
+IMPORT "audio"
+PRINT "stumm "; AUDIO_IS_SILENT()
+--- umgebung
+DH_OHNE_AUDIO=1
+--- erwartet
+stumm TRUE
+
+=== endliche loops laufen auch ohne flip
+' Endliche Loops liefen in update(), das nur FLIP rief: AUDIO_PLAY(k, 2) in
+' einem Programm ohne Bildschleife spielte EINMAL (85 ms statt 300). Jetzt
+' stellt jeder Ton-Befehl und SLEEP die Uhr.
+IMPORT "audio"
+DIM k AS INTEGER : k = AUDIO_TONE(440, 100)
+DIM c AS INTEGER : c = AUDIO_PLAY(k, 2)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE AUDIO_IS_PLAYING(c) AND MILLIS() - t0 < 3000
+    SLEEP(10)
+WEND
+PRINT "dreimal "; (MILLIS() - t0 >= 250)
+--- umgebung
+DHRT_OHNE_AUDIO=1
+--- erwartet
+dreimal TRUE
+
+=== playsound wertet loops aus
+' PLAYSOUND(k, loops, vol) uebergab loops bis 2026.53 nicht ("raylib-Sounds
+' loopen nicht"): -1 spielte einmal. Jetzt wie AUDIO_PLAY.
+IMPORT "audio"
+DIM k AS INTEGER : k = AUDIO_TONE(440, 80)
+PLAYSOUND(k, -1, 0.5)
+SLEEP(300)
+PRINT "laeuft noch "; AUDIO_IS_PLAYING(k)
+STOPSOUND(k)
+--- umgebung
+DHRT_OHNE_AUDIO=1
+--- erwartet
+laeuft noch TRUE
+
+=== die musik-warteschlange prueft die datei
+' AUDIO_MUSIC_QUEUE merkte sich jeden Pfad; ein vertippter fiel erst am Ende
+' des laufenden Stuecks still unter den Tisch.
+IMPORT "audio"
+TRY
+    AUDIO_MUSIC_QUEUE("gibtsnicht.ogg")
+CATCH e
+    PRINT LEFT$(e, INSTR(e, " (gesucht"))
+END TRY
+--- umgebung
+DHRT_OHNE_AUDIO=1
+--- erwartet
+AUDIO_MUSIC_QUEUE: Datei 'gibtsnicht.ogg' nicht gefunden

@@ -182,7 +182,7 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `SOUND_PLAY(s[, loops[, volume]])` | abspielen, default loops=0, volume=1.0 — bisher `PLAYSOUND` |
 | `SOUND_STOP(s)` | Sound stoppen — bisher `STOPSOUND` |
 | `SOUND_FREE(s)` | Sound stoppen und seinen Puffer freigeben — gegen Puffer-Akkumulation bei vielen … — bisher `UNLOADSOUND` |
-| `MUSIC_PLAY(path$[, loops[, volume]])` | längere Datei streamen (.ogg/.mp3/.qoa + Tracker-Module .mod/.xm — echter Amiga-Sound), default loops=-1 … — bisher `PLAYMUSIC` |
+| `MUSIC_PLAY(path$[, loops[, volume]])` | längere Datei streamen (.ogg/.mp3/.flac + Tracker-Module .mod/.xm — echter Amiga-Sound), default loops=-1 … — bisher `PLAYMUSIC` |
 | `MUSIC_STOP()` | ein Stream gleichzeitig. Nachgefüllt wird auf dem Audio-Thread, nicht im Game-Loop: einen … — bisher `STOPMUSIC` |
 | `MODEL_LOAD(path$: STRING)` | INTEGER — Modell aus einer Datei laden (OBJ, GLTF, IQM …) — bisher `LOADMODEL` |
 | `IMAGE_WIDTH(image)` | Breite eines Bildes in Pixeln — bisher `IMAGEWIDTH` |

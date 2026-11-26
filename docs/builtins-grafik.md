@@ -822,11 +822,11 @@ WEND
 | Funktion | Zweck |
 |---|---|
 | `LOADSOUND(path$)` → SOUND | Sample laden (kurze Effekte: WAV, OGG) |
-| `PLAYSOUND(s[, loops[, volume]])` | abspielen, default loops=0, volume=1.0 |
+| `PLAYSOUND(s[, loops[, volume]])` | abspielen: `loops` 0 einmal (Vorgabe), -1 endlos, n Wiederholungen wie bei `AUDIO_PLAY` (bis 2026.53 ging `loops` verloren); volume=1.0 |
 | `STOPSOUND(s)` | stoppen |
 | `UNLOADSOUND(s)` | Sound stoppen **und seinen Puffer freigeben** — gegen Puffer-Akkumulation bei vielen `AUDIO_TONE`/`AUDIO_SFX`/`AUDIO_NOISE`-Noten (langer Song). Der Handle bleibt gültig, erneutes Abspielen wirft einen Fehler |
 | `AUDIO_SOUND_COUNT()` → INTEGER | Anzahl lebender (nicht freigegebener) Sound-Slots — Diagnose gegen Sound-Lecks |
-| `PLAYMUSIC(path$[, loops[, volume]])` | längere Datei streamen (`.ogg`/`.mp3`/`.qoa` **+ Tracker-Module `.mod`/`.xm`** — echter Amiga-Sound), default loops=-1 (endlos) |
+| `PLAYMUSIC(path$[, loops[, volume]])` | längere Datei streamen (`.ogg`/`.mp3`/`.flac` **+ Tracker-Module `.mod`/`.xm`** — echter Amiga-Sound); `loops` n > 0 Wiederholungen, 0 und -1 endlos (die Vorgabe; 0 wie in alten Programmen) |
 | `STOPMUSIC()` | stoppen |
 
 ```basic

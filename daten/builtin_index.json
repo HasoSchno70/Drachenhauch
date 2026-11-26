@@ -429,6 +429,12 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_IS_SILENT",
+   "kind": "core",
+   "signature": "AUDIO_IS_SILENT() AS BOOLEAN",
+   "module": "audio"
+  },
+  {
    "name": "AUDIO_BUS_GET_VOLUME",
    "kind": "core",
    "signature": "AUDIO_BUS_GET_VOLUME(bus$)",
@@ -11705,13 +11711,13 @@
   {
    "name": "PLAYMUSIC",
    "kind": "graphics",
-   "signature": "PLAYMUSIC(path$[, loops = 0[, volume]])",
+   "signature": "PLAYMUSIC(path$[, loops = -1[, volume]])",
    "module": "core"
   },
   {
    "name": "MUSIC_PLAY",
    "kind": "graphics",
-   "signature": "MUSIC_PLAY(path$[, loops = 0[, volume]])",
+   "signature": "MUSIC_PLAY(path$[, loops = -1[, volume]])",
    "module": "core"
   },
   {

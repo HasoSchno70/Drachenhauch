@@ -818,11 +818,11 @@ WEND
 | Function | Purpose |
 |---|---|
 | `LOADSOUND(path$)` → SOUND | load a sample (short effects: WAV, OGG) |
-| `PLAYSOUND(s[, loops[, volume]])` | play, default loops=0, volume=1.0 |
+| `PLAYSOUND(s[, loops[, volume]])` | play: `loops` 0 once (default), -1 endless, n repetitions as with `AUDIO_PLAY` (up to 2026.53 `loops` was lost); volume=1.0 |
 | `STOPSOUND(s)` | stop |
 | `UNLOADSOUND(s)` | stop the sound **and free its buffer** — against buffers piling up with many `AUDIO_TONE`/`AUDIO_SFX`/`AUDIO_NOISE` notes (a long song). The handle stays valid; playing it again raises an error |
 | `AUDIO_SOUND_COUNT()` → INTEGER | number of live (not freed) sound slots — diagnostics against sound leaks |
-| `PLAYMUSIC(path$[, loops[, volume]])` | stream a longer file (`.ogg`/`.mp3`/`.qoa` **+ tracker modules `.mod`/`.xm`** — real Amiga sound), default loops=-1 (endless) |
+| `PLAYMUSIC(path$[, loops[, volume]])` | stream a longer file (`.ogg`/`.mp3`/`.flac` **+ tracker modules `.mod`/`.xm`** — real Amiga sound); `loops` n > 0 repetitions, 0 and -1 endless (the default; 0 as in old programs) |
 | `STOPMUSIC()` | stop |
 
 ```basic

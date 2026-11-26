@@ -2048,7 +2048,7 @@ impl<'p> Vm<'p> {
                 }
             };
             if slot >= 0 {
-                if let Some(au) = self.audio.as_mut() { let _ = au.play_sound(slot, laut as f64 / 100.0); }
+                if let Some(au) = self.audio.as_mut() { let _ = au.play_sound(slot, 0, laut as f64 / 100.0); }
             }
         }
     }
@@ -2100,8 +2100,17 @@ impl<'p> Vm<'p> {
     #[cfg(feature = "graphics")]
     pub(super) fn audio_mut(&mut self) -> R<&mut crate::audio::Audio> {
         if self.audio.is_none() {
-            self.audio = Some(crate::audio::Audio::new()?);
+            if let Some(e) = &self.audio_fehler { return Err(e.clone()); }
+            match crate::audio::Audio::new() {
+                Ok(a) => self.audio = Some(a),
+                Err(e) => { self.audio_fehler = Some(e.clone()); return Err(e); }
+            }
         }
+        // Endliche Loops, AUTOPAN und die Musik-Warteschlange laufen in
+        // `update()`. Das rief bis 2026.53 nur FLIP -- AUDIO_PLAY(k, 3) in
+        // einem Programm ohne Bildschleife spielte einmal. Jetzt auch jeder
+        // Ton-Befehl (und SLEEP, vm_system.rs).
+        if let Some(a) = self.audio.as_mut() { a.update(); }
         Ok(self.audio.as_mut().unwrap())
     }
 

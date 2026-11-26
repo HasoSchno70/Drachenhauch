@@ -120,7 +120,7 @@ pub fn lader_fuer_datei(text: &str) -> Option<(&'static str, &'static str)> {
     let endung = t.rsplit_once('.').map(|(_, e)| e)?;
     Some(match endung {
         "png" | "jpg" | "jpeg" | "bmp" | "gif" | "tga" | "qoi" => ("Bild", "LOADIMAGE"),
-        "wav" | "ogg" | "mp3" | "flac" | "qoa" => ("Klang", "LOADSOUND"),
+        "wav" | "ogg" | "mp3" | "flac" => ("Klang", "LOADSOUND"),
         "ttf" | "otf" => ("Schrift", "LOADFONT"),
         _ => return None,
     })

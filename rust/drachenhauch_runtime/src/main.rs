@@ -41,6 +41,9 @@ mod webcam;
 // ueber emscriptens OpenAL (das intern WebAudio bedient).
 #[cfg(all(feature = "graphics", target_os = "emscripten"))]
 mod web_audio;
+// Auf dem Desktop: das Geraet (cpal) oder stumm (DHRT_OHNE_AUDIO).
+#[cfg(all(feature = "graphics", not(target_os = "emscripten")))]
+mod audio_backend;
 // Im Browser: das Arbeitsverzeichnis ist ein IndexedDB-Ordner (web_speicher.rs).
 #[cfg(target_os = "emscripten")]
 mod web_speicher;

@@ -1805,11 +1805,13 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "playsound" => {
-                // PLAYSOUND(sound[, loops, volume]). `loops` wird nativ ignoriert
-                // (raylib-Sounds loopen nicht) -- SFX spielen einmal.
+                // PLAYSOUND(sound[, loops, volume]): loops wie bei AUDIO_PLAY --
+                // 0 einmal, -1 endlos, n Wiederholungen. Bis 2026.53 ging es
+                // verloren ("raylib-Sounds loopen nicht" -- Kira kann es).
                 let idx = gi(a, 0, "PLAYSOUND")?;
+                let loops = if a.len() >= 2 { gi(a, 1, "PLAYSOUND")? } else { 0 };
                 let vol = if a.len() >= 3 { need_f(a, 2, "PLAYSOUND")? } else { 1.0 };
-                self.audio_mut()?.play_sound(idx, vol)?;
+                self.audio_mut()?.play_sound(idx, loops, vol)?;
                 Value::Nil
             }
             "stopsound" => {
@@ -1829,11 +1831,14 @@ impl<'p> Vm<'p> {
                 Value::Int(self.audio_mut()?.sound_count())
             }
             "playmusic" => {
-                // PLAYMUSIC(pfad$[, loops, volume]). Musik loopt (raylib-Default);
-                // `loops` wird nativ nicht ausgewertet.
+                // PLAYMUSIC(pfad$[, loops, volume]): n > 0 sind so viele
+                // Wiederholungen wie bei AUDIO_MUSIC_PLAY; 0 und -1 endlos --
+                // 0 wie bisher, weil Programme PLAYMUSIC(datei, 0, v) fuer
+                // Hintergrundmusik schreiben (bis 2026.53 lief sie immer endlos).
                 let path = gs(a, 0, "PLAYMUSIC")?.to_string();
+                let loops = if a.len() >= 2 { gi(a, 1, "PLAYMUSIC")? } else { -1 };
                 let vol = if a.len() >= 3 { need_f(a, 2, "PLAYMUSIC")? } else { 1.0 };
-                self.audio_mut()?.play_music(&path, vol)?;
+                self.audio_mut()?.play_music(&path, if loops > 0 { loops } else { -1 }, vol)?;
                 Value::Nil
             }
             "stopmusic" => { self.audio_mut()?.stop_music(); Value::Nil }
@@ -1887,6 +1892,9 @@ impl<'p> Vm<'p> {
                 let easing = easing_name(a, 2, "AUDIO_STOP")?;
                 self.audio_mut()?.ch_stop(i, fade, &easing)?; Value::Nil
             }
+            // AUDIO_IS_SILENT(): laeuft der Ton stumm (DHRT_OHNE_AUDIO)? Der
+            // Mix wird dann gerechnet, aber nicht ausgegeben.
+            "audio_is_silent" => Value::Bool(self.audio_mut()?.stumm),
             "audio_is_playing" => { let i = gi(a, 0, "AUDIO_IS_PLAYING")?; Value::Bool(self.audio_mut()?.ch_is_playing(i)?) }
             "audio_is_waiting" => { let i = gi(a, 0, "AUDIO_IS_WAITING")?; Value::Bool(self.audio_mut()?.ch_is_waiting(i)?) }
             "audio_record_start" => {
@@ -2126,7 +2134,7 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "audio_music_busy" => Value::Bool(self.audio_mut()?.music_busy()),
-            "audio_music_queue" => { let p = gs(a, 0, "AUDIO_MUSIC_QUEUE")?.to_string(); self.audio_mut()?.music_queue(&p); Value::Nil }
+            "audio_music_queue" => { let p = gs(a, 0, "AUDIO_MUSIC_QUEUE")?.to_string(); self.audio_mut()?.music_queue(&p)?; Value::Nil }
 
             // --- Clock (Kira-Uhr fuer sample-genaues Musik-/Rhythmus-Timing) ---
             // --- Modulatoren: LFO + Tweener ---------------------------------

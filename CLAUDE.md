@@ -425,7 +425,8 @@ rust\drachenhauch_runtime\target\release\dhrt pruef      # Doku, Namen, Pfade, M
   allein; jeder Fall hat eine Zeitgrenze (Vorgabe 300 s).
 - Die CI fährt dasselbe auf Windows (mit Grafik), Linux und macOS (ohne
   Grafik, `DHRT_OHNE_GRAFIK=1`), dazu `cargo check`/`cargo test` je System.
-  `DH_OHNE_AUDIO=1` ohne Soundkarte.
+  `DHRT_OHNE_AUDIO=1` (alter Name `DH_OHNE_AUDIO`) rechnet den Ton stumm in
+  Echtzeit -- Ton-Faelle laufen dann auch ohne Soundkarte (`AUDIO_IS_SILENT`).
 - **Headless prüfen:** `DHRT_FRAMES=n DHRT_SCREENSHOT=p.png dhrt run x.dh`
   liefert ein Bild; für alles, was sich über die Zeit falsch verhält, der
   **Kontaktbogen** `DHRT_FRAMES=480 DHRT_CONTACT=bogen.png` (`DHRT_CONTACT_MAX`,

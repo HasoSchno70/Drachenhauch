@@ -153,7 +153,7 @@ Demo: [examples/160_musik_seek.dh](../../examples/160_musik_seek.dh) — a click
 
 * **MOD/XM cannot do it** and say so. Their timeline is patterns and rows, not seconds; how long it takes to reach a point depends on tempo changes in the piece itself. `AUDIO_MUSIC_POSITION()` still returns seconds for modules — counting along works, jumping to a point does not.
 
-**Formats:** `.ogg`, `.mp3`, `.qoa` — **and tracker modules `.mod` (ProTracker/Amiga) + `.xm` (FastTracker II)**. Modules contain their own samples + pattern data and are **streamed in real time**: a Kira sound of its own (`ModuleSound` in `audio.rs`) drives the pure Rust player [`xmrs`/`xmrsplayer`](https://crates.io/crates/xmrs) on the audio thread -- 4+ channels, sample-based, with exact endless looping. (Until 2026-06-13 raylib handled this; since the switch to Kira it runs through its own player.) Simply load a `.mod`/`.xm` (e.g. from [modarchive.org](https://modarchive.org)):
+**Formats:** `.ogg`, `.mp3`, `.flac` — **and tracker modules `.mod` (ProTracker/Amiga) + `.xm` (FastTracker II)**. Modules contain their own samples + pattern data and are **streamed in real time**: a Kira sound of its own (`ModuleSound` in `audio.rs`) drives the pure Rust player [`xmrs`/`xmrsplayer`](https://crates.io/crates/xmrs) on the audio thread -- 4+ channels, sample-based, with exact endless looping. (Until 2026-06-13 raylib handled this; since the switch to Kira it runs through its own player.) Simply load a `.mod`/`.xm` (e.g. from [modarchive.org](https://modarchive.org)):
 
 ```basic
 AUDIO_MUSIC_LOAD("song.mod")
@@ -364,7 +364,7 @@ instrument.
 
 | Function | Effect |
 |---|---|
-| `SAMPLE_LOAD(path$)` → SAMPLE | load WAV/OGG/QOA, normalized to mono |
+| `SAMPLE_LOAD(path$)` → SAMPLE | load WAV/OGG, normalized to mono |
 | `SAMPLE_FREE(sample)` | release the sample's data — whatever already sounds plays to the end; releasing twice is silent |
 | `SAMPLE_FROM_BUFFER(buffer, sample_rate)` → SAMPLE | sample from raw 16-bit PCM (little endian, signed, mono) |
 | `SAMPLE_FROM_SOUND(sound)` → SAMPLE | a SOUND (from `SPEAK_SOUND`, `AUDIO_NOTE`, `LOADSOUND` ...) as a sample, channels averaged to mono, sample rate kept |
@@ -473,6 +473,7 @@ independent of the individual volumes (they multiply in the mixer).
 | Function | Effect |
 |---|---|
 | `AUDIO_BUS_VOLUME(bus$, vol)` | master volume of a bus (0..1) |
+| `AUDIO_IS_SILENT()` | is the sound silent? With `DHRT_OHNE_AUDIO=1` (old name `DH_OHNE_AUDIO`) the mix is computed in real time but not output -- positions, levels and `AUDIO_SAVE_WAV` run as with a sound card |
 | `AUDIO_BUS_GET_VOLUME(bus$)` → FLOAT | current bus volume |
 
 `bus$` is `"sfx"`, `"music"`, `"master"` or `"speech"` (case-insensitive;
