@@ -126,3 +126,63 @@ zwei TRUE
 Hilfe Hilfe
 FALSE FALSE
 3
+
+=== freigeben heisst _FREE: koerper der physik
+' Seit 2026.54 heisst Freigeben ueberall _FREE (docs/builtins-namen.md); die
+' alten Namen _REMOVE/_DESTROY/_DISCONNECT bleiben gueltig.
+IMPORT "physics2d"
+IMPORT "physics3d"
+DIM w AS PHYS2D_WORLD : w = PHYS2D_NEW()
+DIM a AS INTEGER : a = PHYS2D_ADD_CIRCLE(w, 10.0, 10.0, 4.0, TRUE, 0.0)
+DIM b AS INTEGER : b = PHYS2D_ADD_CIRCLE(w, 20.0, 20.0, 4.0, TRUE, 0.0)
+PHYS2D_BODY_FREE(w, a)
+PRINT "2d "; PHYS2D_COUNT(w)
+DIM r AS PHYS_WORLD : r = PHYS3D_NEW()
+DIM k AS INTEGER : k = PHYS3D_ADD_SPHERE(r, 0.0, 0.0, 0.0, 1.0, TRUE, 0.0)
+DIM l AS INTEGER : l = PHYS3D_ADD_SPHERE(r, 5.0, 0.0, 0.0, 1.0, TRUE, 0.0)
+PHYS3D_BODY_FREE(r, k)
+PRINT "3d "; PHYS3D_COUNT(r)
+--- erwartet
+2d 1
+3d 1
+
+=== freigeben heisst _FREE: widgets und fenster
+IMPORT "gui"
+DIM gw AS GUI_WINDOW : gw = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(gw, "A", 10, 10, 60, 24)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(gw, "B", 10, 50, 60, 24)
+GUI_WIDGET_FREE(a)
+PRINT "widget "; GUI_WINDOW_WIDGET_COUNT(gw)
+GUI_WINDOW_FREE(gw)
+PRINT "fenster "; GUI_WINDOW_WIDGET_COUNT(gw)
+--- erwartet
+widget 1
+fenster 0
+
+=== freigeben heisst _FREE: die audio-uhr
+IMPORT "audio"
+DIM uhr AS AUDIO_CLOCK : uhr = AUDIO_CLOCK_NEW(100)
+AUDIO_CLOCK_FREE(uhr)
+TRY
+    PRINT AUDIO_CLOCK_TICKS(uhr)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DH_OHNE_AUDIO=1
+--- erwartet
+AUDIO_CLOCK_TICKS: ungueltiges oder entferntes Uhr-Handle 0
+
+=== eine verbindung schliessen heisst _CLOSE
+' BT und MQTT brauchen ein Geraet bzw. einen Broker; der Hover der alten
+' Namen nennt die neuen, und --check kennt sie.
+PRINT "bt "; INSTR(CODE_HOVER$("BT_DISCONNECT(b)", 1, 3), "Neuer Name: BT_CLOSE") >= 0
+PRINT "mqtt "; INSTR(CODE_HOVER$("MQTT_DISCONNECT(b)", 1, 3), "Neuer Name: MQTT_CLOSE") >= 0
+DIM q AS STRING
+q = "IMPORT " + CHR$(34) + "mqtt" + CHR$(34) + CHR$(10) + "MQTT_CLOSE(0)" + CHR$(10)
+PRINT "check "; CODE_CHECK$(q)
+--- erwartet
+bt TRUE
+mqtt TRUE
+check []
+

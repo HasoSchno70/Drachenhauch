@@ -283,3 +283,18 @@ hand are callback timers from the `timer` module.
 |---|---|
 | `SMTP_SET_TIMEOUT(m: SMTP, ms)` | time limit per step when sending — formerly `SMTP_TIMEOUT` |
 | `MODBUS_SET_TIMEOUT(m, ms)` | how long to wait for an answer — formerly `MODBUS_TIMEOUT` |
+
+### Releasing is `_FREE`, closing a connection `_CLOSE`
+
+| Name | What it does |
+|---|---|
+| `AUDIO_CLOCK_FREE(clock)` | release a clock — formerly `AUDIO_CLOCK_REMOVE` |
+| `AUDIO_EMITTER_FREE(emitter)` | release an emitter — formerly `AUDIO_EMITTER_REMOVE` |
+| `AUDIO_LISTENER_FREE(listener)` | release a listener — formerly `AUDIO_LISTENER_REMOVE` |
+| `AUDIO_MOD_FREE(mod: AUDIO_MOD)` | release a modulator — formerly `AUDIO_MOD_REMOVE` |
+| `GUI_WIDGET_FREE(widget)` | remove a widget (the handle becomes invalid) — formerly `GUI_DESTROY` |
+| `GUI_WINDOW_FREE(win)` | remove a window with its widgets — formerly `GUI_WINDOW_DESTROY` |
+| `PHYS2D_BODY_FREE(w, idx)` | take a body out of the world — formerly `PHYS2D_REMOVE` |
+| `PHYS3D_BODY_FREE(w, idx)` | take a body out of the world — formerly `PHYS3D_REMOVE` |
+| `BT_CLOSE(handle)` | close the connection (like DB_CLOSE, NET_CLOSE) — formerly `BT_DISCONNECT` |
+| `MQTT_CLOSE(handle)` | close the connection (like DB_CLOSE, NET_CLOSE) — formerly `MQTT_DISCONNECT` |

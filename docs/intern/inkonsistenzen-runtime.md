@@ -1322,8 +1322,14 @@ Aufwand. Jeder Punkt hält `docs/stabilitaet.md` ein.
 4. **Eine Handle-Regel und ein `handle_get`** (A4, B5, D5). *Umgesetzt auf
    `thema/abstuerze-features-handles`: Regel in CLAUDE.md, `MODEL_FREE`, `FONT_FREE`,
    `SHADER_FREE`, `RENDERTARGET_FREE`, `ATLAS_FREE`, `SAMPLE_FREE`, Getter nennen den
-   Befehl, doppelt freigeben still. Offen: `_REMOVE`/`_DESTROY`/`_DISCONNECT` als
-   `_FREE`-Namen, `db_res_mut` nennt noch das Modul, getaggte Handles.*
+   Befehl, doppelt freigeben still. Auf `thema/lesen-verbinden` nachgezogen:
+   neue Namen `AUDIO_CLOCK/EMITTER/LISTENER/MOD_FREE`, `GUI_WIDGET_FREE`,
+   `GUI_WINDOW_FREE`, `PHYS2D/PHYS3D_BODY_FREE`, `BT_CLOSE`, `MQTT_CLOSE`
+   (`namen.rs`, die alten bleiben); die DB_RESULT-Meldungen nennen den Befehl
+   („DB_NEXT: das Ergebnis wurde mit DB_CLOSE_RESULT geschlossen“). Bewusst
+   nicht umbenannt: `ECS_DESTROY` (zerstört ein Wesen im Spiel, gibt kein
+   Handle frei) und `WIFI_DISCONNECT` (trennt den Adapter, kein Handle).
+   Offen: getaggte Handles.*
    - Ungültig ist ein Fehler mit Befehlsnamen, Freigeben ist idempotent und
      still, Laden scheitert laut (LOADMODEL, SHADER_LOAD).
    - Fehlende `_FREE` nachrüsten (Modell, Schrift, Shader, Render-Ziel, Atlas,

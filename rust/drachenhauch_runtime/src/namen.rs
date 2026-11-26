@@ -112,6 +112,19 @@ pub const NEU: &[(&str, &str)] = &[
     // Fristen heissen _SET_TIMEOUT und zaehlen ms (beide taten das schon).
     ("smtp_set_timeout", "smtp_timeout"),
     ("modbus_set_timeout", "modbus_timeout"),
+    // Freigeben heisst _FREE, eine Verbindung schliessen _CLOSE (Regel 4,
+    // die Handle-Regel in CLAUDE.md) -- bis 2026.53 _REMOVE, _DESTROY und
+    // _DISCONNECT nebeneinander.
+    ("audio_clock_free", "audio_clock_remove"),
+    ("audio_emitter_free", "audio_emitter_remove"),
+    ("audio_listener_free", "audio_listener_remove"),
+    ("audio_mod_free", "audio_mod_remove"),
+    ("gui_widget_free", "gui_destroy"),
+    ("gui_window_free", "gui_window_destroy"),
+    ("phys2d_body_free", "phys2d_remove"),
+    ("phys3d_body_free", "phys3d_remove"),
+    ("bt_close", "bt_disconnect"),
+    ("mqtt_close", "mqtt_disconnect"),
     // ---- Dateien (mit Pfad), Dateien (mit Handle), Ordner, Pfade
     ("file_exists", "fileexists"),
     ("file_size", "filesize"),

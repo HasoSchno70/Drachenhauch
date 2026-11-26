@@ -283,3 +283,18 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 |---|---|
 | `SMTP_SET_TIMEOUT(m: SMTP, ms)` | Frist je Schritt beim Versand — bisher `SMTP_TIMEOUT` |
 | `MODBUS_SET_TIMEOUT(m, ms)` | wie lange auf eine Antwort gewartet wird — bisher `MODBUS_TIMEOUT` |
+
+### Freigeben heißt `_FREE`, eine Verbindung schließen `_CLOSE`
+
+| Name | Was es tut |
+|---|---|
+| `AUDIO_CLOCK_FREE(clock)` | eine Uhr freigeben — bisher `AUDIO_CLOCK_REMOVE` |
+| `AUDIO_EMITTER_FREE(emitter)` | eine Schallquelle freigeben — bisher `AUDIO_EMITTER_REMOVE` |
+| `AUDIO_LISTENER_FREE(listener)` | einen Zuhörer freigeben — bisher `AUDIO_LISTENER_REMOVE` |
+| `AUDIO_MOD_FREE(mod: AUDIO_MOD)` | einen Modulator freigeben — bisher `AUDIO_MOD_REMOVE` |
+| `GUI_WIDGET_FREE(widget)` | ein Widget entfernen (das Handle wird ungültig) — bisher `GUI_DESTROY` |
+| `GUI_WINDOW_FREE(win)` | ein Fenster samt Widgets entfernen — bisher `GUI_WINDOW_DESTROY` |
+| `PHYS2D_BODY_FREE(w, idx)` | einen Körper aus der Welt nehmen — bisher `PHYS2D_REMOVE` |
+| `PHYS3D_BODY_FREE(w, idx)` | einen Körper aus der Welt nehmen — bisher `PHYS3D_REMOVE` |
+| `BT_CLOSE(handle)` | die Verbindung schließen (wie DB_CLOSE, NET_CLOSE) — bisher `BT_DISCONNECT` |
+| `MQTT_CLOSE(handle)` | die Verbindung schließen (wie DB_CLOSE, NET_CLOSE) — bisher `MQTT_DISCONNECT` |

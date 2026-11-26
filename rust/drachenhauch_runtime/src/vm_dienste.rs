@@ -23,17 +23,17 @@ impl<'p> Vm<'p> {
         Self::handle_get_mut(&mut self.db_conns, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes DB_CONN-Handle")
     }
     #[cfg(feature = "db")]
-    pub(super) fn db_res(&self, idx: i64) -> R<&crate::db::DbResult> {
+    pub(super) fn db_res(&self, idx: i64, fn_: &str) -> R<&crate::db::DbResult> {
         let r = self.db_results.get(idx as usize)
-            .ok_or_else(|| format!("DB: ungueltiges DB_RESULT-Handle {}", idx))?;
-        if r.closed { return Err("DB: Result wurde bereits geschlossen".into()); }
+            .ok_or_else(|| format!("{}: ungueltiges DB_RESULT-Handle {}", fn_.to_uppercase(), idx))?;
+        if r.closed { return Err(format!("{}: das Ergebnis wurde mit DB_CLOSE_RESULT geschlossen", fn_.to_uppercase())); }
         Ok(r)
     }
     #[cfg(feature = "db")]
-    pub(super) fn db_res_mut(&mut self, idx: i64) -> R<&mut crate::db::DbResult> {
+    pub(super) fn db_res_mut(&mut self, idx: i64, fn_: &str) -> R<&mut crate::db::DbResult> {
         let r = self.db_results.get_mut(idx as usize)
-            .ok_or_else(|| format!("DB: ungueltiges DB_RESULT-Handle {}", idx))?;
-        if r.closed { return Err("DB: Result wurde bereits geschlossen".into()); }
+            .ok_or_else(|| format!("{}: ungueltiges DB_RESULT-Handle {}", fn_.to_uppercase(), idx))?;
+        if r.closed { return Err(format!("{}: das Ergebnis wurde mit DB_CLOSE_RESULT geschlossen", fn_.to_uppercase())); }
         Ok(r)
     }
 
@@ -67,17 +67,17 @@ impl<'p> Vm<'p> {
                 Value::Int((self.db_results.len() - 1) as i64)
             }
             "db_next" => {
-                let r = self.db_res_mut(bi_int(a, 0, "DB_NEXT")?)?;
+                let r = self.db_res_mut(bi_int(a, 0, "DB_NEXT")?, name)?;
                 r.pos += 1;
                 Value::Bool((r.pos as usize) < r.rows.len())
             }
-            "db_col_count" => Value::Int(self.db_res(bi_int(a, 0, "DB_COL_COUNT")?)?.columns.len() as i64),
-            "db_col_name" => { let i1 = bi_int(a, 1, "DB_COL_NAME")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_COL_NAME")?)?.col_name(i1)?) }
+            "db_col_count" => Value::Int(self.db_res(bi_int(a, 0, "DB_COL_COUNT")?, name)?.columns.len() as i64),
+            "db_col_name" => { let i1 = bi_int(a, 1, "DB_COL_NAME")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_COL_NAME")?, name)?.col_name(i1)?) }
             "db_close_result" => {
                 let k = bi_int(a, 0, "DB_CLOSE_RESULT")?;
                 // Doppelt schliessen ist still (bis 2026.53 ein Fehler).
                 if k >= 0 && self.db_results.get(k as usize).is_some_and(|r| r.closed) { return Ok(Some(Value::Nil)); }
-                let r = self.db_res_mut(k)?;
+                let r = self.db_res_mut(k, name)?;
                 r.closed = true;
                 // rows leert sich NICHT von selbst durch das closed-Flag -- ohne
                 // das hier bleiben eager geladene Zeilen bis Programmende im
@@ -85,12 +85,12 @@ impl<'p> Vm<'p> {
                 r.rows = Vec::new();
                 Value::Nil
             }
-            "db_is_null" => { let i1 = bi_int(a, 1, "DB_IS_NULL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_IS_NULL")?)?.is_null(i1)?) }
-            "db_get_buffer" => { let i1 = bi_int(a, 1, "DB_GET_BUFFER")?; Value::Buffer(Rc::new(RefCell::new(self.db_res(bi_int(a, 0, "DB_GET_BUFFER")?)?.get_buffer(i1)?))) }
-            "db_get_string" => { let i1 = bi_int(a, 1, "DB_GET_STRING")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_GET_STRING")?)?.get_string(i1)?) }
-            "db_get_int" => { let i1 = bi_int(a, 1, "DB_GET_INT")?; Value::Int(self.db_res(bi_int(a, 0, "DB_GET_INT")?)?.get_int(i1)?) }
-            "db_get_float" => { let i1 = bi_int(a, 1, "DB_GET_FLOAT")?; Value::Float(self.db_res(bi_int(a, 0, "DB_GET_FLOAT")?)?.get_float(i1)?) }
-            "db_get_bool" => { let i1 = bi_int(a, 1, "DB_GET_BOOL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_GET_BOOL")?)?.get_bool(i1)?) }
+            "db_is_null" => { let i1 = bi_int(a, 1, "DB_IS_NULL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_IS_NULL")?, name)?.is_null(i1)?) }
+            "db_get_buffer" => { let i1 = bi_int(a, 1, "DB_GET_BUFFER")?; Value::Buffer(Rc::new(RefCell::new(self.db_res(bi_int(a, 0, "DB_GET_BUFFER")?, name)?.get_buffer(i1)?))) }
+            "db_get_string" => { let i1 = bi_int(a, 1, "DB_GET_STRING")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_GET_STRING")?, name)?.get_string(i1)?) }
+            "db_get_int" => { let i1 = bi_int(a, 1, "DB_GET_INT")?; Value::Int(self.db_res(bi_int(a, 0, "DB_GET_INT")?, name)?.get_int(i1)?) }
+            "db_get_float" => { let i1 = bi_int(a, 1, "DB_GET_FLOAT")?; Value::Float(self.db_res(bi_int(a, 0, "DB_GET_FLOAT")?, name)?.get_float(i1)?) }
+            "db_get_bool" => { let i1 = bi_int(a, 1, "DB_GET_BOOL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_GET_BOOL")?, name)?.get_bool(i1)?) }
             "db_begin" => { self.db_conn(bi_int(a, 0, "DB_BEGIN")?, name)?.befehl("BEGIN", "DB_BEGIN")?; Value::Nil }
             "db_commit" => { self.db_conn(bi_int(a, 0, "DB_COMMIT")?, name)?.befehl("COMMIT", "DB_COMMIT")?; Value::Nil }
             "db_rollback" => { self.db_conn(bi_int(a, 0, "DB_ROLLBACK")?, name)?.befehl("ROLLBACK", "DB_ROLLBACK")?; Value::Nil }

@@ -932,6 +932,7 @@ ungueltiges/geschlossenes {}	invalid/closed {}
 ungueltiges/gestopptes HTTPD-Handle	invalid/stopped HTTPD handle
 ungueltiges/getrenntes BT_HANDLE	invalid/disconnected BT_HANDLE
 {}: ungueltiges DB_RESULT-Handle {}	{}: invalid DB_RESULT handle {}
+{}: das Ergebnis wurde mit DB_CLOSE_RESULT geschlossen	{}: the result was closed with DB_CLOSE_RESULT
 {}: ungueltiges oder freigegebenes VIDEO {}	{}: invalid or freed VIDEO {}
 {}: Stack ist bereits leer	{}: the stack is already empty
 {}: der Stapel ist leer -- zu jedem AUDIO_POP gehoert ein AUDIO_PUSH	{}: the stack is empty -- every AUDIO_POP needs an AUDIO_PUSH

@@ -471,6 +471,12 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_CLOCK_FREE",
+   "kind": "core",
+   "signature": "AUDIO_CLOCK_FREE(clock)",
+   "module": "audio"
+  },
+  {
    "name": "AUDIO_CLOCK_SET_SPEED",
    "kind": "core",
    "signature": "AUDIO_CLOCK_SET_SPEED(clock, ticks_per_second)",
@@ -534,6 +540,12 @@
    "name": "AUDIO_EMITTER_REMOVE",
    "kind": "core",
    "signature": "AUDIO_EMITTER_REMOVE(emitter)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_EMITTER_FREE",
+   "kind": "core",
+   "signature": "AUDIO_EMITTER_FREE(emitter)",
    "module": "audio"
   },
   {
@@ -639,6 +651,12 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_LISTENER_FREE",
+   "kind": "core",
+   "signature": "AUDIO_LISTENER_FREE(listener)",
+   "module": "audio"
+  },
+  {
    "name": "AUDIO_LISTENER_SET_ORIENTATION",
    "kind": "core",
    "signature": "AUDIO_LISTENER_SET_ORIENTATION(listener, yaw_deg)",
@@ -666,6 +684,12 @@
    "name": "AUDIO_MOD_REMOVE",
    "kind": "function",
    "signature": "AUDIO_MOD_REMOVE(mod: AUDIO_MOD)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_MOD_FREE",
+   "kind": "function",
+   "signature": "AUDIO_MOD_FREE(mod: AUDIO_MOD)",
    "module": "audio"
   },
   {
@@ -1092,6 +1116,12 @@
    "name": "BT_DISCONNECT",
    "kind": "core",
    "signature": "BT_DISCONNECT(handle)",
+   "module": "bt"
+  },
+  {
+   "name": "BT_CLOSE",
+   "kind": "core",
+   "signature": "BT_CLOSE(handle)",
    "module": "bt"
   },
   {
@@ -5199,6 +5229,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WIDGET_FREE",
+   "kind": "core",
+   "signature": "GUI_WIDGET_FREE(widget)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_DIALOG",
    "kind": "core",
    "signature": "GUI_DIALOG(title$, text$[, style$])",
@@ -8115,6 +8151,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WINDOW_FREE",
+   "kind": "core",
+   "signature": "GUI_WINDOW_FREE(win)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_WINDOW_GET_H",
    "kind": "core",
    "signature": "GUI_WINDOW_GET_H(win)",
@@ -10635,6 +10677,12 @@
    "module": "mqtt"
   },
   {
+   "name": "MQTT_CLOSE",
+   "kind": "core",
+   "signature": "MQTT_CLOSE(handle)",
+   "module": "mqtt"
+  },
+  {
    "name": "MQTT_FLUSH",
    "kind": "core",
    "signature": "MQTT_FLUSH(handle[, ms: INTEGER]) AS BOOLEAN",
@@ -11313,6 +11361,12 @@
    "module": "physics2d"
   },
   {
+   "name": "PHYS2D_BODY_FREE",
+   "kind": "core",
+   "signature": "PHYS2D_BODY_FREE(w, idx)",
+   "module": "physics2d"
+  },
+  {
    "name": "PHYS2D_BODY_EXISTS",
    "kind": "core",
    "signature": "PHYS2D_BODY_EXISTS(w, idx) AS BOOLEAN",
@@ -11454,6 +11508,12 @@
    "name": "PHYS3D_REMOVE",
    "kind": "core",
    "signature": "PHYS3D_REMOVE(w, idx)",
+   "module": "physics3d"
+  },
+  {
+   "name": "PHYS3D_BODY_FREE",
+   "kind": "core",
+   "signature": "PHYS3D_BODY_FREE(w, idx)",
    "module": "physics3d"
   },
   {
