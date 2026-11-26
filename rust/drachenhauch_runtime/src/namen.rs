@@ -131,6 +131,7 @@ pub const NEU: &[(&str, &str)] = &[
     ("bt_close", "bt_disconnect"),
     ("mqtt_close", "mqtt_disconnect"),
     ("font_load_sdf", "loadfont_sdf"),
+    ("mic_peak", "mic_level"),
     // ---- Dateien (mit Pfad), Dateien (mit Handle), Ordner, Pfade
     ("file_exists", "fileexists"),
     ("file_size", "filesize"),

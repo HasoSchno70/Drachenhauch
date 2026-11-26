@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2707,
+ "count": 2708,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1648,7 +1648,8 @@
   "MIC_DEVICES": "the names of all inputs, the default first; empty if the computer has none",
   "MIC_ERROR$": "the error the device reported (unplugged, refused) — otherwise \"\"",
   "MIC_FFT": "fills an ARRAY OF FLOAT with band levels 0..1, spread logarithmically, with afterglow and its own gain — the same calculation as AUDIO_FFT, but from the input",
-  "MIC_LEVEL": "highest peak since the last call, 0 to 1 — asked once per frame, that is a level meter that misses no click",
+  "MIC_LEVEL": "highest peak since the last call, 0 to 1 — asked once per frame, that is a level meter that misses no click; new name MIC_PEAK, the same quantity as AUDIO_PEAK at the output",
+  "MIC_PEAK": "highest peak at the input since the last call (like AUDIO_PEAK at the output) — formerly MIC_LEVEL",
   "MIC_PITCH": "fundamental in Hz, 50 to 2000; 0 if it is quiet or no tone stands out (noise, speech between two syllables)",
   "MIC_RATE": "sample rate of the open input (usually 44100 or 48000), otherwise 0",
   "MIC_RECORDING": "is a recording running?",

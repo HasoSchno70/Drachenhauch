@@ -50,7 +50,7 @@ Alles weiter unten verlangt einen laufenden Eingang; ohne ist es ein Fehler
 
 | Befehl | Was es tut |
 |---|---|
-| `MIC_LEVEL()` → FLOAT | höchster Ausschlag seit dem letzten Aufruf, 0 bis 1 — einmal je Bild gefragt ist das eine Pegelanzeige, die keinen Knacks verpasst |
+| `MIC_LEVEL()` → FLOAT | höchster Ausschlag seit dem letzten Aufruf, 0 bis 1 — einmal je Bild gefragt ist das eine Pegelanzeige, die keinen Knacks verpasst; neuer Name `MIC_PEAK`, dieselbe Größe wie `AUDIO_PEAK` am Ausgang |
 | `MIC_RMS()` → FLOAT | Effektivwert der letzten 50 ms — das, was man als Lautstärke hört (ein Sinus mit Ausschlag 1 hat 0,707) |
 | `MIC_PITCH()` → FLOAT | Grundton in Hz, 50 bis 2000; 0, wenn es leise ist oder kein Ton heraussticht (Rauschen, Sprache zwischen zwei Silben) |
 | `MIC_FFT(bands)` | füllt ein `ARRAY OF FLOAT` mit Bandpegeln 0..1, logarithmisch verteilt, mit Nachleuchten und eigener Verstärkung — dieselbe Rechnung wie `AUDIO_FFT`, aber vom Eingang |

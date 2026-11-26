@@ -168,25 +168,7 @@ pub fn tonhoehe(w: &[f32], rate: u32) -> f64 {
 /// Werte (ein Kanal) als WAV, 16 Bit -- fuer MIC_RECORD_SAVE, das ohne
 /// Ausgabegeraet gehen soll (ein SOUND braucht die Audio-Ausgabe).
 pub fn wav_bytes(werte: &[f32], rate: u32) -> Vec<u8> {
-    let daten = werte.len() * 2;
-    let mut b = Vec::with_capacity(44 + daten);
-    b.extend_from_slice(b"RIFF");
-    b.extend_from_slice(&((36 + daten) as u32).to_le_bytes());
-    b.extend_from_slice(b"WAVEfmt ");
-    b.extend_from_slice(&16u32.to_le_bytes());
-    b.extend_from_slice(&1u16.to_le_bytes());
-    b.extend_from_slice(&1u16.to_le_bytes());
-    b.extend_from_slice(&rate.to_le_bytes());
-    b.extend_from_slice(&(rate * 2).to_le_bytes());
-    b.extend_from_slice(&2u16.to_le_bytes());
-    b.extend_from_slice(&16u16.to_le_bytes());
-    b.extend_from_slice(b"data");
-    b.extend_from_slice(&(daten as u32).to_le_bytes());
-    for &w in werte {
-        let v = (w.clamp(-1.0, 1.0) * 32767.0).round() as i16;
-        b.extend_from_slice(&v.to_le_bytes());
-    }
-    b
+    crate::wav::bytes(1, rate, 16, werte)
 }
 
 // --- Geraete --------------------------------------------------------------

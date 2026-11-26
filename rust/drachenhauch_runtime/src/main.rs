@@ -122,6 +122,8 @@ mod modbus;
 mod midifile;
 mod hotplug;
 mod farbraum;
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))] // nur Ton und Mikrofon
+mod wav;
 mod systemaussehen;
 #[cfg(feature = "graphics")]
 mod nativfenster;

@@ -232,6 +232,7 @@ hand are callback timers from the `timer` module.
 | `AUDIO_SET_VOLUME(ch, v)` | volume of a channel 0..1 — formerly `AUDIO_VOLUME` |
 | `AUDIO_MUSIC_SET_VOLUME(v)` | volume of the music 0..1 — formerly `AUDIO_MUSIC_VOLUME` |
 | `FONT_LOAD_SDF(path$, size[, chars$]) AS INTEGER` | a font that stays sharp at any size (distance field) — formerly `LOADFONT_SDF` |
+| `MIC_PEAK() AS FLOAT` | highest peak at the input since the last call (like AUDIO_PEAK at the output) — formerly `MIC_LEVEL` |
 
 ### files (by path), files (by handle), folders, paths
 

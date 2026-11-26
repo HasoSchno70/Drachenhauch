@@ -232,6 +232,7 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `AUDIO_SET_VOLUME(ch, v)` | Lautstärke eines Kanals 0..1 — bisher `AUDIO_VOLUME` |
 | `AUDIO_MUSIC_SET_VOLUME(v)` | Lautstärke der Musik 0..1 — bisher `AUDIO_MUSIC_VOLUME` |
 | `FONT_LOAD_SDF(path$, size[, chars$]) AS INTEGER` | eine Schrift, die bei jeder Größe scharf bleibt (Abstandsfeld) — bisher `LOADFONT_SDF` |
+| `MIC_PEAK() AS FLOAT` | höchster Ausschlag am Eingang seit dem letzten Aufruf (wie AUDIO_PEAK am Ausgang) — bisher `MIC_LEVEL` |
 
 ### Dateien (mit Pfad), Dateien (mit Handle), Ordner, Pfade
 

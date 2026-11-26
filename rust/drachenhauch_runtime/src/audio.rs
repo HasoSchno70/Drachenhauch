@@ -2181,39 +2181,12 @@ resonance/reverb/distortion", other)),
         // legen denselben Wert auf beide, und eine doppelt so grosse Datei
         // ohne Gegenwert waere eine Ueberraschung.
         let stereo = data.frames.iter().any(|f| (f.left - f.right).abs() > 1e-6);
-        let kanaele: u16 = if stereo { 2 } else { 1 };
-        let bytes_pro_wert: u16 = if bits == 8 { 1 } else { 2 };
-        let n_werte = data.frames.len() * kanaele as usize;
-        let daten_bytes = n_werte * bytes_pro_wert as usize;
-
-        let mut buf: Vec<u8> = Vec::with_capacity(44 + daten_bytes);
-        let block_align = kanaele * bytes_pro_wert;
-        let byte_rate = sr * block_align as u32;
-        buf.extend_from_slice(b"RIFF");
-        buf.extend_from_slice(&((36 + daten_bytes) as u32).to_le_bytes());
-        buf.extend_from_slice(b"WAVEfmt ");
-        buf.extend_from_slice(&16u32.to_le_bytes());          // fmt-Laenge
-        buf.extend_from_slice(&1u16.to_le_bytes());           // PCM
-        buf.extend_from_slice(&kanaele.to_le_bytes());
-        buf.extend_from_slice(&sr.to_le_bytes());
-        buf.extend_from_slice(&byte_rate.to_le_bytes());
-        buf.extend_from_slice(&block_align.to_le_bytes());
-        buf.extend_from_slice(&(bits as u16).to_le_bytes());   // bits pro Wert
-        buf.extend_from_slice(b"data");
-        buf.extend_from_slice(&(daten_bytes as u32).to_le_bytes());
-
-        let mut schreibe = |v: f32, buf: &mut Vec<u8>| {
-            let v = v.clamp(-1.0, 1.0);
-            if bits == 8 {
-                buf.push((v * 127.0 + 128.0).round().clamp(0.0, 255.0) as u8);
-            } else {
-                buf.extend_from_slice(&((v * 32767.0).round() as i16).to_le_bytes());
-            }
+        let werte: Vec<f32> = if stereo {
+            data.frames.iter().flat_map(|f| [f.left, f.right]).collect()
+        } else {
+            data.frames.iter().map(|f| f.left).collect()
         };
-        for f in data.frames.iter() {
-            schreibe(f.left, &mut buf);
-            if stereo { schreibe(f.right, &mut buf); }
-        }
+        let buf = crate::wav::bytes(if stereo { 2 } else { 1 }, sr, bits as u16, &werte);
         std::fs::write(pfad, &buf)
             .map_err(|e| format!("AUDIO_SAVE_WAV: '{}' liess sich nicht schreiben -- {}", pfad, e))
     }
@@ -2818,15 +2791,11 @@ pub(crate) fn wellenform(name: &str, fn_: &str) -> Result<&'static str, String> 
         .ok_or_else(|| format!("{}: unbekannte Wellenform '{}' (erlaubt: sine, square/pulse, saw, triangle, noise -- auch sinus, rechteck, saege, dreieck, rauschen)", fn_, name))
 }
 
+/// Ein Wert der Wellenform `kind` zur Zeit `t` -- dieselbe Formel wie
+/// `phase_value` (bis 2026.53 eine eigene Kopie, Bericht A19), dazu Rauschen.
 fn waveform_value(kind: &str, freq: f64, t: f64) -> f64 {
-    match kind {
-        "sine" => (2.0 * PI64 * freq * t).sin(),
-        "square" => if (2.0 * PI64 * freq * t).sin() >= 0.0 { 1.0 } else { -1.0 },
-        "saw" => 2.0 * (t * freq - (0.5 + t * freq).floor()),
-        "triangle" => 2.0 * (2.0 * (t * freq - (0.5 + t * freq).floor())).abs() - 1.0,
-        "noise" => rng_uniform(),
-        _ => 0.0,
-    }
+    if kind == "noise" { return rng_uniform(); }
+    phase_value(kind, 2.0 * PI64 * freq * t)
 }
 
 /// Die Wellenform einer Note, einmal aus dem Text entschieden.
@@ -2834,6 +2803,20 @@ fn waveform_value(kind: &str, freq: f64, t: f64) -> f64 {
 enum Welle { Sinus, Rechteck, Saege, Dreieck, Stumm }
 
 impl Welle {
+    /// Der Wert beim Bruchteil `p` einer Schwingung (0..1).
+    fn wert(self, p: f64) -> f64 {
+        match self {
+            Welle::Sinus => (2.0 * PI64 * p).sin(),
+            Welle::Rechteck => if p < 0.5 { 1.0 } else { -1.0 },
+            Welle::Saege => if p < 0.5 { 2.0 * p } else { 2.0 * p - 2.0 },
+            Welle::Dreieck => {
+                let sg = if p < 0.5 { 2.0 * p } else { 2.0 * p - 2.0 };
+                2.0 * sg.abs() - 1.0
+            }
+            Welle::Stumm => 0.0,
+        }
+    }
+
     fn von(kind: &str) -> Welle {
         match kind {
             "sine" => Welle::Sinus,
@@ -2845,14 +2828,15 @@ impl Welle {
     }
 }
 
+/// Die Wellenformen an EINER Stelle: `phase` im Bogenmass, beliebig gross.
+/// Die Note (`build_note_buffer`) rechnet mit dem Bruchteil `p` (0..1) und
+/// einem gedrehten Zeiger fuer den Sinus -- `Welle::wert` ist dieselbe
+/// Formel fuer diesen Bruchteil.
 fn phase_value(kind: &str, phase: f64) -> f64 {
-    let ph = phase / (2.0 * PI64);
-    match kind {
-        "sine" => phase.sin(),
-        "square" => if phase.sin() >= 0.0 { 1.0 } else { -1.0 },
-        "saw" => 2.0 * (ph - (0.5 + ph).floor()),
-        "triangle" => 2.0 * (2.0 * (ph - (0.5 + ph).floor())).abs() - 1.0,
-        _ => 0.0,
+    match Welle::von(kind) {
+        Welle::Sinus => phase.sin(),
+        Welle::Rechteck => if phase.sin() >= 0.0 { 1.0 } else { -1.0 },
+        w => { let ph = phase / (2.0 * PI64); w.wert(ph - ph.floor()) }
     }
 }
 
@@ -3005,13 +2989,7 @@ fn build_note_buffer(wf: &str, freq: f64, dauer_ms: i64, attack_ms: i64, decay_m
                         }
                         zeiger[k].1
                     }
-                    Welle::Rechteck => if p < 0.5 { 1.0 } else { -1.0 },
-                    Welle::Saege => if p < 0.5 { 2.0 * p } else { 2.0 * p - 2.0 },
-                    Welle::Dreieck => {
-                        let sg = if p < 0.5 { 2.0 * p } else { 2.0 * p - 2.0 };
-                        2.0 * sg.abs() - 1.0
-                    }
-                    Welle::Stumm => 0.0,
+                    w => w.wert(p),
                 };
             }
             *out = v / layers as f64;

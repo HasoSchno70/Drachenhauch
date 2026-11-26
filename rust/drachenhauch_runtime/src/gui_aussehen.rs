@@ -627,7 +627,7 @@ mod tests {
         assert_eq!(ablauf_verformung(&ks, 1.0), (0.0, 0.0, 0.0, 2.0));
         assert!(ablauf_lesen("120%: x 1", 3, |_| 3).unwrap_err().contains("0% bis 100%"));
         assert!(ablauf_lesen("50%: schwanz 1", 3, |_| 3).unwrap_err().contains("x, y, drehen, groesse"));
-        assert!(ablauf_lesen("50%: farbe 1", 3, |_| 3).unwrap_err().contains("farbe #RRGGBB"));
+        assert!(ablauf_lesen("50%: farbe 1", 3, |_| 3).unwrap_err().contains("farbe #RGB oder #RRGGBB"));
         let k = ablauf_bei(&ablauf_lesen("100%: deckkraft 0, farbe #0000FF", 1, |_| 1).unwrap(), 0.5);
         assert_eq!((k.deckkraft, k.farbe), (0.5, [127.5, 127.5, 255.0]));
         assert_eq!(bild_lesen("figur.png 8 12fps", 1).unwrap(), Some("figur.png|8|12".to_string()));
