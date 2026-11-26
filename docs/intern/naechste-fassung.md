@@ -46,6 +46,12 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
   Ton-Fehler ohne rohe Bibliotheksnamen, `PADL$`/`PADR$`/`TWEEN_NEW*`/
   `ASTAR_*`/`PARTICLE_*`/`TILED_*` nennen sich selbst statt „PAD“, „S“, „T“.
 
+**Typen**
+
+* Ein Modultyp, der ein echter Wert ist (`VEC2`, `JSON_HANDLE`, `SPRITE`,
+  `TILED_MAP` …), nimmt bei der Zuweisung nur seinesgleichen (oder NIL);
+  `DIM j AS JSON_HANDLE = 5` ist ein Fehler.
+
 **Schalter**
 
 * `DIRLIST` (rekursiv), `CODE_FORMAT$`, `FONT_LIGATURES`, `AUDIO_LOFI`,

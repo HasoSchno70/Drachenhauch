@@ -723,6 +723,19 @@ pub(crate) fn klasse_erbt(kind: &str, basis: &str) -> bool {
 /// `AS Tier` nahm ein `Auto` und eine Parameter `AS Datei` die Zahl 5, und
 /// der Fehler kam erst beim ersten Methodenaufruf, weit weg von der Stelle
 /// (docs/intern/entwurf-schnittstellen.md, Weg B).
+/// Die Modultypen, deren Werte echte Werte sind (keine Handle-Nummer) --
+/// so, wie `Value::type_name` sie nennt. EINE Tafel fuer `coerce` (und
+/// `IS`): ein neuer Werttyp gehoert hierher.
+pub(crate) const WERT_TYPEN: &[&str] = &["VEC2", "VEC3", "VEC4", "QUAT", "MAT4", "SPRITE",
+    "FILE", "BUFFER", "TWEEN", "JSON_HANDLE", "XML_HANDLE", "SAVE_HANDLE", "ASTAR_GRID",
+    "PARTICLE_SYSTEM", "ECS_WORLD", "TILED_MAP", "CHAR_CONTROLLER", "PHYSICS_BROAD",
+    "PHYS_WORLD", "PHYS2D_WORLD", "ANIM_FSM", "CHART"];
+
+/// Ist `target` (klein, wie im Typ-String) ein Werttyp? Dann sein Name.
+pub(crate) fn wert_typ(target: &str) -> Option<&'static str> {
+    WERT_TYPEN.iter().copied().find(|t| t.eq_ignore_ascii_case(target))
+}
+
 pub(crate) fn klasse_pruefen(value: &Value, target: &str, ctx: &str) -> Result<(), String> {
     let ist = match value {
         Value::Nil => return Ok(()),
@@ -739,6 +752,14 @@ pub(crate) fn klasse_pruefen(value: &Value, target: &str, ctx: &str) -> Result<(
         }
         v => v.type_name().to_string(),
     };
+    // Ein Modultyp, der ein echter Wert ist (VEC2, JSON_HANDLE, SPRITE ...),
+    // nimmt nur seinesgleichen. Bis 2026.53 ging `DIM j AS JSON_HANDLE = 5`
+    // durch, und der Fehler kam erst beim naechsten JSON-Befehl. Typen mit
+    // Handle-Nummer (IMAGE, PDF, GUI_WIDGET ...) bleiben bei INTEGER.
+    if let Some(soll) = wert_typ(target) {
+        if value.type_name() == soll { return Ok(()); }
+        return Err(format!("{}: Erwartet {}, erhalten {}", ctx, soll, ist));
+    }
     if !ist_klasse(target) { return Ok(()); }
     Err(format!("{}: Erwartet {} (oder eine Unterklasse), erhalten {}",
         ctx, crate::namensraum::lesbar_text(&target.to_uppercase()), ist))
