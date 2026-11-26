@@ -144,7 +144,6 @@ pub(crate) fn a_text<'a>(a: &'a [Value], i: usize, fn_: &str) -> R<&'a str> { te
 pub(crate) fn a_schalter(a: &[Value], i: usize, fn_: &str) -> R<bool> { schalter(an(a, i, fn_)?, fn_, Some(i + 1)) }
 
 /// Ein optionaler Schalter: fehlt er, gilt `vorgabe`.
-#[cfg_attr(not(feature = "graphics"), allow(dead_code))] // nur die Grafik
 pub(crate) fn a_schalter_oder(a: &[Value], i: usize, vorgabe: bool, fn_: &str) -> R<bool> {
     match a.get(i) { None => Ok(vorgabe), Some(v) => schalter(v, fn_, Some(i + 1)) }
 }

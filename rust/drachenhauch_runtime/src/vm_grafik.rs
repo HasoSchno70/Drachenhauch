@@ -651,7 +651,7 @@ impl<'p> Vm<'p> {
                 if a.len() != 2 { return Err(format!("{}: erwartet (font, an)", n)); }
                 let h = gi(a,0,n)?;
                 let _ = g!();
-                if !crate::formung::ligaturen_setzen(h, a[1].truthy()) {
+                if !crate::formung::ligaturen_setzen(h, crate::argument::a_schalter(a, 1, n)?) {
                     return Err(format!("{}: {} ist keine mit LOADFONT geladene Schrift", n, h));
                 }
                 Value::Nil }
@@ -1698,7 +1698,7 @@ impl<'p> Vm<'p> {
                 // AUDIO_LOFI(an[, bits[, cutoff_hz]]) -- Paula/Amiga-Lo-Fi.
                 // Argument-Pruefung VOR der Audio-Initialisierung (golden-testbar).
                 let on = match a.first() {
-                    Some(v) => v.truthy(),
+                    Some(_) => crate::argument::a_schalter(a, 0, "AUDIO_LOFI")?,
                     None => return Err("AUDIO_LOFI: erwartet (an[, bits[, cutoff_hz]])".into()),
                 };
                 let bits = if a.len() >= 2 {
@@ -2877,7 +2877,7 @@ wie viele Plaetze gelten", i + 1)),
                 let (x,y) = (gi(a,1,"UI_CHECKBOX")? as i32 + self.ui_state.offset_x, gi(a,2,"UI_CHECKBOX")? as i32 + self.ui_state.offset_y);
                 let label = gs(a,3,"UI_CHECKBOX")?.to_string();
                 if !self.ui_state.checkbox.contains_key(&id) {
-                    let init = if a.len() == 5 { matches!(a[4], Value::Bool(true)) } else { false };
+                    let init = crate::argument::a_schalter_oder(a, 4, false, "UI_CHECKBOX")?;
                     self.ui_state.checkbox.insert(id.clone(), init);
                 }
                 let bs = self.ui_state.metric("checkbox_size") as i32;

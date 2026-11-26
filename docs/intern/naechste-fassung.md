@@ -34,6 +34,12 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
   Ton-Fehler ohne rohe Bibliotheksnamen, `PADL$`/`PADR$`/`TWEEN_NEW*`/
   `ASTAR_*`/`PARTICLE_*`/`TILED_*` nennen sich selbst statt „PAD“, „S“, „T“.
 
+**Schalter**
+
+* `DIRLIST` (rekursiv), `CODE_FORMAT$`, `FONT_LIGATURES`, `AUDIO_LOFI`,
+  `GUI_TEXTAREA_FOLD`/`_FOLD_ALL` und `UI_CHECKBOX` nehmen wie alle Schalter
+  BOOLEAN oder eine Zahl; ein Text ist ein Fehler (vorher war „nein“ wahr).
+
 **Zahlen**
 
 * Werte in Feldern und MAPs prüft dieselbe Regel wie Variablen:

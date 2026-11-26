@@ -3622,7 +3622,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let path_r = resolve_asset_path(need_str(&a[0], "DIRLIST")?);
             let path = path_r.as_str();
             let muster = if a.len() > 1 { Some(need_str(&a[1], "DIRLIST")?).filter(|m| !m.is_empty()) } else { None };
-            if a.len() > 2 && a[2].truthy() {
+            if a.len() > 2 && crate::argument::a_schalter(a, 2, "DIRLIST")? {
                 let mut raus: Vec<String> = Vec::new();
                 baum_lesen(std::path::Path::new(path), "", muster, &mut raus, "DIRLIST")?;
                 return Ok(new_str_array(raus));

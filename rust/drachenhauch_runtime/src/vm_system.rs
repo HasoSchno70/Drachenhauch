@@ -405,7 +405,7 @@ impl<'p> Vm<'p> {
             // herumzuruecken hilft niemandem, und die IDE sagt es dann.
             "code_format$" | "code_format" => {
                 let text = bi_str(a, 0, "CODE_FORMAT$")?;
-                let einruecken = if a.len() > 1 { a[1].truthy() } else { true };
+                let einruecken = crate::argument::a_schalter_oder(a, 1, true, "CODE_FORMAT$")?;
                 Value::str_rc(crate::formatiere(text, einruecken, "    ").unwrap_or_default())
             }
             // CODE_RENAME$: ein Symbol im ganzen Text umbenennen. Liefert den

@@ -1889,12 +1889,13 @@ impl<'p> Vm<'p> {
             }
             "gui_textarea_fold" => {
                 let n = "GUI_TEXTAREA_FOLD";
-                let an = if a.len() > 2 { Some(a[2].truthy()) } else { None };
+                let an = if a.len() > 2 { Some(crate::argument::a_schalter(a, 2, n)?) } else { None };
                 Value::Bool(self.gui.textarea_fold(gi(a, 0, n)?, gi(a, 1, n)?, an)?)
             }
             "gui_textarea_fold_all" => {
                 let n = "GUI_TEXTAREA_FOLD_ALL";
-                Value::Int(self.gui.textarea_fold_all(gi(a, 0, n)?, a.len() < 2 || a[1].truthy())?)
+                let auf = crate::argument::a_schalter_oder(a, 1, true, n)?;
+                Value::Int(self.gui.textarea_fold_all(gi(a, 0, n)?, auf)?)
             }
             "gui_textarea_folded" => Value::Bool(self.gui.textarea_folded(
                 gi(a, 0, "GUI_TEXTAREA_FOLDED")?, gi(a, 1, "GUI_TEXTAREA_FOLDED")?)?),

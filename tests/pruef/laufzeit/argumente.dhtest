@@ -82,6 +82,24 @@ END TRY
 --- erwartet
 SORT: 2. Argument muss BOOLEAN (absteigend) oder FUNCREF (Comparator) sein
 
+=== auch die letzten schalter nehmen kein wort
+' DIRLIST (rekursiv), CODE_FORMAT$, FONT_LIGATURES, AUDIO_LOFI,
+' GUI_TEXTAREA_FOLD* und UI_CHECKBOX nahmen bis 2026.53 jeden Wert ueber
+' truthy() -- "nein" war wahr. Jetzt die Regel aller Schalter.
+TRY
+    PRINT LEN(DIRLIST(".", "", "nein"))
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT CODE_FORMAT$("x", "nein")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+DIRLIST: erwartet BOOLEAN oder Zahl (Arg 3), erhalten STRING
+CODE_FORMAT$: erwartet BOOLEAN oder Zahl (Arg 2), erhalten STRING
+
 === die meldung hat den doppelpunkt und darum den aufruf
 ' "UPPER$ erwartet STRING" (ohne Doppelpunkt) bekam von mit_signatur keine
 ' Aufrufform -- gerade die haeufigsten Typfehler blieben ohne Hilfe.
