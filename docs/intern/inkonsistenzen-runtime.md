@@ -1352,7 +1352,11 @@ Aufwand. Jeder Punkt hält `docs/stabilitaet.md` ein.
    - Alle festen Pixel laufen durch `sk`.
    - Ein Rollbalken, ein Radschritt, ein Kürzen, eine Popup-Liste.
    - Ein Schlüssel-Setter-Helfer mit englischen Zweitnamen und `GUI_<W>_GET`.
-8. **Ein Weg zum Lesen und Verbinden** (A11, A15).
+8. **Ein Weg zum Lesen und Verbinden** (A11, A15). *Umgesetzt auf `thema/lesen-verbinden`:
+   `verbinden.rs` (alle Adressen, NET/WS/MQTT/SMTP/Modbus, UDP nach Art des Sockets),
+   cloud kodiert die Pfadteile, COPYFILE/DIREXISTS/DIRLIST/ZIP_* über den Pfad-Helfer,
+   `datei_fehler`, ZIP_READ$/SAVE_LOAD/ANIM_FSM_LOAD wie READALL$. Offen (innen): ein
+   `tls.rs`, `html::Abrufe` → `hintergrund`, cloud über `http_request`, `MQTT_PENDING`.*
    - Alle lesenden Dateibefehle laufen über `resolve_asset_path` und
      `text_lesen` (JSON_LOAD mit BOM, ZIP_READ$, COPYFILE, SAVE_EXISTS).
    - Ein `datei_fehler` mit Pfad.
