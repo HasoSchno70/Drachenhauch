@@ -67,7 +67,7 @@ module.exports = (H) => [
 
   H.h2("Samples: einen Klang in Tonhöhen spielen"),
   H.p("Ein Sample ist eine kurze Aufnahme (z. B. ein einzelner Klavieranschlag), die du in beliebigen Tonhöhen abspielst – das Prinzip eines Samplers. SAMPLE_PLAY transponiert die Aufnahme um eine Anzahl Halbtöne. Kurze One-Shots eignen sich für Drums und Treffer, mit einer Loop-Region (SAMPLE_SET_LOOP) lassen sich gehaltene Töne erzeugen."),
-  H.cmd("SAMPLE_LOAD · SAMPLE_PLAY · SAMPLE_SET_LOOP · SAMPLE_LEN", 'SAMPLE_LOAD(pfad$)   SAMPLE_PLAY(sample, halbtoene, vol [, dur_ms])   SAMPLE_SET_LOOP(sample, start, ende [, art$])   SAMPLE_LEN(sample)',
+  H.cmd("SAMPLE_LOAD · SAMPLE_PLAY · SAMPLE_SET_LOOP · SAMPLE_LEN", 'SAMPLE_LOAD(pfad$)   SAMPLE_PLAY(sample, halbtoene [, vol [, dur_ms]])   SAMPLE_SET_LOOP(sample, start, ende [, art$])   SAMPLE_LEN(sample)',
     "LOAD lädt eine Audiodatei als SAMPLE. PLAY spielt sie um halbtoene transponiert (0 = Originaltonhöhe, 12 = eine Oktave höher) und gibt eine Kanal-Nummer zurück. SET_LOOP markiert eine Schleifenregion in Frames; mit \"pingpong\" läuft sie am Ende rückwärts wieder hinunter, statt an ihren Anfang zu springen. LEN liefert die Länge in Sekunden.",
     [
       'IMPORT "audio"',

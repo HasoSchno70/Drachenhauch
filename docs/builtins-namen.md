@@ -56,6 +56,11 @@ Signaturhilfe kennen beide.
    `path`, `text`, `width`, `count`, `encoding`. Dasselbe Ding heißt in jedem
    Befehl gleich. Die Befehlstabellen im Handbuch nennen dieselben Namen wie
    `daten/builtin_index.json`; `dhrt pruef parameter` hält beide zusammen.
+   Wo ältere Befehle abweichende Namen tragen, nimmt ein benanntes Argument
+   auch den Zweitnamen derselben Gruppe: `p`/`path`, `digits`/`decimals`,
+   `vol`/`volume`, `n`/`count`, `v`/`number`, `wf`/`waveform`, `alt`/`old`,
+   `fn`/`handler`, `flag`/`on`, `bind`/`bind_addr`, `wdg`/`widget` —
+   `FILE_EXISTS(path: "a.txt")` geht, obwohl der Parameter `p` heißt.
 9. **Zeit:** Zeitspannen und Fristen zählen **Millisekunden** (Parameter
    `ms` oder `…_ms`): `TWEEN_NEW`, `TIMER_AFTER`, `SLEEP`, die Fades, jedes
    `…_SET_TIMEOUT`. Der Schritt eines Bildes zählt **Sekunden** wie `DELTA()`:

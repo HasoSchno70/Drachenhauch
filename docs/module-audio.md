@@ -370,7 +370,7 @@ Drum-Sample wird so ein ganzes Instrument.
 | `SAMPLE_FREE(sample)` | die Daten des Samples freigeben — was schon klingt, klingt zu Ende; doppelt freigeben ist still |
 | `SAMPLE_FROM_BUFFER(buffer, sample_rate)` → SAMPLE | Sample aus rohem 16-Bit-PCM (little endian, vorzeichenbehaftet, mono) |
 | `SAMPLE_FROM_SOUND(sound)` → SAMPLE | ein SOUND (aus `SPEAK_SOUND`, `AUDIO_NOTE`, `LOADSOUND` ...) als Sample, Kanäle auf Mono gemittelt, Abtastrate übernommen |
-| `SAMPLE_PLAY(sample, semitones, vol[, dur_ms])` → AUDIO_CHANNEL | bei relativer Tonhoehe abspielen |
+| `SAMPLE_PLAY(sample, semitones[, vol[, dur_ms]])` → AUDIO_CHANNEL | bei relativer Tonhoehe abspielen |
 | `SAMPLE_NOTE(sample, semitones, duration_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_semitones])` → SOUND | eine Note als Klang bauen (nicht abspielen), Huellkurve wie `AUDIO_NOTE` |
 | `SAMPLE_SET_LOOP(sample, start, end[, kind$])` | Loop-Region in Frames (fuer gehaltene Noten), `kind$` = `vorwaerts` (Vorgabe) oder `pingpong` |
 | `SAMPLE_LEN(sample)` → FLOAT | Laenge in Sekunden bei Originaltonhoehe |

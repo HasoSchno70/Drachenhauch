@@ -92,8 +92,8 @@ PRINT HEX$(RGB(255, 0, 0))  ' "FF0000"
 | `POW(base, exponent)` | b to the power of e |
 | `EXP(x)` | e^x |
 | `LOG(x[, base])` | Logarithm, natural by default |
-| `DEG(rad)`, `RAD(grad)` | Radians ↔ degrees |
-| `FLOOR(x)`, `CEIL(x)`, `ROUND(x)` | INT conversion |
+| `DEG(rad)`, `RAD(deg)` | Radians ↔ degrees |
+| `FLOOR(x)`, `CEIL(x)`, `ROUND(x[, digits])` | INT conversion |
 | `ROUND(x, digits)` → FLOAT | round to N decimal places, **to the even number** (see below) |
 | `ROUND_HALF_UP(x[, decimals])` | commercial rounding: away from zero |
 | `MIN(a, ...)`, `MAX(a, b, ...)` | variadic |
@@ -980,7 +980,7 @@ Path-based, without a FILE handle *(native runtime only)*:
 | `READALL$(f$[, encoding$])` → STRING | read a whole file as text |
 | `FILESIZE(path$)` → INTEGER | size in bytes |
 | `FILE_ENCODING$(path$)` → STRING | what `"auto"` would choose: `utf8`, `utf8bom`, `cp1252` or `binaer` (see encodings) |
-| `DELETEFILE(path$)`, `RENAME(alt$, neu$)` | delete / rename·move |
+| `DELETEFILE(path$)`, `RENAME(old$, new$)` | delete / rename·move |
 | `DIREXISTS(path$)` → BOOLEAN | directory present? |
 | `DIRLIST(path$, pattern$ = "", recursive = FALSE)` → ARRAY OF STRING | entry names (sorted), optionally filtered; with `recursive: TRUE` like `DIRLIST_REC` |
 | `DIRLIST_REC(path$[, pattern$])` → ARRAY OF STRING | as above, but recursive — files only, relative paths with `/` |
@@ -1068,8 +1068,8 @@ trimmed — otherwise it would only show up in the finished output file.
 |---|---|
 | `BUFFER_FROM_STRING(text$)` → BUFFER | text as UTF-8 bytes |
 | `BUFFER_TO_STRING$(buffer)` → STRING | bytes as UTF-8 text |
-| `BUFFER_TO_HEX$(buffer)` / `BUFFER_FROM_HEX(s$)` | hex text (`"deadbeef"`) |
-| `BUFFER_TO_BASE64$(buffer)` / `BUFFER_FROM_BASE64(s$)` | Base64 |
+| `BUFFER_TO_HEX$(buffer)` / `BUFFER_FROM_HEX(hex$)` | hex text (`"deadbeef"`) |
+| `BUFFER_TO_BASE64$(buffer)` / `BUFFER_FROM_BASE64(text$)` | Base64 |
 
 `BUFFER_TO_STRING$` is **strict**: if the bytes are not valid UTF-8, there is
 an error instead of silently replaced characters — a `?` in the wrong

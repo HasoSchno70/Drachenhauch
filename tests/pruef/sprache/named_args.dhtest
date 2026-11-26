@@ -283,3 +283,26 @@ PRINT anteil()
 3
 --- fehler
 fall.dh:2: Integer-Division durch 0
+
+=== ein parameter nimmt auch seinen zweitnamen
+' Rangliste Punkt 9 (B6): die Parameternamen im Index sind zugesagt, aber
+' uneinheitlich -- FILE_EXISTS(p) neben FILE_SIZE(path), ROUND(x, digits)
+' neben NUMFMT$(x, decimals), SQR(v) neben SQRT(number). Ein benanntes
+' Argument nimmt jetzt auch den anderen Namen der Gruppe (compiler.rs,
+' PARAM_ZWEITNAMEN). Bis 2026.53: "FILE_EXISTS: kein Parameter 'path'".
+WRITEALL("da.txt", "x")
+PRINT FILE_EXISTS(path: "da.txt")
+PRINT ROUND(5.678, decimals: 1)
+PRINT SQR(number: 16)
+RENAME(alt: "da.txt", new: "dort.txt")
+PRINT FILE_EXISTS(p: "dort.txt")
+--- erwartet
+TRUE
+5.7
+4.0
+TRUE
+
+=== ein unbekannter name bleibt ein fehler
+PRINT ROUND(5.678, stellen: 1)
+--- fehler
+ROUND: kein Parameter 'stellen'

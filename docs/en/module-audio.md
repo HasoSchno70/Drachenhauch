@@ -368,7 +368,7 @@ instrument.
 | `SAMPLE_FREE(sample)` | release the sample's data — whatever already sounds plays to the end; releasing twice is silent |
 | `SAMPLE_FROM_BUFFER(buffer, sample_rate)` → SAMPLE | sample from raw 16-bit PCM (little endian, signed, mono) |
 | `SAMPLE_FROM_SOUND(sound)` → SAMPLE | a SOUND (from `SPEAK_SOUND`, `AUDIO_NOTE`, `LOADSOUND` ...) as a sample, channels averaged to mono, sample rate kept |
-| `SAMPLE_PLAY(sample, semitones, vol[, dur_ms])` → AUDIO_CHANNEL | play at a relative pitch |
+| `SAMPLE_PLAY(sample, semitones[, vol[, dur_ms]])` → AUDIO_CHANNEL | play at a relative pitch |
 | `SAMPLE_NOTE(sample, semitones, duration_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_semitones])` → SOUND | build a note as a sound (not play it), envelope like `AUDIO_NOTE` |
 | `SAMPLE_SET_LOOP(sample, start, end[, kind$])` | loop region in frames (for held notes), `kind$` = `vorwaerts` (forwards, default) or `pingpong` |
 | `SAMPLE_LEN(sample)` → FLOAT | length in seconds at the original pitch |

@@ -55,7 +55,12 @@ shows the new one; completion and signature help know both.
    `path`, `text`, `width`, `count`, `encoding`. The same thing has the same
    name in every command. The command tables in the manual use the same
    names as `daten/builtin_index.json`; `dhrt pruef parameter` keeps them
-   together.
+   together. Where older commands carry differing names, a named argument
+   also takes the second name of the same group: `p`/`path`,
+   `digits`/`decimals`, `vol`/`volume`, `n`/`count`, `v`/`number`,
+   `wf`/`waveform`, `alt`/`old`, `fn`/`handler`, `flag`/`on`,
+   `bind`/`bind_addr`, `wdg`/`widget` — `FILE_EXISTS(path: "a.txt")` works
+   although the parameter is called `p`.
 9. **Time:** time spans and time limits count **milliseconds** (parameter
    `ms` or `…_ms`): `TWEEN_NEW`, `TIMER_AFTER`, `SLEEP`, the fades, every
    `…_SET_TIMEOUT`. The step of a frame counts **seconds** like `DELTA()`:

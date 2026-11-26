@@ -858,6 +858,36 @@ pub(crate) fn modul_von_builtin(name: &str) -> Option<String> {
     builtin_modul().get(&name.to_lowercase()).cloned()
 }
 
+/// Zweitnamen fuer Parameter von Befehlen (Rangliste Punkt 9, B6). Die
+/// Parameternamen im Index sind zugesagt (docs/stabilitaet.md) -- auch die
+/// uneinheitlichen: `FILE_EXISTS(p)` neben `FILE_SIZE(path)`, `ROUND(x,
+/// digits)` neben `NUMFMT$(x, decimals)`, `SQR(v)` neben `SQRT(number)`.
+/// Statt sie umzubenennen, nimmt ein benanntes Argument auch den anderen
+/// Namen derselben Gruppe -- aber nur, wenn der geschriebene Name selbst
+/// kein Parameter ist und genau einer der Gruppe passt.
+const PARAM_ZWEITNAMEN: &[&[&str]] = &[
+    &["path", "p"],
+    &["digits", "decimals"],
+    &["volume", "vol"],
+    &["count", "n"],
+    &["number", "v"],
+    &["waveform", "wf"],
+    &["old", "alt"],
+    &["handler", "fn"],
+    &["on", "flag"],
+    &["bind_addr", "bind"],
+    &["widget", "wdg"],
+];
+
+/// Die Stelle des Parameters, den `key` ueber einen Zweitnamen meint.
+fn param_zweitname<'a>(namen: impl Iterator<Item = &'a str> + Clone, key: &str) -> Option<usize> {
+    let gruppe = PARAM_ZWEITNAMEN.iter().find(|g| g.contains(&key))?;
+    let mut treffer = namen.enumerate().filter(|(_, n)| *n != key && gruppe.contains(n));
+    let erster = treffer.next()?;
+    if treffer.next().is_some() { return None; }
+    Some(erster.0)
+}
+
 /// "3", "3 bis 4" bzw. "mindestens 3" -- fuer lesbare Meldungen.
 ///
 /// Variadische Signaturen ("...") liefern `usize::MAX` als Obergrenze. Ohne den
@@ -3798,7 +3828,8 @@ impl Compiler {
         for a in &args[n_pos..] {
             let Node::NamedArg { name: an, value } = a else { continue };
             let key = an.trim_end_matches('$').to_lowercase();
-            let Some(i) = params.iter().position(|p| p.name == key) else {
+            let Some(i) = params.iter().position(|p| p.name == key)
+                .or_else(|| param_zweitname(params.iter().map(|p| p.name.as_str()), &key)) else {
                 let hinweis = crate::aehnlich::hinweis_klein(&key, params.iter().map(|p| p.name.as_str()));
                 return Err(format!("{}: kein Parameter '{}'.{} Die Parameter heissen {}",
                     gross, an, hinweis, liste()));

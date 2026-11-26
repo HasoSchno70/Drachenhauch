@@ -569,7 +569,7 @@
   {
    "name": "AUDIO_INIT",
    "kind": "core",
-   "signature": "AUDIO_INIT([frequency = 44100[, channels = 2[, buffer]]])",
+   "signature": "AUDIO_INIT([frequency[, channels[, buffer]]])",
    "module": "audio"
   },
   {
@@ -3311,7 +3311,7 @@
   {
    "name": "WEBCAM_OPEN",
    "kind": "core",
-   "signature": "WEBCAM_OPEN([device$ = \"\" [, width = 0, height]]) AS WEBCAM",
+   "signature": "WEBCAM_OPEN([device$ = \"\" [, width, height]]) AS WEBCAM",
    "module": "webcam"
   },
   {
@@ -12215,7 +12215,7 @@
   {
    "name": "RENAME",
    "kind": "core",
-   "signature": "RENAME(alt, new)",
+   "signature": "RENAME(old, new)",
    "module": "dhrt"
   },
   {
@@ -12389,7 +12389,7 @@
   {
    "name": "SAMPLE_PLAY",
    "kind": "core",
-   "signature": "SAMPLE_PLAY(sample, semitones, vol[, dur_ms])",
+   "signature": "SAMPLE_PLAY(sample, semitones[, vol = 1.0[, dur_ms = 0]])",
    "module": "audio"
   },
   {

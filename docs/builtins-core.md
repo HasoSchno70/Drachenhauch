@@ -91,8 +91,8 @@ PRINT HEX$(RGB(255, 0, 0))  ' "FF0000"
 | `POW(base, exponent)` | b hoch e |
 | `EXP(x)` | e^x |
 | `LOG(x[, base])` | Logarithmus, default natürlich |
-| `DEG(rad)`, `RAD(grad)` | Radiant ↔ Grad |
-| `FLOOR(x)`, `CEIL(x)`, `ROUND(x)` | INT-Konvertierung |
+| `DEG(rad)`, `RAD(deg)` | Radiant ↔ Grad |
+| `FLOOR(x)`, `CEIL(x)`, `ROUND(x[, digits])` | INT-Konvertierung |
 | `ROUND(x, digits)` → FLOAT | auf N Nachkommastellen runden, **zur geraden Zahl** (siehe unten) |
 | `ROUND_HALF_UP(x[, decimals])` | kaufmännisch runden: von der Null weg |
 | `MIN(a, ...)`, `MAX(a, b, ...)` | variadic |
@@ -981,7 +981,7 @@ Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
 | `READALL$(f$[, encoding$])` → STRING | Datei komplett als Text lesen |
 | `FILESIZE(path$)` → INTEGER | Größe in Bytes |
 | `FILE_ENCODING$(path$)` → STRING | was `"auto"` wählen würde: `utf8`, `utf8bom`, `cp1252` oder `binaer` (siehe Kodierungen) |
-| `DELETEFILE(path$)`, `RENAME(alt$, neu$)` | löschen / umbenennen·verschieben |
+| `DELETEFILE(path$)`, `RENAME(old$, new$)` | löschen / umbenennen·verschieben |
 | `DIREXISTS(path$)` → BOOLEAN | Verzeichnis vorhanden? |
 | `DIRLIST(path$, pattern$ = "", recursive = FALSE)` → ARRAY OF STRING | Eintragsnamen (sortiert), optional gefiltert; mit `recursive: TRUE` wie `DIRLIST_REC` |
 | `DIRLIST_REC(path$[, pattern$])` → ARRAY OF STRING | wie oben, aber rekursiv — nur Dateien, Pfade relativ mit `/` |
@@ -1069,8 +1069,8 @@ beschnitten — das fiele sonst erst in der fertigen Ausgabedatei auf.
 |---|---|
 | `BUFFER_FROM_STRING(text$)` → BUFFER | Text als UTF-8-Bytes |
 | `BUFFER_TO_STRING$(buffer)` → STRING | Bytes als UTF-8-Text |
-| `BUFFER_TO_HEX$(buffer)` / `BUFFER_FROM_HEX(s$)` | Hex-Text (`"deadbeef"`) |
-| `BUFFER_TO_BASE64$(buffer)` / `BUFFER_FROM_BASE64(s$)` | Base64 |
+| `BUFFER_TO_HEX$(buffer)` / `BUFFER_FROM_HEX(hex$)` | Hex-Text (`"deadbeef"`) |
+| `BUFFER_TO_BASE64$(buffer)` / `BUFFER_FROM_BASE64(text$)` | Base64 |
 
 `BUFFER_TO_STRING$` ist **streng**: sind die Bytes kein gültiges UTF-8, gibt es
 einen Fehler statt stillschweigend ersetzter Zeichen — ein `?` an der falschen
