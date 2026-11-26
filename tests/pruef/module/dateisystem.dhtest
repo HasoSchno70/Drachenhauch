@@ -366,3 +366,48 @@ nochmal TRUE bleibt
 PRINT DIR_USER_DATA$("../anderswo")
 --- fehler
 DIR_USER_DATA$: erwartet den Namen des Programms
+
+=== lesende befehle finden dieselben dateien
+' Rangliste Punkt 8 (docs/intern/inkonsistenzen-runtime.md): FILEEXISTS,
+' READALL$ & Co. gehen ueber resolve_asset_path (ein "../" vor einem Pfad,
+' den es so nicht gibt, faellt weg -- so findet ein exportiertes Programm
+' seine Dateien). Bis 2026.53 taten COPYFILE, DIREXISTS, DIRLIST und ZIP_*
+' das nicht: FILEEXISTS sagte TRUE, COPYFILE "nicht gefunden".
+WRITEALL("quelle.txt", "inhalt")
+MKDIR("unter")
+WRITEALL("unter/a.txt", "a")
+ZIP_CREATE("pack.zip", ["quelle.txt"])
+DIM weg AS STRING : weg = "../../../../../../"
+PRINT "fileexists "; FILEEXISTS(weg + "quelle.txt")
+COPYFILE(weg + "quelle.txt", "kopie.txt")
+PRINT "copyfile "; READALL$("kopie.txt")
+PRINT "direxists "; DIREXISTS(weg + "unter")
+PRINT "dirlist "; LEN(DIRLIST(weg + "unter")); " "; LEN(DIRLIST_REC(weg + "unter"))
+PRINT "zip "; LEN(ZIP_LIST(weg + "pack.zip")); " "; ZIP_READ$(weg + "pack.zip", "quelle.txt")
+TRY
+    COPYFILE("gibtsnicht.txt", "x.txt")
+CATCH e
+    PRINT LEFT$(e, INSTR(e, " (gesucht"))
+END TRY
+--- erwartet
+fileexists TRUE
+copyfile inhalt
+direxists TRUE
+dirlist 1 1
+zip 1 inhalt
+COPYFILE: Datei 'gibtsnicht.txt' nicht gefunden
+
+=== zip_read liest wie readall
+' Bis 2026.53 wurde ungueltiges UTF-8 still zu U+FFFD ("caf?"). Jetzt wie
+' READALL$: ein Fehler, und die Kodierung steht hinten.
+DIM b AS BUFFER : b = BUFFER_FROM_HEX("636166E9")
+ZIP_WRITE("l.zip", ["latin.txt"], [b])
+TRY
+    PRINT ZIP_READ$("l.zip", "latin.txt")
+CATCH e
+    PRINT LEFT$(e, 47)
+END TRY
+PRINT ZIP_READ$("l.zip", "latin.txt", "latin1")
+--- erwartet
+ZIP_READ$: latin.txt: Zeile 1 ist kein UTF-8 (B
+café

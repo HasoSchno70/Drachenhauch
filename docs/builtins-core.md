@@ -522,7 +522,7 @@ eine weiterzugeben.
 | Funktion | Zweck |
 |---|---|
 | `ZIP_LIST(archive$)` → ARRAY OF STRING | Namen aller Einträge |
-| `ZIP_READ$(archive$, name$)` → STRING | einen Eintrag als Text |
+| `ZIP_READ$(archive$, name$ [, encoding$])` → STRING | einen Eintrag als Text -- liest wie `READALL$`: eine BOM fällt weg, eine andere Kodierung als UTF-8 steht hinten (`"cp1252"`, `"latin1"`, `"auto"`); ungültiges UTF-8 ist ein Fehler |
 | `ZIP_READ(archive$, name$)` → BUFFER | einen Eintrag als Bytes |
 | `ZIP_EXTRACT(archive$, folder$)` → INTEGER | alles entpacken, liefert die Zahl der Dateien |
 | `ZIP_CREATE(archive$, files)` → INTEGER | Archiv aus einer Liste von Dateipfaden |

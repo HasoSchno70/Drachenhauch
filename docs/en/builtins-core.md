@@ -523,7 +523,7 @@ as one.
 | Function | Purpose |
 |---|---|
 | `ZIP_LIST(archive$)` → ARRAY OF STRING | names of all entries |
-| `ZIP_READ$(archive$, name$)` → STRING | one entry as text |
+| `ZIP_READ$(archive$, name$ [, encoding$])` → STRING | one entry as text -- reads like `READALL$`: a BOM is dropped, an encoding other than UTF-8 goes last (`"cp1252"`, `"latin1"`, `"auto"`); invalid UTF-8 is an error |
 | `ZIP_READ(archive$, name$)` → BUFFER | one entry as bytes |
 | `ZIP_EXTRACT(archive$, folder$)` → INTEGER | extract everything, returns the number of files |
 | `ZIP_CREATE(archive$, files)` → INTEGER | archive from a list of file paths |

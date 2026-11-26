@@ -55,6 +55,17 @@ pub fn datei_da(pfad: &str, befehl: &str) -> Result<(), String> {
     Err(format!("{}: Datei '{}' nicht gefunden (gesucht relativ zu {})", befehl, pfad, ort))
 }
 
+/// Ein Dateifehler mit Pfad: fehlt die Datei, derselbe Satz wie `datei_da`
+/// (mit dem Ort, an dem gesucht wurde), sonst der Grund des Systems hinter
+/// dem Pfad. Bis 2026.53 meldete COPYFILE nur "Das System kann die
+/// angegebene Datei nicht finden. (os error 2)" -- welche, stand nirgends.
+pub fn datei_fehler(befehl: &str, pfad: &str, e: &std::io::Error) -> String {
+    if e.kind() == std::io::ErrorKind::NotFound {
+        if let Err(m) = datei_da(pfad, befehl) { return m; }
+    }
+    format!("{}: '{}': {}", befehl, pfad, e)
+}
+
 /// Warum sich eine Datei, die es gibt, nicht als Bild lesen liess. raylib
 /// sagt nur "image data is null, either the file doesnt exist or the image
 /// type is unsupported" -- ohne Dateinamen, und "doesnt exist" fuehrt in
@@ -3425,7 +3436,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // PATHJOIN/MKDIR/DIREXISTS weiter unten -- KEINE Duplikate anlegen!).
         "copyfile" => {
             arity!(2);
-            std::fs::copy(need_str(&a[0], "COPYFILE")?, need_str(&a[1], "COPYFILE")?).map_err(|e| format!("COPYFILE: {}", e))?;
+            // Die Quelle wie jede gelesene Datei (resolve_asset_path) -- bis
+            // 2026.53 fand FILEEXISTS sie, COPYFILE nicht.
+            let quelle = resolve_asset_path(need_str(&a[0], "COPYFILE")?);
+            let ziel = need_str(&a[1], "COPYFILE")?;
+            std::fs::copy(&quelle, ziel).map_err(|e| {
+                if !std::path::Path::new(&quelle).is_file() { datei_fehler("COPYFILE", &quelle, &e) }
+                else { format!("COPYFILE: '{}' -> '{}': {}", quelle, ziel, e) }
+            })?;
             Ok(Value::Nil)
         }
         "appendfile" => {
@@ -3607,13 +3625,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
         }
         // --- Datei/Verzeichnis (WP3, pfadbasiert -- kein FILE-Handle) ---
-        "direxists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(need_str(&a[0], "DIREXISTS")?).is_dir())) }
+        "direxists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(&resolve_asset_path(need_str(&a[0], "DIREXISTS")?)).is_dir())) }
         "dirlist" => {
             // DIR_LIST(pfad [, muster [, recursive]]) -- mit recursive = TRUE
             // wie DIR_LIST_REC. Ein leeres Muster heisst "alles", damit
             // `DIR_LIST(p, recursive: TRUE)` ohne Muster geht.
             arity!(1, 3);
-            let path = need_str(&a[0], "DIRLIST")?;
+            let path_r = resolve_asset_path(need_str(&a[0], "DIRLIST")?);
+            let path = path_r.as_str();
             let muster = if a.len() > 1 { Some(need_str(&a[1], "DIRLIST")?).filter(|m| !m.is_empty()) } else { None };
             if a.len() > 2 && a[2].truthy() {
                 let mut raus: Vec<String> = Vec::new();
@@ -3626,7 +3645,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // Rekursiv -- liefert DATEIEN (keine Ordner) als Pfade relativ
             // zum Startordner, immer mit `/` getrennt.
             arity!(1, 2);
-            let path = need_str(&a[0], "DIRLIST_REC")?;
+            let path_r = resolve_asset_path(need_str(&a[0], "DIRLIST_REC")?);
+            let path = path_r.as_str();
             // Ein leeres Muster heisst "alles" wie bei DIRLIST -- bis 2026.53
             // passte es hier auf nichts (eine leere Filtervariable lieferte
             // still ein leeres Feld).
@@ -3855,29 +3875,37 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // (siehe zipdatei.rs) -- ein Archiv darf `../../autoexec.bat` heissen.
         "zip_list" => {
             arity!(1);
-            let pfad = need_str(&a[0], "ZIP_LIST")?;
-            Ok(new_str_array(crate::zipdatei::liste(std::path::Path::new(pfad))?))
+            let pfad = resolve_asset_path(need_str(&a[0], "ZIP_LIST")?);
+            Ok(new_str_array(crate::zipdatei::liste(std::path::Path::new(&pfad))?))
         }
         "zip_read" => {
             arity!(2);
-            let pfad = need_str(&a[0], "ZIP_READ")?;
+            let pfad = resolve_asset_path(need_str(&a[0], "ZIP_READ")?);
             let name = need_str(&a[1], "ZIP_READ")?;
-            let daten = crate::zipdatei::lies(std::path::Path::new(pfad), name)?;
+            let daten = crate::zipdatei::lies(std::path::Path::new(&pfad), name)?;
             Ok(Value::Buffer(Rc::new(RefCell::new(daten))))
         }
         "zip_read$" => {
-            arity!(2);
-            let pfad = need_str(&a[0], "ZIP_READ$")?;
+            // ZIP_READ$(archiv$, name$ [, kodierung$]) -- liest wie READALL$:
+            // BOM weg, eine andere Kodierung als UTF-8 hinten. Bis 2026.53
+            // wurde ungueltiges UTF-8 still zu U+FFFD ("caf\u{fffd}").
+            arity!(2, 3);
+            let pfad = resolve_asset_path(need_str(&a[0], "ZIP_READ$")?);
             let name = need_str(&a[1], "ZIP_READ$")?;
-            let daten = crate::zipdatei::lies(std::path::Path::new(pfad), name)?;
-            Ok(Value::str_rc(String::from_utf8_lossy(&daten).into_owned()))
+            let k = match a.get(2) {
+                Some(v) => crate::kodierung::aus_name(need_str(v, "ZIP_READ$")?, "ZIP_READ$")?,
+                None => crate::kodierung::Kodierung::Utf8,
+            };
+            let daten = crate::zipdatei::lies(std::path::Path::new(&pfad), name)?;
+            let text = crate::kodierung::ohne_bom(crate::kodierung::dekodieren(&daten, k, "ZIP_READ$", name)?);
+            Ok(Value::str_rc(text))
         }
         "zip_extract" => {
             arity!(2);
-            let pfad = need_str(&a[0], "ZIP_EXTRACT")?;
+            let pfad = resolve_asset_path(need_str(&a[0], "ZIP_EXTRACT")?);
             let ziel = need_str(&a[1], "ZIP_EXTRACT")?;
             Ok(Value::Int(crate::zipdatei::entpacke(
-                std::path::Path::new(pfad), std::path::Path::new(ziel))?))
+                std::path::Path::new(&pfad), std::path::Path::new(ziel))?))
         }
         "zip_create" => {
             arity!(2);

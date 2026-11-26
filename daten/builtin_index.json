@@ -15533,7 +15533,7 @@
   {
    "name": "ZIP_READ$",
    "kind": "core",
-   "signature": "ZIP_READ$(archive$, name$) AS STRING",
+   "signature": "ZIP_READ$(archive$, name$ [, encoding$]) AS STRING",
    "module": "dhrt"
   },
   {

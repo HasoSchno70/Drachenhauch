@@ -2631,7 +2631,7 @@
   "ZIP_EXTRACT": "alles entpacken, liefert die Zahl der Dateien",
   "ZIP_LIST": "Namen aller Einträge",
   "ZIP_READ": "einen Eintrag als Bytes",
-  "ZIP_READ$": "einen Eintrag als Text",
+  "ZIP_READ$": "einen Eintrag als Text -- liest wie READALL$: eine BOM fällt weg, eine andere Kodierung als UTF-8 steht hinten (\"cp1252\", \"latin1\", \"auto\"); ungültiges UTF-8 ist ein Fehler",
   "ZIP_WRITE": "Archiv aus Namen und Inhalten (Texte oder Puffer), ohne Umweg über Dateien"
  }
 }
