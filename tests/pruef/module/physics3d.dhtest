@@ -118,7 +118,7 @@ DIM w AS PHYS_WORLD
 w = PHYS3D_NEW()
 PHYS3D_SLEEP(w)
 --- fehler
-PHYS3D_SLEEP: erwartet 2 oder 3 Argumente
+PHYS3D_SLEEP: erwartet 2 bis 3 Argumente
 
 === ein koerper, den es nicht gibt, ist ein fehler wie in 2d
 ' Bis 2026.53 lieferte PHYS3D_BODY_X(w, 7) still 0.0, und PHYS3D_SET_POS auf

@@ -225,7 +225,7 @@ fn bind_params<I: ExactSizeIterator<Item = Value>>(fn_: &Func, args: I, mut loca
     if fn_.is_variadic {
         let normal_n = fn_.n_params - 1;
         if args.len() < normal_n {
-            return Err(format!("{}: erwartet mind. {} Argument(e), erhalten {}",
+            return Err(format!("{}: erwartet mindestens {} Argument(e), erhalten {}",
                 fn_.name.to_uppercase(), normal_n, args.len()));
         }
         let mut it = args.into_iter();
@@ -253,7 +253,11 @@ fn bind_params<I: ExactSizeIterator<Item = Value>>(fn_: &Func, args: I, mut loca
                 return Err(format!("Lambda: erwartet {} Argument(e), erhalten {}",
                     fn_.n_params.saturating_sub(k), args.len().saturating_sub(k)));
             }
-            return Err(format!("{}: erwartet {}..{} Argument(e), erhalten {}",
+            if n_required == fn_.n_params {
+                return Err(format!("{}: erwartet {} Argument(e), erhalten {}",
+                    fn_.name.to_uppercase(), n_required, args.len()));
+            }
+            return Err(format!("{}: erwartet {} bis {} Argumente, erhalten {}",
                 fn_.name.to_uppercase(), n_required, fn_.n_params, args.len()));
         }
         let argn = args.len();
@@ -2850,7 +2854,7 @@ impl<'p> Vm<'p> {
     /// oder eine Funktion, die den Fortschritt 0..1 bekommt.
     fn tween_wert(&mut self, a: &[Value]) -> R<Value> {
         if a.len() != 1 {
-            return Err(format!("TWEEN_VALUE: erwartet 1 Argument(e), erhalten {} -- Aufruf: TWEEN_VALUE(t)", a.len()));
+            return Err(format!("TWEEN_VALUE: erwartet 1 Argument(e), erhalten {}", a.len()));
         }
         let t = match &a[0] {
             Value::Tween(t) => t.clone(),

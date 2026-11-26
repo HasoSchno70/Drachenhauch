@@ -669,7 +669,7 @@ impl<'p> Vm<'p> {
                 // Lade-Groesse -- wer scharf bei 32 laedt und bei 16 zeichnen
                 // will, schrieb vorher SETFONT + TEXT_SIZE und vergass das zweite.
                 if a.is_empty() || a.len() > 2 {
-                    return Err(format!("SETFONT: erwartet (handle[, groesse]), erhalten {} Argument(e)", a.len()));
+                    return Err(format!("SETFONT: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
                 }
                 g!().set_font(gi(a,0,"SETFONT")?)?;
                 if a.len() == 2 {
@@ -729,7 +729,7 @@ impl<'p> Vm<'p> {
                     // sx, sy, sw, sh]) -- gedacht fuer benannte Argumente:
                     // DRAW_IMAGE(held, x, y, angle: 30, flip_x: TRUE).
                     if a.len() > 13 {
-                        return Err(format!("DRAW_IMAGE: erwartet 3..13 Argumente, erhalten {}", a.len()));
+                        return Err(format!("DRAW_IMAGE: erwartet 3 bis 13 Argumente, erhalten {}", a.len()));
                     }
                     let ganz = |i: usize, vorgabe: i64| -> Result<i64, String> {
                         if a.len() > i { gi(a, i, "DRAW_IMAGE") } else { Ok(vorgabe) } };
@@ -1898,7 +1898,7 @@ impl<'p> Vm<'p> {
             "audio_is_playing" => { let i = gi(a, 0, "AUDIO_IS_PLAYING")?; Value::Bool(self.audio_mut()?.ch_is_playing(i)?) }
             "audio_is_waiting" => { let i = gi(a, 0, "AUDIO_IS_WAITING")?; Value::Bool(self.audio_mut()?.ch_is_waiting(i)?) }
             "audio_record_start" => {
-                if a.len() > 1 { return Err(format!("AUDIO_RECORD_START: erwartet 0..1 Argumente, erhalten {}", a.len())); }
+                if a.len() > 1 { return Err(format!("AUDIO_RECORD_START: erwartet 0 bis 1 Argumente, erhalten {}", a.len())); }
                 let m = if a.is_empty() { 600.0 } else { need_f(a, 0, "AUDIO_RECORD_START")? };
                 self.audio_mut()?.record_start(m)?; Value::Nil
             }
@@ -2399,7 +2399,7 @@ impl<'p> Vm<'p> {
 
             // --- Modul: input ---
             "input_bind" => {
-                if a.len() < 2 { return Err("INPUT_BIND: erwartet Action + mind. 1 Key".into()); }
+                if a.len() < 2 { return Err(format!("INPUT_BIND: erwartet mindestens 2 Argument(e), erhalten {}", a.len())); }
                 let action = gs(a, 0, "INPUT_BIND")?.to_lowercase();
                 let mut keys = Vec::with_capacity(a.len() - 1);
                 for i in 1..a.len() { keys.push(gi(a, i, "INPUT_BIND")?); }

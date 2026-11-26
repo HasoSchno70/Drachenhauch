@@ -660,7 +660,7 @@ impl<'p> Vm<'p> {
             // senkrechte Achsenbeschriftungen (Glutfaden, 2026-10-16).
             "pdf_text" => {
                 if a.len() != 4 && a.len() != 5 {
-                    return Err(format!("PDF_TEXT: erwartet 4 oder 5 Argumente (pdf, x, y, text$ [, winkel]), nicht {}", a.len()));
+                    return Err(format!("PDF_TEXT: erwartet 4 bis 5 Argumente, erhalten {}", a.len()));
                 }
                 let i = bi_int(a, 0, "PDF_TEXT")?;
                 let (x, y) = (bi_num(a, 1, "PDF_TEXT")?, bi_num(a, 2, "PDF_TEXT")?);
@@ -684,7 +684,7 @@ impl<'p> Vm<'p> {
             // die Spruenge im Stickpfad).
             "pdf_dash" => {
                 if a.len() != 2 && a.len() != 3 {
-                    return Err(format!("PDF_DASH: erwartet 2 oder 3 Argumente (pdf, strich_mm [, luecke_mm]), nicht {}", a.len()));
+                    return Err(format!("PDF_DASH: erwartet 2 bis 3 Argumente, erhalten {}", a.len()));
                 }
                 let i = bi_int(a, 0, "PDF_DASH")?;
                 let an = bi_num(a, 1, "PDF_DASH")?;
@@ -740,7 +740,7 @@ impl<'p> Vm<'p> {
             // (Messdaten-Runde, 2026-10-13).
             "pdf_image" => {
                 if a.len() != 5 && a.len() != 6 {
-                    return Err(format!("PDF_IMAGE: erwartet 5 oder 6 Argumente (pdf, bild, x, y, b [, h]), nicht {}", a.len()));
+                    return Err(format!("PDF_IMAGE: erwartet 5 bis 6 Argumente, erhalten {}", a.len()));
                 }
                 let i = bi_int(a, 0, "PDF_IMAGE")?;
                 let bild = bi_int(a, 1, "PDF_IMAGE")?;
@@ -772,7 +772,7 @@ impl<'p> Vm<'p> {
                 let drucker = if a.len() > 1 { bi_str(a, 1, "PDF_PRINT")?.to_string() } else { String::new() };
                 let kopien = if a.len() > 2 { bi_int(a, 2, "PDF_PRINT")? } else { 1 };
                 let ziel = if a.len() > 3 { bi_str(a, 3, "PDF_PRINT")?.to_string() } else { String::new() };
-                if a.len() > 4 { return Err("PDF_PRINT: erwartet 1..4 Argumente (pdf[, drucker$[, kopien[, zieldatei$]]])".into()); }
+                if a.len() > 4 { return Err(format!("PDF_PRINT: erwartet 1 bis 4 Argumente, erhalten {}", a.len())); }
                 let doc = self.pdf_d(i, name)?;
                 crate::drucken::drucken(doc, &drucker, kopien, &ziel)?;
                 Value::Nil
@@ -1106,7 +1106,7 @@ impl<'p> Vm<'p> {
     pub(super) fn http_anfrage(&self, fn_: &str, a: &[Value]) -> R<crate::html::Anfrage> {
         if a.len() < 2 || a.len() > 4 {
             return Err(format!(
-                "{}: erwartet 2..4 Argumente (methode, url [, rumpf [, kopfzeilen]]), erhalten {}",
+                "{}: erwartet 2 bis 4 Argumente, erhalten {}",
                 fn_, a.len()));
         }
         let mut anfrage = crate::html::Anfrage::neu(bi_str(a, 0, fn_)?, bi_str(a, 1, fn_)?);

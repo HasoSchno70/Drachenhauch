@@ -2244,9 +2244,19 @@ fn check_source_roh(raw_source: &str, base: &std::path::Path, label: &str) -> Ve
             }
             diags
         }
-        Err((line, msg)) => vec![serde_json::json!({
-            "line": line, "col": 0, "severity": "error",
-            "phase": "compile", "message": msg })],
+        Err((line, msg)) => {
+            // Der erste Fehler und die, nach denen der Compiler weiterlief
+            // (falsche Argumentzahl) -- der Editor zeigt alle.
+            let mut v = vec![serde_json::json!({
+                "line": line, "col": 0, "severity": "error",
+                "phase": "compile", "message": msg })];
+            for (l, m) in compiler::weitere_fehler() {
+                v.push(serde_json::json!({
+                    "line": l, "col": 0, "severity": "error",
+                    "phase": "compile", "message": m }));
+            }
+            v
+        }
     }
 }
 

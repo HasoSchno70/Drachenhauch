@@ -4,7 +4,7 @@
 ' Das Gegenstueck zur Meldung: hier laeuft das Programm eben NICHT
 PRINT MID$("abc", 1, 2, 99)
 --- fehler
-MID$: erwartet 2..3 Argumente, erhalten 4
+MID$: erwartet 2 bis 3 Argumente, erhalten 4
 
 === warnung blockiert nicht
 ' Es bleibt eine Warnung: das Programm laeuft, solange der Wert passt.
@@ -70,7 +70,7 @@ FUNCTION wieviele(teil AS STRING) AS INTEGER
     NEXT
     RETURN n
 END FUNCTION
-PRINT "eine meldung mit [PLOTS|5 Argumente]: "; eine$("PLOTS|5 Argumente")
+PRINT "eine meldung mit [PLOTS|erhalten 5]: "; eine$("PLOTS|erhalten 5")
 --- datei w.dh
 SCREEN(64, 64, "a", 1)
 DIM xs[3] AS INTEGER
@@ -78,7 +78,7 @@ DIM ys[3] AS INTEGER
 PLOTS(xs, ys, &HFF0000, 2, 9)
 
 --- erwartet
-eine meldung mit [PLOTS|5 Argumente]: TRUE
+eine meldung mit [PLOTS|erhalten 5]: TRUE
 
 === zu wenige argumente werden gemeldet
 ' (Bis Stufe 47 in test_compiler_warnungen.py.)
@@ -244,13 +244,13 @@ FUNCTION wieviele(teil AS STRING) AS INTEGER
     NEXT
     RETURN n
 END FUNCTION
-PRINT "eine meldung mit [MID$|4 Argumente]: "; eine$("MID$|4 Argumente")
+PRINT "eine meldung mit [MID$|erhalten 4]: "; eine$("MID$|erhalten 4")
 PRINT "eine meldung mit [werden ignoriert]: "; eine$("werden ignoriert")
 --- datei w.dh
 PRINT MID$("abc", 1, 2, 99)
 
 --- erwartet
-eine meldung mit [MID$|4 Argumente]: TRUE
+eine meldung mit [MID$|erhalten 4]: TRUE
 eine meldung mit [werden ignoriert]: FALSE
 
 === variadische builtins werden nicht gemeldet

@@ -1,20 +1,24 @@
 ' Aus test_arity_hints.py uebertragen (5 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+'
+' Die Aufrufform kommt aus dem Index (mit_signatur) und steht genau einmal da.
+' Bis 2026.53 haengte arity! eine zweite, eigene an: "-- Aufruf: RANDF(min,
+' max) -- Aufruf: RANDF(lo: Zahl, hi: Zahl)".
 
 === randf arity shows signature
 PRINT RANDF()
 --- fehler
-RANDF: erwartet 2 Argument(e), erhalten 0 -- Aufruf: RANDF(min, max)
+RANDF: erwartet 2 Argument(e), erhalten 0 -- Aufruf: RANDF(lo: Zahl, hi: Zahl)
 
 === randint arity shows signature
 PRINT RANDINT(5)
 --- fehler
-RANDINT: erwartet 2 Argument(e), erhalten 1 -- Aufruf: RANDINT(lo, hi)
+RANDINT: erwartet 2 Argument(e), erhalten 1 -- Aufruf: RANDINT(lo: INTEGER, hi: INTEGER)
 
 === curve bezier2 arity shows signature
 IMPORT "curves"
 PRINT CURVE_BEZIER2(0.5, 1.0)
 --- fehler
-CURVE_BEZIER2: erwartet 9 Argument(e), erhalten 2 -- Aufruf: CURVE_BEZIER2(t, x0,y0, x1,y1, x2,y2, x3,y3)
+CURVE_BEZIER2: erwartet 9 Argument(e), erhalten 2 -- Aufruf: CURVE_BEZIER2(t, x0, y0, x1, y1, x2, y2, x3, y3)
 
 === builtin without signature unchanged
 ' Builtins ohne Tabellen-Eintrag behalten die schlichte Aritaets-Meldung.

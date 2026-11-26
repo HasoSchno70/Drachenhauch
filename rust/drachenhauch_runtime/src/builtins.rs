@@ -1205,51 +1205,21 @@ pub fn call_builtin(name: &str, args: &[Value]) -> Option<R> {
     Some(call_inner(name, args))
 }
 
-/// Aufruf-Signatur fuer Builtins, deren Argumentform man sonst raten muss --
-/// wird an die Aritaets-Fehlermeldung angehaengt ("... -- Aufruf: NAME(...)").
-/// Bewusst fokussiert auf Zufalls-/Kurven-/Game-Math; die Tabelle darf wachsen.
-/// Schluessel = der intern kleingeschriebene Builtin-Name (wie im match unten).
-fn builtin_signature(name: &str) -> Option<&'static str> {
-    Some(match name {
-        "randint"            => "RANDINT(lo, hi)",
-        "randf"              => "RANDF(min, max)",
-        "choice"             => "CHOICE(array)",
-        "shuffle"           => "SHUFFLE(array)",
-        "curve_lerp"         => "CURVE_LERP(a, b, t)",
-        "curve_smoothstep"   => "CURVE_SMOOTHSTEP(edge0, edge1, x)",
-        "curve_smootherstep" => "CURVE_SMOOTHERSTEP(edge0, edge1, x)",
-        "curve_bezier"       => "CURVE_BEZIER(t, p0, p1, p2, p3)",
-        "curve_bezier2"      => "CURVE_BEZIER2(t, x0,y0, x1,y1, x2,y2, x3,y3)",
-        "curve_catmull"      => "CURVE_CATMULL(t, p0, p1, p2, p3)",
-        "curve_bspline"      => "CURVE_BSPLINE(t, p0, p1, p2, p3)",
-        "curve_bspline2"     => "CURVE_BSPLINE2(t, x0,y0, x1,y1, x2,y2, x3,y3)",
-        "curve_catmull2"     => "CURVE_CATMULL2(t, x0,y0, x1,y1, x2,y2, x3,y3)",
-        "curve_hermite"      => "CURVE_HERMITE(t, p0, p1, m0, m1)",
-        "numfmt$" | "numfmt" => "NUMFMT$(zahl[, nachkommastellen])",
-        _ => return None,
-    })
-}
-
 fn call_inner(name: &str, a: &[Value]) -> R {
     macro_rules! arity {
         ($n:expr) => {
             if a.len() != $n {
-                let base = format!("{}: erwartet {} Argument(e), erhalten {}", name.to_uppercase(), $n, a.len());
-                return err(match builtin_signature(name) {
-                    Some(sig) => format!("{} -- Aufruf: {}", base, sig),
-                    None => base,
-                });
+                // Die Aufrufform haengt mit_signatur aus dem Index an (bis
+                // 2026.53 eine zweite, eigene Tabelle builtin_signature --
+                // die Meldung trug sie dann doppelt).
+                return err(format!("{}: erwartet {} Argument(e), erhalten {}", name.to_uppercase(), $n, a.len()));
             }
         };
         // Spanne, fuer Builtins mit optionalen Argumenten.
         ($lo:expr, $hi:expr) => {
             if a.len() < $lo || a.len() > $hi {
-                let base = format!("{}: erwartet {} bis {} Argument(e), erhalten {}",
-                                   name.to_uppercase(), $lo, $hi, a.len());
-                return err(match builtin_signature(name) {
-                    Some(sig) => format!("{} -- Aufruf: {}", base, sig),
-                    None => base,
-                });
+                return err(format!("{}: erwartet {} bis {} Argumente, erhalten {}",
+                                   name.to_uppercase(), $lo, $hi, a.len()));
             }
         };
     }
@@ -1268,7 +1238,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "flt" => { arity!(1); Ok(Value::Float(need_num(&a[0], "FLT")?)) }
         "numfmt$" | "numfmt" => {
             if a.is_empty() || a.len() > 2 {
-                return err(format!("NUMFMT$: erwartet 1 oder 2 Argument(e), erhalten {} -- Aufruf: NUMFMT$(zahl[, nachkommastellen])", a.len()));
+                return err(format!("NUMFMT$: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
             }
             let n = need_num(&a[0], "NUMFMT$")?;
             let dec = if a.len() == 2 { need_int(&a[1], "NUMFMT$")? } else { 2 };
@@ -1413,7 +1383,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     if st == 0 { return err("RANGE: step darf nicht 0 sein".to_string()); }
                     (need_int(&a[0], "RANGE")?, need_int(&a[1], "RANGE")?, st)
                 }
-                _ => return err("RANGE: 1..3 Argumente".to_string()),
+                _ => return err(format!("RANGE: erwartet 1 bis 3 Argumente, erhalten {}", a.len())),
             };
             // Wie viele es werden, vorher -- sonst hing RANGE(2147483648).
             let anzahl = if step > 0 { (stop as i128 - start as i128 + step as i128 - 1) / step as i128 }
@@ -1487,8 +1457,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "lbound" | "ubound" => {
             let gross = name.to_uppercase();
             if a.is_empty() || a.len() > 2 {
-                return err(format!("{}: erwartet 1 oder 2 Argumente, erhalten {} -- Aufruf: {}(feld [, dimension])",
-                                   gross, a.len(), gross));
+                return err(format!("{}: erwartet 1 bis 2 Argumente, erhalten {}",
+                                   gross, a.len()));
             }
             let Value::Array(arr) = &a[0] else {
                 return err(format!("{}: erwartet ARRAY, erhalten {}", gross, a[0].type_name()));
@@ -1658,7 +1628,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let s = format!("{:.*}", n.min(1100) as usize, x);
                 Ok(Value::Float(s.parse::<f64>().unwrap_or(x)))
             } else {
-                err(format!("ROUND: erwartet 1 oder 2 Argument(e), erhalten {}", a.len()))
+                err(format!("ROUND: erwartet 1 bis 2 Argumente, erhalten {}", a.len()))
             }
         }
         // --- Geld: siehe den Block "Geld" weiter oben ---
@@ -1678,7 +1648,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // nur ueber EURO$ mit ganzen Cent, und NUMFMT$ schreibt "1.2K".
         "zahl$" => {
             if a.is_empty() || a.len() > 2 {
-                return err(format!("ZAHL$: erwartet 1..2 Argument(e), erhalten {}", a.len()));
+                return err(format!("ZAHL$: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
             }
             let stellen = match a.get(1) {
                 None => None,
@@ -1694,7 +1664,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "euro$" => {
             if a.is_empty() || a.len() > 2 {
-                return err(format!("EURO$: erwartet 1..2 Argument(e), erhalten {}", a.len()));
+                return err(format!("EURO$: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
             }
             // Bewusst KEIN FLOAT: wer EURO$(19.99) schreibt, hat den Punkt
             // verfehlt, um den es hier geht -- also sagen wir es ihm.
@@ -1718,7 +1688,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "round_half_up" => {
             if a.is_empty() || a.len() > 2 {
-                return err(format!("ROUND_HALF_UP: erwartet 1..2 Argument(e), erhalten {}", a.len()));
+                return err(format!("ROUND_HALF_UP: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
             }
             let x = need_num(&a[0], "ROUND_HALF_UP")?;
             let n = if a.len() == 2 {
@@ -1745,7 +1715,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // direkt und paniked (statt "LOG: erwartet ..."), LOG(x,y,z)
             // wurde stillschweigend akzeptiert (Extra-Argument ignoriert).
             if a.is_empty() || a.len() > 2 {
-                return err(format!("LOG: erwartet 1..2 Argument(e), erhalten {}", a.len()));
+                return err(format!("LOG: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
             }
             let x = need_num(&a[0], "LOG")?;
             if x <= 0.0 { return err("LOG: Argument muss > 0 sein".to_string()); }
@@ -1780,7 +1750,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
         }
         "min" | "max" => {
-            if a.is_empty() { return err(format!("{}: mind. 1 Argument", name.to_uppercase())); }
+            if a.is_empty() { return err(format!("{}: erwartet mindestens 1 Argument(e), erhalten 0", name.to_uppercase())); }
             for v in a { if !is_num(v) { return err(format!("{}: erwartet Zahl", name.to_uppercase())); } }
             let want_min = name == "min";
             let mut best = a[0].clone();
@@ -1874,7 +1844,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "approx" => {
             // APPROX(a, b [, eps]): True, wenn |a-b| <= eps (Default 1e-6).
-            if a.len() != 2 && a.len() != 3 { return err("APPROX: erwartet 2 oder 3 Argumente".to_string()); }
+            if a.len() != 2 && a.len() != 3 { return err(format!("APPROX: erwartet 2 bis 3 Argumente, erhalten {}", a.len())); }
             let (x, y) = (need_num(&a[0], "APPROX")?, need_num(&a[1], "APPROX")?);
             let eps = if a.len() == 3 { need_num(&a[2], "APPROX")? } else { 1e-6 };
             Ok(Value::Bool((x - y).abs() <= eps))
@@ -2070,7 +2040,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // SPACE$, LEFT$, RIGHT$) clampt bereits mit `.max(0)`.
             let fn_ = if name.starts_with("padl") { "PADL$" } else { "PADR$" };
             if a.len() < 2 || a.len() > 3 {
-                return err(format!("{}: erwartet 2..3 Argument(e), erhalten {}", fn_, a.len()));
+                return err(format!("{}: erwartet 2 bis 3 Argumente, erhalten {}", fn_, a.len()));
             }
             let s = need_str(&a[0], fn_)?;
             let n = need_int(&a[1], fn_)?.max(0) as usize;
@@ -2203,7 +2173,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // SORT(arr, comparator-FUNCREF) wird vorher in vm.rs abgefangen
             // (braucht die VM, um die User-Funktion zu rufen).
             if a.is_empty() || a.len() > 2 {
-                return err(format!("SORT: erwartet 1 oder 2 Argument(e), erhalten {}", a.len()));
+                return err(format!("SORT: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
             }
             let desc = match a.get(1) {
                 None => false,
@@ -2423,7 +2393,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::str_stueck(&s[zeichen_stelle(s, anzahl - n)..]))
         }
         "mid$" | "mid" => {
-            if a.len() < 2 || a.len() > 3 { return err(format!("MID$: erwartet 2..3 Argumente, erhalten {}", a.len())); }
+            if a.len() < 2 || a.len() > 3 { return err(format!("MID$: erwartet 2 bis 3 Argumente, erhalten {}", a.len())); }
             let s = need_str(&a[0], "MID$")?;
             let start = need_int(&a[1], "MID$")?.max(0) as usize;
             text_anmelden(&a[0]);
@@ -2438,7 +2408,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
         }
         "instr" => {
-            if a.len() < 2 || a.len() > 3 { return err(format!("INSTR: erwartet 2..3 Argumente, erhalten {}", a.len())); }
+            if a.len() < 2 || a.len() > 3 { return err(format!("INSTR: erwartet 2 bis 3 Argumente, erhalten {}", a.len())); }
             if a.len() == 3 && matches!(a[0], Value::Int(_)) && matches!(a[1], Value::Str(_)) {
                 return err("INSTR: die Startstelle steht in Drachenhauch HINTEN -- INSTR(text, suche, start), und gezaehlt wird ab 0 (nicht gefunden = -1)".to_string());
             }
@@ -2467,7 +2437,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // Pythons str.rfind). Gemeldet beim Dogfooding (2026-10-09):
             // ohne den Befehl brauchte ein Umbruch an der letzten Wortgrenze
             // eine eigene Schleife.
-            if a.len() < 2 || a.len() > 3 { return err(format!("INSTRREV: erwartet 2..3 Argumente, erhalten {}", a.len())); }
+            if a.len() < 2 || a.len() > 3 { return err(format!("INSTRREV: erwartet 2 bis 3 Argumente, erhalten {}", a.len())); }
             let hay = need_str(&a[0], "INSTRREV")?;
             let needle = need_str(&a[1], "INSTRREV")?;
             text_anmelden(&a[0]);
@@ -3068,7 +3038,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys3d_sleep" => {
             if a.len() != 2 && a.len() != 3 {
-                return Err("PHYS3D_SLEEP: erwartet 2 oder 3 Argumente (welt, koerper [, schlafen])".into());
+                return Err(format!("PHYS3D_SLEEP: erwartet 2 bis 3 Argumente, erhalten {}", a.len()));
             }
             let an = if a.len() == 3 { need_flag(&a[2], "PHYS3D_SLEEP")? } else { true };
             let mut w = phys3d_h(&a[0], "PHYS3D_SLEEP")?.borrow_mut();
@@ -3193,7 +3163,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys2d_sleep" => {
             if a.len() != 2 && a.len() != 3 {
-                return Err("PHYS2D_SLEEP: erwartet 2 oder 3 Argumente (welt, koerper [, schlafen])".into());
+                return Err(format!("PHYS2D_SLEEP: erwartet 2 bis 3 Argumente, erhalten {}", a.len()));
             }
             let an = if a.len() == 3 { need_flag(&a[2], "PHYS2D_SLEEP")? } else { true };
             let mut w = phys2d_h(&a[0], "PHYS2D_SLEEP")?.borrow_mut();
@@ -3779,7 +3749,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Int(m.len() as i64))
         }
         "pathjoin" => {
-            if a.len() < 2 { return err(format!("PATHJOIN: erwartet mind. 2 Argumente, erhalten {}", a.len())); }
+            if a.len() < 2 { return err(format!("PATHJOIN: erwartet mindestens 2 Argument(e), erhalten {}", a.len())); }
             // Mit '/' verbinden (deterministisch, plattformuebergreifend; raylib/
             // std akzeptieren '/' auch auf Windows). Erstes Teil behaelt fuehrendes
             // '/', folgende werden beidseitig getrimmt.
@@ -4144,7 +4114,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "buffer_indexof" => {
             // BUFFER_INDEXOF(heu, nadel [, ab]) -> Position oder -1.
-            if a.len() < 2 || a.len() > 3 { return err(format!("BUFFER_INDEXOF: erwartet 2..3 Argumente, erhalten {}", a.len())); }
+            if a.len() < 2 || a.len() > 3 { return err(format!("BUFFER_INDEXOF: erwartet 2 bis 3 Argumente, erhalten {}", a.len())); }
             let heu = buf_h(&a[0], "BUFFER_INDEXOF")?;
             let nadel = buf_h(&a[1], "BUFFER_INDEXOF")?;
             let ab = if a.len() == 3 { need_int(&a[2], "BUFFER_INDEXOF")?.max(0) as usize } else { 0 };
@@ -4216,7 +4186,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "buffer_deflate" | "buffer_inflate" => {
             let gross = name.to_uppercase();
             if a.is_empty() || a.len() > 2 {
-                return err(format!("{}: erwartet 1..2 Argumente (puffer [, \"zlib\"/\"roh\"]), erhalten {}", gross, a.len()));
+                return err(format!("{}: erwartet 1 bis 2 Argumente, erhalten {}", gross, a.len()));
             }
             let zlib = if a.len() == 2 {
                 match need_str(&a[1], &gross)?.to_lowercase().as_str() {
@@ -4247,7 +4217,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "buffer_get_i16" | "buffer_get_u16" | "buffer_get_i32" | "buffer_get_u32"
         | "buffer_get_i64" | "buffer_get_f32" | "buffer_get_f64" => {
             if a.len() < 2 || a.len() > 3 {
-                return err(format!("{}: erwartet 2..3 Argumente (puffer, position [, \"le\"/\"be\"]), erhalten {}",
+                return err(format!("{}: erwartet 2 bis 3 Argumente, erhalten {}",
                                    name.to_uppercase(), a.len()));
             }
             let anz = name.to_uppercase();
@@ -4275,7 +4245,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "buffer_set_i16" | "buffer_set_u16" | "buffer_set_i32" | "buffer_set_u32"
         | "buffer_set_i64" | "buffer_set_f32" | "buffer_set_f64" => {
             if a.len() < 3 || a.len() > 4 {
-                return err(format!("{}: erwartet 3..4 Argumente (puffer, position, wert [, \"le\"/\"be\"]), erhalten {}",
+                return err(format!("{}: erwartet 3 bis 4 Argumente, erhalten {}",
                                    name.to_uppercase(), a.len()));
             }
             let anz = name.to_uppercase();
@@ -4444,7 +4414,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "system_language$" | "system_language" => { arity!(0); Ok(Value::str_rc(crate::meldung::systemsprache())) }
         "runtime_language$" | "runtime_language" => { arity!(0); Ok(Value::str_rc(crate::meldung::sprache().to_string())) }
         "getenv$" | "getenv" => {
-            if a.is_empty() || a.len() > 2 { return err(format!("GETENV$: erwartet 1..2 Argumente, erhalten {}", a.len())); }
+            if a.is_empty() || a.len() > 2 { return err(format!("GETENV$: erwartet 1 bis 2 Argumente, erhalten {}", a.len())); }
             let name_ = need_str(&a[0], "GETENV$")?;
             let vorgabe = if a.len() == 2 { need_str(&a[1], "GETENV$")? } else { "" };
             // `var_os` + lossy: eine Umgebungsvariable mit ungueltigem UTF-8
@@ -4502,7 +4472,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
 
         // ===== Modul: tween (zeitbasiert -> nicht deterministisch) =====
         "tween_new" | "tween_new_loop" | "tween_new_pingpong" => {
-            if a.len() < 3 || a.len() > 4 { return err(format!("{}: 3..4 Argumente", name.to_uppercase())); }
+            if a.len() < 3 || a.len() > 4 { return err(format!("{}: erwartet 3 bis 4 Argumente, erhalten {}", name.to_uppercase(), a.len())); }
             let fn_ = match name { "tween_new_loop" => "TWEEN_NEW_LOOP", "tween_new_pingpong" => "TWEEN_NEW_PINGPONG", _ => "TWEEN_NEW" };
             let start = need_num(&a[0], fn_)?;
             let end = need_num(&a[1], fn_)?;
@@ -4975,14 +4945,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         "chart_series" => {
-            if a.len() < 2 || a.len() > 3 { return err("CHART_SERIES: erwartet 2 bis 3 Argumente -- Aufruf: CHART_SERIES(diagramm, name [, farbe])"); }
+            if a.len() < 2 || a.len() > 3 { return err(format!("CHART_SERIES: erwartet 2 bis 3 Argumente, erhalten {}", a.len())); }
             let farbe = match a.get(2) { Some(v) => need_int(v, "CHART_SERIES")?, None => -1 };
             let c = chart_h(&a[0], "CHART_SERIES")?;
             let name = need_str(&a[1], "CHART_SERIES")?.to_string();
             Ok(Value::Int(c.borrow_mut().add_series(&name, farbe)))
         }
         "chart_add" => {
-            if a.len() < 3 || a.len() > 4 { return err("CHART_ADD: erwartet 3 bis 4 Argumente -- Aufruf: CHART_ADD(diagramm, name, wert [, farbe])"); }
+            if a.len() < 3 || a.len() > 4 { return err(format!("CHART_ADD: erwartet 3 bis 4 Argumente, erhalten {}", a.len())); }
             let farbe = match a.get(3) { Some(v) => need_int(v, "CHART_ADD")?, None => -1 };
             let c = chart_h(&a[0], "CHART_ADD")?;
             let label = need_str(&a[1], "CHART_ADD")?.to_string();
@@ -5115,7 +5085,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         "chart_zone" => {
-            if a.len() < 4 || a.len() > 5 { return err("CHART_ZONE: erwartet 4 bis 5 Argumente -- Aufruf: CHART_ZONE(diagramm, von, bis, farbe [, name])"); }
+            if a.len() < 4 || a.len() > 5 { return err(format!("CHART_ZONE: erwartet 4 bis 5 Argumente, erhalten {}", a.len())); }
             let name = match a.get(4) { Some(v) => need_str(v, "CHART_ZONE")?.to_string(), None => String::new() };
             let c = chart_h(&a[0], "CHART_ZONE")?;
             let von = need_num(&a[1], "CHART_ZONE")?;
@@ -5725,7 +5695,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // Ein dt ueber 0.1 s wird geteilt, damit ein Ruckler die Figur
             // nicht durch duenne Boeden traegt (wie PHYS*_STEP).
             if a.len() != 3 && a.len() != 4 {
-                return Err(format!("CHAR_UPDATE: erwartet 3 oder 4 Argumente, erhalten {}", a.len()));
+                return Err(format!("CHAR_UPDATE: erwartet 3 bis 4 Argumente, erhalten {}", a.len()));
             }
             let c = char_h(&a[0], "CHAR_UPDATE")?;
             let m = tiled_h(&a[1], "CHAR_UPDATE")?; let mb = m.borrow();

@@ -141,7 +141,6 @@ FUNCTION probe$(n AS INTEGER) AS STRING
                 FOR k = 1 TO 65 : viele = viele + "e" + STR$(k) + "|" : NEXT
                 TRAY_MENU(viele)
             CASE 2 : TRAY_SHOW(9999)
-            CASE 3 : TRAY_SHOW(1, 2, 3)
         END SELECT
         RETURN "kein fehler"
     CATCH e
@@ -159,7 +158,6 @@ DHRT_FRAMES=2
 --- enthaelt
 TRAY_MENU: hoechstens 64 Eintraege, nicht 65
 TRAY_SHOW
-TRAY_SHOW: erwartet ([bild[, hinweis$]])
 
 === das beispiel pausenwecker laesst sich ueber das symbol bedienen
 ' examples/209_pausenwecker.dh, wie es ist -- nur mit dem Fenstertitel des

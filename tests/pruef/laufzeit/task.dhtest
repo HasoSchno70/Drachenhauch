@@ -319,7 +319,7 @@ WHILE NOT TASK_READY(a)
 WEND
 PRINT TASK_RESULT$(a)
 --- fehler
-TASK: SUMME: erwartet 3..3 Argument(e), erhalten 1
+TASK: SUMME: erwartet 3 Argument(e), erhalten 1
 
 === untragbares argument nennt die stelle
 FUNCTION Summe(a AS INTEGER, b AS INTEGER, c AS INTEGER) AS INTEGER

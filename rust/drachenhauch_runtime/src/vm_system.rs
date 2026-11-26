@@ -155,7 +155,7 @@ impl<'p> Vm<'p> {
         // einen Strom, der sofort zu Ende ist (wie INPUT dort "" liefert).
         if name == "stdin" {
             if a.len() > 1 {
-                return Err(format!("STDIN: erwartet 0..1 Argument(e), erhalten {}", a.len()));
+                return Err(format!("STDIN: erwartet 0 bis 1 Argumente, erhalten {}", a.len()));
             }
             let kod = match a.first() {
                 None => crate::kodierung::Kodierung::Utf8,
@@ -170,7 +170,7 @@ impl<'p> Vm<'p> {
         }
         let v = match name {
             "exit" => {
-                if a.len() > 1 { return Err(format!("EXIT: erwartet 0..1 Argument(e), erhalten {}", a.len())); }
+                if a.len() > 1 { return Err(format!("EXIT: erwartet 0 bis 1 Argumente, erhalten {}", a.len())); }
                 let code = match a.first() {
                     None => 0,
                     Some(Value::Int(n)) => *n,
@@ -199,7 +199,7 @@ impl<'p> Vm<'p> {
             }
             "shell" | "shell_out$" | "shell_out" => {
                 let anzeige = if name == "shell" { "SHELL" } else { "SHELL_OUT$" };
-                if a.is_empty() { return Err(format!("{}: erwartet mind. 1 Argument (Programm)", anzeige)); }
+                if a.is_empty() { return Err(format!("{}: erwartet mindestens 1 Argument(e), erhalten 0", anzeige)); }
                 let prog = o_str(a, 0, anzeige)?.to_string();
                 // Argumente EINZELN statt als eine Kommandozeile -- damit gibt
                 // es keine Quoting-Regeln zu lernen und keine Shell, die aus
@@ -264,7 +264,7 @@ impl<'p> Vm<'p> {
                 // Griff, das Kind ueberlebt das Ende dieses Programms; die
                 // Argumente nehmen beide gleich.
                 let fn_ = if name == "process_start" { "PROCESS_START" } else { "PROCESS_START_DETACHED" };
-                if a.is_empty() { return Err(format!("{}: erwartet mind. 1 Argument (Programm)", fn_)); }
+                if a.is_empty() { return Err(format!("{}: erwartet mindestens 1 Argument(e), erhalten 0", fn_)); }
                 let prog = bi_str(a, 0, fn_)?.to_string();
                 // Ein FELD von Texten wird ausgebreitet (eine variable Zahl von
                 // Argumenten liess sich vorher gar nicht uebergeben), eine MAP
@@ -535,7 +535,7 @@ impl<'p> Vm<'p> {
                 }
             }
             "shell_start" => {
-                if a.is_empty() { return Err("SHELL_START: erwartet mind. 1 Argument (Programm)".into()); }
+                if a.is_empty() { return Err("SHELL_START: erwartet mindestens 1 Argument(e), erhalten 0".into()); }
                 let prog = bi_str(a, 0, "SHELL_START")?.to_string();
                 let mut rest: Vec<String> = Vec::new();
                 for i in 1..a.len() { rest.push(bi_str(a, i, "SHELL_START")?.to_string()); }
@@ -642,11 +642,11 @@ impl<'p> Vm<'p> {
                 }
             }
             "shell_code" => {
-                if !a.is_empty() { return Err("SHELL_CODE: erwartet 0 Argumente (gilt fuer den zuletzt abgeholten Auftrag)".into()); }
+                if !a.is_empty() { return Err(format!("SHELL_CODE: erwartet 0 Argumente, erhalten {}", a.len())); }
                 Value::Int(self.shell_letzter_code)
             }
             "shell_err$" | "shell_err" => {
-                if !a.is_empty() { return Err("SHELL_ERR$: erwartet 0 Argumente (gilt fuer den zuletzt abgeholten Auftrag)".into()); }
+                if !a.is_empty() { return Err(format!("SHELL_ERR$: erwartet 0 Argumente, erhalten {}", a.len())); }
                 Value::str_rc(&self.shell_letzter_fehler)
             }
             "shell_cancel" => { self.shell_auftraege.abbrechen(bi_int(a, 0, "SHELL_CANCEL")?); Value::Nil }
@@ -723,7 +723,7 @@ impl<'p> Vm<'p> {
             }
             "assert" => {
                 if a.is_empty() || a.len() > 2 {
-                    return Err(format!("ASSERT: erwartet 1..2 Argumente (bedingung [, meldung]), erhalten {}", a.len()));
+                    return Err(format!("ASSERT: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
                 }
                 // Absichtlich streng auf BOOLEAN: `ASSERT(anzahl)` waere sonst
                 // still "wahr, weil nicht null" -- und eine Pruefung, die aus
@@ -742,7 +742,7 @@ impl<'p> Vm<'p> {
             }
             "assert_eq" => {
                 if a.len() < 2 || a.len() > 3 {
-                    return Err(format!("ASSERT_EQ: erwartet 2..3 Argumente (ist, soll [, was]), erhalten {}", a.len()));
+                    return Err(format!("ASSERT_EQ: erwartet 2 bis 3 Argumente, erhalten {}", a.len()));
                 }
                 // Dieselbe Gleichheit wie der `=`-Operator der Sprache --
                 // eine zweite Vorstellung davon, wann zwei Werte gleich sind,

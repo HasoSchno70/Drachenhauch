@@ -106,7 +106,7 @@ END SUB
 
 log()
 --- fehler
-LOG: erwartet mind. 1 Argument(e), erhalten 0
+LOG: erwartet mindestens 1 Argument(e), erhalten 0
 
 === variadic too few args throws (2)
 ' Wenn Pflicht-Args vor Variadic nicht erfuellt sind.
@@ -116,7 +116,7 @@ END SUB
 
 log()
 --- fehler
-LOG: erwartet mind. 1 Argument(e), erhalten 0
+LOG: erwartet mindestens 1 Argument(e), erhalten 0
 
 === variadic must be last (1)
 ' `SUB foo(...args, x)` -> ParseError.

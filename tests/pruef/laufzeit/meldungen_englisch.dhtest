@@ -95,8 +95,7 @@ Runtime error in p.dh:1: BUFFER_NEW: size -1 is negative
 Runtime error in p.dh:1: MAPGET: key 'x' is not in the map
 Runtime error in p.dh:1: ARRAY_POP: the array is empty
 Runtime error in p.dh:1: FORMAT$: unknown specifier %q
-p.dh:1: Warning: REPEAT$: only 1 argument(s) given, 2 expected.
-Runtime error in p.dh:1: REPEAT$: expected 2 argument(s), got 1 -- usage: REPEAT$(s, n)
+p.dh:1: Compile error: REPEAT$: expected 2 argument(s), got 1 -- usage: REPEAT$(s, n)
 
 === meldungen der gui, beispiele und zusammengesetzte (runde 3)
 ' Die dritte Runde: gui, Grafik, Ton. Dazu zwei Funde: ein Beispiel mit

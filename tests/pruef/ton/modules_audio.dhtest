@@ -142,13 +142,9 @@ AUDIO_COMPRESSOR: unbekannter Bus 'nope' (sfx, music, master)
 AUDIO_EQ: unbekannter Bus 'nope' (sfx, music, master)
 
 === unloadsound is wired
-TRY
-    UNLOADSOUND()
-CATCH e
-    PRINT e
-END TRY
---- erwartet
-UNLOADSOUND: fehlendes Argument 1
+UNLOADSOUND()
+--- fehler
+UNLOADSOUND: erwartet 1 Argument(e), erhalten 0
 
 === audio clock type compiles
 IMPORT "audio"

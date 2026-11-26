@@ -504,17 +504,11 @@ TRY
 CATCH e
     PRINT e
 END TRY
-TRY
-    PDF_TEXT(p, 0, 0, "x", 1, 2)
-CATCH e
-    PRINT e
-END TRY
 --- erwartet
 PDF_CIRCLE: der Radius muss groesser als 0 sein, nicht 0
 PDF_POLYGON_FILL: ein Vieleck braucht mindestens drei Punkte, nicht 2
 PDF_POLYGON: xs und ys muessen gleich lang sein (3 gegen 2)
 PDF_POLYGON: erwartet 1D ARRAY OF FLOAT
-PDF_TEXT: erwartet 4 oder 5 Argumente (pdf, x, y, text$ [, winkel]), nicht 6
 
 === die grossen formate a2 a1 a0
 IMPORT "pdf"
@@ -580,12 +574,15 @@ TRY
 CATCH e
     PRINT e
 END TRY
-TRY
-    PDF_DASH(p)
-CATCH e
-    PRINT e
-END TRY
 --- erwartet
 PDF_DASH: Strich und Luecke muessen beide groesser als 0 sein (oder beide 0 fuer durchgezogen), nicht 2 und 0
 PDF_DASH: Strich und Luecke muessen beide groesser als 0 sein (oder beide 0 fuer durchgezogen), nicht -1 und 1
-PDF_DASH: erwartet 2 oder 3 Argumente (pdf, strich_mm [, luecke_mm]), nicht 1
+
+=== eine falsche argumentzahl haelt schon der compiler an
+' Seit 2026.54 ein Fehler beim Uebersetzen (vorher erst zur Laufzeit).
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_TEXT(p, 0, 0, "x", 1, 2)
+--- fehler
+PDF_TEXT: erwartet 4 bis 5 Argumente, erhalten 6 -- Aufruf: PDF_TEXT(

@@ -3,22 +3,22 @@
 === too few args is clean error not crash[PRINT MID$("hi")]
 PRINT MID$("hi")
 --- fehler
-MID$: erwartet 2..3 Argumente, erhalten 1
+MID$: erwartet 2 bis 3 Argumente, erhalten 1
 
 === too few args is clean error not crash[PRINT INSTR("abc")]
 PRINT INSTR("abc")
 --- fehler
-INSTR: erwartet 2..3 Argumente, erhalten 1
+INSTR: erwartet 2 bis 3 Argumente, erhalten 1
 
 === too few args is clean error not crash[PRINT LOG()]
 PRINT LOG()
 --- fehler
-LOG: erwartet 1..2 Argument(e), erhalten 0
+LOG: erwartet 1 bis 2 Argumente, erhalten 0
 
 === too few args is clean error not crash[PRINT PADL$("x")]
 PRINT PADL$("x")
 --- fehler
-PADL$: erwartet 2..3 Argument(e), erhalten 1
+PADL$: erwartet 2 bis 3 Argumente, erhalten 1
 
 === array equals itself
 DIM a[3] AS INTEGER

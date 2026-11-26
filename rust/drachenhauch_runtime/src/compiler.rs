@@ -514,6 +514,10 @@ pub struct Compiler {
     // Builtins, das dhrt gar nicht kennt (Tippfehler / nur Tree-Walker). Werden
     // von `--check` als severity:"warning" gemeldet, blockieren NICHT.
     warnings: Vec<(u32, String)>,
+    // Fehler, nach denen das Uebersetzen trotzdem weiterlaeuft (eine falsche
+    // Argumentzahl): am Ende ist der erste DER Fehler, `--check` zeigt alle
+    // (`weitere_fehler`). Ohne das saehe der Editor nur den ersten.
+    spaete_fehler: Vec<(u32, String)>,
     // Laufvariablen von FOR EACH ueber Structs, deren Schleife gerade
     // uebersetzt wird: sie halten eine KOPIE des Elements -- ein Feld
     // daran zu schreiben ginge ins Leere und ist darum eine Meldung.
@@ -639,7 +643,7 @@ fn parse_arity(sig: &str) -> Option<(usize, usize)> {
     if inner.is_empty() { return Some((0, 0)); }
     if inner.contains('*') { return None; }             // *args
 
-    // "6..8 Argumente" / "7 Argumente"
+    // "6..8 Argumente" / "7 Argumente" (Signaturform im Index)
     if let Some(rest) = inner.strip_suffix("Argumente").or_else(|| inner.strip_suffix("Argument")) {
         let r = rest.trim();
         if let Some((a, b)) = r.split_once("..") {
@@ -888,15 +892,16 @@ fn param_zweitname<'a>(namen: impl Iterator<Item = &'a str> + Clone, key: &str) 
     Some(erster.0)
 }
 
-/// "3", "3 bis 4" bzw. "mindestens 3" -- fuer lesbare Meldungen.
+/// "3 Argument(e)", "3 bis 4 Argumente" bzw. "mindestens 3 Argument(e)" --
+/// dieselben drei Formen wie die Meldungen der Laufzeit.
 ///
 /// Variadische Signaturen ("...") liefern `usize::MAX` als Obergrenze. Ohne den
 /// mittleren Zweig stand die dann ausgeschrieben in der Meldung:
 /// "erwartet werden 2 bis 18446744073709551615".
 fn arity_text(min: usize, max: usize) -> String {
-    if min == max { format!("{}", min) }
-    else if max == usize::MAX { format!("mindestens {}", min) }
-    else { format!("{} bis {}", min, max) }
+    if min == max { format!("{} Argument(e)", min) }
+    else if max == usize::MAX { format!("mindestens {} Argument(e)", min) }
+    else { format!("{} bis {} Argumente", min, max) }
 }
 
 /// Builtins, die laut Index Text liefern (`... AS STRING` / `-> STRING`).
@@ -984,7 +989,7 @@ impl Compiler {
                    gemeldete_module: std::collections::HashSet::new(),
                    enum_decls: HashMap::new(), enum_werte: HashMap::new(), global_types: HashMap::new(), konst_werte: HashMap::new(),
                    ctx: Ctx::new(), err_line: 0, stmt_nr: 0,
-                   warnings: vec![], foreach_kopien: vec![] }
+                   warnings: vec![], spaete_fehler: vec![], foreach_kopien: vec![] }
     }
 
     /// Bekannter skalarer DIM-Typ: Werttyp ODER importierter externer Modul-Typ.
@@ -4162,7 +4167,7 @@ impl Compiler {
             // Compiler kann nicht wissen, welcher Fall vorliegt:
             //
             //   * die 661 Builtins in `builtins.rs` pruefen mit `arity!` und
-            //     BRECHEN AB ("MID$: erwartet 2..3 Argumente, erhalten 4"),
+            //     BRECHEN AB ("MID$: erwartet 2 bis 3 Argumente, erhalten 4"),
             //   * alles was ueber `try_*` in `vm.rs` laeuft (Grafik, gui, db,
             //     zeit, ...) greift seine Argumente per Index ab und
             //     IGNORIERT den Rest stillschweigend.
@@ -4176,17 +4181,20 @@ impl Compiler {
             // Ein Verhaltensbit im Index waere die genauere Variante -- aber
             // auch wieder eine von Hand gepflegte Liste neben dem Quelltext.
             else if let Some(&(min, max)) = builtin_arity().get(&bname) {
+                // Seit 2026.54 ein Fehler beim Uebersetzen (bis dahin eine
+                // Warnung): zu viele brachen bei zwei Dritteln der Builtins zur
+                // Laufzeit ab und wurden beim Rest still verworfen, zu wenige
+                // brachen immer ab -- beides erst, wenn die Zeile lief.
                 let n = args.len();
-                if n > max {
-                    self.warnings.push((self.ctx.cur_line, format!(
-                        "{}: {} Argumente uebergeben, erwartet werden {} -- die \
-                         ueberzaehligen weglassen (viele Builtins brechen sonst \
-                         zur Laufzeit ab).",
-                        anzeige, n, arity_text(min, max))));
-                } else if n < min {
-                    self.warnings.push((self.ctx.cur_line, format!(
-                        "{}: nur {} Argument(e) uebergeben, erwartet werden {}.",
-                        anzeige, n, arity_text(min, max))));
+                if n > max || n < min {
+                    // Mit der Aufrufform aus dem Index (wie die Laufzeit) und
+                    // dem Hinweis fuer Umsteiger (RGB("FF0000")).
+                    let mut m = crate::vm::mit_signatur(&format!("{}: erwartet {}, erhalten {}",
+                        anzeige.to_uppercase(), arity_text(min, max), n));
+                    if let Some(Node::StringLit(t)) = args.first() {
+                        m.push_str(&crate::umstieg::text_statt_zahl(&bname, t));
+                    }
+                    self.spaete_fehler.push((self.ctx.cur_line, m));
                 }
             }
             // Gehoert der Befehl zu einem Modul, das nicht importiert ist?
@@ -6814,12 +6822,23 @@ pub fn compile_to_program(ast: &Node, external_types: &std::collections::HashSet
     Ok((c.finish_direkt(data), warnings))
 }
 
+thread_local! {
+    /// Die Fehler hinter dem ersten aus `spaete_fehler` -- `--check` holt sie
+    /// nach dem gescheiterten Uebersetzen ab (`weitere_fehler`).
+    static WEITERE_FEHLER: std::cell::RefCell<Vec<(u32, String)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+/// Die weiteren Fehler des letzten gescheiterten Uebersetzens (und leert sie).
+pub fn weitere_fehler() -> Vec<(u32, String)> {
+    WEITERE_FEHLER.with(|w| std::mem::take(&mut *w.borrow_mut()))
+}
+
 #[allow(clippy::type_complexity)]
 fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
                builtin_aliases: &[(String, String)],
                importierte_module: &std::collections::HashSet<String>,
                herkunft: &[crate::preprocess::Herkunft], haupt: &str)
     -> Result<(Compiler, Vec<Value>, Vec<(u32, String)>), (u32, String)> {
+    WEITERE_FEHLER.with(|w| w.borrow_mut().clear());
     let stmts = match ast {
         Node::Program { statements } => statements,
         _ => return Err((0, "Erwartet Program-Knoten".into())),
@@ -7016,6 +7035,16 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
         collect_data(stmts, &mut data)?;
         Ok(())
     })();
+    let outcome = match outcome {
+        Ok(()) if !c.spaete_fehler.is_empty() => {
+            let mut alle = std::mem::take(&mut c.spaete_fehler);
+            let erster = alle.remove(0);
+            WEITERE_FEHLER.with(|w| *w.borrow_mut() = alle);
+            c.err_line = erster.0;
+            Err(erster.1)
+        }
+        o => o,
+    };
     match outcome {
         Ok(()) => {
             // Erst JETZT -- vorher weiss niemand, ob ein Name weiter unten

@@ -74,7 +74,7 @@ PRINT RAY_HIT_TRI(0.0, 0.0, 5.0)
 --- umgebung
 DHRT_FRAMES=1
 --- fehler
-RAY_HIT_TRI: erwartet 15 Zahlen, erhalten 3
+RAY_HIT_TRI: erwartet 15 Argument(e), erhalten 3
 
 === spheres overlap
 IMPORT "physics"

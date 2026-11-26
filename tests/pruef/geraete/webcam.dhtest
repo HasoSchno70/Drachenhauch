@@ -134,7 +134,7 @@ CATCH e
     PRINT e
 END TRY
 --- erwartet
-WEBCAM_OPEN: erwartet 0, 1 oder 3 Argumente (geraet$, breite, hoehe), erhalten 2
+WEBCAM_OPEN: erwartet 0, 1 oder 3 Argumente, erhalten 2
 WEBCAM_OPEN: breite und hoehe muessen 0..8192 sein (0 = was die Kamera vorschlaegt)
 
 === nach close ist die kamera ungueltig

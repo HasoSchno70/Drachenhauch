@@ -8,6 +8,18 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
 
 ## Was sich für bestehende Programme ändert
 
+**Übersetzen**
+
+* **Eine falsche Zahl von Argumenten an einen eingebauten Befehl ist ein
+  Fehler beim Übersetzen** (bis 2026.53 eine Warnung; zu viele wurden je nach
+  Befehl still verworfen oder brachen zur Laufzeit ab, zu wenige brachen
+  immer ab, aber erst, wenn die Zeile lief). Die Meldung nennt die
+  Aufrufform aus dem Handbuch; `--check` und der Editor zeigen alle solchen
+  Stellen einer Datei, nicht nur die erste.
+* Die Argumentzahl-Meldungen haben drei Formen: „erwartet 2 Argument(e)“,
+  „erwartet 1 bis 3 Argumente“, „erwartet mindestens 2 Argument(e)“, jeweils
+  mit „erhalten n“; die Aufrufform steht genau einmal dahinter.
+
 **gui: Lagen sind logisch**
 
 * `GUI_LISTBOX_ITEM_RECT`, `GUI_TREE_ITEM_RECT`, `GUI_TABLE_ROW_RECT`,

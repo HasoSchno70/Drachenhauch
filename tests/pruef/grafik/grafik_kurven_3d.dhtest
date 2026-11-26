@@ -177,8 +177,6 @@ FUNCTION probe$(n AS INTEGER) AS STRING
             CASE 2
                 DIM c AS ARRAY OF INTEGER : c = [1, 2, 3]
                 SPLINE_BASIS(c, c)
-            CASE 3 : BEZIER(0, 0, 10, 10)
-            CASE 4 : CAPSULE(0, 0, 0, 1, 1, 1, 0.5)
             CASE 5 : DIM q AS TUPLE : q = MODEL_BBOX(99)
             CASE 6
                 DIM v AS IMAGE : v = GENTEX_COLOR(8, 8, RED)
@@ -199,7 +197,12 @@ DHRT_FRAMES=2
 --- enthaelt
 SPLINE_BEZIER: braucht 4, 7, 10 ... Punkte (Anfang, dann je zwei Kontrollpunkte und ein Ende), nicht 5
 SPLINE_BASIS: braucht mindestens 4 Punkte, nicht 3
-BEZIER: erwartet (x1, y1, kx, ky, x2, y2[, farbe[, breite]])
-CAPSULE: erwartet (x1, y1, z1, x2, y2, z2, r, farbe)
 MODEL_BBOX: ungueltiges MODEL-Handle 99
 BILLBOARD_PART: Breite und Hoehe des Ausschnitts muessen groesser als 0 sein
+
+=== eine falsche argumentzahl ist ein fehler beim uebersetzen
+' Seit 2026.54 haelt schon der Compiler an (vorher eine Warnung und der
+' Fehler erst, wenn die Zeile lief) -- mit der Aufrufform aus dem Index.
+BEZIER(0, 0, 10, 10)
+--- fehler
+BEZIER: erwartet 6 bis 8 Argumente, erhalten 4 -- Aufruf: BEZIER(

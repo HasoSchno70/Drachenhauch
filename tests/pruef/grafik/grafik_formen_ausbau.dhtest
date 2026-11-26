@@ -162,8 +162,6 @@ FUNCTION probe$(n AS INTEGER) AS STRING
         SELECT CASE n
             CASE 1 : NGON(10, 10, 2, 5, 0)
             CASE 2 : LINEDASHED(0, 0, 10, 10, 0, 3)
-            CASE 3 : PIE(10, 10, 5, 0)
-            CASE 4 : GRADIENT4(0, 0, 10, 10, RED, GREEN, BLUE)
             CASE 5
                 DIM v AS IMAGE : v = IMAGE_NEW(10, 10, RED)
                 DRAWIMAGE9(v, 0, 0, 50, 50, 6, 6, 6, 6)
@@ -186,8 +184,6 @@ DHRT_FRAMES=2
 --- enthaelt
 NGON: ein Vieleck hat mindestens 3 Ecken, nicht 2
 LINEDASHED: Strich und Luecke muessen mindestens 1 sein
-PIE: erwartet (x, y, r, von_grad, bis_grad[, farbe])
-GRADIENT4: erwartet (x1, y1, x2, y2, oben_links, oben_rechts, unten_rechts, unten_links)
 DRAWIMAGE9: Raender 6 + 6 bzw. 6 + 6 sind groesser als das Bild (10x10)
 DRAWIMAGE9: die Raender duerfen nicht negativ sein
 
@@ -197,3 +193,10 @@ PIE(10, 10, 5, 0, 90)
 DHRT_FRAMES=2
 --- fehler
 PIE: es gibt noch kein Fenster
+
+=== eine falsche argumentzahl ist ein fehler beim uebersetzen
+' Seit 2026.54 haelt schon der Compiler an (vorher eine Warnung und der
+' Fehler erst, wenn die Zeile lief) -- mit der Aufrufform aus dem Index.
+PIE(10, 10, 5, 0)
+--- fehler
+PIE: erwartet 5 bis 6 Argumente, erhalten 4 -- Aufruf: PIE(

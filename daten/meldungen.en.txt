@@ -299,8 +299,6 @@ Namens-Kollision: '{}' ist zugleich eine Variable und eine SUB/FUNCTION -- beim 
 {}: BYREF-Parameter '{}' braucht ein zuweisbares Argument	{}: BYREF parameter '{}' needs an assignable argument
 {}: Named-Args nur bei SUB/FUNCTION	{}: named arguments only for SUB/FUNCTION
 Unbekanntes Builtin '{}' -- dhrt kennt es nicht (Tippfehler? oder veraltet/entfernt). Der Aufruf schlaegt sonst erst zur Laufzeit fehl.{}	Unknown builtin '{}' -- dhrt does not know it (typo? or outdated/removed). Otherwise the call only fails at run time.{}
-{}: {} Argumente uebergeben, erwartet werden {} -- die ueberzaehligen weglassen (viele Builtins brechen sonst zur Laufzeit ab).	{}: {} arguments given, {} expected -- leave out the extra ones (many builtins stop the program at run time otherwise).
-{}: nur {} Argument(e) uebergeben, erwartet werden {}.	{}: only {} argument(s) given, {} expected.
 {} gehoert zum Modul '{}', aber IMPORT "{}" fehlt. Das Programm laeuft trotzdem -- dhrt kennt die Module nativ, der Preprocessor macht aus der Zeile einen Kommentar. Ohne sie ist aber `DIM x AS <Modultyp>` ein Fehler, und man sieht dem Quelltext nicht an, worauf er aufbaut.	{} belongs to the module '{}', but IMPORT "{}" is missing. The program runs anyway -- dhrt knows the modules natively, the preprocessor turns the line into a comment. Without it, however, `DIM x AS <module type>` is an error, and the source does not show what it builds on.
 BYREF-Parameter braucht eine zuweisbare Variable (Identifier, Member oder Index-Access)	A BYREF parameter needs an assignable variable (identifier, member or index access)
 CASE IS: unbekannter Operator '{}'	CASE IS: unknown operator '{}'
@@ -556,10 +554,6 @@ DIM {} AS {} global anlegen (oben in der Datei)	Declare DIM {} AS {} globally (a
 {}: erwartet {} Argument(e), erhalten {}	{}: expected {} argument(s), got {}
 {}: erwartet {} bis {} Argument(e), erhalten {}	{}: expected {} to {} argument(s), got {}
 {}: erwartet {} Argumente, erhalten {}	{}: expected {} arguments, got {}
-{}: erwartet mind. {} Argument(e), erhalten {}	{}: expected at least {} argument(s), got {}
-{}: erwartet mind. {} Argumente, erhalten {}	{}: expected at least {} arguments, got {}
-{}: mind. 1 Argument	{}: at least 1 argument
-{}: erwartet mind. 1 Argument (Programm)	{}: expected at least 1 argument (the program)
 {} hat keine Methode '{}'	{} has no method '{}'
 {}: Array ist leer	{}: the array is empty
 {}: Schiebeweite muss 0..63 sein, erhalten {}	{}: shift width must be 0..63, got {}
@@ -647,13 +641,13 @@ TASK_START: dieses Lambda traegt Werte aus seiner Umgebung mit, und ein Auftrag 
 {}: Elemente sind INTEGER oder STRING, nicht {}	{}: elements are INTEGER or STRING, not {}
 
 # ---------------------------------------------------------------- Befehle: Argumentzahl
+{}: erwartet {} Argumente, erhalten {} -- Aufruf: {}	{}: expected {} arguments, got {} -- call: {}
+{}: erwartet 0, 1 oder 3 Argumente, erhalten {}	{}: expected 0, 1 or 3 arguments, got {}
+{}: erwartet {} bis {} Argumente, erhalten {}	{}: expected {} to {} arguments, got {}
 {}: erwartet {} oder {} Argument(e), erhalten {}	{}: expected {} or {} argument(s), got {}
 {}: erwartet {} oder {} Argumente	{}: expected {} or {} arguments
 {}: erwartet {} Argumente, bekam {}	{}: expected {} arguments, got {}
 {}: erwartet {} bis {} Argumente	{}: expected {} to {} arguments
-{}: erwartet 1..2 Argumente (puffer [, "zlib"/"roh"]), erhalten {}	{}: expected 1..2 arguments (buffer [, "zlib"/"roh"]), got {}
-{}: erwartet 2..3 Argumente (puffer, position [, "le"/"be"]), erhalten {}	{}: expected 2..3 arguments (buffer, position [, "le"/"be"]), got {}
-{}: erwartet 3..4 Argumente (puffer, position, wert [, "le"/"be"]), erhalten {}	{}: expected 3..4 arguments (buffer, position, value [, "le"/"be"]), got {}
 {}: erwartet (text$, links$, rechts$[, ab])	{}: expected (text$, left$, right$[, from])
 {}: erwartet (text, pattern [, ab])	{}: expected (text, pattern [, from])
 {}: erwartet 3 Zahlen (r, g, b){}	{}: expected 3 numbers (r, g, b){}
@@ -814,7 +808,6 @@ Ungueltige Regex '{}': {}	Invalid regex '{}': {}
 {}: erwartet ({}), optional dahinter ({}) und eine Faerbung	{}: expected ({}), optionally followed by ({}) and a tint
 {}: erwartet {} Argumente ({}), erhalten {}	{}: expected {} arguments ({}), got {}
 {}: erwartet {} Argumente ({})	{}: expected {} arguments ({})
-{}: erwartet {} Argumente (gilt fuer den zuletzt abgeholten Auftrag)	{}: expected {} arguments (applies to the task fetched last)
 {}: erwartet 0 Argumente	{}: expected 0 arguments
 {}: erwartet keine Argumente	{}: expected no arguments
 {}: erwartet 1 Argument, erhalten {}	{}: expected 1 argument, got {}
@@ -843,7 +836,6 @@ das Widget oder Fenster gibt es noch nicht (ein Fenster aus dem Studio legt sein
 {}: erwartet Text oder Zahl, erhalten {}	{}: expected text or a number, got {}
 {}: erwartet eine MAP mit den Werten	{}: expected a MAP with the values
 {}: erwartet genau ein Zeichen, nicht "{}"	{}: expected exactly one character, not "{}"
-{}: erwartet Action + mind. 1 Key	{}: expected an action + at least 1 key
 {}: erwartet GELD, erhalten {} -- mit GELD_NEU() einen Betrag daraus machen	{}: expected GELD, got {} -- turn it into an amount with GELD_NEU()
 {}: erwartet die Programmdatei, z.B. WINDOW_OPEN("palette.dh")	{}: expected the program file, e.g. WINDOW_OPEN("palette.dh")
 {}: erwartet eine Funktion als erstes Argument, bekommen {}. Schreib den Namen ohne Klammern: TASK_START(Rechne, 42)	{}: expected a function as the first argument, got {}. Write the name without parentheses: TASK_START(Calc, 42)
@@ -1340,7 +1332,6 @@ IMAGE_TO_BUFFER: raylib hat nichts geschrieben	IMAGE_TO_BUFFER: raylib wrote not
 LOADFONT: Font nicht ladbar: {}	LOADFONT: font cannot be loaded: {}
 LOADFONT: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)	LOADFONT: font '{}' cannot be loaded (not a TrueType/OpenType font raylib can read)
 DHRT_FONT nicht ladbar: {}	DHRT_FONT cannot be loaded: {}
-SETFONT: erwartet (handle[, groesse]), erhalten {} Argument(e)	SETFONT: expects (handle[, groesse]), got {} argument(s)
 SETFONT: groesse muss mindestens 1 sein, erhalten {}	SETFONT: groesse must be at least 1, got {}
 LOADFONT_SDF: Font nicht ladbar: {}	LOADFONT_SDF: font cannot be loaded: {}
 LOADFONT_SDF: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)	LOADFONT_SDF: font '{}' cannot be loaded (not a TrueType/OpenType font raylib can read)
@@ -1761,9 +1752,7 @@ ZEIT_FORMAT$: '%{}' kennt das Muster nicht -- %Y %y %m %d %H %M %S %a %A %% oder
 CHART_X: {} x-Werte fuer {} Punkte -- erst CHART_DATA, dann CHART_X mit gleich vielen	CHART_X: {} x values for {} points -- first CHART_DATA, then CHART_X with as many
 CHART_X: der x-Wert von Punkt {} ist kleiner als der davor -- die Werte muessen aufsteigen	CHART_X: the x value of point {} is smaller than the one before -- the values must ascend
 RENDERTARGET_IMAGE: das Ziel ist noch offen -- erst RENDERTARGET_END	RENDERTARGET_IMAGE: the target is still open -- RENDERTARGET_END first
-PDF_IMAGE: erwartet 5 oder 6 Argumente (pdf, bild, x, y, b [, h]), nicht {}	PDF_IMAGE: expects 5 or 6 arguments (pdf, image, x, y, w [, h]), not {}
 PDF_IMAGE: kein Bild geladen -- ein Bild kommt aus LOADIMAGE, IMAGE_NEW oder RENDERTARGET_IMAGE	PDF_IMAGE: no image loaded -- an image comes from LOADIMAGE, IMAGE_NEW or RENDERTARGET_IMAGE
-PDF_DASH: erwartet 2 oder 3 Argumente (pdf, strich_mm [, luecke_mm]), nicht {}	PDF_DASH: expects 2 or 3 arguments (pdf, dash_mm [, gap_mm]), not {}
 Strich und Luecke muessen beide groesser als 0 sein (oder beide 0 fuer durchgezogen), nicht {} und {}	dash and gap must both be greater than 0 (or both 0 for solid), not {} and {}
 die Breite muss groesser als 0 sein, nicht {}	the width must be greater than 0, not {}
 das Bild ist leer	the image is empty
@@ -1881,7 +1870,6 @@ WEBCAM_OPEN: die Kamera startet nicht -- {}	WEBCAM_OPEN: the camera does not sta
 WEBCAM_OPEN: {} laesst sich nicht oeffnen -- {} (Datenschutz -> Kamera erlaubt?)	WEBCAM_OPEN: {} cannot be opened -- {} (privacy -> camera allowed?)
 WEBCAM_OPEN: {} laesst sich nicht oeffnen -- {}	WEBCAM_OPEN: {} cannot be opened -- {}
 WEBCAM_OPEN: der Zugriff auf die Kamera ist verweigert -- Systemeinstellungen -> Datenschutz & Sicherheit -> Kamera	WEBCAM_OPEN: access to the camera is denied -- System Settings -> Privacy & Security -> Camera
-{}: erwartet 0, 1 oder 3 Argumente (geraet$, breite, hoehe), erhalten {}	{}: expected 0, 1 or 3 arguments (geraet$, breite, hoehe), got {}
 {}: breite und hoehe muessen 0..8192 sein (0 = was die Kamera vorschlaegt)	{}: width and height must be 0..8192 (0 = what the camera suggests)
 {}: ungueltige oder geschlossene WEBCAM {}	{}: invalid or closed WEBCAM {}
 die Kamera liefert nicht mehr -- {}	the camera delivers no more -- {}
@@ -2139,7 +2127,6 @@ jit: {} Runden in der VM -- {}	jit: {} rounds in the VM -- {}
 {}: keine Verbindung zu {}:{} -- {}	{}: no connection to {}:{} -- {}
 {}: Host '{}' nicht aufloesbar (auch nicht ueber mDNS)	{}: host '{}' cannot be resolved (not even via mDNS)
 {}: das Aufloesen von '{}' hat laenger als {} s gedauert	{}: resolving '{}' took longer than {} s
-CHAR_UPDATE: erwartet 3 oder 4 Argumente, erhalten {}	CHAR_UPDATE: expected 3 or 4 arguments, got {}
 CHAR_UPDATE: dt muss eine Zahl >= 0 sein (Sekunden), erhalten {}	CHAR_UPDATE: dt must be a number >= 0 (seconds), got {}
 CHAR_UPDATE: dt ist in Sekunden (wie DELTA) -- {} sieht nach Millisekunden aus	CHAR_UPDATE: dt is in seconds (like DELTA) -- {} looks like milliseconds
 {}: das Widget ist kein {}	{}: the widget is not a {}

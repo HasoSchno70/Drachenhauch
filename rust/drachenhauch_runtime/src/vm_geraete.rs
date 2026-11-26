@@ -1021,7 +1021,7 @@ impl<'p> Vm<'p> {
             "webcam_open" => {
                 const F: &str = "WEBCAM_OPEN";
                 if a.len() > 3 || a.len() == 2 {
-                    return Err(format!("{}: erwartet 0, 1 oder 3 Argumente (geraet$, breite, hoehe), erhalten {}", F, a.len()));
+                    return Err(format!("{}: erwartet 0, 1 oder 3 Argumente, erhalten {}", F, a.len()));
                 }
                 let wunsch = if a.is_empty() { String::new() } else { bi_str(a, 0, F)?.to_string() };
                 let (b, h) = if a.len() == 3 { (bi_int(a, 1, F)?, bi_int(a, 2, F)?) } else { (0, 0) };
@@ -1114,7 +1114,7 @@ impl<'p> Vm<'p> {
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
             "mic_start" => {
-                if a.len() > 1 { return Err(format!("MIC_START: erwartet 0..1 Argumente, erhalten {}", a.len())); }
+                if a.len() > 1 { return Err(format!("MIC_START: erwartet 0 bis 1 Argumente, erhalten {}", a.len())); }
                 let wunsch = if a.is_empty() { String::new() } else { bi_str(a, 0, "MIC_START")?.to_string() };
                 self.mikrofon = None;
                 self.mic_baender.clear();
@@ -1163,7 +1163,7 @@ impl<'p> Vm<'p> {
             }
             "mic_samples" => { keine_args(a, "MIC_SAMPLES")?; lauf!("MIC_SAMPLES"); Value::Int(mic::gesamt() as i64) }
             "mic_record_start" => {
-                if a.len() > 1 { return Err(format!("MIC_RECORD_START: erwartet 0..1 Argumente, erhalten {}", a.len())); }
+                if a.len() > 1 { return Err(format!("MIC_RECORD_START: erwartet 0 bis 1 Argumente, erhalten {}", a.len())); }
                 let sek = if a.is_empty() { 600.0 } else { bi_num(a, 0, "MIC_RECORD_START")? };
                 if !(sek > 0.0 && sek <= mic::MAX_SEKUNDEN) {
                     return Err("MIC_RECORD_START: max_sekunden muss 0 < x <= 3600 sein".into());

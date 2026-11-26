@@ -15,6 +15,9 @@ use super::*;
 /// kennt die Form -- also wird sie angehaengt. Nur bei Meldungen, in denen es
 /// erkennbar um Argumente geht: "Datei nicht gefunden" braucht sie nicht.
 pub(crate) fn mit_signatur(msg: &str) -> String {
+    // Schon mit Aufrufform (eine Meldung, die sie selbst baut, etwa fuer
+    // DECLARE-Funktionen): nicht noch einmal.
+    if msg.contains(" -- Aufruf: ") { return msg.to_string(); }
     let Some((kopf, rest)) = msg.split_once(':') else { return msg.to_string() };
     if kopf.is_empty() || kopf.len() > 40
         || !kopf.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_' || c == '$') {
