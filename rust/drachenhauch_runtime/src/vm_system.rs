@@ -6,12 +6,6 @@
 use super::*;
 
 impl<'p> Vm<'p> {
-    /// Modul `zeit` (zeit.rs): mit Datum und Uhrzeit rechnen.
-    ///
-    /// Der Zeitwert ist eine ganze Zahl: Sekunden seit 1970 in ORTSZEIT --
-    /// so passen `ZEIT_JETZT()` und ein aus der Datenbank gelesener Anstoss
-    /// ohne Zeitzonen-Umrechnung zusammen. Alles hier ist reine Mathematik
-    /// (die Tests dazu stehen in zeit.rs); nur JETZT fragt die Uhr.
     /// Argumente ab `ab` als Texte; ein FELD von Texten wird ausgebreitet
     /// (SHELL, SHELL_OUT$, SHELL_START wie PROCESS_START).
     fn argumente_ausbreiten(a: &[Value], ab: usize, fn_: &str) -> R<Vec<String>> {
@@ -30,6 +24,12 @@ impl<'p> Vm<'p> {
         Ok(rest)
     }
 
+    /// Modul `zeit` (zeit.rs): mit Datum und Uhrzeit rechnen.
+    ///
+    /// Der Zeitwert ist eine ganze Zahl: Sekunden seit 1970 in ORTSZEIT --
+    /// so passen `ZEIT_JETZT()` und ein aus der Datenbank gelesener Anstoss
+    /// ohne Zeitzonen-Umrechnung zusammen. Alles hier ist reine Mathematik
+    /// (die Tests dazu stehen in zeit.rs); nur JETZT fragt die Uhr.
     pub(super) fn try_zeit(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("zeit_") { return Ok(None); }
         use crate::zeit;
@@ -86,10 +86,10 @@ impl<'p> Vm<'p> {
             // ZEIT_TEXT$ gibt Text, ZEIT_LESBAR fragt nach. Getrennte Namen,
             // weil "lesbar" sich als beides lesen laesst -- ich habe die
             // zwei beim Schreiben der ersten Pruefung selbst verwechselt.
-            "zeit_text$" | "zeit_text" =>
+            "zeit_text$" =>
                 Value::str_rc(zeit::format(z_int(a, 0, "ZEIT_TEXT$")?, "")),
             "zeit_lesbar" => Value::Bool(zeit::parse(z_str(a, 0, "ZEIT_LESBAR")?).is_some()),
-            "zeit_format$" | "zeit_format" => {
+            "zeit_format$" => {
                 let t = z_int(a, 0, "ZEIT_FORMAT$")?;
                 let muster = if a.len() > 1 { z_str(a, 1, "ZEIT_FORMAT$")? } else { "" };
                 Value::str_rc(zeit::format_pruefen(t, muster)?)
@@ -116,7 +116,7 @@ impl<'p> Vm<'p> {
                 z_int(a, 0, "ZEIT_PLUS")?.saturating_add(z_int(a, 1, "ZEIT_PLUS")?)),
             "zeit_diff" => Value::Int(
                 z_int(a, 0, "ZEIT_DIFF")?.saturating_sub(z_int(a, 1, "ZEIT_DIFF")?)),
-            "zeit_dauer$" | "zeit_dauer" => Value::str_rc(zeit::dauer(z_int(a, 0, "ZEIT_DAUER$")?)),
+            "zeit_dauer$" => Value::str_rc(zeit::dauer(z_int(a, 0, "ZEIT_DAUER$")?)),
             "zeit_wochentag" => Value::Int(zeit::wochentag(z_int(a, 0, "ZEIT_WOCHENTAG")?)),
             _ => return Ok(None),
         };
@@ -254,13 +254,6 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
-    /// Hintergrund-Auftraege (WP H): SHELL_START, DB_QUERY_START und TASK_START.
-    ///
-    /// Dasselbe Muster ueberall -- starten, pro Bild nachsehen, abholen.
-    /// `shell_`/`db_query_` laufen als reine Rust-Arbeit ohne VM. `task_`
-    /// fuehrt dagegen DH-Code aus, und zwar in einem EIGENEN dhrt-Prozess:
-    /// im Thread ginge es nicht, weil `Value` ueberall `Rc` haelt und
-    /// `Program` damit weder Send noch Sync ist.
     /// Der Kindprozess zu Argument 0 (PROCESS_*), mit Meldung fuer eine
     /// unbekannte oder schon geschlossene Nummer.
     pub(super) fn prozess(&mut self, a: &[Value], fn_: &str) -> R<&mut crate::prozess::Prozess> {
@@ -271,6 +264,13 @@ impl<'p> Vm<'p> {
         Err(format!("{}: Prozess {} gibt es nicht (nie gestartet oder schon PROCESS_CLOSE)", fn_, id))
     }
 
+    /// Hintergrund-Auftraege (WP H): SHELL_START, DB_QUERY_START und TASK_START.
+    ///
+    /// Dasselbe Muster ueberall -- starten, pro Bild nachsehen, abholen.
+    /// `shell_`/`db_query_` laufen als reine Rust-Arbeit ohne VM. `task_`
+    /// fuehrt dagegen DH-Code aus, und zwar in einem EIGENEN dhrt-Prozess:
+    /// im Thread ginge es nicht, weil `Value` ueberall `Rc` haelt und
+    /// `Program` damit weder Send noch Sync ist.
     pub(super) fn try_hintergrund(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("shell_") || name.starts_with("db_query_")
              || name.starts_with("task_") || name.starts_with("window_") || name.starts_with("parent_")
@@ -320,8 +320,8 @@ impl<'p> Vm<'p> {
                 self.prozesse.push(Some(p));
                 Value::Int((self.prozesse.len() - 1) as i64)
             }
-            "process_read$" | "process_read" => Value::str_rc(&self.prozess(a, "PROCESS_READ$")?.lesen()),
-            "process_err$" | "process_err" => Value::str_rc(&self.prozess(a, "PROCESS_ERR$")?.fehler_lesen()),
+            "process_read$" => Value::str_rc(&self.prozess(a, "PROCESS_READ$")?.lesen()),
+            "process_err$" => Value::str_rc(&self.prozess(a, "PROCESS_ERR$")?.fehler_lesen()),
             "process_write" => {
                 let text = bi_str(a, 1, "PROCESS_WRITE")?.to_string();
                 self.prozess(a, "PROCESS_WRITE")?.schreiben(&text)?;
@@ -341,7 +341,7 @@ impl<'p> Vm<'p> {
             // Dieselben Funktionen, die `dhrt lsp` VS Code anbietet -- eine IDE
             // in Drachenhauch braucht dafuer keinen zweiten Prozess und keine
             // JSON-RPC-Rahmung in BASIC. Zeilen und Spalten zaehlen ab 1.
-            "code_check$" | "code_check" => {
+            "code_check$" => {
                 let text = bi_str(a, 0, "CODE_CHECK$")?.to_string();
                 let basis = if a.len() > 1 { std::path::PathBuf::from(bi_str(a, 1, "CODE_CHECK$")?) }
                             else { std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")) };
@@ -374,7 +374,7 @@ impl<'p> Vm<'p> {
                 }).collect();
                 Value::str_rc(&serde_json::Value::Array(liste).to_string())
             }
-            "code_hover$" | "code_hover" => {
+            "code_hover$" => {
                 let text = bi_str(a, 0, "CODE_HOVER$")?;
                 let z = bi_int(a, 1, "CODE_HOVER$")?.max(1) as usize - 1;
                 let s = bi_int(a, 2, "CODE_HOVER$")?.max(1) as usize - 1;
@@ -422,7 +422,7 @@ impl<'p> Vm<'p> {
             // mit `einruecken` (Vorgabe TRUE) die Bloecke neu eingerueckt. Leer,
             // wenn sich die Quelle nicht lexen laesst: an kaputtem Code
             // herumzuruecken hilft niemandem, und die IDE sagt es dann.
-            "code_format$" | "code_format" => {
+            "code_format$" => {
                 let text = bi_str(a, 0, "CODE_FORMAT$")?;
                 let einruecken = crate::argument::a_schalter_oder(a, 1, true, "CODE_FORMAT$")?;
                 Value::str_rc(crate::formatiere(text, einruecken, "    ").unwrap_or_default())
@@ -431,14 +431,14 @@ impl<'p> Vm<'p> {
             // neuen Quelltext, oder LEER, wenn an der Stelle kein Name steht
             // oder der neue keiner ist -- ein Aufrufer, der das nicht prueft,
             // schreibt dann nichts, statt die Datei zu leeren.
-            "code_rename$" | "code_rename" => {
+            "code_rename$" => {
                 let text = bi_str(a, 0, "CODE_RENAME$")?;
                 let z = bi_int(a, 1, "CODE_RENAME$")?.max(1) as usize - 1;
                 let s = bi_int(a, 2, "CODE_RENAME$")?.max(1) as usize - 1;
                 let neu = bi_str(a, 3, "CODE_RENAME$")?;
                 Value::str_rc(crate::lsp::umbenennen(text, z, s, neu).unwrap_or_default())
             }
-            "code_method_calls$" | "code_method_calls" => {
+            "code_method_calls$" => {
                 let text = bi_str(a, 0, "CODE_METHOD_CALLS$")?.to_string();
                 let basis = code_basis(a, 1, "CODE_METHOD_CALLS$")?
                     .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
@@ -448,11 +448,11 @@ impl<'p> Vm<'p> {
             }
             // CODE_CLASSES$: Klassen und Structs des Textes mit ihren
             // Mitgliedern als JSON, ohne zu uebersetzen (lsp::klassen_struktur).
-            "code_classes$" | "code_classes" => {
+            "code_classes$" => {
                 let text = bi_str(a, 0, "CODE_CLASSES$")?;
                 Value::str_rc(crate::lsp::klassen_struktur(text).to_string())
             }
-            "code_types$" | "code_types" => {
+            "code_types$" => {
                 let text = bi_str(a, 0, "CODE_TYPES$")?.to_string();
                 let basis = if a.len() > 1 { std::path::PathBuf::from(bi_str(a, 1, "CODE_TYPES$")?) }
                             else { std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")) };
@@ -475,7 +475,7 @@ impl<'p> Vm<'p> {
                 Value::Tuple(std::rc::Rc::new(vec![
                     crate::builtins::new_int_array(starts),
                     crate::builtins::new_int_array(laengen),
-                    crate::builtins::new_string_array(arten),
+                    crate::builtins::new_str_array(arten),
                 ]))
             }
             "code_names" => {
@@ -484,7 +484,7 @@ impl<'p> Vm<'p> {
                 for (k, n) in crate::syntax::namen_zaehlen(text) { m.put(k, Value::Int(n)); }
                 Value::Map(std::rc::Rc::new(std::cell::RefCell::new(m)))
             }
-            "code_symbols$" | "code_symbols" => {
+            "code_symbols$" => {
                 fn um(v: &serde_json::Value) -> serde_json::Value {
                     serde_json::json!({
                         "name": v["name"], "art": match (v["kind"].as_i64(), v["detail"].as_str()) {
@@ -509,7 +509,7 @@ impl<'p> Vm<'p> {
                 for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(&s)); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
-            "printer_default$" | "printer_default" => Value::str_rc(crate::drucken::standard_drucker()?),
+            "printer_default$" => Value::str_rc(crate::drucken::standard_drucker()?),
             // ===== Fenster als Prozess (docs/intern/entwurf-native-fenster.md, Weg B) =====
             // Ein zweites OS-Fenster ist ein zweiter dhrt mit eigenem SCREEN;
             // die Seiten reden ueber Textzeilen. Kein geteilter Zustand --
@@ -535,7 +535,7 @@ impl<'p> Vm<'p> {
                 Value::Int(self.fenster.oeffnen(exe, &datei, &args)?)
             }
             "window_send" => { self.fenster.senden(bi_int(a, 0, "WINDOW_SEND")?, bi_str(a, 1, "WINDOW_SEND")?)?; Value::Nil }
-            "window_recv$" | "window_recv" => Value::str_rc(&self.fenster.empfangen(bi_int(a, 0, "WINDOW_RECV$")?)?),
+            "window_recv$" => Value::str_rc(&self.fenster.empfangen(bi_int(a, 0, "WINDOW_RECV$")?)?),
             "window_alive" => Value::Bool(self.fenster.lebt(bi_int(a, 0, "WINDOW_ALIVE")?)?),
             "window_close" => { self.fenster.schliessen(bi_int(a, 0, "WINDOW_CLOSE")?)?; Value::Nil }
             "parent_send" | "parent_recv$" | "parent_recv" | "parent_alive" => {
@@ -626,10 +626,10 @@ impl<'p> Vm<'p> {
             // das Ergebnis wegnehmen, je nachdem wer zuerst fragt. Was der
             // Auftrag gedruckt hat, geht damit verloren: ein Auftrag rechnet,
             // er redet nicht.
-            "task_result$" | "task_result" => {
+            "task_result$" => {
                 let id = bi_int(a, 0, "TASK_RESULT$")?;
                 match self.task_auftraege.abholen(id, "TASK_RESULT$")? {
-                    Some(Ok(e)) => Value::str_rc(&e.ergebnis),
+                    Some(Ok(e)) => Value::str_rc(&e),
                     Some(Err(e)) => return Err(e),
                     None => return Err(format!(
                         "TASK_RESULT$: Auftrag {} ist noch nicht fertig -- erst \
@@ -640,7 +640,7 @@ impl<'p> Vm<'p> {
             "task_pending" => Value::Int(self.task_auftraege.offen()),
 
             "shell_ready" => Value::Bool(self.shell_auftraege.fertig(bi_int(a, 0, "SHELL_READY")?, "SHELL_READY")?),
-            "shell_result$" | "shell_result" => {
+            "shell_result$" => {
                 let id = bi_int(a, 0, "SHELL_RESULT$")?;
                 match self.shell_auftraege.abholen(id, "SHELL_RESULT$")? {
                     Some(Ok(e)) => {
@@ -663,7 +663,7 @@ impl<'p> Vm<'p> {
                 if !a.is_empty() { return Err(format!("SHELL_CODE: erwartet 0 Argumente, erhalten {}", a.len())); }
                 Value::Int(self.shell_letzter_code)
             }
-            "shell_err$" | "shell_err" => {
+            "shell_err$" => {
                 if !a.is_empty() { return Err(format!("SHELL_ERR$: erwartet 0 Argumente, erhalten {}", a.len())); }
                 Value::str_rc(&self.shell_letzter_fehler)
             }
@@ -735,7 +735,7 @@ impl<'p> Vm<'p> {
                 if !a.is_empty() { return Err("ERROR_LINE: erwartet 0 Argumente".into()); }
                 Value::Int(self.error_line as i64)
             }
-            "error_code$" | "error_code" => {
+            "error_code$" => {
                 if !a.is_empty() { return Err("ERROR_CODE$: erwartet 0 Argumente".into()); }
                 Value::str_rc(&self.error_code)
             }
@@ -849,12 +849,12 @@ impl<'p> Vm<'p> {
         Ok(Value::Nil)
     }
 
-    /// Ab welcher Stufe LOG_* etwas ausgibt. Aus `DH_LOG` (debug/info/warn/
+    /// Ab welcher Stufe LOG_* etwas ausgibt. Aus `DHRT_LOG` (debug/info/warn/
     /// error/aus), einmal nachgesehen und dann gemerkt. Vorgabe: `info` --
     /// LOG_DEBUG schweigt also, bis jemand es einschaltet.
     pub(super) fn log_schwelle(&mut self) -> u8 {
         if let Some(p) = self.log_pegel { return p; }
-        let p = match std::env::var("DH_LOG").unwrap_or_default().to_ascii_lowercase().as_str() {
+        let p = match crate::umgebung::var("DHRT_LOG").unwrap_or_default().to_ascii_lowercase().as_str() {
             "debug" => 0,
             "warn" => 2,
             "error" => 3,
@@ -935,6 +935,7 @@ impl<'p> Vm<'p> {
         Ok(Some(r))
     }
 
+    /// Modul `scene` (globaler Stack-State, kein Grafik-Bezug).
     pub(super) fn try_scene(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("scene_")) { return Ok(None); }
         fn sa<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {

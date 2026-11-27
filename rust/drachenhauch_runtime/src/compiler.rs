@@ -113,7 +113,7 @@ mod oc {
     /// unter dem Namen angelegten Eintrag auch in den globalen Platz haengen
     /// (dasselbe Objekt). Danach laufen alle Zugriffe ueber den Platz.
     pub const BIND_GLOBAL_SLOT: i64 = 122;
-    /// Nur mit `DHRT_TYPEN_PRUEFEN=1`: prueft, ob der Wert oben auf dem Stapel
+    /// Nur mit `DHRT_CHECK_TYPES=1`: prueft, ob der Wert oben auf dem Stapel
     /// den Typ hat, den `typ_von` ihm zuschreibt (Arg = Konstante mit der
     /// Angabe). Der Wert bleibt liegen.
     pub const TYP_PRUEFEN: i64 = 123;
@@ -437,7 +437,7 @@ struct FfiDecl {
 }
 
 pub struct Compiler {
-    /// `DHRT_TYPEN_PRUEFEN=1`: hinter jeden getypten Ausdruck eine Probe.
+    /// `DHRT_CHECK_TYPES=1`: hinter jeden getypten Ausdruck eine Probe.
     typen_pruefen: bool,
     /// `dhrt --typen`: (Zeile, Ausdruck, Typ) je uebersetztem Ausdruck.
     typen_liste: Option<Vec<(u32, String, String)>>,
@@ -777,7 +777,7 @@ fn builtin_params() -> &'static std::collections::HashMap<String, (Vec<BuiltinPa
         for (n, sig, _) in builtin_eintraege() {
             let Some(p) = signatur_params(sig) else { continue };
             let n = n.to_lowercase();
-            if let Some(alt) = crate::namen::bisher(&n) {
+            if let Some(alt) = crate::namen::kanonisch(&n) {
                 m.entry(alt.to_string()).or_insert_with(|| p.clone());
             }
             m.insert(n, p);
@@ -839,7 +839,7 @@ pub(crate) fn modul_von_builtin(name: &str) -> Option<String> {
 const PARAM_ZWEITNAMEN: &[&[&str]] = &[
     &["path", "p"],
     &["digits", "decimals"],
-    &["volume", "vol"],
+    &["volume", "vol", "v"],
     &["count", "n"],
     &["number", "v"],
     &["waveform", "wf"],
@@ -855,12 +855,28 @@ const PARAM_ZWEITNAMEN: &[&[&str]] = &[
     &["decay_ms", "dec"],
     &["vib_depth", "vib_d"],
     &["vib_speed", "vib_s"],
+    // PDF misst in Millimetern und sagt es im Namen; `x:` meint dasselbe.
+    &["x_mm", "x"],
+    &["y_mm", "y"],
+    // Handles: die kurzen Namen aelterer Befehle (Bericht B6.3).
+    &["handle", "h"],
+    &["conn", "c"],
+    &["result", "r"],
+    // GUI_TEXTAREA_SELECT hiess "z1, s1, z2, s2" (Zeile, Spalte).
+    &["line1", "z1"],
+    &["column1", "s1"],
+    &["line2", "z2"],
+    &["column2", "s2"],
+    // FONT_SET hiess "handle", SETFONT (der alte Name) schon immer "font".
+    &["font", "handle"],
 ];
 
 /// Die Stelle des Parameters, den `key` ueber einen Zweitnamen meint.
+/// Ein Name darf in mehreren Gruppen stehen (`v` = volume oder number):
+/// gesucht wird in allen, und nur ein eindeutiger Treffer zaehlt.
 fn param_zweitname<'a>(namen: impl Iterator<Item = &'a str> + Clone, key: &str) -> Option<usize> {
-    let gruppe = PARAM_ZWEITNAMEN.iter().find(|g| g.contains(&key))?;
-    let mut treffer = namen.enumerate().filter(|(_, n)| *n != key && gruppe.contains(n));
+    let mut treffer = namen.enumerate().filter(|(_, n)| *n != key
+        && PARAM_ZWEITNAMEN.iter().any(|g| g.contains(&key) && g.contains(n)));
     let erster = treffer.next()?;
     if treffer.next().is_some() { return None; }
     Some(erster.0)
@@ -902,14 +918,14 @@ fn builtin_liefert_text(name: &str) -> bool {
 ///   der keinen Text liefert (`LEN$`), bleibt ein Fehler.
 pub(crate) fn builtin_kanonisch(name: &str) -> String {
     let low = name.to_lowercase();
-    if let Some(b) = crate::namen::bisher(&low) { return b.to_string(); }
+    if let Some(b) = crate::namen::kanonisch(&low) { return b.to_string(); }
     if is_known_builtin(&low) { return name.to_string(); }
     if let Some(ohne) = low.strip_suffix('$') {
-        let ziel = crate::namen::bisher(ohne).map(str::to_string).unwrap_or_else(|| ohne.to_string());
+        let ziel = crate::namen::kanonisch(ohne).map(str::to_string).unwrap_or_else(|| ohne.to_string());
         if known_builtins().contains(&ziel) && builtin_liefert_text(&ziel) { return ziel; }
     } else {
         let mit = format!("{}$", low);
-        if let Some(b) = crate::namen::bisher(&mit) { return b.to_string(); }
+        if let Some(b) = crate::namen::kanonisch(&mit) { return b.to_string(); }
         if known_builtins().contains(&mit) { return mit; }
     }
     name.to_string()
@@ -939,8 +955,8 @@ impl Compiler {
     fn new(external_types: std::collections::HashSet<String>,
            builtin_aliases: Vec<(String, String)>,
            importierte_module: std::collections::HashSet<String>) -> Self {
-        Compiler { typen_pruefen: std::env::var_os("DHRT_TYPEN_PRUEFEN").is_some(),
-                   typen_liste: std::env::var_os("DHRT_TYPEN_LISTE").map(|_| Vec::new()),
+        Compiler { typen_pruefen: crate::umgebung::var_os("DHRT_CHECK_TYPES").is_some(),
+                   typen_liste: crate::umgebung::var_os("DHRT_TYPES_LIST").map(|_| Vec::new()),
                    bekannte_namen: std::collections::HashSet::new(),
                    offene_namen: Vec::new(),
                    // Platz 0 gehoert dem Hauptprogramm. Es hat keine
@@ -1506,12 +1522,11 @@ impl Compiler {
                 "DECLARE ... LIB gehoert auf die oberste Ebene des Programms, nicht in ein Unterprogramm oder einen Block".into()),
             Node::StructLayout { .. } => Err(
                 "STRUCT ... LAYOUT C gehoert auf die oberste Ebene des Programms, nicht in ein Unterprogramm oder einen Block".into()),
-            Node::FunctionDecl { .. } | Node::SubDecl { .. } | Node::ClassDecl { .. }
-            | Node::EnumDecl { .. } => Err(format!(
+            Node::FunctionDecl { .. } | Node::SubDecl { .. } | Node::ClassDecl { .. } => Err(format!(
                 "{} darf nicht innerhalb eines Unterprogramms oder Blocks stehen -- \
-                 SUB, FUNCTION, CLASS, STRUCT und ENUM gehoeren auf die oberste Ebene des Programms",
+                 SUB, FUNCTION, CLASS und STRUCT gehoeren auf die oberste Ebene des Programms",
                 other_name(s))),
-            other => Err(format!("Stufe 3e: Statement {} noch nicht unterstuetzt",
+            other => Err(format!("interner Fehler des Uebersetzers: die Anweisung {} kennt er nicht -- bitte als Fehler in dhrt melden",
                                  node_name(other))),
         }
     }
@@ -1676,7 +1691,7 @@ impl Compiler {
     /// Der Typ, den ein Ausdruck ZUR LAUFZEIT hat -- fuer den Code, nicht
     /// fuer Meldungen (M1, `docs/intern/entwurf-maschinencode.md`). Anders als
     /// `statischer_typ` muss hier jede Aussage stimmen; `Typ::Unbekannt` ist
-    /// immer erlaubt. Belegt wird das mit `DHRT_TYPEN_PRUEFEN=1`: dann steht
+    /// immer erlaubt. Belegt wird das mit `DHRT_CHECK_TYPES=1`: dann steht
     /// hinter jedem getypten Ausdruck eine Probe (`TYP_PRUEFEN`).
     ///
     /// Zwei Stellen, an denen `statischer_typ` fuer Warnungen bewusst
@@ -3565,6 +3580,7 @@ impl Compiler {
             }
             Node::IsTyp { wert, typ } => {
                 let t = typ.to_lowercase();
+                let t = crate::namen::typ(&t).map(str::to_string).unwrap_or(t);
                 if !self.is_typname_bekannt(&t) {
                     // Eine Variable rechts: gemeint ist meist "dasselbe Objekt",
                     // und das fragt `=` (Glutfaden, 2026-10-15 -- vorher hiess es
@@ -3608,7 +3624,7 @@ impl Compiler {
             }
             Node::DictComp { var, iterable, filter, key, value } =>
                 self.expr_dictcomp(var, iterable, filter, key, value),
-            other => Err(format!("Stufe 3e: Ausdruck {} noch nicht unterstuetzt",
+            other => Err(format!("interner Fehler des Uebersetzers: den Ausdruck {} kennt er nicht -- bitte als Fehler in dhrt melden",
                                  node_name(other))),
         }
     }
@@ -4108,7 +4124,7 @@ impl Compiler {
             // Hier als nicht-fatale Warnung melden (--check zeigt es im Editor).
             if !is_known_builtin(&bname) {
                 self.warnings.push((self.ctx.cur_line, format!(
-                    "Unbekanntes Builtin '{}' -- dhrt kennt es nicht (Tippfehler? \
+                    "Unbekannter Befehl '{}' -- dhrt kennt ihn nicht (Tippfehler? \
                      oder veraltet/entfernt). Der Aufruf schlaegt sonst \
                      erst zur Laufzeit fehl.{}{}", bname.to_uppercase(),
                     match crate::umstieg::befehl(&bname.to_lowercase()) {
@@ -6788,7 +6804,7 @@ fn node_name(n: &Node) -> &'static str {
 /// fuer `IMPORT "json" AS j` (Builtin-Namen-Rueckabbildung). Beide aus
 /// preprocess::compile_env. Fehler bei nicht unterstuetzten Konstrukten.
 /// Uebersetzt ein Programm ins .dhc-JSON (fuer `--export`, `--dumpbc`, `--check`).
-pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<String>,
+pub fn compile_to_dhc(ast: &Node, external_types: &std::collections::HashSet<String>,
                       builtin_aliases: &[(String, String)],
                       importierte_module: &std::collections::HashSet<String>,
                       herkunft: &[crate::preprocess::Herkunft], haupt: &str)

@@ -1,9 +1,10 @@
-//! VM-Kern (Schritt 2+3): stack-basierte Dispatch-Schleife.
+//! VM-Kern: stack-basierte Dispatch-Schleife.
 //!
 //! Skalar-Ops, Control-Flow, User-Calls, Strings/Arrays/Maps/Tupel, OOP
 //! (Structs/Klassen/Methoden/Properties/Operator-Overloading), Slicing, IN,
-//! DATA/READ, TRY/THROW und die puren Builtins (siehe builtins.rs).
-//! Semantik 1:1 aus `drachenhauch/vm.py`, damit `stdout` bit-identisch bleibt.
+//! DATA/READ, TRY/THROW und der Ruf der Builtin-Familien (siehe builtins.rs).
+//! Regel: was hier gerechnet wird, rechnet der Maschinencode (`jit.rs`) und
+//! das Falten von Konstanten (`konstant_rechnen`) mit denselben Funktionen.
 
 /// Einen Wert fuer einen Platz vom Typ `$ty` passend machen (STORE_LOCAL,
 /// STORE_GLOBAL_SLOT und die ADD_STORE_*-Befehle). Fast-Arm: Wert hat schon
@@ -156,14 +157,10 @@ enum Step {
     Yield(Value),
 }
 
-/// Bindet Argumente an die Parameter-Slots (mit Variadic + Defaults). Geteilt
-/// von normalem Aufruf (exec) und Coroutine-Erststart.
-/// Call-Argument zerlegen: bevorzugt das beim Laden gepackte Arg::Call,
-/// faellt fuer rohe Listen (z.B. alte .dhc ohne specialize-Pass) zurueck.
-#[inline]
 /// 1D `ARRAY OF FLOAT`/`INTEGER` -> `Vec<f64>` (Faltungskern, Shader-Arrays).
 /// Auf Modul-Ebene, weil mehrere Dispatch-Bloecke (`try_graphics`, imgfx) sie
 /// brauchen -- die `gstrs`-Helfer liegen dagegen lokal im Haupt-Match.
+#[cfg_attr(not(any(feature = "graphics", feature = "pdf")), allow(dead_code))]
 fn gfloats(a: &[Value], i: usize, f: &str) -> R<Vec<f64>> {
     match a.get(i) {
         Some(Value::Array(arr)) => {
@@ -180,6 +177,9 @@ fn gfloats(a: &[Value], i: usize, f: &str) -> R<Vec<f64>> {
     }
 }
 
+/// Call-Argument zerlegen: bevorzugt das beim Laden gepackte Arg::Call,
+/// faellt fuer rohe Listen (z.B. alte .dhc ohne specialize-Pass) zurueck.
+#[inline]
 fn call_parts(arg: &Arg) -> (&str, usize, i32) {
     match arg {
         Arg::Call(n, c, i) => (n, *c as usize, *i),
@@ -191,6 +191,9 @@ fn call_parts(arg: &Arg) -> (&str, usize, i32) {
     }
 }
 
+/// Bindet Argumente an die Parameter-Slots (mit Variadic + Defaults). Geteilt
+/// von normalem Aufruf (exec) und Coroutine-Erststart.
+///
 /// `args` ist ein Iterator, damit CALL_USER/CALL_METHOD die Argumente direkt
 /// vom Stapel des Aufrufers verschieben koennen (`stack.drain(split..)`) --
 /// vorher entstand je Aufruf per `split_off` eine eigene Liste.
@@ -331,11 +334,8 @@ fn vm_top(stack: &[Value]) -> R<&Value> {
 }
 
 // Arg-Helfer fuer die Modul-Dispatcher (db/net/html/serial/usb/wifi/bt) --
-// die Regeln stehen in `argument.rs`. `allow(dead_code)`: in einem Bau ohne
-// die Module ruft sie niemand.
-#[allow(dead_code)]
+// die Regeln stehen in `argument.rs`.
 fn bi_int(a: &[Value], i: usize, fn_: &str) -> R<i64> { crate::argument::a_int(a, i, fn_) }
-#[allow(dead_code)]
 fn bi_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> { crate::argument::a_text(a, i, fn_) }
 /// Den Befehlsnamen vorn in einer Meldung (`ALT: ...`, `ALT ...`) und in
 /// Anfuehrungszeichen (`'ALT'`) durch den geschriebenen ersetzen. Die
@@ -369,10 +369,8 @@ fn code_basis(a: &[Value], i: usize, fn_: &str) -> R<Option<std::path::PathBuf>>
     Ok(Some(if b.is_empty() { std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")) }
             else { std::path::PathBuf::from(b) }))
 }
-#[allow(dead_code)]
 fn bi_num(a: &[Value], i: usize, fn_: &str) -> R<f64> { crate::argument::a_num(a, i, fn_) }
 /// Ein Schalter: BOOLEAN oder Zahl (`argument::schalter`).
-#[allow(dead_code)]
 fn bi_bool(a: &[Value], i: usize, fn_: &str) -> R<bool> { crate::argument::a_schalter(a, i, fn_) }
 #[cfg(feature = "db")]
 fn db_params(args: &[Value], fn_: &str) -> R<Vec<crate::db::Param>> {
@@ -387,6 +385,7 @@ pub(crate) struct Slot {
 
 /// Zustand des `input`-Moduls: Action->Keycodes + Edge-Detection-Snapshots.
 #[derive(Default)]
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 struct InputModule {
     actions: HashMap<String, Vec<i64>>,
     prev: HashSet<i64>,
@@ -394,6 +393,7 @@ struct InputModule {
 }
 
 /// Zustand des Immediate-Mode-`ui`-Moduls (per String-ID + globales Theme).
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 struct UiState {
     checkbox: HashMap<String, bool>,
     slider: HashMap<String, f64>,
@@ -421,6 +421,7 @@ struct UiState {
 }
 
 #[derive(Default)]
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 struct UiTable {
     scroll_x: i32, scroll_y: i32,
     drag_v: bool, drag_h: bool, drag_off: i32,
@@ -517,7 +518,9 @@ impl UiState {
             tables: HashMap::new(),
         }
     }
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     fn th(&self, key: &str) -> i64 { *self.theme.get(key).unwrap_or(&0xFFFFFF) }
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     fn metric(&self, key: &str) -> i64 { *self.metrics.get(key).unwrap_or(&14) }
     /// Plastik-Werte gebuendelt (siehe `UiPlastik`).
     #[cfg(feature = "graphics")]
@@ -587,6 +590,7 @@ fn ui_preset(name: &str) -> Option<Vec<(&'static str, i64)>> {
 /// Metrik-Profil eines Presets. Nur die "glas_*"-Themen bringen Plastik mit;
 /// alle anderen bleiben flach, damit bestehende Programme unveraendert
 /// aussehen.
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
     if name.starts_with("glas") {
         vec![("corner_radius", 5), ("gradient", 16), ("gloss", 26), ("bevel", 1)]
@@ -595,11 +599,6 @@ fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
     }
 }
 
-/// Ruft ein reines Builtin auf und faengt einen evtl. Rust-Panic ab (z.B.
-/// Index-out-of-bounds bei zu wenigen Argumenten in variadischen Builtins),
-/// damit ein Tippfehler im DH-Programm NICHT die Runtime abstuerzen laesst,
-/// sondern einen klaren Laufzeitfehler liefert.
-/// Zahl der Befehlsfamilien in `Vm::familie_rufen`; die letzte sind die reinen.
 /// Befehle, die die Zeile ihres Aufrufs brauchen, ohne abzubrechen: ASSERT
 /// fuer seine Meldung, SHADER_SET* fuer die Warnung bei einem Uniform, das es
 /// nicht gibt. Die VM schlaegt sie nur fuer diese nach (sonst zahlt kein
@@ -614,10 +613,15 @@ pub(crate) fn braucht_zeile(name: &str) -> bool {
     }
 }
 
+/// Zahl der Befehlsfamilien in `Vm::familie_rufen`; die letzte sind die reinen.
 pub(crate) const BUILTIN_FAMILIEN: u8 = 34;
 
-/// Die reine Familie, auch fuer Container-Methoden (`liste.push(1)`), die
-/// nicht ueber `builtin_rufen` gehen -- darum fangen sie ihre Panik selbst.
+/// Ruft ein reines Builtin auf und faengt einen evtl. Rust-Panic ab (z.B.
+/// Index-out-of-bounds bei zu wenigen Argumenten in variadischen Builtins),
+/// damit ein Tippfehler im DH-Programm NICHT die Runtime abstuerzen laesst,
+/// sondern einen klaren Laufzeitfehler liefert. Die reine Familie, auch fuer
+/// Container-Methoden (`liste.push(1)`), die nicht ueber `builtin_rufen`
+/// gehen -- darum fangen sie ihre Panik selbst.
 fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
     let mut unbekannt = false;
     let r = panik_fangen(name, args.len(), || match crate::builtins::call_builtin(name, args) {
@@ -843,7 +847,9 @@ pub struct Vm<'p> {
     /// Programmende, auch im Terminal: "Bitte warten ..." vor einer langen
     /// Rechnung oder einem SLEEP erschien erst danach (Dogfooding 2026-10-09).
     out_zeit: std::time::Instant,
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     input_state: InputModule,
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     ui_state: UiState,
     // Modul `scene`: globaler Stack (name, daten). Daten = key->typisierter Wert.
     scene_stack: Vec<(String, HashMap<String, Value>)>,
@@ -916,7 +922,7 @@ pub struct Vm<'p> {
     /// Vec wie die Auftraege: eine Nummer bleibt gueltig, bis PROCESS_CLOSE.
     prozesse: Vec<Option<crate::prozess::Prozess>>,
     /// Auftraege, die eine EIGENE DH-Funktion ausfuehren (`TASK_*`).
-    task_auftraege: crate::hintergrund::Auftraege<Result<crate::hintergrund::TaskErgebnis, String>>,
+    task_auftraege: crate::hintergrund::Auftraege<Result<String, String>>,
     /// Fenster als Prozess: die Kinder (WINDOW_*) und, wenn dieses Programm
     /// selbst ein Kind ist, die Verbindung zu den Eltern (PARENT_*). Die
     /// Elternverbindung wird beim ersten PARENT_*-Aufruf aufgebaut.
@@ -925,7 +931,7 @@ pub struct Vm<'p> {
     eltern_geprueft: bool,
     shell_letzter_code: i64,
     shell_letzter_fehler: String,
-    // WP E -- Melden: Pegel fuer LOG_*, aus der Umgebung (DH_LOG) gelesen.
+    // WP E -- Melden: Pegel fuer LOG_*, aus der Umgebung (DHRT_LOG) gelesen.
     // None = noch nicht nachgesehen.
     log_pegel: Option<u8>,
     // Profiler-Sink (Stufe B): None = kein Profiling-Overhead (Normalfall).
@@ -972,12 +978,15 @@ pub struct Vm<'p> {
     /// Schrift der gui (GUI_FONT) laeuft -- zurueckgetauscht wird am Ende
     /// des Befehls, bei GUI_UPDATE schon VOR den Rueckrufen (die sind
     /// Programmcode und sollen dessen Schrift sehen).
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     gui_tausch: Option<(i64, i32)>,
     /// Die eingebaute Sans als Vorgabe der gui (einmal geladen; -2 = es gibt
     /// keine, etwa ohne das Feature `schriften`).
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     gui_sans: Option<i64>,
     /// GUI_FONT(-1): die gui folgt ausdruecklich der Schrift des Programms,
     /// auch der Pixelschrift.
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     gui_pixel: bool,
     // Sprachausgabe (SPEAK): Stimme, Tempo, Vorrat, geplantes Ende.
     #[cfg(feature = "graphics")]
@@ -1011,6 +1020,7 @@ pub struct Vm<'p> {
     /// Modul `httpd` -- laufende Webserver (Tombstone-Vec wie ueberall:
     /// eine vergebene Nummer bleibt gueltig, auch wenn ein frueherer
     /// Server schon gestoppt wurde).
+    #[cfg_attr(not(feature = "net"), allow(dead_code))]
     httpd_server: Vec<Option<crate::httpd::Server>>,
     /// Modul `pdf` -- offene Dokumente. Sie halten alle Seiten im
     /// Speicher, bis PDF_SAVE sie schreibt; ein Bericht mit hundert
@@ -2286,6 +2296,7 @@ impl<'p> Vm<'p> {
         Ok(if g.is_sub { Value::Nil } else { ret })
     }
 
+    #[cfg_attr(not(feature = "jit"), allow(dead_code))]
     pub(crate) fn methode_rufen(&mut self, instr: &'p crate::model::Instr, method: &str, obj: Value, margs: Vec<Value>) -> R<Value> {
         match &obj {
             Value::Instance(rc) => {
@@ -2334,7 +2345,7 @@ impl<'p> Vm<'p> {
     /// des Ergebnisses + 1 (0 = keine), gemerkt je Aufrufstelle
     /// (`Instr::merk`, `model::func_bauen`).
     pub(crate) fn builtin_rufen(&mut self, name: &str, a: &[Value], merk: &std::cell::Cell<u8>, liefert: usize) -> R<Value> {
-        let v = if a.iter().any(|v| matches!(v, Value::Handle(..))) && !crate::handle::ROH.contains(&name) {
+        let v = if a.iter().any(|v| matches!(v, Value::Handle(..))) && !crate::handle::roh(name) {
             let a = crate::handle::auspacken(name, a)?;
             panik_fangen(name, a.len(), || self.builtin_rufen_innen(name, &a, merk))?
         } else {
@@ -4291,7 +4302,7 @@ impl<'p> Vm<'p> {
                     }
                 }
                 op::TYP_PRUEFEN => {
-                    // Nur mit DHRT_TYPEN_PRUEFEN uebersetzt: sagt der Compiler
+                    // Nur mit DHRT_CHECK_TYPES uebersetzt: sagt der Compiler
                     // (`typ_von`) etwas, das zur Laufzeit nicht stimmt, ist das
                     // ein Fehler im COMPILER -- darum ein eigener Wortlaut.
                     let angabe = constants[arg.as_usize()].fmt();
@@ -4306,7 +4317,7 @@ impl<'p> Vm<'p> {
                         },
                     };
                     if !stimmt {
-                        return Err(format!("Typpruefung (DHRT_TYPEN_PRUEFEN): der Compiler sagt {}, der Wert ist {} ({}) -- ein Fehler in compiler.rs typ_von",
+                        return Err(format!("Typpruefung (DHRT_CHECK_TYPES): der Compiler sagt {}, der Wert ist {} ({}) -- ein Fehler in compiler.rs typ_von",
                             angabe, v.type_name(), v.fmt()));
                     }
                 }
@@ -4469,7 +4480,7 @@ impl<'p> Vm<'p> {
 
                 op::HALT => return Ok(Some(Step::Return(Value::Nil))),
 
-                other => return Err(format!("Opcode {} im Rust-VM noch nicht implementiert (ip={})", other, *ip - 1)),
+                other => return Err(format!("interner Fehler der Laufzeit: Befehl {} an Stelle {} unbekannt -- bitte als Fehler in dhrt melden (passt die .dhc zur Laufzeit?)", other, *ip - 1)),
         }
         Ok(None)
     }
@@ -4570,15 +4581,6 @@ impl<'p> Vm<'p> {
         self.err_line_set = true;
     }
 
-    /// Zugriff auf den frame_count (fuer main.rs-Schleifenlogik), 0 ohne Grafik.
-    #[allow(dead_code)]
-    pub fn frame_count(&self) -> u64 {
-        #[cfg(feature = "graphics")]
-        { return self.gfx.as_ref().map(|g| g.frame_count).unwrap_or(0); }
-        #[allow(unreachable_code)]
-        0
-    }
-
     fn scene_top(&self) -> R<&(String, HashMap<String, Value>)> {
         self.scene_stack.last().ok_or_else(|| "Scene-Stack ist leer - SCENE_PUSH oder SCENE_SWITCH zuerst".to_string())
     }
@@ -4599,7 +4601,7 @@ impl<'p> Vm<'p> {
     /// Ist der Platz schon freigegeben (es gab ihn, jetzt ist er leer)? Dann
     /// ist ein weiteres Freigeben still (die Handle-Regel, CLAUDE.md) -- ein
     /// Platz, den es nie gab, bleibt ein Fehler beim Getter.
-    #[allow(dead_code)]
+    #[cfg_attr(not(any(feature = "graphics", feature = "bt")), allow(dead_code))]
     pub(super) fn schon_frei<T>(vec: &[Option<T>], idx: i64) -> bool {
         idx >= 0 && vec.get(idx as usize).is_some_and(|o| o.is_none())
     }
@@ -4639,6 +4641,24 @@ pub(crate) const DEFAULT_COLORS: &[(&str, i64)] = &[
     ("darkgreen", 32768), ("darkblue", 128),
 ];
 
+/// Der Code einer Taste aus `DEFAULT_KEYS`, zur Uebersetzungszeit -- die gui
+/// nimmt ihre Konstanten hierher statt sie roh hinzuschreiben (Bericht
+/// C4.2). Ein Name, den es nicht gibt, bricht den Bau ab.
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
+pub(crate) const fn taste(name: &str) -> i64 {
+    let mut i = 0;
+    while i < DEFAULT_KEYS.len() {
+        let (a, b) = (DEFAULT_KEYS[i].0.as_bytes(), name.as_bytes());
+        if a.len() == b.len() {
+            let mut k = 0;
+            while k < a.len() && a[k] == b[k] { k += 1; }
+            if k == a.len() { return DEFAULT_KEYS[i].1; }
+        }
+        i += 1;
+    }
+    panic!("DEFAULT_KEYS: Taste fehlt")
+}
+
 pub(crate) const DEFAULT_KEYS: &[(&str, i64)] = &[
     ("key_escape", 27), ("key_return", 13), ("key_enter", 13), ("key_space", 32),
     ("key_tab", 9), ("key_backspace", 8),
@@ -4671,6 +4691,19 @@ pub(crate) const DEFAULT_KEYS: &[(&str, i64)] = &[
     ("key_kp9", 1073741921),
     ("key_kp_enter", 1073741912), ("key_kp_plus", 1073741911), ("key_kp_minus", 1073741910),
     ("key_kp_multiply", 1073741909), ("key_kp_divide", 1073741908), ("key_kp_period", 1073741923),
+    // Zweite Namen mit Unterstrich, wie KEY_KP_ENTER (Bericht B9) -- die
+    // kurzen bleiben gueltig.
+    ("key_left_shift", 1073742049), ("key_right_shift", 1073742053),
+    ("key_left_ctrl", 1073742048), ("key_right_ctrl", 1073742052),
+    ("key_left_alt", 1073742050), ("key_right_alt", 1073742054),
+    ("key_left_super", 1073742051), ("key_right_super", 1073742055),
+    ("key_caps_lock", 1073741881), ("key_page_up", 1073741899), ("key_page_down", 1073741902),
+    ("key_kp_0", 1073741922), ("key_kp_1", 1073741913), ("key_kp_2", 1073741914),
+    ("key_kp_3", 1073741915), ("key_kp_4", 1073741916), ("key_kp_5", 1073741917),
+    ("key_kp_6", 1073741918), ("key_kp_7", 1073741919), ("key_kp_8", 1073741920),
+    ("key_kp_9", 1073741921),
+    ("key_num_lock", 1073741907), ("key_scroll_lock", 1073741895),
+    ("key_print_screen", 1073741894), ("key_pause", 1073741896),
     // Gamepad-Bind-Codes (negativ, kollidieren nicht mit Tasten) -- wie graphics.KEYS.
     ("joy_button_a", -100), ("joy_button_b", -101), ("joy_button_x", -102), ("joy_button_y", -103),
     ("joy_button_lb", -104), ("joy_button_rb", -105), ("joy_button_back", -106), ("joy_button_start", -107),

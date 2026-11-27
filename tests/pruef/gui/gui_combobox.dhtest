@@ -394,4 +394,4 @@ neue liste Kiel 0
 gewaehlt Luebeck 1
 in der datei TRUE
 geladen Irgendwo -1
-GUI_DROPDOWN_SET: unbekannter Schluessel 'gibtsnicht' (bekannt: bearbeitbar)
+GUI_DROPDOWN_SET: unbekannter Schluessel 'gibtsnicht' -- moeglich sind bearbeitbar/editable

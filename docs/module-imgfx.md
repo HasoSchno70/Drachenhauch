@@ -299,7 +299,7 @@ gedreht = IMAGE_ROTATE(hero, 45.0)           ' 45 Grad
 
 ## Wichtige Eigenschaften
 
-**Immutable:** Das Original wird nie verändert. `IMAGE_TINT(hero, ...)` gibt ein neues Bild zurück, `hero` bleibt unverändert.
+**Filter lassen das Original stehen:** `IMAGE_TINT(hero, ...)` und die anderen Effekte geben ein neues Bild zurück, `hero` bleibt unverändert. Anders die Zeichenbefehle `IMAGE_DRAW_*` und `IMAGE_FILL_*`: sie malen in das Bild selbst und liefern nichts zurück.
 
 **Verkettbar:** Effekte lassen sich kombinieren:
 

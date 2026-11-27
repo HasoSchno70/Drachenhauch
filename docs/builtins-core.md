@@ -461,8 +461,8 @@ PRINT LEN(stack)                 ' 1
 
 > Die `ARRAY_*`-Aggregate und die dynamischen Array-Ops
 > (`ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`) sind in `dhrt` implementiert
-> (`builtins.rs`/`vm.rs`) und laufen über alle Wege — `dhrt run` (auch aus der IDE),
-> `--runsrc` und den `dhrt --export`-Standalone-Build.
+> (`builtins.rs`/`vm.rs`) und laufen über alle Wege — `dhrt run` (auch aus der IDE)
+> und den `dhrt --export`-Standalone-Build.
 
 ## Maps
 
@@ -1505,9 +1505,9 @@ LOG_ERROR("Datenbank nicht lesbar")
 Ausgabe: `20:45:43 INFO  Saison 2026 geladen` — nach **stderr**, damit `PRINT`
 als Nutzdaten durchgereicht werden kann.
 
-Wie viel davon erscheint, steuert die Umgebungsvariable **`DH_LOG`**:
+Wie viel davon erscheint, steuert die Umgebungsvariable **`DHRT_LOG`** (bisher `DHRT_LOG`, gilt weiter):
 
-| `DH_LOG` | was erscheint |
+| `DHRT_LOG` | was erscheint |
 |---|---|
 | `debug` | alles |
 | *(nicht gesetzt)* / `info` | INFO, WARN, ERROR — **Vorgabe** |
@@ -1519,7 +1519,7 @@ Wie viel davon erscheint, steuert die Umgebungsvariable **`DH_LOG`**:
 im Code stehen bleiben, ohne den Normalbetrieb zuzumüllen:
 
 ```bash
-DH_LOG=debug dhrt run werkzeug.dh
+DHRT_LOG=debug dhrt run werkzeug.dh
 ```
 
 ## Zeit & Random
@@ -1693,8 +1693,9 @@ Container-Methode `arr.join(trenner)` ≡ `JOIN$(arr, trenner)`.
 - **Suffix `2` ist mehrdeutig** und kontextabhängig: `PHYSICS_DISTANCE2` =
   *quadrierte* Distanz (schneller), `LINE3D`/Vec2-Funktionen meinen *2D*, und
   `VEC2_*` ist der Typname. Kein einheitliches Schema — am Funktionsnamen ablesen.
-- **`SPRITE_COLLIDE` vs `SPRITE_COLLIDES`.** Das `sprite`-Modul nutzt
-  `SPRITE_COLLIDES` (mit `S`). Auf den Core-`COLLIDES` (AABB von Rohwerten)
+- **`SPRITE_COLLIDE` und `SPRITE_COLLIDES`** sind derselbe Befehl mit
+  denselben Parametern (`sp1, sp2`), ebenso `BATCH_DRAW` und `ATLAS_DRAW`,
+  `EOF` und `ENDOFFILE`. Auf den Core-`COLLIDES` (AABB von Rohwerten)
   achten — anderer Anwendungsfall.
 - **`CAMERA_X` (2D) vs `CAMERA3D_X`.** Das 2D-`camera`-Modul und die native
   3D-Kamera (`g3d`) haben getrennte Getter — nicht verwechseln.

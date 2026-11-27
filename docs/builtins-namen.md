@@ -33,8 +33,11 @@ Signaturhilfe kennen beide.
    Das Wort `PRESSED` kommt in neuen Namen nicht vor: es hieß bei
    `KEYPRESSED` „gehalten“ und bei `INPUT_PRESSED` „gerade gedrückt“.
 4. **Wörter mit fester Bedeutung:** `_FREE` gibt frei, `_COUNT` ist eine
-   Anzahl (`MAP_COUNT`, `SET_COUNT`), `LEN` eine Länge (Text, Bytes, Feld),
-   `_LOAD`/`_SAVE` lesen und schreiben Dateien.
+   Anzahl (`MAP_COUNT`, `SET_COUNT`, `JSON_COUNT`), `LEN` eine Länge in
+   Zeichen, Bytes oder Elementen einer Dimension (`ARRAY_DIM_LEN`), eine Dauer
+   heißt `_DURATION` (Sekunden, `SAMPLE_DURATION`), `_DONE` ist „fertig“
+   (`TWEEN_DONE`, `SPRITE_DONE`), `_NEXT` holt das Nächste ab (`WS_NEXT`,
+   `MQTT_NEXT`), `_LOAD`/`_SAVE` lesen und schreiben Dateien.
 5. **Das `$`:** Ein Befehl, der Text liefert, darf mit und ohne `$`
    geschrieben werden — `ENV_GET$("HOME")` und `ENV_GET("HOME")` sind
    dasselbe, ebenso `CLIPBOARD_GET()` und `CLIPBOARD_GET$()`. Nur wo es beide
@@ -59,7 +62,8 @@ Signaturhilfe kennen beide.
    Wo ältere Befehle abweichende Namen tragen, nimmt ein benanntes Argument
    auch den Zweitnamen derselben Gruppe: `p`/`path`, `digits`/`decimals`,
    `vol`/`volume`, `n`/`count`, `v`/`number`, `wf`/`waveform`, `alt`/`old`,
-   `fn`/`handler`, `flag`/`on`, `bind`/`bind_addr`, `wdg`/`widget` —
+   `fn`/`handler`, `flag`/`on`, `bind`/`bind_addr`, `wdg`/`widget`,
+   `x`/`x_mm`, `h`/`handle`, `c`/`conn`, `r`/`result` —
    `FILE_EXISTS(path: "a.txt")` geht, obwohl der Parameter `p` heißt.
 9. **Zeit:** Zeitspannen und Fristen zählen **Millisekunden** (Parameter
    `ms` oder `…_ms`): `TWEEN_NEW`, `TIMER_AFTER`, `SLEEP`, die Fades, jedes
@@ -121,7 +125,7 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 
 | Name | Was es tut |
 |---|---|
-| `KEY_DOWN(key: Code oder Buchstabe)` | TRUE solange die Taste mit SDL-Code code gehalten wird — jedes Frame erneut. Für Bewegen/Lenken — bisher `KEYPRESSED` |
+| `KEY_DOWN(key: Code oder Buchstabe)` | TRUE solange die Taste `key` (eine `KEY_*`-Konstante oder ein Buchstabe) gehalten wird — jedes Frame erneut. Für Bewegen/Lenken — bisher `KEYPRESSED` |
 | `KEY_HIT(key: Code oder Buchstabe)` | TRUE nur in dem einen Frame, in dem die Taste heruntergeht. Für Schießen, Springen, Umschalten — bisher `KEYHIT` |
 | `KEY_RELEASED(key: Code oder Buchstabe)` | TRUE in dem Frame, in dem die Taste losgelassen wird — etwa „aufladen und beim Loslassen feuern“ — bisher `KEYRELEASED` |
 | `KEY_REPEAT(key: Code oder Buchstabe)` | wie KEYHIT, feuert beim Halten aber zusätzlich mit der System-Tastenwiederholung. Für Textcursor und … — bisher `KEYREPEAT` |
@@ -219,7 +223,7 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `IMAGE_GET_ALPHA(image, x, y)` | Deckkraft an (x, y), 0..255; -1 bei Index außerhalb. Nötig, weil GETPIXEL eine Farbe liefert und dort … — bisher `GETALPHA` |
 | `FONT_LOAD(path$, size[, chars$])` | TTF/OTF/TTC laden → FONT-Handle (INTEGER); chars$ = Schriftblöcke ("kyrillisch, griechisch", … — bisher `LOADFONT` |
 | `FONT_LOAD_IMAGE(image: IMAGE, separator_color: Zahl, first_char: Zahl)` | Lädt eine Pixelschrift aus einem PNG, in dem die Zeichen durch eine Trennfarbe voneinander abgesetzt sind — bisher `LOADFONT_IMAGE` |
-| `FONT_SET(handle: INTEGER [, size: INTEGER])` | aktive Schrift setzen; SETFONT(-1) = Default-Font. Ohne size gilt danach die Größe, mit der die Schrift … — bisher `SETFONT` |
+| `FONT_SET(font: INTEGER [, size: INTEGER])` | aktive Schrift setzen; SETFONT(-1) = Default-Font. Ohne size gilt danach die Größe, mit der die Schrift … — bisher `SETFONT` |
 | `SOUND_LOAD(path: STRING)` | Sample laden (kurze Effekte: WAV, OGG) — bisher `LOADSOUND` |
 | `SOUND_PLAY(s[, loops[, volume]])` | abspielen, default loops=0, volume=1.0 — bisher `PLAYSOUND` |
 | `SOUND_STOP(s)` | Sound stoppen — bisher `STOPSOUND` |
@@ -229,8 +233,8 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `MODEL_LOAD(path$: STRING)` | INTEGER — Modell aus einer Datei laden (OBJ, GLTF, IQM …) — bisher `LOADMODEL` |
 | `IMAGE_WIDTH(image)` | Breite eines Bildes in Pixeln — bisher `IMAGEWIDTH` |
 | `IMAGE_HEIGHT(image)` | Höhe eines Bildes in Pixeln — bisher `IMAGEHEIGHT` |
-| `AUDIO_SET_VOLUME(ch, v)` | Lautstärke eines Kanals 0..1 — bisher `AUDIO_VOLUME` |
-| `AUDIO_MUSIC_SET_VOLUME(v)` | Lautstärke der Musik 0..1 — bisher `AUDIO_MUSIC_VOLUME` |
+| `AUDIO_SET_VOLUME(ch, volume)` | Lautstärke eines Kanals 0..1 — bisher `AUDIO_VOLUME` |
+| `AUDIO_MUSIC_SET_VOLUME(volume)` | Lautstärke der Musik 0..1 — bisher `AUDIO_MUSIC_VOLUME` |
 | `FONT_LOAD_SDF(path$, size[, chars$]) AS INTEGER` | eine Schrift, die bei jeder Größe scharf bleibt (Abstandsfeld) — bisher `LOADFONT_SDF` |
 | `MIC_PEAK() AS FLOAT` | höchster Ausschlag am Eingang seit dem letzten Aufruf (wie AUDIO_PEAK am Ausgang) — bisher `MIC_LEVEL` |
 
@@ -348,6 +352,68 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `SYSTEM_EXE_PATH$() AS STRING` | Pfad der laufenden Programmdatei — bisher `EXEPATH$` |
 | `CLOUD_LEADERBOARD_SUBMIT(board$, name$, score[, best_low])` | Punkte einreichen; best_low = TRUE für „kleiner ist besser“ — bisher `LEADERBOARD_SUBMIT` |
 | `CLOUD_LEADERBOARD_FETCH(board$, n[, ascending]) AS ARRAY OF TUPLE` | Die besten n Einträge als (name$, score)-Tupel, sortiert (Standard absteigend) — bisher `LEADERBOARD_FETCH` |
+
+### Setzen heißt SET, Lesen heißt GET
+
+| Name | Was es tut |
+|---|---|
+| `MODBUS_SET_UNIT(m: MODBUS, unit)` | Geräteadresse für die folgenden Anfragen (0..255; bei RTU heißt 0 „an alle“, dann kommt keine Antwort) — bisher `MODBUS_UNIT` |
+| `SPI_SET_SPEED(spi: SPI_DEVICE, clock_hz: INTEGER)` | Ändert den Takt — bisher `SPI_SPEED` |
+| `SPI_SET_MODE(spi: SPI_DEVICE, mode: INTEGER)` | Ändert den Modus (0–3, Taktpolarität und -phase) — bisher `SPI_MODE` |
+| `HOTPLUG_SET_INTERVAL(ms)` | wie oft nachgesehen wird (100..10000, Vorgabe 500) — bisher `HOTPLUG_INTERVAL` |
+| `VIDEO_SET_LOOP(video: VIDEO, on)` | am Ende von vorn beginnen statt stehenzubleiben — bisher `VIDEO_LOOP` |
+| `TRAY_SET_TOOLTIP(hint$)` | den Hinweis ändern (etwa einen Fortschritt) — bisher `TRAY_TOOLTIP` |
+| `TRAY_SET_MENU(entries$)` | das Menü der rechten Maustaste (macOS auch Ctrl+Klick); die Einträge stehen durch senkrechte Striche getrennt … — bisher `TRAY_MENU` |
+| `FIRMATA_STEPPER_SET_SPEED(handle: FIRMATA_HANDLE, motor: INTEGER, steps_per_s: FLOAT)` | Hoechstgeschwindigkeit — bisher `FIRMATA_STEPPER_SPEED` |
+| `FIRMATA_STEPPER_SET_ACCEL(handle: FIRMATA_HANDLE, motor: INTEGER, steps_per_s2: FLOAT)` | Beschleunigung, 0 = ohne — bisher `FIRMATA_STEPPER_ACCEL` |
+| `AUDIO_SET_PITCH(ch, factor)` | Tonhoehe/Geschwindigkeit: 1.0 = normal, 2.0 = Oktave hoeher, 0.5 = tiefer — bisher `AUDIO_PITCH` |
+| `AUDIO_SET_PAN_POS(ch, p)` | Position direkt setzen, 0 = links .. 1 = rechts (beendet eine laufende Animation) — bisher `AUDIO_PAN_POS` |
+| `AUDIO_BUS_SET_VOLUME(bus$, vol)` | Master-Lautstaerke eines Busses (0..1) — bisher `AUDIO_BUS_VOLUME` |
+| `AUDIO_BUS_SET_PAN(bus: STRING, pos: Zahl)` | Verschiebt einen ganzen Bus im Stereobild (-1 = links, 0 = Mitte, +1 = rechts). — bisher `AUDIO_BUS_PAN` |
+| `SPEAK_SET_RATE(factor)` | Tempo 0.5 (halb so schnell) .. 2.0 (doppelt), Vorgabe 1.0 — bisher `SPEAK_RATE` |
+| `SPRITE_SET_TINT(sp: ?, color: INTEGER)` | Farb-Tint (RGB-Multi) — bisher `SPRITE_TINT` |
+| `MODEL_SET_TEXTURE(model, image: IMAGE)` | ein Bild als Oberfläche auflegen — bisher `MODEL_TEXTURE` |
+| `TEXT_SET_SIZE(size: Zahl)` | Schriftgröße für folgende TEXT-Aufrufe (4–400) — bisher `TEXT_SIZE` |
+| `MOUSE_SET_LOCK(on: BOOLEAN)` | Cursor fangen: verstecken + im Fenster einsperren (relative Bewegung) — für … — bisher `MOUSE_LOCK` |
+| `BLEND_SET_MODE(name: STRING)` | Mischmodus für folgende Draws: "alpha" (Standard), "add" (additiv – Glow/Licht), "mult" (multiplikativ – … — bisher `BLEND_MODE` |
+| `GUI_WINDOW_SET_TITLE(win: GUI_WINDOW, title$)` | Titelleiste nachträglich beschriften (Name des Dokuments, „Befehle" / „Datei öffnen") — bisher `GUI_WINDOW_TITLE` |
+| `GUI_WINDOW_SET_MOVABLE(win: GUI_WINDOW, flag)` | per Titelleiste verschiebbar (Default: an) — bisher `GUI_WINDOW_MOVABLE` |
+| `GUI_WINDOW_SET_VISIBLE(win: GUI_WINDOW, flag)` | Sichtbarkeit setzen — bisher `GUI_WINDOW_VISIBLE` |
+| `GUI_MENU_SET_ENABLED(item, on)` | Eintrag sperren (grau, kein Klick, kein Kürzel) oder freigeben — bisher `GUI_MENU_ENABLE` |
+| `GUI_LISTBOX_SET_ENABLED(lb: GUI_WIDGET, i, on)` | Eintrag sperren: sichtbar, aber weder anklickbar noch mit Pfeilen erreichbar — bisher `GUI_LISTBOX_ENABLE` |
+| `GUI_MENU_SET_CHECKED(item, on)` | macht den Eintrag zum Häkchen-Eintrag und setzt ihn; ein Klick kippt ihn danach selbst — bisher `GUI_MENU_CHECK` |
+| `GUI_STATUSBAR_SET_TEXT(sb: GUI_WIDGET, field, text$)` | Text eines Feldes (GUI_SET_TEXT meint Feld 0) — bisher `GUI_STATUSBAR_SET` |
+| `GUI_BREADCRUMB_SET_ITEMS(bc: GUI_WIDGET, parts)` | alle Teile auf einmal (ARRAY OF STRING); derselbe Pfad noch einmal ändert nichts — bisher `GUI_BREADCRUMB_SET` |
+| `CAMERA_GET_ROTATION()` | aktuelle Werte lesen — bisher `CAMERA_ROTATION` |
+| `AUDIO_MUSIC_GET_POSITION()` | Sekunden seit Start (von Position 0) — bisher `AUDIO_MUSIC_POSITION` |
+| `AUDIO_CHANNEL_COUNT()` | aktuelle Channel-Anzahl — bisher `AUDIO_NUM_CHANNELS` |
+| `CHAR_GET_X(c)` | FLOAT — aktuelle Position — bisher `CHAR_X` |
+| `CHAR_GET_Y(c)` | FLOAT — aktuelle Position — bisher `CHAR_Y` |
+| `CHAR_GET_VX(c)` | FLOAT — aktuelle Geschwindigkeit je Achse — bisher `CHAR_VX` |
+| `CHAR_GET_VY(c)` | FLOAT — aktuelle Geschwindigkeit je Achse — bisher `CHAR_VY` |
+| `CHAR_GET_W(c)` | FLOAT — Groesse der Kollisionsbox — bisher `CHAR_W` |
+| `CHAR_GET_H(c)` | FLOAT — Groesse der Kollisionsbox — bisher `CHAR_H` |
+| `CHAR_GET_FACING(c)` | INTEGER (-1 = links, +1 = rechts) Blickrichtung -- fuer das Spiegeln des Sprites — bisher `CHAR_FACING` |
+| `GUI_PALETTE_IS_OPEN() AS BOOLEAN` | ist die Befehlspalette offen? (GUI_PALETTE ohne Argument) — bisher `GUI_PALETTE` |
+| `GUI_PALETTE_SET_OPEN(on)` | die Befehlspalette öffnen (TRUE) oder schließen — bisher `GUI_PALETTE` |
+| `GUI_WINDOW_IS_CLOSED(win: GUI_WINDOW)` | ist das Fenster geschlossen? (ein Zustand, kein Ereignis eines Bildes) — bisher `GUI_WINDOW_CLOSED` |
+| `WINDOW_GET_WAIT_EVENTS() AS FLOAT` | wie lange das Fenster ohne Ereignis schläft (Sekunden) — bisher `WINDOW_WAIT_EVENTS` |
+| `WINDOW_SET_WAIT_EVENTS(seconds)` | im Leerlauf bis zu so viele Sekunden auf ein Ereignis warten — bisher `WINDOW_WAIT_EVENTS` |
+
+### Zählen, fertig, empfangen: `_COUNT`, `_LEN`, `_DONE`, `_NEXT`
+
+| Name | Was es tut |
+|---|---|
+| `JSON_COUNT(h: ?, path: STRING)` | Anzahl der Elemente einer Liste bzw. der Felder eines Objekts — bisher `JSON_LEN` |
+| `ASTAR_PATH_COUNT(g)` | Anzahl der Punkte des gefundenen Weges — bisher `ASTAR_PATH_LEN` |
+| `SAMPLE_DURATION(sample: SAMPLE)` | Länge des Samples in Sekunden — bisher `SAMPLE_LEN` |
+| `ARRAY_DIM_LEN(arr, n)` | Länge der n-ten Dimension (0-basiert) — bisher `ARRAY_DIM_SIZE` |
+| `XML_NAME_COUNT(k: XML_HANDLE, path$) AS INTEGER` | wie viele Kinder dieses Namens (neben XML_CHILD_COUNT, das alle zählt) — bisher `XML_COUNT` |
+| `TILED_GID_COUNT(m: ?, layer_idx: INTEGER, gid: INTEGER)` | wie oft eine Kachel (GID) in einer Ebene vorkommt — bisher `TILED_COUNT_GID` |
+| `SPRITE_DONE(sp)` | ist die Animation durchgelaufen? (wie TWEEN_DONE, VIDEO_DONE) — bisher `SPRITE_IS_FINISHED` |
+| `MQTT_NEXT(handle: MQTT_HANDLE) AS BOOLEAN` | die nächste Nachricht holen (wie WS_NEXT, OSC_NEXT) — bisher `MQTT_NEXT_MESSAGE` |
+| `MQTT_MESSAGE$(handle: MQTT_HANDLE) AS STRING` | der Inhalt der geholten Nachricht (wie WS_MESSAGE$) — bisher `MQTT_MESSAGE_PAYLOAD` |
+| `MQTT_TOPIC$(handle: MQTT_HANDLE) AS STRING` | das Thema der geholten Nachricht — bisher `MQTT_MESSAGE_TOPIC` |
 
 ### Fristen: `_SET_TIMEOUT` in Millisekunden
 

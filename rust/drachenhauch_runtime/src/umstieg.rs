@@ -10,25 +10,19 @@
 /// `name` kleingeschrieben, wie der Compiler ihn sieht.
 pub fn befehl(name: &str) -> Option<&'static str> {
     Some(match name {
-        "ucase$" | "ucase" | "toupper" | "upper" => "heisst in Drachenhauch UPPER$(text)",
-        "lcase$" | "lcase" | "tolower" | "lower" => "heisst in Drachenhauch LOWER$(text)",
+        "ucase$" | "ucase" | "toupper" => "heisst in Drachenhauch UPPER$(text)",
+        "lcase$" | "lcase" | "tolower" => "heisst in Drachenhauch LOWER$(text)",
         "string$" => "heisst in Drachenhauch REPEAT$(text, anzahl) -- oder \"*\" * 3",
         "fix" => "INT rundet ab (INT(-3.7) = -4); in Richtung 0: IIF(x < 0, -INT(-x), INT(x))",
         "cint" | "clng" | "cdbl" | "csng" | "cbool" =>
             "Umwandeln: INT(x) oder ROUND(x) fuer Ganzzahlen, FLT(x) fuer Kommazahlen, VAL(text) aus Text",
-        "cstr" | "str" | "tostring" => "heisst in Drachenhauch STR$(wert)",
-        "strlen" | "length" | "size" | "count" => "heisst in Drachenhauch LEN(wert)",
-        "substr" | "substring" | "mid" => "heisst in Drachenhauch MID$(text, start, laenge) -- start zaehlt ab 0",
-        "sqrt" => "heisst in Drachenhauch SQR(x)",
+        "cstr" | "tostring" => "heisst in Drachenhauch STR$(wert)",
+        "strlen" | "length" | "size" => "heisst in Drachenhauch LEN(wert)",
+        "substr" | "substring" => "heisst in Drachenhauch MID$(text, start, laenge) -- start zaehlt ab 0",
         "random" | "rand" => "heisst in Drachenhauch RND() (0 bis unter 1) -- ganze Zahl 1..6: INT(RND() * 6) + 1",
         "println" | "printf" | "echo" => "Ausgabe mit der Anweisung PRINT: PRINT \"Hallo\"; x",
         "wait" | "delay" => "heisst in Drachenhauch SLEEP(millisekunden)",
         "strcmp" => "Texte vergleicht man direkt: IF a = b THEN, a < b sortiert",
-        "chr" => "heisst in Drachenhauch CHR$(code)",
-        "hex" => "heisst in Drachenhauch HEX$(zahl)",
-        "space" => "heisst in Drachenhauch SPACE$(anzahl)",
-        "trim" => "heisst in Drachenhauch TRIM$(text)",
-        "left" | "right" => "heisst in Drachenhauch LEFT$(text, n) bzw. RIGHT$(text, n)",
         "rtrim" | "ltrim" => "heisst in Drachenhauch RTRIM$(text) bzw. LTRIM$(text)",
         "append" | "push" => "ans Feld anhaengen: ARRAY_PUSH(feld, wert)",
         "bitand" => "ist in Drachenhauch der Operator BAND: a BAND b",
@@ -40,23 +34,23 @@ pub fn befehl(name: &str) -> Option<&'static str> {
         "array_remove" | "array_delete" | "remove" => "heisst in Drachenhauch ARRAY_REMOVE_AT(feld, index)",
         "pset" => "heisst in Drachenhauch PLOT(x, y, farbe)",
         "color" => "eine Farbe ist ein Argument jedes Zeichenbefehls: BOX(x1, y1, x2, y2, RED), TEXT(x, y, text$, YELLOW)",
-        "keydown" | "keyisdown" | "iskeydown" => "gehalten: KEYPRESSED(KEY_A), gerade gedrueckt: KEYHIT(KEY_A)",
+        "keydown" | "keyisdown" | "iskeydown" => "gehalten: KEY_DOWN(KEY_A), gerade gedrueckt: KEY_HIT(KEY_A)",
         "locate" => "Text an eine Stelle: TEXT(x, y, text$) im Fenster",
         "trunc" | "cint2" => "INT(x) rundet ab; Richtung 0: IIF(x < 0, -INT(-x), INT(x))",
         "zeit_jahr" | "zeit_monat" | "zeit_tag" | "zeit_stunde" | "zeit_minute" | "zeit_sekunde" =>
-            "ein Teil einer Zeit kommt aus ZEIT_TEIL(zeit, \"jahr\") -- oder ZEIT_FORMAT$(zeit, muster$)",
+            "ein Teil einer Zeit kommt aus TIME_PART(zeit, \"year\") -- oder TIME_FORMAT$(zeit, muster$)",
         "gui_window_new" | "gui_new_window" => "heisst GUI_WINDOW(titel$, x, y, breite, hoehe)",
         "stop" | "system" | "quit" => "das Programm beenden: END (allein auf der Zeile) oder EXIT(0)",
         // Konsolen-Werkzeuge (2026-10-11): auf ISDIR schlug --check CHDIR,
         // ISSTR, MKDIR vor -- ein Wort gegen zwei Wortteile faengt kein Abstand.
-        "isdir" | "is_dir" | "isfolder" | "direxist" | "dir_exists" | "folderexists" =>
-            "heisst in Drachenhauch DIREXISTS(pfad)",
-        "isfile" | "is_file" | "fileexist" | "file_exists" =>
-            "heisst in Drachenhauch FILEEXISTS(pfad)",
+        "isdir" | "is_dir" | "isfolder" | "direxist" | "folderexists" =>
+            "heisst in Drachenhauch DIR_EXISTS(pfad)",
+        "isfile" | "is_file" | "fileexist" =>
+            "heisst in Drachenhauch FILE_EXISTS(pfad)",
         "command$" | "command" | "argv" =>
             "die Argumente: ARGC() und ARG$(n) (ab 0) -- einen Pfad vom Ort des Aufrufs aus liefert ARGPATH$(n)",
         "curdir$" | "curdir" | "getcwd" | "pwd" =>
-            "heisst in Drachenhauch CWD$() -- der Ordner, aus dem das Programm aufgerufen wurde, ist STARTDIR$()",
+            "heisst in Drachenhauch DIR_CURRENT$() -- der Ordner, aus dem das Programm aufgerufen wurde, ist STARTDIR$()",
         "isatty" => "heisst in Drachenhauch TERMINAL() (geht die Ausgabe in ein Terminal?)",
         _ => return None,
     })
@@ -217,5 +211,18 @@ mod tests {
         assert!(name_hinweis("zaehler").is_empty());
         assert!(befehl_hinweis("LCASE$").contains("LOWER$"));
         assert!(befehl_hinweis("meinding").is_empty());
+    }
+}
+
+#[cfg(test)]
+mod umstieg_gegen_index {
+    #[test]
+    fn kein_hinweis_fuer_einen_befehl_den_es_gibt() {
+        // Ein Hinweis fuer einen Namen, der selbst ein Befehl ist, kommt nie
+        // zum Zug -- und waere falsch (SQRT, COUNT, FILE_EXISTS; Bericht C7).
+        for (n, _, _) in crate::compiler::builtin_eintraege() {
+            let k = n.to_lowercase();
+            assert!(super::befehl(&k).is_none(), "umstieg::befehl kennt {}, das ein Befehl ist", n);
+        }
     }
 }

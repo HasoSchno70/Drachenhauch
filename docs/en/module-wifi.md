@@ -12,18 +12,18 @@ IMPORT "wifi"
 
 **Cross-platform status:** The Windows branch has been verified against real hardware. **Linux (`nmcli`) and macOS (`networksetup`/`airport`) are new and NOT tested on real hardware** (development has so far happened on Windows only) — they were written from the public documentation (Linux) or to the best of our knowledge (macOS). The macOS branch is the least certain: `airport` (for `WIFI_SCAN`/`WIFI_SIGNAL`) lives in a private, undocumented Apple framework whose behaviour has changed several times between macOS versions and which newer macOS versions partly hide behind a Location Services permission — if it fails, you get a clear error message instead of a silent failure. Feedback from real Linux/macOS users is explicitly welcome (e.g. as a GitHub issue).
 
-On other platforms (BSD, ...) every call throws `DHRuntimeError` with a clear hint.
+On other platforms (BSD, ...) every call raises a runtime error with a clear hint.
 
 ## Overview
 
 | Function | Returns | Meaning |
 |---|---|---|
-| `WIFI_AVAILABLE()` | BOOLEAN (true if Windows + Wi-Fi adapter) | can the module be used here at all? |
+| `WIFI_AVAILABLE()` | BOOLEAN (true if the system reports a Wi-Fi adapter) | can the module be used here at all? |
 | `WIFI_CURRENT()` | STRING (current SSID, "" if not connected) | which network is the computer connected to? |
 | `WIFI_SIGNAL()` | INTEGER (0..100, -1 if not connected) | signal strength of the current connection |
 | `WIFI_SCAN()` | STRING (multi-line `ssid\|signal_pct`, sorted by signal) | search for reachable networks |
 | `WIFI_NETWORKS()` | ARRAY OF STRING | the same networks as `WIFI_SCAN`, one entry each |
-| `WIFI_CONNECT(ssid$, password$)` | BOOLEAN (create profile + issue connect command) | connect to a network -- creates a Windows profile in the process |
+| `WIFI_CONNECT(ssid$, password$)` | BOOLEAN (create profile + issue connect command) | connect to a network -- creates a profile in the process; FALSE if the system refuses |
 | `WIFI_DISCONNECT()` | BOOLEAN | disconnect |
 | `WIFI_PROFILES()` | STRING (multi-line list of saved profiles) | which networks are saved? |
 | `WIFI_DELETE_PROFILE(name$)` | BOOLEAN | forget a saved network |
@@ -81,6 +81,8 @@ Two steps:
 
 1. It generates a Wi-Fi profile XML (WPA2-PSK / AES for password-protected networks, open for an empty password) and creates it via `netsh wlan add profile`. For an SSID that already has a profile, it replaces the profile.
 2. It calls `netsh wlan connect name=<ssid>`.
+
+If the system refuses (profile not accepted, connect command failed), `WIFI_CONNECT` returns `FALSE` -- the same on all three systems; an error comes only for an empty SSID or when the system tool is missing. A hidden network appears in `WIFI_SCAN`/`WIFI_NETWORKS` with an empty name.
 
 `WIFI_CONNECT` returns immediately — **it does not wait for the connection to actually be established**. Whether the connection is really up, you check with `WIFI_CURRENT()`:
 

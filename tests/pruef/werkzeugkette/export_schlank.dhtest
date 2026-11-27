@@ -195,13 +195,13 @@ kleiner TRUE
 
 === eine kleine laufzeit einer anderen fassung wird uebergangen
 ' Sie bekaeme Bytecode, den sie nicht kennt (ein halbes Update, ein alter Bau
-' daneben). DHRT_FASSUNG_SPIELEN laesst den Export eine andere eigene Fassung
+' daneben). DHRT_PLAY_VERSION laesst den Export eine andere eigene Fassung
 ' annehmen; er nimmt dann die volle Laufzeit und sagt warum.
 IMPORT "lauf.dh"
 pruefen()
-SETENV("DHRT_FASSUNG_SPIELEN", "1999.1")
+SETENV("DHRT_PLAY_VERSION", "1999.1")
 DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "hallo.dh", "ziel"])
-SETENV("DHRT_FASSUNG_SPIELEN", "")
+SETENV("DHRT_PLAY_VERSION", "")
 DIM z AS STRING : z = zeile$(aus, "Schlank:")
 PRINT "volle "; INSTR(z, "die volle wird genommen") >= 0
 PRINT "grund "; INSTR(z, "statt 1999.1") >= 0

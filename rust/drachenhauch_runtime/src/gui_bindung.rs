@@ -53,6 +53,7 @@ impl Gui {
     /// Wert eines Widgets typisiert -- fuer die Datenbank: ein Zahlenfeld
     /// liefert eine Zahl, ein Kaestchen ein BOOLEAN, eine Klappliste ihren
     /// Index, ein Regler eine FLOAT, alles andere Text.
+    #[cfg_attr(not(feature = "db"), allow(dead_code))]
     pub(super) fn wert_typisiert(&self, w: &Widget) -> Value {
         match w.kind {
             Kind::Checkbox | Kind::Toggle => Value::Bool(w.checked),
@@ -174,6 +175,7 @@ impl Gui {
             .map(|(k, i)| (k, self.wert_text(&self.windows[wi].widgets[i]))).collect())
     }
     /// Dasselbe typisiert (fuer die Datenbank).
+    #[cfg_attr(not(feature = "db"), allow(dead_code))]
     pub fn form_get_typisiert(&self, win: i64, form: &str) -> Result<Vec<(String, Value)>, String> {
         let wi = win as usize;
         self.windows.get(wi).ok_or("GUI_FORM_SAVE: erwartet GUI_WINDOW")?;
@@ -260,14 +262,17 @@ impl Gui {
         Ok(())
     }
     /// (Versionsspalte, beim Laden gelesener Stand) -- Spalte leer = keine.
+    #[cfg_attr(not(feature = "db"), allow(dead_code))]
     pub fn form_version(&self, win: i64, form: &str) -> (String, Option<i64>) {
         self.windows.get(win as usize)
             .and_then(|w| w.form_db.iter().find(|f| f.form == form))
             .map(|f| (f.spalte.clone(), f.stand)).unwrap_or_default()
     }
+    #[cfg_attr(not(feature = "db"), allow(dead_code))]
     pub fn form_stand_setzen(&mut self, win: i64, form: &str, stand: Option<i64>) {
         if (win as usize) < self.windows.len() { self.form_db_mut(win as usize, form).stand = stand; }
     }
+    #[cfg_attr(not(feature = "db"), allow(dead_code))]
     pub fn form_konflikt_setzen(&mut self, win: i64, form: &str, k: &str) {
         if (win as usize) < self.windows.len() { self.form_db_mut(win as usize, form).konflikt = k.to_string(); }
     }
@@ -277,6 +282,7 @@ impl Gui {
         Ok(w.form_db.iter().find(|f| f.form == form).map(|f| f.konflikt.clone()).unwrap_or_default())
     }
     /// Die Schluessel eines Formulars (fuer SELECT/INSERT/UPDATE in der VM).
+    #[cfg_attr(not(feature = "db"), allow(dead_code))]
     pub fn form_keys(&self, win: i64, form: &str) -> Result<Vec<String>, String> {
         let wi = win as usize;
         self.windows.get(wi).ok_or("GUI_FORM_LOAD: erwartet GUI_WINDOW")?;
@@ -434,10 +440,10 @@ impl Gui {
     pub fn progress_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_PROGRESS_SET")?;
         if w.kind != Kind::Progress { return Err("GUI_PROGRESS_SET: das Widget ist kein GUI_PROGRESS".into()); }
-        match key.to_ascii_lowercase().as_str() {
-            "unbestimmt" | "indeterminate" => { w.unbestimmt = wert != 0.0; Ok(()) }
-            "kreis" | "circle" => self.progress_kreis_setzen(h, wert != 0.0),
-            k => Err(format!("GUI_PROGRESS_SET: unbekannter Schluessel '{}' -- erwartet unbestimmt oder kreis", k)),
+        match super::einstellungen::schluessel("GUI_PROGRESS_SET", key, super::einstellungen::PROGRESS)? {
+            "unbestimmt" => { w.unbestimmt = wert != 0.0; Ok(()) }
+            "kreis" => self.progress_kreis_setzen(h, wert != 0.0),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
     }
     pub fn image_mode(&mut self, h: i64, modus: &str) -> Result<(), String> {
@@ -701,12 +707,8 @@ impl Gui {
         let sicht = w.h - kopf - 2;
         if p.inhalt_h <= sicht || sicht <= 0 { return None; }
         let (ax, ay, aw, _) = self.abs_rect(wi, w);
-        let bw = self.sk(8);
-        let (tx, ty, th) = (ax + aw - 1 - bw, ay + kopf + 1, sicht);
-        let thh = ((th as i64 * sicht as i64 / p.inhalt_h.max(1) as i64) as i32).clamp(self.sk(16).min(th), th);
-        let max = (p.inhalt_h - sicht).max(1);
-        let thy = ty + ((th - thh) as i64 * p.scroll as i64 / max as i64) as i32;
-        Some((tx, ty, bw, th, thy, thh))
+        // Unter dem Kopf; gespiegelt links wie bei Liste und Baum.
+        Some(self.rollbalken_lage((ax, ay + kopf, aw, sicht + 2), self.windows[wi].rtl, sicht, p.inhalt_h, p.scroll as f64))
     }
     /// Je Bild: welches Widget in welchem Panel steckt (durch Layouts
     /// hindurch), und wie hoch der Inhalt jedes Panels ist.
@@ -846,7 +848,7 @@ impl Gui {
             }
         }
         self.windows[ziel.0].widgets[ziel.1].abgelegt = true;
-        self.drop = Some(DropInfo { ziel, quelle: d.quelle, index_quelle: d.index, index_ziel, text: d.text });
+        self.drop = Some(DropInfo { quelle: d.quelle, index_quelle: d.index, index_ziel, text: d.text });
     }
 
     /// Was ueber allen Fenstern liegt: ein offenes Kontextmenue und der
@@ -898,10 +900,7 @@ impl Gui {
             let tw = self.ctext_width(g, &text);
             let th = self.ctext_height(g);
             let (bx, by) = (mx + 12, my + 12);
-            let rad = self.m("corner_radius").min(6);
-            g.round_rect(bx + 2, by + 3, bx + tw + pad * 2 + 1, by + th + pad + 2, rad.max(2), (0x55i64 << 24) as i64, true);
-            g.round_rect(bx, by, bx + tw + pad * 2 - 1, by + th + pad - 1, rad, self.th("widget_bg"), true);
-            g.round_rect(bx, by, bx + tw + pad * 2 - 1, by + th + pad - 1, rad, self.th("accent"), false);
+            self.popup_kasten(g, (bx, by, tw + pad * 2, th + pad), 1.0, self.th("widget_bg"), self.th("accent"));
             self.ctext(g, bx + pad, by + pad / 2, text, self.th("text_fg"));
         }
         // Offene Auswahlliste einer Gitterzelle -- sie reicht gern ueber den
@@ -1064,10 +1063,7 @@ impl Gui {
         let mut by = ay;
         if bx + bw > sw { bx = (sw - bw).max(0); }
         if by + bh > sh { by = (ay - bh - 24).max(0); }
-        let rad = self.m("corner_radius").min(6);
-        g.round_rect(bx + 2, by + 3, bx + bw - 1 + 2, by + bh - 1 + 3, rad.max(2), (0x55i64 << 24) as i64, true);
-        g.round_rect(bx, by, bx + bw - 1, by + bh - 1, rad, self.th("widget_bg"), true);
-        g.round_rect(bx, by, bx + bw - 1, by + bh - 1, rad, self.th("accent"), false);
+        self.popup_kasten(g, (bx, by, bw, bh), 1.0, self.th("widget_bg"), self.th("accent"));
         for (r, line) in lines.iter().enumerate() {
             self.ctext(g, bx + pad, by + pad + r as i32 * lh, line.to_string(), self.th("text_fg"));
         }
@@ -1215,8 +1211,8 @@ impl Gui {
             return true;
         }
         let (wi, mi) = match self.tiefstes_popup() { Some(x) => x, None => return false };
-        let (auf, ab) = (g.key_pressed(KEY_UP), g.key_pressed(KEY_DOWN));
-        let (links, rechts) = (g.key_pressed(KEY_LEFT), g.key_pressed(KEY_RIGHT));
+        let (auf, ab) = (g.key_repeat(KEY_UP), g.key_repeat(KEY_DOWN));
+        let (links, rechts) = (g.key_repeat(KEY_LEFT), g.key_repeat(KEY_RIGHT));
         let waehlen = g.key_pressed(KEY_ENTER) || g.key_pressed(KEY_SPACE);
         if ab { self.menu_cursor = self.menue_schritt(wi, mi, self.menu_cursor, 1); }
         if auf { self.menu_cursor = self.menue_schritt(wi, mi, self.menu_cursor, -1); }

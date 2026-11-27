@@ -76,13 +76,9 @@ impl Gui {
         // Teil. Ohne Uebergang (0) steht es sofort ganz da.
         let t = if self.m("uebergang") > 0 { weich(m.auf_t) } else { 1.0 };
         let h = ((h_voll as f64 * t).round() as i32).max(1);
-        let rad = self.m("corner_radius").min(6);
         g.push_clip(px, py, wmax + 8, h + 8);
         // Schatten + Hintergrund + Rahmen.
-        let schatten = ((0x44 as f64) * t).round().max(1.0) as i64;
-        g.round_rect(px + 3, py + 4, px + wmax - 1 + 3, py + h - 1 + 4, rad.max(2), schatten << 24, true);
-        g.round_rect(px, py, px + wmax - 1, py + h - 1, rad, deckkraft(self.th("widget_bg"), 0.35 + 0.65 * t), true);
-        g.round_rect(px, py, px + wmax - 1, py + h - 1, rad, self.th("win_border"), false);
+        self.popup_kasten(g, (px, py, wmax, h), t, deckkraft(self.th("widget_bg"), 0.35 + 0.65 * t), self.th("win_border"));
         g.push_clip(px, py, wmax, h);
         // Der Eintrag, dessen Untermenue offen ist, bleibt hervorgehoben --
         // sonst verliert man beim Hinueberfahren den Faden.
@@ -287,9 +283,10 @@ impl Gui {
         if !self.dock_hat_angedockte(wi) { self.dock_zeichnen_oben(g, wi); }
         g.pop_clip();
         // Inhalts-Scrollbalken (rechts), wenn der Inhalt hoeher als das Fenster ist.
-        if let Some((tx, ty, bw, th, thy, thh)) = self.winscroll_geom(wi) {
-            g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(self.th("win_bg"), -10));
-            g.round_rect(tx + 1, thy, tx + bw - 2, thy + thh - 1, 4, self.th("widget_border"), true);
+        if let Some(lage) = self.winscroll_geom(wi) {
+            let aktiv = self.scroll_drag == Some(wi)
+                || Self::rollbalken_unter(lage, g.mouse_x() as i32, g.mouse_y() as i32);
+            self.rollbalken_zeichnen(g, lage, self.th("win_bg"), self.th("widget_border"), aktiv);
         }
         // Der Lichtstreif liegt ueber den Widgets, aber unter aufgeklappten
         // Menues und Klapplisten -- die gehoeren nicht zum Fenster.
@@ -602,10 +599,7 @@ impl Gui {
         let (px, py, pw, zeilen) = match self.tb_popup_geom(wi, i) { Some(x) => x, None => return };
         let l = match self.windows[wi].widgets[i].leiste.as_ref() { Some(l) => l, None => return };
         let ph = zeilen.last().map(|z| z.2 - py).unwrap_or(0);
-        let rad = self.m("corner_radius").min(6);
-        g.round_rect(px + 2, py + 3, px + pw + 1, py + ph + 2, rad.max(2), (0x55i64 << 24) as i64, true);
-        g.round_rect(px, py, px + pw - 1, py + ph - 1, rad, self.th("widget_bg"), true);
-        g.round_rect(px, py, px + pw - 1, py + ph - 1, rad, self.th("widget_border"), false);
+        self.popup_kasten(g, (px, py, pw, ph), 1.0, self.th("widget_bg"), self.th("widget_border"));
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
         let acc = self.th("accent");
         let ruhig = mischen(self.th("text_fg"), self.th("muted_fg"), 0.25);
@@ -855,9 +849,9 @@ impl Gui {
                     self.wtext(g, wdg, ax + self.sk(5), ay + self.sk(2), wdg.text.clone(), self.wcol(wdg, "fg", "title_fg"));
                 }
                 // Rollbalken rechts, wenn der Inhalt hoeher ist als das Panel.
-                if let Some((tx, ty, bw, th, thy, thh)) = self.panel_bar_geom(wi, idx) {
-                    g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(self.wcol(wdg, "bg", "widget_bg"), -10));
-                    g.round_rect(tx + 1, thy, tx + bw - 2, thy + thh - 1, 3, self.wcol(wdg, "border", "widget_border"), true);
+                if let Some(lage) = self.panel_bar_geom(wi, idx) {
+                    let aktiv = Self::rollbalken_unter(lage, g.mouse_x() as i32, g.mouse_y() as i32);
+                    self.rollbalken_zeichnen(g, lage, self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"), aktiv);
                 }
             }
             Kind::Button => {
@@ -1838,14 +1832,10 @@ impl Gui {
                 }
                 // Rollbalken: Rinne und Griff, der Griff hebt sich unter der
                 // Maus und beim Ziehen -- er ist ein Bedienelement, kein Zierrat.
-                if let Some((tx, ty, bw, th, thy, thh)) = bar {
-                    let grund = self.wcol(wdg, "bg", "widget_bg");
-                    g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(grund, -10));
+                if let Some(lage) = bar {
                     let aktiv = self.listbar_zug.map(|(a, b, _)| (a, b) == (wi, idx)).unwrap_or(false)
-                        || (mx >= tx && mx < tx + bw && my >= thy && my < thy + thh);
-                    let gc = if aktiv { mischen(self.wcol(wdg, "border", "widget_border"), acc, 0.5) }
-                             else { self.wcol(wdg, "border", "widget_border") };
-                    g.round_rect(tx + 1, thy, tx + bw - 2, thy + thh - 1, 3, gc, true);
+                        || Self::rollbalken_unter(lage, mx, my);
+                    self.rollbalken_zeichnen(g, lage, self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"), aktiv);
                 }
                 // Umbenennen: ein Eingabefeld ueber der Zeile, mit Auswahl und
                 // Schreibmarke -- gezeichnet wie ein Textfeld mit Fokus.
@@ -2027,11 +2017,8 @@ impl Gui {
                         }
                     }
                     if a.inhalt_h > h {
-                        let sw = self.sk(4);
-                        let anteil = (h as f64 / a.inhalt_h as f64).min(1.0);
-                        let griff = ((h - 4) as f64 * anteil) as i32;
-                        let oben = ((h - 4 - griff) as f64 * (a.scroll as f64 / (a.inhalt_h - h) as f64).clamp(0.0, 1.0)) as i32;
-                        g.box_fill(ax + w - sw - 2, ay + 2 + oben, ax + w - 3, ay + 2 + oben + griff, shade(fg, -60));
+                        let lage = self.rollbalken_lage((ax, ay, w, h), self.windows[wi].rtl, h, a.inhalt_h, a.scroll as f64);
+                        self.rollbalken_zeichnen(g, lage, self.wcol(wdg, "bg", "widget_bg"), shade(fg, -60), false);
                     }
                 }
                 g.pop_clip();
@@ -2189,11 +2176,11 @@ impl Gui {
         if wdg.kind == Kind::TextArea {
             if let Some((tx, ty, bw, th, thy, thh, _, _)) = self.ta_bar_geom(g, wi, idx) {
                 let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
-                g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(self.wcol(wdg, "bg", "win_bg"), -8));
+                // Der Griff ist schmal (er liegt im Innenabstand); die Maus
+                // trifft ihn darum mit zwei Punkten Spiel.
                 let aktiv = self.tabar_zug.map(|(a, b, _)| (a, b) == (wi, idx)).unwrap_or(false)
-                    || (mx >= tx - 2 && mx < tx + bw + 1 && my >= thy && my < thy + thh);
-                let rc = self.wcol(wdg, "border", "widget_border");
-                g.round_rect(tx, thy, tx + bw - 1, thy + thh - 1, 2, if aktiv { mischen(rc, self.th("accent"), 0.5) } else { rc }, true);
+                    || Self::rollbalken_unter((tx - 2, ty, bw + 3, th, thy, thh), mx, my);
+                self.rollbalken_zeichnen(g, (tx, ty, bw, th, thy, thh), self.wcol(wdg, "bg", "win_bg"), self.wcol(wdg, "border", "widget_border"), aktiv);
             }
         }
         if wdg.fokus_t > 0.0 && wdg.kind.fokussierbar() {
@@ -2214,21 +2201,6 @@ impl Gui {
         }
     }
 
-    /// Eine Textzeile in Abschnittsfarben zeichnen.
-    ///
-    /// Der Weg fuehrt ueber eine Farbe JE ZEICHEN und erst danach ueber das
-    /// Zusammenfassen gleichfarbiger Laeufe. Direkt ueber die Abschnitte zu
-    /// laufen waere kuerzer, aber dann muesste jeder Sonderfall (Abschnitt
-    /// ragt ueber die Zeile hinaus, zwei ueberlappen sich, dazwischen klafft
-    /// eine Luecke) einzeln bedacht werden -- und genau dort entstehen die
-    /// Fehler, bei denen ein Zeichen die Farbe des Nachbarn bekommt.
-    ///
-    /// `zeilen_start` ist der Zeichen-Index des Zeilenanfangs im GESAMTEN
-    /// Text; die Abschnitte zaehlen von dort.
-    /// Vorne so viel von `s`, wie in `px` Punkte passen KANN: kein Zeichen ist
-    /// schmaler als ein Punkt. Eine Liste zeichnete einen Eintrag sonst ganz
-    /// und liess ihn nur vom Clip beschneiden -- eine Ausgabezeile mit 300000
-    /// Zeichen kostete so jedes Bild bis zu 72 ms (Stresstest 2026-10-02).
     /// Wie viel Breite der TEXT eines Listeneintrags hat -- dieselbe Rechnung
     /// wie beim Zeichnen (Kaestchen, Sinnbild, Zusatztext rechts, Rollbalken).
     /// Gebraucht fuer den Tooltip mit dem ganzen Text.
@@ -2253,23 +2225,14 @@ impl Gui {
     /// Text auf eine Breite kuerzen: passt er nicht, endet er mit "..." --
     /// statt mitten im Buchstaben abgeschnitten zu werden.
     pub(super) fn mit_auslassung(&self, g: &Graphics, wdg: &Widget, text: &str, breite: i32) -> Option<String> {
-        // Nie mehr Zeichen messen, als in die Zeile passen KOENNEN (keins ist
-        // schmaler als ein Punkt) -- ein Eintrag mit einer Million Zeichen
-        // kostete sonst je Bild zwanzig Messungen ueber den ganzen Text.
-        let cap = breite.max(0) as usize + 8;
-        let kopf: String = text.chars().take(cap + 1).collect();
-        let zu_lang = kopf.chars().count() > cap;
-        if !zu_lang && self.wtext_width(g, wdg, &kopf) <= breite { return None; }
-        let z: Vec<char> = kopf.chars().take(cap).collect();
-        let (mut lo, mut hi) = (0usize, z.len());
-        while lo < hi {
-            let m = (lo + hi + 1) / 2;
-            let t: String = z[..m].iter().collect::<String>().trim_end().to_string() + "...";
-            if self.wtext_width(g, wdg, &t) <= breite { lo = m; } else { hi = m - 1; }
-        }
-        Some(z[..lo].iter().collect::<String>().trim_end().to_string() + "...")
+        let k = super::bausteine::kuerzen_mit(text, 1, breite, &|s| self.wtext_width(g, wdg, s));
+        if k == text { None } else { Some(k) }
     }
 
+    /// Vorne so viel von `s`, wie in `px` Punkte passen KANN: kein Zeichen ist
+    /// schmaler als ein Punkt. Eine Liste zeichnete einen Eintrag sonst ganz
+    /// und liess ihn nur vom Clip beschneiden -- eine Ausgabezeile mit 300000
+    /// Zeichen kostete so jedes Bild bis zu 72 ms (Stresstest 2026-10-02).
     pub(super) fn sichtbar_vorn(s: &str, px: i32) -> String {
         let cap = px.max(0) as usize + 8;
         if s.len() <= cap { return s.to_string(); }
@@ -2293,6 +2256,17 @@ impl Gui {
         farbe
     }
 
+    /// Eine Textzeile in Abschnittsfarben zeichnen.
+    ///
+    /// Der Weg fuehrt ueber eine Farbe JE ZEICHEN und erst danach ueber das
+    /// Zusammenfassen gleichfarbiger Laeufe. Direkt ueber die Abschnitte zu
+    /// laufen waere kuerzer, aber dann muesste jeder Sonderfall (Abschnitt
+    /// ragt ueber die Zeile hinaus, zwei ueberlappen sich, dazwischen klafft
+    /// eine Luecke) einzeln bedacht werden -- und genau dort entstehen die
+    /// Fehler, bei denen ein Zeichen die Farbe des Nachbarn bekommt.
+    ///
+    /// `zeilen_start` ist der Zeichen-Index des Zeilenanfangs im GESAMTEN
+    /// Text; die Abschnitte zaehlen von dort.
     pub(super) fn zeile_bunt(&self, g: &mut Graphics, wdg: &Widget, x: i32, y: i32,
                   zeile: &str, zeilen_start: usize, grund: i64, links: i32, rechts: i32) {
         let z: Vec<char> = zeile.chars().collect();

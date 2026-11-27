@@ -156,5 +156,5 @@ END TRY
 --- umgebung
 DHRT_FRAMES=1
 --- erwartet
-GUI_TREE_SET: unbekannte Einstellung 'zeilenhoehe' (gueltig: mehrfachauswahl, kaestchen, bearbeitbar)
+GUI_TREE_SET: unbekannter Schluessel 'zeilenhoehe' -- moeglich sind mehrfachauswahl/multi_select, kaestchen/checkboxes, bearbeitbar/editable
 GUI_TREE_SET: das Widget ist kein GUI_TREE

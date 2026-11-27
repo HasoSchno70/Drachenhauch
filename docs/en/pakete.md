@@ -48,7 +48,7 @@ from the importing file. The exact order is in the
 
 1. next to the importing file (your own copy always wins),
 2. `pakete/`, going upwards from there,
-3. `DH_PATH`, then the library in the user folder.
+3. `DHRT_PATH`, then the library in the user folder.
 
 ## The two files
 

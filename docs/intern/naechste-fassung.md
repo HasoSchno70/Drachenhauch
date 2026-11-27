@@ -20,6 +20,21 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
   „erwartet 1 bis 3 Argumente“, „erwartet mindestens 2 Argument(e)“, jeweils
   mit „erhalten n“; die Aufrufform steht genau einmal dahinter.
 
+**gui: Einstellungen nach einer Regel**
+
+* `GUI_<W>_SET(w, key$, value)` nimmt den Schlüssel bei jeder Art in jeder
+  Schreibweise, deutsch oder englisch (`multi_select` auch bei Baum und
+  Tabelle, `MEHRERE` beim Akkordeon), den Wert als Zahl oder BOOLEAN; ein
+  unbekannter Schlüssel meldet sich überall gleich („unbekannter Schluessel
+  'x' -- moeglich sind mehrfachauswahl/multi_select, …“). Jede Art hat ihre
+  Abfrage `GUI_<W>_GET(w, key$)`; sie liefert eine Zahl, ganz als INTEGER --
+  `GUI_TABLE_GET` lieferte bis 2026.53 immer FLOAT (`PRINT` zeigt jetzt `24`
+  statt `24.0`).
+* Die gui-Rollbalken sind überall 8 Punkte breit (die Tabelle hatte 12, das
+  Fenster 10) und stehen gespiegelt links; Popup-Listen und Tipps haben
+  denselben Schatten. Pfeil- und Bildtasten wiederholen gehalten in jedem
+  Widget.
+
 **gui: Lagen sind logisch**
 
 * `GUI_LISTBOX_ITEM_RECT`, `GUI_TREE_ITEM_RECT`, `GUI_TABLE_ROW_RECT`,
@@ -91,6 +106,15 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
   Fehler.
 * Neuer Name `MQTT_UNACKED_COUNT` für `MQTT_PENDING` (der alte bleibt).
 
+**Kleinigkeiten**
+
+* `SAVE_DELETE` liefert BOOLEAN (gab es den Schlüssel?) statt NIL; `LEN(b)`
+  nimmt einen BUFFER (seine Bytes). `EOF` ist derselbe Befehl wie
+  `ENDOFFILE` (Meldung „Datei wurde nicht im Lese-Modus geoeffnet“),
+  `SPRITE_COLLIDE` heißt in den Parametern `sp1, sp2` wie `SPRITE_COLLIDES`.
+* Hinweise in Meldungen nennen die neuen Namen (`SOUND_FREE`, `MONEY_NEW`,
+  `FILE_OPEN`, `IMAGE_WIDTH`).
+
 **Ton**
 
 * Eine Lautstärke über 1 ist ein Fehler (vorher still 1); nur
@@ -143,6 +167,65 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
 * Übergänge mischen die Deckkraft mit (ein Glasknopf blieb mitten im
   Übergang deckend). Die `.dhform` liest `#RGB` wie die Stildatei.
 
+**Namen**
+
+* `IMAGE`, `SOUND` und `FILE` sind keine Schlüsselwörter mehr: ein Parameter
+  `file` oder eine Variable `sound` geht; als Typ (`DIM f AS FILE`) gelten
+  sie weiter.
+* Die Parameter von `AUDIO_SET_VOLUME`/`AUDIO_MUSIC_SET_VOLUME` heißen
+  `volume` (wie bei den alten Namen `AUDIO_VOLUME`), der von `FONT_SET`
+  heißt `font` (wie bei `SETFONT`). Die bisherigen Namen `v` und `handle`
+  gelten in benannten Argumenten weiter.
+* Ein Befehl mit `$` und derselbe ohne sind wie bisher derselbe; die Laufzeit
+  kennt intern nur noch eine Form (unsichtbar für Programme).
+
+**Umgebungsvariablen**
+
+* Alle heißen `DHRT_…`, englisch (Tafel in `docs/werkzeuge.md`,
+  Umgebungsvariablen): `DHRT_PATH` statt `DH_PATH`, `DHRT_LOG` statt
+  `DH_LOG`, `DHRT_NO_AUDIO`, `DHRT_NO_GRAPHICS`, `DHRT_CLIPBOARD`,
+  `DHRT_PLAYBACK`, `DHRT_RECORD` … Die alten Namen gelten weiter; steht beides
+  da, gewinnt der neue. `dhrt aufnehmen` schreibt in neue Fälle
+  `DHRT_PLAYBACK=…`.
+
+**Grafik und Eingabe**
+
+* `SCROLL(dx, dy)` ist ein Fehler, der sagt, was stattdessen verschiebt
+  (`CAMERA_SET`, ein Render-Ziel); bis 2026.53 tat es still nichts.
+* `CLIPBOARD_SET_IMAGE` liefert nichts mehr (vorher immer TRUE) -- wie
+  `CLIPBOARD_SET` ist ein Misserfolg ein Fehler. `IF CLIPBOARD_SET_IMAGE(b)`
+  wird zu `CLIPBOARD_SET_IMAGE(b)`.
+* Die Zahlenfelder der gui (`GUI_TEXTAREA_SPANS`, `_MARKS`, `_HINTS`,
+  `_LINE_COLORS`, `_FOLDABLE`, `_SWATCHES`, `GUI_LISTBOX_SPANS`) nehmen nur
+  ganze Zahlen; `2.0` geht, `2.5` ist ein Fehler (vorher still 2). Ein BUFFER
+  geht auch.
+
+**Geräte**
+
+* `WIFI_CONNECT` liefert auf allen drei Systemen FALSE, wenn das System
+  ablehnt; ein Fehler kommt nur bei leerer SSID oder fehlendem Werkzeug
+  (bis 2026.53 unter Linux/macOS immer ein Fehler, unter Windows je nach
+  Schritt). `WIFI_DISCONNECT` unter macOS sagt, ob es gelang (vorher immer
+  TRUE). Ein verstecktes Netz steht mit leerem Namen in `WIFI_SCAN`/
+  `WIFI_NETWORKS` (vorher „(versteckt)“).
+
+**Netz**
+
+* dhrt meldet sich bei Servern als `Drachenhauch/<Fassung>
+  (+https://github.com/HasoSchno70/Drachenhauch)` (vorher
+  „Drachenhauch/0.1“ mit einer fremden Adresse; cloud „Drachenhauch-cloud/0.1“).
+
+**Kommandozeile**
+
+* `dhrt run` (und `debug`, `profile`, `--check` …) ohne Datei endet mit Code
+  2 und der passenden Zeile der Hilfe statt „Kann 'run' nicht lesen“ (Code 1).
+  „Kann '…' nicht lesen“ spricht bei allen Einstiegen die Sprache der
+  Laufzeit. `dhrt --runsrc` gibt es nicht mehr (war ein interner Rest).
+* Die Kurzhilfe in Meldungen zeigt die Aufrufform ohne Rückgabetyp
+  (`REPEAT$(s, n)`, nicht `REPEAT$(s, n) AS STRING`).
+* `daten/builtin_index.json` hat kein Feld `kind` und kein `count` mehr
+  (niemand las sie; `kind` passte nicht zu `module`).
+
 ## Neu
 
 * `GUI_TREE_COUNT`, `GUI_TREE_SET_LABEL`, `GUI_TREE_REMOVE`,
@@ -166,3 +249,25 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
 * Gerätelisten als ARRAY OF STRING: `SERIAL_DEVICES`, `USB_DEVICES` (mit dem
   HID-Pfad für `USB_OPEN_PATH`), `MIDI_IN_DEVICES`, `MIDI_OUT_DEVICES`,
   `WIFI_NETWORKS`; `BT_SCAN_MS` liefert ein Feld.
+* Abfragen der gui-Einstellungen für jede Art: `GUI_LISTBOX_GET`,
+  `GUI_TREE_GET`, `GUI_ACCORDION_GET`, `GUI_WIZARD_GET`, `GUI_TABCONTROL_GET`,
+  `GUI_SLIDER_GET`, `GUI_DROPDOWN_GET`, `GUI_PROGRESS_GET`, `GUI_LAYOUT_GET`,
+  `GUI_LABEL_GET`, `GUI_TEXTAREA_GET`, `GUI_RICHTEXT_GET`,
+  `GUI_COLORPICKER_GET`, `GUI_DATEPICKER_GET`, `GUI_TIMEPICKER_GET`,
+  `GUI_FILETREE_GET`; Platzhalter in einer Form für alle Arten
+  (`GUI_TEXTINPUT_PLACEHOLDER`, `GUI_TEXTAREA_PLACEHOLDER`/`$`,
+  `GUI_DROPDOWN_PLACEHOLDER$`, `GUI_TREE_PLACEHOLDER$`,
+  `GUI_TABLE_PLACEHOLDER$`); `GUI_GET_MOTION_MODE$`.
+* Neue Namen nach `docs/builtins-namen.md` (die alten bleiben): der Bereich
+  vorn (`GUI_WINDOW_SET_TITLE`, `GUI_MENU_SET_ENABLED`, `CHAR_GET_X` …),
+  Setzen heißt SET (`AUDIO_SET_PITCH`, `TEXT_SET_SIZE`, `MOUSE_SET_LOCK`,
+  `SPI_SET_SPEED`, `TRAY_SET_MENU` …), Zählen heißt COUNT (`JSON_COUNT`,
+  `XML_NAME_COUNT`, `ASTAR_PATH_COUNT`, `AUDIO_CHANNEL_COUNT`,
+  `TILED_GID_COUNT`), dazu `SPRITE_DONE`, `MQTT_NEXT`, `MQTT_MESSAGE$`,
+  `MQTT_TOPIC$`, `SAMPLE_DURATION`, `SAVE_GET_KEYS`, `PHYS3D_WORLD` (Typ).
+* Tasten: `KEY_NUM_LOCK`, `KEY_SCROLL_LOCK`, `KEY_PRINT_SCREEN`, `KEY_PAUSE`
+  (bis 2026.53 ohne Code), Zweitnamen `KEY_LEFT_SHIFT` …, `KEY_KP_0` …,
+  `KEY_PAGE_UP`/`_DOWN`, `KEY_CAPS_LOCK`.
+* `CAMERA3D_UPDATE` nimmt den Modus als Wort: "free"/"frei",
+  "orbital"/"umkreisend", "first_person"/"ego", "third_person"/"verfolger",
+  "custom"/"eigen".

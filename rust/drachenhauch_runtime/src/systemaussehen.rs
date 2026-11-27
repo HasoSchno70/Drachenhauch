@@ -8,12 +8,12 @@
 //! dann selbst.
 //!
 //! Fuer Pruefungen und zum Ausprobieren legen zwei Umgebungsvariablen die
-//! Antwort fest: `DHRT_SYSTEM_DUNKEL=1|0` und `DHRT_SYSTEM_AKZENT=#RRGGBB`
+//! Antwort fest: `DHRT_SYSTEM_DARK=1|0` und `DHRT_SYSTEM_ACCENT=#RRGGBB`
 //! (leer oder `-` = unbekannt). Unter macOS und Linux startet eine Abfrage
 //! ein Programm; die Antwort gilt darum zwei Sekunden, damit ein Programm,
 //! das je Bild fragt, nicht je Bild einen Prozess startet.
 
-#![allow(dead_code)]
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -43,8 +43,8 @@ pub fn jetzt() -> Aussehen {
     };
     // Die Umgebung gewinnt -- und wird nicht gemerkt, damit ein Test sie
     // zwischen zwei Faellen umstellen kann.
-    if let Ok(v) = std::env::var("DHRT_SYSTEM_DUNKEL") { a.dunkel = dunkel_aus_text(&v); }
-    if let Ok(v) = std::env::var("DHRT_SYSTEM_AKZENT") { a.akzent = farbe_aus_text(&v); }
+    if let Ok(v) = crate::umgebung::var("DHRT_SYSTEM_DARK") { a.dunkel = dunkel_aus_text(&v); }
+    if let Ok(v) = crate::umgebung::var("DHRT_SYSTEM_ACCENT") { a.akzent = farbe_aus_text(&v); }
     a
 }
 
@@ -52,10 +52,10 @@ static RUHIG_MERK: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
 const RUHIG_GILT: Duration = Duration::from_secs(5);
 
 /// Will das System weniger Bewegung ("Animationen reduzieren")? Die
-/// Antwort gilt fuenf Sekunden; `DHRT_SYSTEM_WENIGER_BEWEGUNG=1|0` legt sie
+/// Antwort gilt fuenf Sekunden; `DHRT_SYSTEM_REDUCED_MOTION=1|0` legt sie
 /// fest. Unbekannt = nein.
 pub fn weniger_bewegung() -> bool {
-    if let Ok(v) = std::env::var("DHRT_SYSTEM_WENIGER_BEWEGUNG") {
+    if let Ok(v) = crate::umgebung::var("DHRT_SYSTEM_REDUCED_MOTION") {
         if let Some(b) = dunkel_aus_text(&v) { return b; }
     }
     let mut m = RUHIG_MERK.lock().unwrap_or_else(|e| e.into_inner());
@@ -72,9 +72,9 @@ pub fn weniger_bewegung() -> bool {
 static KONTRAST_MERK: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
 
 /// Will das System hohen Kontrast? Die Antwort gilt fuenf Sekunden;
-/// `DHRT_SYSTEM_HOHER_KONTRAST=1|0` legt sie fest. Unbekannt = nein.
+/// `DHRT_SYSTEM_HIGH_CONTRAST=1|0` legt sie fest. Unbekannt = nein.
 pub fn hoher_kontrast() -> bool {
-    if let Ok(v) = std::env::var("DHRT_SYSTEM_HOHER_KONTRAST") {
+    if let Ok(v) = crate::umgebung::var("DHRT_SYSTEM_HIGH_CONTRAST") {
         if let Some(b) = dunkel_aus_text(&v) { return b; }
     }
     let mut m = KONTRAST_MERK.lock().unwrap_or_else(|e| e.into_inner());
@@ -113,6 +113,7 @@ fn kontrast_vom_system() -> Option<bool> {
 fn kontrast_vom_system() -> Option<bool> { None }
 
 /// GNOME `enable-animations`: `false` heisst weniger Bewegung.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn gnome_ruhig(antwort: &str) -> Option<bool> {
     match antwort.trim() { "false" => Some(true), "true" => Some(false), _ => None }
 }
@@ -152,6 +153,7 @@ fn farbe_aus_text(v: &str) -> Option<i64> {
 }
 
 /// Windows speichert die Akzentfarbe als 0xAABBGGRR.
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn abgr_zu_rgb(v: u32) -> i64 {
     let (r, g, b) = (v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF);
     ((r << 16) | (g << 8) | b) as i64
@@ -159,6 +161,7 @@ pub fn abgr_zu_rgb(v: u32) -> i64 {
 
 /// macOS `AppleAccentColor`: eine Nummer statt einer Farbe; fehlt der
 /// Schluessel, ist es Blau. Die Werte sind die Systemfarben von macOS.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub fn mac_akzent(nummer: Option<i32>) -> i64 {
     match nummer {
         Some(-1) => 0x8C8C8C, // Graphit
@@ -173,6 +176,7 @@ pub fn mac_akzent(nummer: Option<i32>) -> i64 {
 }
 
 /// GNOME `accent-color` (seit GNOME 47) -- die Farben von libadwaita.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn gnome_akzent(name: &str) -> Option<i64> {
     Some(match name.trim().trim_matches('\'') {
         "blue" => 0x3584E4,
@@ -190,6 +194,7 @@ pub fn gnome_akzent(name: &str) -> Option<i64> {
 
 /// GNOME `color-scheme`: `'prefer-dark'` ist dunkel, `'default'` und
 /// `'prefer-light'` hell.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn gnome_dunkel(antwort: &str) -> Option<bool> {
     match antwort.trim().trim_matches('\'') {
         "prefer-dark" => Some(true),

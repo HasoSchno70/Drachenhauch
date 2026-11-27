@@ -398,12 +398,24 @@ SHELL_READY: einen Auftrag 7 gibt es nicht -- nie gestartet, schon abgeholt oder
 
 === shell und shell_out$ geben die testvariablen nicht weiter
 ' Alle Kindprozesse laufen ueber prozess::befehl: "dhrt" ist die eigene
-' Laufzeit, DHRT_FRAMES & Co. gehen nicht mit (bis 2026.53 vererbten SHELL*
-' und TASK_START sie), ein Feld von Texten wird ausgebreitet (Bericht A16).
+' Laufzeit, ein GEERBTES DHRT_FRAMES & Co. geht nicht mit (bis 2026.53
+' vererbten SHELL* und TASK_START sie), ein Feld von Texten wird
+' ausgebreitet (Bericht A16).
+WRITEALL("kind.dh", "PRINT " + CHR$(34) + "[" + CHR$(34) + " + GETENV$(" + CHR$(34) + "DHRT_FRAMES" + CHR$(34) + ") + " + CHR$(34) + "]" + CHR$(34) + CHR$(10))
+DIM args AS ARRAY OF STRING = ["run", "kind.dh"]
+PRINT TRIM$(SHELL_OUT$("dhrt", args))
+--- umgebung
+DHRT_FRAMES=7
+--- erwartet
+[]
+
+=== was das programm selbst setzt, geht an das kind
+' SETENV("DHRT_FRAMES", ...) vor einem Kind ist Absicht: so endet ein
+' gebautes Fenster-Programm nach N Bildern (Studio, werkzeug_studio3).
 SETENV("DHRT_FRAMES", "7")
 WRITEALL("kind.dh", "PRINT " + CHR$(34) + "[" + CHR$(34) + " + GETENV$(" + CHR$(34) + "DHRT_FRAMES" + CHR$(34) + ") + " + CHR$(34) + "]" + CHR$(34) + CHR$(10))
 DIM args AS ARRAY OF STRING = ["run", "kind.dh"]
 PRINT TRIM$(SHELL_OUT$("dhrt", args))
 --- erwartet
-[]
+[7]
 

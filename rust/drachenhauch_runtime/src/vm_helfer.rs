@@ -14,6 +14,15 @@ use super::*;
 /// Der Name steht am Anfang jeder solchen Meldung, und das Befehlsverzeichnis
 /// kennt die Form -- also wird sie angehaengt. Nur bei Meldungen, in denen es
 /// erkennbar um Argumente geht: "Datei nicht gefunden" braucht sie nicht.
+/// Die Meldung fuer eine falsche Zahl von Argumenten zur Laufzeit -- mit der
+/// Aufrufform aus dem Index (`mit_signatur`), nicht mit einer eigenen
+/// Kurzhilfe. Bis 2026.53 schrieben rund 130 Stellen ihre Form selbst hin,
+/// oft mit deutschen Parameternamen ("(tbl, ab, zellen)"), die es fuer
+/// benannte Argumente gar nicht gibt (Bericht B6).
+pub(crate) fn falsche_argumente(fn_: &str, n: usize) -> String {
+    mit_signatur(&format!("{}: falsche Zahl von Argumenten, erhalten {}", fn_, n))
+}
+
 pub(crate) fn mit_signatur(msg: &str) -> String {
     // Schon mit Aufrufform (eine Meldung, die sie selbst baut, etwa fuer
     // DECLARE-Funktionen): nicht noch einmal.
@@ -29,10 +38,28 @@ pub(crate) fn mit_signatur(msg: &str) -> String {
     let low = kopf.to_lowercase();
     for (n, sig, _) in crate::compiler::builtin_eintraege() {
         if n.to_lowercase() == low && !sig.is_empty() && !sig.contains("Argumente") {
-            return format!("{} -- Aufruf: {}", msg, sig);
+            return format!("{} -- Aufruf: {}", msg, aufrufform(&sig));
         }
     }
     msg.to_string()
+}
+
+/// Die Signatur als Aufruf: ohne den Rueckgabetyp hinter der schliessenden
+/// Klammer (`REPEAT$(s, n) AS STRING` -> `REPEAT$(s, n)`). Seit der Index
+/// Rueckgabetypen traegt, stand er sonst in jeder Kurzhilfe.
+pub(crate) fn aufrufform(sig: &str) -> &str {
+    let mut tiefe = 0i32;
+    for (i, c) in sig.char_indices() {
+        match c {
+            '(' | '[' => tiefe += 1,
+            ')' | ']' => {
+                tiefe -= 1;
+                if tiefe == 0 && c == ')' { return sig[..=i].trim_end(); }
+            }
+            _ => {}
+        }
+    }
+    sig
 }
 
 /// Zeichnet dieser Befehl auf den BILDSCHIRM? Dann braucht er ein Fenster
@@ -43,6 +70,7 @@ pub(crate) fn mit_signatur(msg: &str) -> String {
 /// Befehle ab, mit denen ein erstes Grafikprogramm anfaengt. Ein Befehl, der
 /// hier fehlt, verhaelt sich wie bisher -- ein Befehl, der zu Unrecht
 /// darinstuende, braeche fremden Code.
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub(crate) fn ist_schirmbefehl(name: &str) -> bool {
     matches!(name,
         "flip" | "cls"
@@ -55,7 +83,7 @@ pub(crate) fn ist_schirmbefehl(name: &str) -> bool {
         | "text" | "drawfps"
         | "drawimage" | "drawimagerot" | "drawimageflipped"
         | "drawimagepart" | "drawimagepartex" | "drawtilemap"
-        | "atlas_draw" | "atlas_draw_flipped" | "batch_draw")
+        | "atlas_draw" | "atlas_draw_flipped")
 }
 
 /// `DIM p AS Spieler` legt die Variable an, aber kein Objekt -- sie ist NIL,
@@ -213,6 +241,7 @@ pub(super) fn arg_value(a: &Arg) -> Value {
 }
 
 /// Gibt es eine Methode dieses Namens fuer Text, Feld, MAP oder Tupel?
+#[cfg_attr(not(feature = "jit"), allow(dead_code))]
 pub(crate) fn ist_container_methode(name: &str) -> bool {
     let n = name.to_lowercase();
     ["string", "array", "map", "tuple"].iter().any(|k| container_method(k, &n).is_some())
@@ -666,7 +695,7 @@ pub(super) fn module_op(op: char, a: &Value, b: &Value) -> Option<R<Value>> {
 /// Die Meldung, fuer die es den Typ ueberhaupt gibt.
 pub(super) fn geld_mischt_nicht(op: char) -> String {
     format!("{} : GELD und eine gewoehnliche Zahl mischen sich nicht -- genau \
-             dafuer gibt es den Typ. Entweder GELD_NEU(zahl) daraus machen \
+             dafuer gibt es den Typ. Entweder MONEY_NEW(zahl) daraus machen \
              oder mit GELD_ZAHL(betrag) bewusst herausgehen.", op)
 }
 
@@ -784,6 +813,7 @@ pub(super) fn mul(a: Value, b: Value) -> R<Value> {
 /// Rundet f32-gestuetzte Audio-Werte (Lautstaerken 0..1) auf 6 Nachkommastellen,
 /// damit die f32->f64-Verbreiterung nicht als „0.800000011920929" durchschlaegt
 /// (siehe docs/drachenhauch-stolpersteine.md D2). 6 Stellen reichen fuer Volumes weit.
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub(super) fn round_audio(f: f64) -> f64 { (f * 1_000_000.0).round() / 1_000_000.0 }
 
 /// Baut aus den Werten eines Array-Literals `[a, b, c]` ein 1D-DhArray.
@@ -1094,7 +1124,7 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
         "geld" => match value {
             Value::Geld(_) | Value::Nil => Ok(value),
             v if is_num(&v) => Err(format!(
-                "{}: Erwartet GELD, erhalten {} -- mit GELD_NEU({}) einen Betrag daraus machen",
+                "{}: Erwartet GELD, erhalten {} -- mit MONEY_NEW({}) einen Betrag daraus machen",
                 ctx, v.type_name(), v.fmt())),
             v => Err(format!("{}: Erwartet GELD, erhalten {}", ctx, v.type_name())),
         },

@@ -298,25 +298,26 @@ impl Gui {
         let skal = |v: i32| if ms == 1.0 { v } else { ((v as f64 * ms).round() as i32).max(1) };
         let t = self.tbl_mut(h, "GUI_TABLE_SET")?;
         let n = wert as i32;
-        match key.to_lowercase().as_str() {
+        match super::einstellungen::schluessel("GUI_TABLE_SET", key, super::einstellungen::TABLE)? {
             // Untergrenze: eine Zeilenhoehe von 0 waere eine Division durch null
             // im Treffertest, eine negative ein Absturz beim Zeichnen.
-            "zeilenhoehe" | "row_height" => t.row_h = skal(n.clamp(8, 400)),
-            "kopfhoehe" | "header_height" => t.header_h = skal(n.clamp(0, 200)),
+            "zeilenhoehe" => t.row_h = skal(n.clamp(8, 400)),
+            "kopfhoehe" => t.header_h = skal(n.clamp(0, 200)),
             "zebra" => t.zebra = n != 0,
-            "gitter" | "grid" => t.grid = n != 0,
-            "filterzeile" | "filter_row" => { t.filter_row = n != 0; if n == 0 { t.filter_focus = -1; } }
-            "sortierbar" | "sortable" => t.sortable = n != 0,
-            "spalten_ziehbar" | "resizable_cols" => t.resizable_cols = n != 0,
-            "feste_spalten" | "frozen" => t.frozen = n.max(0),
-            "spalten_verschiebbar" | "reorderable" => t.reorderable = n != 0,
-            "baum" | "tree" => { t.baum = n != 0; t.rebuild_view(); }
-            "zellmodus" | "cells" => {
+            "gitter" => t.grid = n != 0,
+            "filterzeile" => { t.filter_row = n != 0; if n == 0 { t.filter_focus = -1; } }
+            "sortierbar" => t.sortable = n != 0,
+            "spalten_ziehbar" => t.resizable_cols = n != 0,
+            "feste_spalten" => t.frozen = n.max(0),
+            "spalten_verschiebbar" => t.reorderable = n != 0,
+            "baum" => { t.baum = n != 0; t.rebuild_view(); }
+            "zellmodus" => {
                 t.zellmodus = n != 0;
                 if !t.zellmodus { t.ber_r = -1; t.ber_c = -1; }
             }
-            "zeilen_anhaengen" | "append_rows" => t.zeilen_anhaengen = n != 0,
-            "mehrfachauswahl" | "multi_select" => {
+            "zeilen_anhaengen" => t.zeilen_anhaengen = n != 0,
+            "spalten" => return Err("GUI_TABLE_SET: spalten laesst sich nur abfragen -- Spalten setzt GUI_TABLE_SET_HEADERS".into()),
+            "mehrfachauswahl" => {
                 t.multi = n != 0;
                 // Beim Einschalten die bisherige Einzelauswahl uebernehmen,
                 // sonst waere sie nach dem Umschalten ploetzlich weg.
@@ -325,10 +326,7 @@ impl Gui {
                     if t.selected >= 0 { t.sel_rows.push(t.selected); }
                 }
             }
-            _ => return Err(format!(
-                "GUI_TABLE_SET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, \
-filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, \
-zellmodus, zeilen_anhaengen", key)),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -474,25 +472,22 @@ zellmodus, zeilen_anhaengen", key)),
         let ms = self.scale;
         let entskal = |v: i32| if ms == 1.0 { v } else { (v as f64 / ms).round() as i32 };
         let t = self.tbl_ref(h, "GUI_TABLE_GET")?;
-        Ok(match key.to_lowercase().as_str() {
-            "zeilenhoehe" | "row_height" => entskal(t.row_h) as f64,
-            "kopfhoehe" | "header_height" => entskal(t.header_h) as f64,
+        Ok(match super::einstellungen::schluessel("GUI_TABLE_GET", key, super::einstellungen::TABLE)? {
+            "zeilenhoehe" => entskal(t.row_h) as f64,
+            "kopfhoehe" => entskal(t.header_h) as f64,
             "zebra" => if t.zebra { 1.0 } else { 0.0 },
-            "gitter" | "grid" => if t.grid { 1.0 } else { 0.0 },
-            "filterzeile" | "filter_row" => if t.filter_row { 1.0 } else { 0.0 },
-            "sortierbar" | "sortable" => if t.sortable { 1.0 } else { 0.0 },
-            "spalten_ziehbar" | "resizable_cols" => if t.resizable_cols { 1.0 } else { 0.0 },
-            "feste_spalten" | "frozen" => t.frozen as f64,
-            "spalten_verschiebbar" | "reorderable" => if t.reorderable { 1.0 } else { 0.0 },
-            "mehrfachauswahl" | "multi_select" => if t.multi { 1.0 } else { 0.0 },
-            "zellmodus" | "cells" => if t.zellmodus { 1.0 } else { 0.0 },
-            "baum" | "tree" => if t.baum { 1.0 } else { 0.0 },
-            "zeilen_anhaengen" | "append_rows" => if t.zeilen_anhaengen { 1.0 } else { 0.0 },
-            "spalten" | "columns" => t.n_cols() as f64,
-            _ => return Err(format!(
-                "GUI_TABLE_GET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, \
-filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, \
-zellmodus, zeilen_anhaengen, spalten", key)),
+            "gitter" => if t.grid { 1.0 } else { 0.0 },
+            "filterzeile" => if t.filter_row { 1.0 } else { 0.0 },
+            "sortierbar" => if t.sortable { 1.0 } else { 0.0 },
+            "spalten_ziehbar" => if t.resizable_cols { 1.0 } else { 0.0 },
+            "feste_spalten" => t.frozen as f64,
+            "spalten_verschiebbar" => if t.reorderable { 1.0 } else { 0.0 },
+            "mehrfachauswahl" => if t.multi { 1.0 } else { 0.0 },
+            "zellmodus" => if t.zellmodus { 1.0 } else { 0.0 },
+            "baum" => if t.baum { 1.0 } else { 0.0 },
+            "zeilen_anhaengen" => if t.zeilen_anhaengen { 1.0 } else { 0.0 },
+            "spalten" => t.n_cols() as f64,
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         })
     }
 
@@ -596,11 +591,6 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
     pub fn table_sort_desc(&self, h: i64) -> Result<bool, String> {
         Ok(self.tbl_ref(h, "GUI_TABLE_SORT_DESC")?.sort_desc)
-    }
-    /// Filter je Spalte setzen (leerer Text = kein Filter).
-    pub fn table_placeholder(&mut self, h: i64, text: String) -> Result<(), String> {
-        self.tbl_mut(h, "GUI_TABLE_PLACEHOLDER")?.leer_text = text;
-        Ok(())
     }
     pub fn table_filter(&mut self, h: i64, col: i64, text: String) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_FILTER")?;

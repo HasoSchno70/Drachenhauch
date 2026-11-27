@@ -1,5 +1,5 @@
 ' Bilder und Dateien ueber die Zwischenablage (ablage.rs), in der privaten
-' Ablage, die dhrt test jedem Programm gibt (DHRT_ZWISCHENABLAGE=privat) --
+' Ablage, die dhrt test jedem Programm gibt (DHRT_CLIPBOARD=privat) --
 ' laeuft ueberall, auch ohne Fenster (die Dateiliste) bzw. mit einem
 ' (das Bild). Die echte Ablage des Systems prueft
 ' tests/pruef/fenster/zwischenablage_bilder.dhtest.
@@ -30,10 +30,11 @@ CATCH e
 END TRY
 PRINT "vorher "; CLIPBOARD_HAS_IMAGE(); " "; CLIPBOARD_GET_IMAGE()
 DIM b AS INTEGER : b = IMAGE_NEW(40, 30, RGB(200, 30, 60))
-PRINT "gesetzt "; CLIPBOARD_SET_IMAGE(b)
+' Kein Rueckgabewert mehr: wie CLIPBOARD_SET ein Fehler, wenn es misslingt.
+PRINT "gesetzt "; TYPEOF(CLIPBOARD_SET_IMAGE(b))
 DIM c AS INTEGER : c = CLIPBOARD_GET_IMAGE()
 PRINT "zurueck "; CLIPBOARD_HAS_IMAGE(); " "; IMAGE_WIDTH(c); "x"; IMAGE_HEIGHT(c); " neues bild "; c <> b
 --- erwartet
 vorher FALSE -1
-gesetzt TRUE
+gesetzt NIL
 zurueck TRUE 40x30 neues bild TRUE

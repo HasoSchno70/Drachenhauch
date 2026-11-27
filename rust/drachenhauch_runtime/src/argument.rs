@@ -151,7 +151,6 @@ pub(crate) fn a_schalter_oder(a: &[Value], i: usize, vorgabe: bool, fn_: &str) -
 /// Zahlen aus einem Feld oder einem BUFFER (Pins, Firmata, I2C/SPI, die
 /// Byte-Befehle der Geraete). EIN Leser -- bis 2026.53 standen zwei Kopien
 /// in vm_geraete.rs (`bytes`, `bytes_arg`).
-#[allow(dead_code)] // nicht jeder Bau hat Geraete
 pub(crate) fn a_zahlenfeld(a: &[Value], i: usize, fn_: &str) -> R<Vec<i64>> {
     match a.get(i) {
         Some(Value::Buffer(b)) => Ok(b.borrow().iter().map(|&x| x as i64).collect()),
@@ -173,7 +172,6 @@ pub(crate) fn a_zahlenfeld(a: &[Value], i: usize, fn_: &str) -> R<Vec<i64>> {
 }
 
 /// Dasselbe als Bytes 0..255 (ein Wert ausserhalb ist ein Fehler).
-#[allow(dead_code)]
 pub(crate) fn a_bytes(a: &[Value], i: usize, fn_: &str) -> R<Vec<u8>> {
     let roh = a_zahlenfeld(a, i, fn_)?;
     let mut out = Vec::with_capacity(roh.len());
@@ -185,7 +183,7 @@ pub(crate) fn a_bytes(a: &[Value], i: usize, fn_: &str) -> R<Vec<u8>> {
 }
 
 /// Ein BUFFER als Wert (die Byte-Befehle liefern ihn).
-#[allow(dead_code)]
+#[cfg_attr(not(any(feature = "net", feature = "serial", feature = "usb", feature = "bt")), allow(dead_code))]
 pub(crate) fn buffer_wert(v: Vec<u8>) -> Value {
     Value::Buffer(std::rc::Rc::new(std::cell::RefCell::new(v)))
 }

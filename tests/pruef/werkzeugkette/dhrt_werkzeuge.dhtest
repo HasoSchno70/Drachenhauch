@@ -417,3 +417,27 @@ ohne unterbefehl: rueckgabe 2
 prosa TRUE
 grammatik TRUE
 referenz TRUE
+
+=== ein unterbefehl ohne datei nennt seine zeile der hilfe
+' Bis 2026.53 sagte `dhrt run` "Kann 'run' nicht lesen", und nur einer von
+' dreizehn Lesewegen sprach Englisch (Bericht E5).
+IMPORT "helfer.dh"
+dlStarten(["run"])
+PRINT "rueckgabe "; dlCode
+PRINT "sagt es "; INSTR(dlErr, "dhrt run: es fehlt") >= 0; " zeigt die zeile "; INSTR(dlErr, "dhrt run <datei.dh>") >= 0
+SETENV("DHRT_LANG", "en")
+dlStarten(["run", CWD$() + "/gibtsnicht.dh"])
+PRINT "englisch "; INSTR(dlErr, "Cannot read") >= 0
+dlStarten(["--tokens", CWD$() + "/gibtsnicht.dh"])
+PRINT "auch die werkzeuge "; INSTR(dlErr, "Cannot read") >= 0
+SETENV("DHRT_LANG", "de")
+dlStarten(["--help"])
+PRINT "hilfe "; INSTR(dlAus, "dhrt aufnehmen") >= 0; " "; INSTR(dlAus, "--mit-daten") >= 0; " "; INSTR(dlAus, "uebersetzung") >= 0
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 2
+sagt es TRUE zeigt die zeile TRUE
+englisch TRUE
+auch die werkzeuge TRUE
+hilfe TRUE TRUE TRUE

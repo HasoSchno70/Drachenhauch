@@ -482,8 +482,8 @@ impl Gui {
         let Some(z) = w.feld.as_ref() else { return false };
         let (offen, n, mark, suche, leer) = (z.offen, z.treffer.len() as i32, z.mark, z.suche, w.text.is_empty());
         if offen && n > 0 {
-            let runter = g.key_pressed(KEY_DOWN);
-            let hoch = g.key_pressed(KEY_UP);
+            let runter = g.key_repeat(KEY_DOWN);
+            let hoch = g.key_repeat(KEY_UP);
             if runter || hoch {
                 let z = self.windows[wi].widgets[i].feld.as_mut().unwrap();
                 z.mark = if runter { (mark + 1).min(n - 1) } else { (mark - 1).max(-1) };
@@ -752,13 +752,7 @@ impl Gui {
     }
     /// Text, der nicht passt, endet mit "..." statt mitten im Buchstaben.
     fn kuerzen(&self, g: &Graphics, text: &str, breite: i32) -> String {
-        if self.ctext_width(g, text) <= breite { return text.to_string(); }
-        let z: Vec<char> = text.chars().collect();
-        for n in (0..z.len()).rev() {
-            let probe: String = z[..n].iter().collect::<String>() + "...";
-            if self.ctext_width(g, &probe) <= breite { return probe; }
-        }
-        String::new()
+        super::bausteine::kuerzen_mit(text, 1, breite, &|s| self.ctext_width(g, s))
     }
     fn art_sinnbild(art: u8) -> &'static str {
         match art { 1 => "pruefen", 2 | 3 => "warnung", _ => "info" }
@@ -886,9 +880,7 @@ impl Gui {
         let fg = self.wcol(wdg, "fg", "text_fg");
         let acc = self.wcol(wdg, "accent", "accent");
         let pad = self.m("pad");
-        g.round_rect(px + 1, py + 3, px + pw, py + ph + 2, 3, (0x40i64) << 24, true);
-        g.box_fill(px, py, px + pw - 1, py + ph - 1, bg);
-        g.rect(px, py, px + pw - 1, py + ph - 1, border);
+        self.popup_kasten(g, (px, py, pw, ph), 1.0, bg, border);
         let th = self.ctext_height(g);
         let tipp = wdg.text.to_lowercase();
         g.push_clip(px + 1, py + 1, pw - 2, ph - 2);

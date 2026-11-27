@@ -110,7 +110,7 @@ PLAYSOUND(s)
 
 ## Prüfen ohne Mikrofon
 
-`DHRT_MIKROFON=datei.wav` macht aus einer WAV-Datei ein Mikrofon: sie ist
+`DHRT_MICROPHONE=datei.wav` macht aus einer WAV-Datei ein Mikrofon: sie ist
 dann das einzige Gerät (`Datei: name.wav`) und wird in Echtzeit und in
 Schleife eingespeist — über denselben Weg wie die Werte eines echten Geräts.
 So prüft `tests/pruef/ton/mikrofon.dhtest` Pegel, Tonhöhe, Spektrum, Wellenform

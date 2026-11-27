@@ -413,7 +413,7 @@ GUI_TABCONTROL_SET(tc, "farbe", 1)
 --- umgebung
 DHRT_FRAMES=1
 --- fehler
-bekannt: schliessbar
+moeglich sind schliessbar/closable
 
 === ein breiter titel bekommt einen kopf, der ihn fasst
 ' Die Koepfe richten sich nach der gemessenen Beschriftung, nicht nach der

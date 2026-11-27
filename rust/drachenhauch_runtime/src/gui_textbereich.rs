@@ -437,7 +437,7 @@ impl Gui {
                         // an DIESER Stelle, in 0,4 s.
                         let jetzt = g.uhr_jetzt();
                         let w = &mut self.windows[wi].widgets[i];
-                        let n = if jetzt - w.klick_zeit < 0.4 && (idx - w.klick_idx).abs() <= 2 { w.klick_n % 3 + 1 } else { 1 };
+                        let n = super::bausteine::klick_zaehlen(jetzt, w.klick_zeit, w.klick_idx, idx, w.klick_n, 3);
                         w.klick_n = n; w.klick_zeit = jetzt; w.klick_idx = idx;
                         if n == 2 {
                             let (a, e) = Self::wort_um(&chars, idx as usize);
@@ -718,12 +718,12 @@ impl Gui {
                 c = if ctrl { len } else { rows[row].2 as i32 };
                 if !shift { a = c; }
             }
-            if g.key_pressed(KEY_UP) && row > 0 && !kuerzel_weg {
+            if g.key_repeat(KEY_UP) && row > 0 && !kuerzel_weg {
                 let (_, ps, pe) = rows[row - 1];
                 c = (ps as i32 + col).min(pe as i32);
                 if !shift { a = c; }
             }
-            if g.key_pressed(KEY_DOWN) && row + 1 < rows.len() && !kuerzel_weg {
+            if g.key_repeat(KEY_DOWN) && row + 1 < rows.len() && !kuerzel_weg {
                 let (_, ns, ne) = rows[row + 1];
                 c = (ns as i32 + col).min(ne as i32);
                 if !shift { a = c; }
@@ -850,7 +850,7 @@ impl Gui {
         // Weich wie Liste und Baum: Radschritte addieren sich aufs ZIEL,
         // `uebergaenge` zieht Zeile um Zeile nach.
         let basis = w.rad_ziel.unwrap_or(w.scroll as f64);
-        let ziel = (basis.round() as i32 - wheel as i32 * 3).clamp(0, max);
+        let ziel = (basis.round() as i32 - wheel as i32 * super::RAD_ZEILEN_TEXT).clamp(0, max);
         if weich_an { w.rad_ziel = Some(ziel as f64); w.rad_letzt = w.scroll as f64; }
         else { w.scroll = ziel; }
         w.rad_stand = Some((w.caret, w.sel_anchor, w.text.chars().count()));
@@ -1207,7 +1207,7 @@ impl Gui {
     pub(super) fn richtext_wheel(&mut self, wi: usize, i: usize, h: i32, g: &mut Graphics) {
         let wheel = Self::rad(g);
         if wheel == 0 { return; }
-        let schritt = self.sk(48);
+        let schritt = self.rad_schritt_px();
         let r = self.windows[wi].widgets[i].rich.as_mut().unwrap();
         let max = (r.inhalt_h - h).max(0);
         r.scroll = (r.scroll - wheel as i32 * schritt).clamp(0, max);

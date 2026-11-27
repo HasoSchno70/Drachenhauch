@@ -61,8 +61,8 @@ impl Gui {
     /// Einstellungen am Baum (GUI_TREE_SET). Bisher nur `mehrfachauswahl`.
     pub fn tree_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let t = self.tree_mut(h, "GUI_TREE_SET")?;
-        match key.to_lowercase().as_str() {
-            "mehrfachauswahl" | "multi" => {
+        match super::einstellungen::schluessel("GUI_TREE_SET", key, super::einstellungen::TREE)? {
+            "mehrfachauswahl" => {
                 t.multi = wert != 0.0;
                 t.sync();
                 // Beim Einschalten zaehlt die bisherige Auswahl mit, sonst
@@ -72,10 +72,9 @@ impl Gui {
                     if k < t.sel.len() { t.sel[k] = true; t.anker = t.selected; }
                 }
             }
-            "kaestchen" | "checkboxes" => { t.kaestchen = wert != 0.0; t.sync(); }
-            "bearbeitbar" | "editable" => { t.bearbeitbar = wert != 0.0; if !t.bearbeitbar { t.edit = None; } }
-            _ => return Err(format!(
-                "GUI_TREE_SET: unbekannte Einstellung '{}' (gueltig: mehrfachauswahl, kaestchen, bearbeitbar)", key)),
+            "kaestchen" => { t.kaestchen = wert != 0.0; t.sync(); }
+            "bearbeitbar" => { t.bearbeitbar = wert != 0.0; if !t.bearbeitbar { t.edit = None; } }
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -296,25 +295,24 @@ impl Gui {
     pub fn filetree_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let t = self.ft_mut(h, "GUI_FILETREE_SET")?;
         let an = wert != 0.0;
-        match key.to_lowercase().as_str() {
-            "ordner_zuerst" | "dirs_first" => t.datei.as_mut().unwrap().ordner_zuerst = an,
-            "verborgene" | "hidden" => t.datei.as_mut().unwrap().verborgene = an,
-            "nur_ordner" | "dirs_only" => t.datei.as_mut().unwrap().nur_ordner = an,
+        match super::einstellungen::schluessel("GUI_FILETREE_SET", key, super::einstellungen::FILETREE)? {
+            "ordner_zuerst" => t.datei.as_mut().unwrap().ordner_zuerst = an,
+            "verborgene" => t.datei.as_mut().unwrap().verborgene = an,
+            "nur_ordner" => t.datei.as_mut().unwrap().nur_ordner = an,
             // Wie im Datei-Bereich einer Entwicklungsumgebung: ein Klick auf
             // einen Ordner klappt ihn um. Ohne das tut ein Klick auf eine
             // Ordnerzeile scheinbar nichts -- nur das schmale Dreieck wirkt.
-            "klick_klappt" | "click_expands" => t.datei.as_mut().unwrap().klick_klappt = an,
-            "nach_art" | "by_type" => t.datei.as_mut().unwrap().nach_art = an,
-            "mehrfachauswahl" | "multi" => { t.multi = an; t.sync(); }
-            "kaestchen" | "checkboxes" => t.kaestchen = an,
+            "klick_klappt" => t.datei.as_mut().unwrap().klick_klappt = an,
+            "nach_art" => t.datei.as_mut().unwrap().nach_art = an,
+            "mehrfachauswahl" => { t.multi = an; t.sync(); }
+            "kaestchen" => t.kaestchen = an,
             // In MILLISEKUNDEN, wie ueberall sonst -- innen in Sekunden, weil
             // die Uhr der Grafik so zaehlt.
-            "auffrischen" | "refresh" => {
+            "auffrischen" => {
                 t.datei.as_mut().unwrap().auffrischen = (wert.max(0.0)) / 1000.0;
                 t.datei.as_mut().unwrap().naechste = 0.0;
             }
-            _ => return Err(format!("GUI_FILETREE_SET: unbekannte Einstellung '{}' (gueltig: \
-                ordner_zuerst, verborgene, nur_ordner, nach_art, klick_klappt, mehrfachauswahl, kaestchen, auffrischen)", key)),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         dateibaum_neu(t);
         Ok(())
@@ -694,8 +692,8 @@ impl Gui {
     pub fn accordion_set(&mut self, h: i64, key: &str, v: i64) -> Result<(), String> {
         let w = self.akk_mut(h, "GUI_ACCORDION_SET")?;
         let a = w.akk.get_or_insert_with(Default::default);
-        match key {
-            "mehrere" | "multiple" => {
+        match super::einstellungen::schluessel("GUI_ACCORDION_SET", key, super::einstellungen::ACCORDION)? {
+            "mehrere" => {
                 a.mehrere = v != 0;
                 // Aus "mehrere" zurueck zu einem: nur der erste offene bleibt.
                 if !a.mehrere {
@@ -703,7 +701,7 @@ impl Gui {
                     for o in a.offen.iter_mut() { if *o { if gesehen { *o = false; } gesehen = true; } }
                 }
             }
-            _ => return Err(format!("GUI_ACCORDION_SET: unbekannter Schluessel '{}' (erlaubt: mehrere)", key)),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -889,9 +887,9 @@ impl Gui {
     pub fn wizard_set(&mut self, h: i64, key: &str, v: i64) -> Result<(), String> {
         let w = self.wz_mut(h, "GUI_WIZARD_SET")?;
         let z = w.wz.get_or_insert_with(Default::default);
-        match key {
-            "pruefen" | "validate" => z.pruefen = v != 0,
-            _ => return Err(format!("GUI_WIZARD_SET: unbekannter Schluessel '{}' (erlaubt: pruefen)", key)),
+        match super::einstellungen::schluessel("GUI_WIZARD_SET", key, super::einstellungen::WIZARD)? {
+            "pruefen" => z.pruefen = v != 0,
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -1105,9 +1103,10 @@ impl Gui {
     /// Vor der ersten Messung gilt eine Schaetzung an der Zeichenzahl; die war
     /// frueher die einzige und zu knapp: bei "Lagerorte" lief der Text in den
     /// naechsten Kopf (gefunden mit der Kuehlschrank-App).
-    /// Die Koepfe eines Reiterwerks (Seite, x0, x1). Passen sie nicht in
-    /// `breite`, werden die breitesten zuerst schmaler (ihr Titel endet dann
-    /// mit "…", `tc_titel`) -- vorher lagen Koepfe jenseits des Rands, eine
+    ///
+    /// Passen die Koepfe nicht in `breite`, werden die breitesten zuerst
+    /// schmaler (ihr Titel endet dann mit "...", `text_kuerzen` beim
+    /// Zeichnen) -- vorher lagen Koepfe jenseits des Rands, eine
     /// Seite war mit der Maus nicht zu erreichen (Kuehlschrank-App,
     /// Einstellungen mit sechs Reitern).
     pub(super) fn tc_koepfe(&self, ax: i32, breite: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
@@ -1191,9 +1190,9 @@ impl Gui {
     pub fn tabcontrol_set(&mut self, h: i64, schluessel: &str, wert: bool) -> Result<(), String> {
         let w = self.tc_mut(h, "GUI_TABCONTROL_SET")?;
         let st = w.tabctl.get_or_insert_with(Default::default);
-        match schluessel.to_lowercase().as_str() {
-            "schliessbar" | "closable" => { st.schliessbar = wert; Ok(()) }
-            _ => Err(format!("GUI_TABCONTROL_SET: unbekannter Schluessel '{}' (bekannt: schliessbar)", schluessel)),
+        match super::einstellungen::schluessel("GUI_TABCONTROL_SET", schluessel, super::einstellungen::TABCONTROL)? {
+            "schliessbar" => { st.schliessbar = wert; Ok(()) }
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
     }
     /// GUI_TABCONTROL_CLOSED(tc): welche Seite in diesem Bild zu soll
@@ -1480,8 +1479,8 @@ impl Gui {
         let breite_vorgabe = self.tp_breite(0, false);
         let breite_sek = self.tp_breite(0, true);
         let w = self.tp_mut(h, "GUI_TIMEPICKER_SET")?;
-        match key.to_lowercase().as_str() {
-            "sekunden" | "seconds" => {
+        match super::einstellungen::schluessel("GUI_TIMEPICKER_SET", key, super::einstellungen::TIMEPICKER)? {
+            "sekunden" => {
                 let an = wert != 0.0;
                 // Die Breite wandert mit, solange sie die Vorgabe ist -- wer
                 // sie selbst gesetzt hat, behaelt seine.
@@ -1492,9 +1491,8 @@ impl Gui {
                 w.zeit_sek = an;
             }
             // Schrittweite der MINUTE (5 heisst: in Fuenferschritten).
-            "schritt" | "step" => w.step = wert.max(1.0),
-            _ => return Err(format!(
-                "GUI_TIMEPICKER_SET: unbekannte Einstellung '{}' (gueltig: sekunden, schritt)", key)),
+            "schritt" => w.step = wert.max(1.0),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }

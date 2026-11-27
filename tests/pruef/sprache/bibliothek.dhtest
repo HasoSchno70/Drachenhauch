@@ -2,11 +2,11 @@
 '
 ' Gesucht wird in dieser Reihenfolge:
 '   1. neben der importierenden Datei (die eigene Kopie gewinnt IMMER)
-'   2. jeder Ordner aus DH_PATH (Trenner des Betriebssystems)
+'   2. jeder Ordner aus DHRT_PATH (Trenner des Betriebssystems)
 '   3. <Benutzerordner>/.drachenhauch/bibliothek
 '
 ' Bis 2026-09-16 tests/test_bibliothek.py. Jeder Fall startet das Programm als
-' Kind: DH_PATH und der Benutzerordner gehen per SETENV hinein, und der
+' Kind: DHRT_PATH und der Benutzerordner gehen per SETENV hinein, und der
 ' Benutzerordner zeigt IMMER in den Fallordner -- eine Bibliothek, die auf dem
 ' Rechner des Pruefenden liegt, darf kein Ergebnis beeinflussen. Die Beilage
 ' helfer.dh ist in jedem Fall dieselbe.
@@ -22,7 +22,7 @@ PRINT "nennt den benutzerordner "; (INSTR(dlErr, ".drachenhauch") >= 0)
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
-    SETENV("DH_PATH", suchpfad)
+    SETENV("DHRT_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
     SETENV("HOME", CWD$() + "/heim")
     dlStarten(["run", CWD$() + "/" + datei])
@@ -52,7 +52,7 @@ PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
-    SETENV("DH_PATH", suchpfad)
+    SETENV("DHRT_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
     SETENV("HOME", CWD$() + "/heim")
     dlStarten(["run", CWD$() + "/" + datei])
@@ -81,7 +81,7 @@ PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
-    SETENV("DH_PATH", suchpfad)
+    SETENV("DHRT_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
     SETENV("HOME", CWD$() + "/heim")
     dlStarten(["run", CWD$() + "/" + datei])
@@ -111,7 +111,7 @@ PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
-    SETENV("DH_PATH", suchpfad)
+    SETENV("DHRT_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
     SETENV("HOME", CWD$() + "/heim")
     dlStarten(["run", CWD$() + "/" + datei])
@@ -145,7 +145,7 @@ PRINT "lib vorn "; TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
-    SETENV("DH_PATH", suchpfad)
+    SETENV("DHRT_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
     SETENV("HOME", CWD$() + "/heim")
     dlStarten(["run", CWD$() + "/" + datei])
@@ -178,7 +178,7 @@ PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
-    SETENV("DH_PATH", suchpfad)
+    SETENV("DHRT_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
     SETENV("HOME", CWD$() + "/heim")
     dlStarten(["run", CWD$() + "/" + datei])
@@ -206,7 +206,7 @@ PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
-    SETENV("DH_PATH", suchpfad)
+    SETENV("DHRT_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
     SETENV("HOME", CWD$() + "/heim")
     dlStarten(["run", CWD$() + "/" + datei])
@@ -239,7 +239,7 @@ PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
-    SETENV("DH_PATH", suchpfad)
+    SETENV("DHRT_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
     SETENV("HOME", CWD$() + "/heim")
     dlStarten(["run", CWD$() + "/" + datei])
@@ -268,7 +268,7 @@ PRINT TRIM$(dlAus); TRIM$(dlErr)
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 SUB laufe(datei AS STRING, suchpfad AS STRING)
-    SETENV("DH_PATH", suchpfad)
+    SETENV("DHRT_PATH", suchpfad)
     SETENV("USERPROFILE", CWD$() + "/heim")
     SETENV("HOME", CWD$() + "/heim")
     dlStarten(["run", CWD$() + "/" + datei])
@@ -287,3 +287,33 @@ PRINT JSON_STRINGIFY(h)
 --- erwartet
 rueckgabe 0
 {"a":1}
+
+=== der alte name dh_path gilt weiter, der neue gewinnt
+' Seit 2026.54 heisst der Suchpfad DHRT_PATH (docs/werkzeuge.md,
+' Umgebungsvariablen); DH_PATH bleibt als Rueckfall, damit kein Skript und
+' keine CI etwas aendern muss. Stehen beide da, gilt der neue.
+IMPORT "lauf.dh"
+SETENV("USERPROFILE", CWD$() + "/heim")
+SETENV("HOME", CWD$() + "/heim")
+SETENV("DH_PATH", CWD$() + "/alt")
+dlStarten(["run", CWD$() + "/proj/haupt.dh"])
+PRINT "nur alt: "; TRIM$(dlAus); TRIM$(dlErr)
+SETENV("DHRT_PATH", CWD$() + "/neu")
+dlStarten(["run", CWD$() + "/proj/haupt.dh"])
+PRINT "beide: "; TRIM$(dlAus); TRIM$(dlErr)
+--- datei lauf.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- datei alt/woher.dh
+FUNCTION Woher$() AS STRING
+    RETURN "alt"
+END FUNCTION
+--- datei neu/woher.dh
+FUNCTION Woher$() AS STRING
+    RETURN "neu"
+END FUNCTION
+--- datei proj/haupt.dh
+IMPORT "woher.dh"
+PRINT Woher$()
+--- erwartet
+nur alt: alt
+beide: neu

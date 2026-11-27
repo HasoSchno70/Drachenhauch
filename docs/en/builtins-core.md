@@ -462,8 +462,8 @@ PRINT LEN(stack)                 ' 1
 
 > The `ARRAY_*` aggregates and the dynamic array ops
 > (`ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`) are implemented in `dhrt`
-> (`builtins.rs`/`vm.rs`) and work along every path — `dhrt run` (also from the IDE),
-> `--runsrc` and the `dhrt --export` standalone build.
+> (`builtins.rs`/`vm.rs`) and work along every path — `dhrt run` (also from the IDE)
+> and the `dhrt --export` standalone build.
 
 ## Maps
 
@@ -1503,9 +1503,9 @@ LOG_ERROR("Datenbank nicht lesbar")
 Output: `20:45:43 INFO  Saison 2026 geladen` — to **stderr**, so that `PRINT`
 can be passed through as payload.
 
-How much of it appears is controlled by the environment variable **`DH_LOG`**:
+How much of it appears is controlled by the environment variable **`DHRT_LOG`** (formerly `DHRT_LOG`, still works):
 
-| `DH_LOG` | what appears |
+| `DHRT_LOG` | what appears |
 |---|---|
 | `debug` | everything |
 | *(not set)* / `info` | INFO, WARN, ERROR — **default** |
@@ -1517,7 +1517,7 @@ So `LOG_DEBUG` stays silent until someone switches it on — debug messages can
 stay in the code without cluttering normal operation:
 
 ```bash
-DH_LOG=debug dhrt run werkzeug.dh
+DHRT_LOG=debug dhrt run werkzeug.dh
 ```
 
 ## Time & random
@@ -1691,8 +1691,9 @@ Container method `arr.join(trenner)` ≡ `JOIN$(arr, trenner)`.
 - **The suffix `2` is ambiguous** and context-dependent: `PHYSICS_DISTANCE2` =
   *squared* distance (faster), `LINE3D`/Vec2 functions mean *2D*, and
   `VEC2_*` is the type name. No uniform scheme — read it from the function name.
-- **`SPRITE_COLLIDE` vs `SPRITE_COLLIDES`.** The `sprite` module uses
-  `SPRITE_COLLIDES` (with `S`). Watch out for the core `COLLIDES` (AABB from raw values)
+- **`SPRITE_COLLIDE` and `SPRITE_COLLIDES`** are the same command with the
+  same parameters (`sp1, sp2`), as are `BATCH_DRAW` and `ATLAS_DRAW`, `EOF`
+  and `ENDOFFILE`. Watch out for the core `COLLIDES` (AABB from raw values)
   — a different use case.
 - **`CAMERA_X` (2D) vs `CAMERA3D_X`.** The 2D `camera` module and the native
   3D camera (`g3d`) have separate getters — do not mix them up.

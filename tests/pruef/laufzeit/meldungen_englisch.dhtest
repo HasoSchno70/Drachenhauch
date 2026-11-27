@@ -310,7 +310,7 @@ export 0
 TRUE
 
 === die bilanz des maschinencodes auf englisch
-' DHRT_JIT_BILANZ=1 zaehlt beim Beenden, was der Maschinencode getan hat;
+' DHRT_JIT_STATS=1 zaehlt beim Beenden, was der Maschinencode getan hat;
 ' Kleine Wunder zitiert daraus. Bis 2026-11-24 blieben diese Zeilen auch
 ' mit DHRT_LANG=en deutsch.
 SUB rechne(t AS TUPLE)
@@ -327,7 +327,7 @@ rechne(("a", "b", "c", "d"))
 --- umgebung
 DHRT_LANG=en
 DHRT_JIT=immer
-DHRT_JIT_BILANZ=1
+DHRT_JIT_STATS=1
 --- erwartet
 a,b,c,d,
 --- stderr

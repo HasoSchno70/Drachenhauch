@@ -17,11 +17,11 @@
 //! jedem macOS-Lauf der CI mit, auch ohne Grafik. Auf anderen Systemen sind
 //! beide Funktionen leer.
 //!
-//! `DHRT_OEFFNEN_PROTOKOLL` (nur fuer Pruefungen): jeder uebergebene Pfad
+//! `DHRT_OPEN_LOG` (nur fuer Pruefungen): jeder uebergebene Pfad
 //! wird dort zusaetzlich angehaengt -- auf den macOS-Laeufern der CI geht
 //! kein Fenster auf, die IDE kommt also nie dazu, die Datei zu zeigen; das
 //! Protokoll belegt, dass das Ereignis angekommen ist.
-#![allow(dead_code)]
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
 
 use std::sync::Mutex;
 
@@ -36,7 +36,7 @@ pub fn abholen() -> Vec<String> {
 }
 
 fn merken(pfad: String) {
-    if let Ok(p) = std::env::var("DHRT_OEFFNEN_PROTOKOLL") {
+    if let Ok(p) = crate::umgebung::var("DHRT_OPEN_LOG") {
         use std::io::Write;
         if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(p) {
             let _ = writeln!(f, "{}", pfad);
@@ -113,13 +113,13 @@ mod mac {
     }
 }
 
-/// `DHRT_ABLEGEN` (nur fuer Pruefungen, Pfade mit `;`): in DIESELBE
+/// `DHRT_DROP` (nur fuer Pruefungen, Pfade mit `;`): in DIESELBE
 /// Warteschlange wie der Finder -- so prueft jeder Test auch das Abholen.
 /// Ein echtes Hineinziehen kann kein Test ausloesen. Einmal je Prozess.
 pub fn vortaeuschen() {
     static EINMAL: std::sync::Once = std::sync::Once::new();
     EINMAL.call_once(|| {
-        if let Ok(s) = std::env::var("DHRT_ABLEGEN") {
+        if let Ok(s) = crate::umgebung::var("DHRT_DROP") {
             for p in s.split(';').filter(|p| !p.is_empty()) {
                 merken(p.to_string());
             }

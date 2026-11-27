@@ -24,7 +24,8 @@ const STUMM_SR: u32 = 48_000;
 
 /// Ist der Ton per Umgebung stumm geschaltet?
 pub fn stumm_gewuenscht() -> bool {
-    ["DHRT_OHNE_AUDIO", "DH_OHNE_AUDIO"].iter()
+    // Neuer Name (umgebung.rs, Bericht B8) und die beiden alten.
+    ["DHRT_NO_AUDIO", "DHRT_OHNE_AUDIO", "DH_OHNE_AUDIO"].iter()
         .any(|n| std::env::var(n).map(|v| !v.trim().is_empty() && v.trim() != "0").unwrap_or(false))
 }
 

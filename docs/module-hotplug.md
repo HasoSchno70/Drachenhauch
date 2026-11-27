@@ -17,8 +17,10 @@ Beobachtet wird, was dieser Bau kennt (`HOTPLUG_KINDS`):
 | `"midi_in"`, `"midi_out"` | MIDI-Ein- und -Ausgänge | Feature `midi` |
 | `"hid"` | USB-HID-Geräte, als `"VID:PID Produkt"` | Feature `usb` |
 
-Die Namen sind dieselben, die `SERIAL_PORTS`, `MIDI_IN_NAME$` und `USB_LIST`
-liefern — wer gemeldet bekommt, dass `COM5` da ist, öffnet `COM5`.
+Bei `serial` und MIDI sind die Namen dieselben, die `SERIAL_PORTS` und
+`MIDI_IN_NAME$` liefern — wer gemeldet bekommt, dass `COM5` da ist, öffnet
+`COM5`. Bei `hid` steht vorn die Kennung `VID:PID` aus der ersten Spalte von
+`USB_LIST` (die `USB_OPEN` nimmt), dahinter der Produktname.
 
 ## Befehle
 
@@ -62,7 +64,7 @@ eigener Faden alle 500 ms in dieselben Listen und vergleicht mit dem Stand
 davor — eine Meldung kommt also bis zu einer halben Sekunde nach dem
 Einstecken. Ein HID-Gerät mit mehreren Schnittstellen zählt einmal.
 
-Zum Prüfen ohne Gerät: `DHRT_GERAETE=datei` liest die Listen aus einer
+Zum Prüfen ohne Gerät: `DHRT_DEVICES=datei` liest die Listen aus einer
 Textdatei statt vom System, eine Zeile je Gerät als `art:name`. Wer die Datei
 ändert, sieht die Meldungen (`tests/pruef/geraete/hotplug.dhtest`).
 

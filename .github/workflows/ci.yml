@@ -142,7 +142,7 @@ jobs:
   # Uebersprungen wird, was Pixel, Fenster, Audio-Pegel oder Eingabe prueft
   # (die Bewertung in `pruefsammlung.rs` erkennt den fehlenden Grafik-Builtin).
   #
-  # `DHRT_OHNE_GRAFIK=1` schaltet das Ueberspringen frei. Ohne die Variable
+  # `DHRT_NO_GRAPHICS=1` schaltet das Ueberspringen frei. Ohne die Variable
   # aendert sich nichts -- der Windows-Lauf oben sieht einen fehlenden
   # Grafik-Builtin weiterhin als Fehler, sonst versteckt diese Bequemlichkeit
   # eines Tages eine echte Luecke.
@@ -153,7 +153,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     env:
-      DHRT_OHNE_GRAFIK: "1"
+      DHRT_NO_GRAPHICS: "1"
       # Wie im Windows-Job: fettes LTO ist der teuerste Schritt und fuer einen
       # Testlauf unnoetig. Begruendung dort.
       CARGO_PROFILE_RELEASE_LTO: thin

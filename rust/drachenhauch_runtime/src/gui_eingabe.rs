@@ -217,7 +217,7 @@ impl Gui {
                 let wheel = Self::rad(g);
                 if wheel != 0 {
                     let ms = self.max_scroll_y(top);
-                    self.windows[top].scroll_y = (self.windows[top].scroll_y - wheel as i32 * self.sk(40)).clamp(0, ms);
+                    self.windows[top].scroll_y = (self.windows[top].scroll_y - wheel as i32 * self.rad_schritt_px()).clamp(0, ms);
                 }
             }
         }
@@ -410,13 +410,13 @@ impl Gui {
                 };
                 if rollt && Self::in_rect(mx, my, r) {
                     let wheel = Self::rad(g);
-                    if wheel != 0 { let s = self.sk(40); self.panel_scroll_um(top, i, -(wheel as i32) * s); }
+                    if wheel != 0 { let s = self.rad_schritt_px(); self.panel_scroll_um(top, i, -(wheel as i32) * s); }
                 }
                 let akk = { let w = &self.windows[top].widgets[i]; w.akk.is_some() && self.widget_shown(top, w) };
                 if akk && Self::in_rect(mx, my, r) {
                     let wheel = Self::rad(g);
                     if wheel != 0 {
-                        let schritt = self.sk(40);
+                        let schritt = self.rad_schritt_px();
                         let (hh, a) = { let w = &mut self.windows[top].widgets[i]; (w.h, w.akk.as_mut().unwrap()) };
                         a.scroll = (a.scroll - wheel as i32 * schritt).clamp(0, (a.inhalt_h - hh).max(0));
                     }
@@ -866,7 +866,6 @@ impl Gui {
         self.was_mouse_down = is_down;
         if !is_down { self.zug_feld = None; }
         self.was_right_down = right_down;
-        self.frame_count += 1;
     }
 
     /// Hat der offene Dialog in diesem Bild eine Antwort bekommen? Dann
@@ -1137,10 +1136,10 @@ impl Gui {
             if g.key_pressed(KEY_ESC) { self.open_dropdown = None; self.liste_taste = true; return; }
             let rows = self.dd_zeilen(wi, i);
             let m = self.dd_mark;
-            let neu = if g.key_pressed(KEY_DOWN) { Some(m + 1) }
-                else if g.key_pressed(KEY_UP) { Some(if m < 0 { 0 } else { m - 1 }) }
-                else if g.key_pressed(KEY_PAGEDOWN) { Some(m + rows) }
-                else if g.key_pressed(KEY_PAGEUP) { Some(m - rows) }
+            let neu = if g.key_repeat(KEY_DOWN) { Some(m + 1) }
+                else if g.key_repeat(KEY_UP) { Some(if m < 0 { 0 } else { m - 1 }) }
+                else if g.key_repeat(KEY_PAGEDOWN) { Some(m + rows) }
+                else if g.key_repeat(KEY_PAGEUP) { Some(m - rows) }
                 else { None };
             if let Some(k) = neu {
                 if n > 0 {
@@ -1160,7 +1159,7 @@ impl Gui {
                     return;
                 }
             }
-        } else if g.key_pressed(KEY_DOWN) && n > 0 {
+        } else if g.key_repeat(KEY_DOWN) && n > 0 {
             self.open_dropdown = Some((wi, i));
             self.dd_pfeil = false;
             return;
@@ -1238,7 +1237,7 @@ impl Gui {
                     caret = idx; anchor = idx;
                     let jetzt = g.uhr_jetzt();
                     let w = &mut self.windows[wi].widgets[i];
-                    let n = if jetzt - w.klick_zeit < 0.4 && (idx - w.klick_idx).abs() <= 2 { w.klick_n % 3 + 1 } else { 1 };
+                    let n = super::bausteine::klick_zaehlen(jetzt, w.klick_zeit, w.klick_idx, idx, w.klick_n, 3);
                     w.klick_n = n; w.klick_zeit = jetzt; w.klick_idx = idx;
                     if n == 3 || (n == 2 && passwort) {
                         anchor = 0; caret = chars.len() as i32;
@@ -1578,13 +1577,6 @@ impl Gui {
             return false;
         }
         false
-    }
-
-    /// Alle Schreibmarken als (caret, anker), die erste ist die fuehrende.
-    pub(super) fn marken(w: &Widget) -> Vec<(i32, i32)> {
-        let mut m = vec![(w.caret, w.sel_anchor)];
-        m.extend(w.marken_zusatz.iter().copied());
-        m
     }
 
     /// Dieselbe Aenderung an JEDER Marke.

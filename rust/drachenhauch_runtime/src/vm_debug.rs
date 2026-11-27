@@ -54,7 +54,7 @@ impl<'p> Vm<'p> {
         const JE_EBENE: usize = 100;
         if tiefe >= 3 || *budget == 0 { return None; }
         let mut paare: Vec<(String, Value)> = Vec::new();
-        let mut gesamt = 0usize;
+        let gesamt: usize;
         match v {
             Value::Instance(rc) => {
                 let inst = rc.borrow();

@@ -206,26 +206,33 @@ pub fn wartend(e: &Eingang) -> i64 {
 // vortaeuschen wuerde, den es nicht gibt.
 
 /// Statusbyte OHNE Kanal (0x90 = Note an, 0x80 = Note aus, 0xB0 = Regler ...).
+#[cfg_attr(not(feature = "midi"), allow(dead_code))]
 pub fn status_von(m: &[u8]) -> i64 {
     match m.first() { Some(b) => (*b as i64) & 0xF0, None => 0 }
 }
 
 /// Kanal 1..16 -- im Protokoll stehen 0..15. Nach aussen zaehlen wir wie
 /// jedes Geraetedisplay.
+#[cfg_attr(not(feature = "midi"), allow(dead_code))]
 pub fn kanal_von(m: &[u8]) -> i64 {
     match m.first() { Some(b) => ((*b as i64) & 0x0F) + 1, None => 0 }
 }
 
+#[cfg_attr(not(feature = "midi"), allow(dead_code))]
 pub fn d1_von(m: &[u8]) -> i64 { m.get(1).map(|b| *b as i64).unwrap_or(0) }
+#[cfg_attr(not(feature = "midi"), allow(dead_code))]
 pub fn d2_von(m: &[u8]) -> i64 { m.get(2).map(|b| *b as i64).unwrap_or(0) }
 
 /// **Der Fallstrick des Protokolls:** die meisten Instrumente schicken kein
 /// 0x80, sondern ein Note-AN mit Anschlagstaerke 0. Wer nur auf 0x80 prueft,
 /// bekommt Toene, die nie aufhoeren.
+#[cfg_attr(not(feature = "midi"), allow(dead_code))]
 pub fn ist_note_an(m: &[u8]) -> bool { status_von(m) == 0x90 && d2_von(m) > 0 }
+#[cfg_attr(not(feature = "midi"), allow(dead_code))]
 pub fn ist_note_aus(m: &[u8]) -> bool {
     status_von(m) == 0x80 || (status_von(m) == 0x90 && d2_von(m) == 0)
 }
+#[cfg_attr(not(feature = "midi"), allow(dead_code))]
 pub fn ist_regler(m: &[u8]) -> bool { status_von(m) == 0xB0 }
 
 // Die duenne Schicht darueber: aus dem Eingang die zuletzt geholte Nachricht
@@ -299,9 +306,6 @@ pub fn uhr_senden(a: &mut Ausgang, bpm: f64) -> Result<(), String> {
     a.uhr = Some(Faden { halt, fertig, griff: Some(griff) });
     Ok(())
 }
-
-#[cfg(feature = "midi")]
-pub fn uhr_laeuft(a: &Ausgang) -> bool { a.uhr.is_some() }
 
 /// Der Kern der Uhr: in gleichen Abstaenden `schlagen` rufen, bis `halt`.
 /// Gerechnet wird von einem festen Anfang aus (Schlag n faellt auf
@@ -410,6 +414,7 @@ pub fn kanal_byte(kanal: i64, fn_: &str) -> Result<u8, String> {
 /// der Uhrtakte F8, 24 je Viertel), ob sie laeuft (Start FA/Weiter FB bis
 /// Stopp FC) und wo sie steht (Takte seit Start; Songposition F2 setzt sie).
 #[derive(Default)]
+#[cfg_attr(not(feature = "midi"), allow(dead_code))]
 pub struct Takt {
     pub laeuft: bool,
     pub ticks: i64,
@@ -420,6 +425,7 @@ pub struct Takt {
 impl Takt {
     /// Eine Nachricht verarbeiten. `true` = sie gehoert NUR der Uhr und geht
     /// nicht in die Warteschlange (Uhrtakt, Zeitcode, Active Sensing).
+    #[cfg_attr(not(feature = "midi"), allow(dead_code))]
     pub fn nachricht(&mut self, b: &[u8], jetzt_us: u64) -> bool {
         match b.first().copied() {
             Some(0xF8) => {
@@ -453,6 +459,7 @@ impl Takt {
 
     /// Schlaege je Minute; 0, wenn seit einer halben Sekunde kein Takt kam
     /// (die Uhr der Gegenseite steht oder es gibt keine).
+    #[cfg_attr(not(feature = "midi"), allow(dead_code))]
     pub fn bpm(&self, jetzt_us: u64) -> f64 {
         match self.letzter {
             Some(l) if jetzt_us.saturating_sub(l) <= 500_000 && self.abstaende.len() >= 2 => {

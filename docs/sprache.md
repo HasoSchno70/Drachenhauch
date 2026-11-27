@@ -1676,15 +1676,15 @@ PRINT Distance(0.0, 0.0, 3.0, 4.0)    ' 5.0 - aus mathlib.dh
    `dhrt paket hole` ablegt (siehe [Pakete](pakete.md)). Braucht ein Paket
    selbst ein Paket, liegt das in seinem eigenen `pakete/` und wird zuerst
    gefunden.
-3. **Jeder Ordner aus `DH_PATH`**, in der angegebenen Reihenfolge (wie
+3. **Jeder Ordner aus `DHRT_PATH`**, in der angegebenen Reihenfolge (wie
    `PATH` und `PYTHONPATH`; Trenner ist `;` unter Windows, sonst `:`).
 4. **`<Benutzerordner>/.drachenhauch/bibliothek`** — der Ort für Dinge, die
    auf diesem Rechner allen Projekten zur Verfügung stehen sollen. Er
    entsteht nicht von selbst; wer ihn anlegt, hat ihn gemeint.
 
 ```bash
-set DH_PATH=D:\dh-bibliothek          &:: Windows
-export DH_PATH=~/dh-bibliothek         # macOS/Linux
+set DHRT_PATH=D:\dh-bibliothek          &:: Windows
+export DHRT_PATH=~/dh-bibliothek         # macOS/Linux
 ```
 
 Wird die Datei nirgends gefunden, nennt die Meldung **alle** durchsuchten

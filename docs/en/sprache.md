@@ -1674,15 +1674,15 @@ PRINT Distance(0.0, 0.0, 3.0, 4.0)    ' 5.0 - from mathlib.dh
    `dhrt paket hole` puts there (see [Packages](pakete.md)). If a package
    itself needs a package, that one lies in its own `pakete/` and is found
    first.
-3. **Every folder from `DH_PATH`**, in the order given (like
+3. **Every folder from `DHRT_PATH`**, in the order given (like
    `PATH` and `PYTHONPATH`; the separator is `;` on Windows, `:` elsewhere).
 4. **`<user folder>/.drachenhauch/bibliothek`** — the place for things that
    should be available to all projects on this machine. It is not
    created automatically; whoever creates it meant it.
 
 ```bash
-set DH_PATH=D:\dh-bibliothek          &:: Windows
-export DH_PATH=~/dh-bibliothek         # macOS/Linux
+set DHRT_PATH=D:\dh-bibliothek          &:: Windows
+export DHRT_PATH=~/dh-bibliothek         # macOS/Linux
 ```
 
 If the file is not found anywhere, the message names **all** the places

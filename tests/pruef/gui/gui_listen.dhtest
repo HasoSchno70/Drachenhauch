@@ -77,7 +77,7 @@ END TRY
 DHRT_FRAMES=1
 --- erwartet
 GUI_LISTBOX_ITEM: Eintrag 4 gibt es nicht (die Liste hat 4)
-GUI_LISTBOX_SET: unbekannter Schluessel 'farbe' -- mehrfachauswahl, kaestchen, bearbeitbar
+GUI_LISTBOX_SET: unbekannter Schluessel 'farbe' -- moeglich sind mehrfachauswahl/multi_select, kaestchen/checkboxes, bearbeitbar/editable
 
 === strg klick sammelt umschalt klick spannt (1)
 IMPORT "gui"

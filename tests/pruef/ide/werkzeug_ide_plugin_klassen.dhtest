@@ -110,7 +110,7 @@ pr gefiltert |Hund : Tier   (b.dh)|rasse AS STRING
 === ohne die ide endet das plugin gleich
 ' Allein gestartet ist PLUGIN_LAEUFT() FALSE -- das Plugin fragt dann
 ' nichts (jede Frage wartete zwei Sekunden auf eine Antwort) und endet.
-SETENV("DH_PATH", ARG$(1))
+SETENV("DHRT_PATH", ARG$(1))
 DIM t0 AS INTEGER : t0 = MILLIS()
 DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0))
 WHILE PROCESS_RUNNING(p) AND MILLIS() - t0 < 20000 : SLEEP(20) : WEND

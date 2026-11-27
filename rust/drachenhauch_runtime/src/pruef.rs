@@ -265,6 +265,22 @@ pub fn parameter(wurzel: &Path, ordner: &Path) -> Vec<Befund> {
             }
         }
     }
+    // Ein neuer Name oder Zweitname traegt dieselben Parameter wie sein
+    // Befehl -- benannte Argumente duerfen nicht davon abhaengen, welchen
+    // Namen man schreibt (Bericht B6.4; SPRITE_COLLIDE hiess (a, b),
+    // SPRITE_COLLIDES (sp1, sp2)).
+    for (neu, alt) in crate::namen::alle_paare() {
+        let (n, a) = (neu.to_uppercase(), alt.to_uppercase());
+        if let (Some(pn), Some(pa)) = (index.get(&n), index.get(&a)) {
+            // Ein Getter oder Setter, der aus einem Befehl mit optionalem
+            // Wert wurde (GUI_PALETTE([on]) -> GUI_PALETTE_IS_OPEN()), nimmt
+            // nur einen Anfang davon.
+            if !pa.starts_with(pn) && !pn.starts_with(pa) {
+                funde.push(("daten/builtin_index.json".into(), 0, n.clone(),
+                    format!("Parameter ({}) -- {} nennt sie ({})", pn.join(", "), a, pa.join(", "))));
+            }
+        }
+    }
     funde
 }
 
@@ -324,9 +340,10 @@ pub fn zaehlungen(wurzel: &Path) -> Vec<Befund> {
 /// ("`KEY_A` bis `KEY_Z`") gelten als Abdeckung.
 pub fn konstanten(ordner: &Path) -> Vec<Befund> {
     let doku: String = md_dateien(ordner, None).iter().map(|d| lesen(d)).collect::<Vec<_>>().join("\n");
-    let bereiche: [(&str, &str); 4] = [
+    let bereiche: [(&str, &str); 5] = [
         (r"^KEY_[A-Z]$", "`KEY_A` bis `KEY_Z`"), (r"^KEY_[0-9]$", "`KEY_0` bis `KEY_9`"),
         (r"^KEY_F\d+$", "`KEY_F1` bis `KEY_F12`"), (r"^KEY_KP\d$", "`KEY_KP0` bis `KEY_KP9`"),
+        (r"^KEY_KP_\d$", "`KEY_KP_0` bis `KEY_KP_9`"),
     ];
     let bereich_re: Vec<(Regex, &str)> = bereiche.iter().map(|(m, t)| (Regex::new(m).unwrap(), *t)).collect();
     // Nur die KEY_*-Namen -- die JOY_*-Codes derselben Tabelle sind Gamepad-Knoepfe

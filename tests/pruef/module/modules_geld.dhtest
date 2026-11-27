@@ -212,7 +212,7 @@ GELD_TEILEN: die Anzahl muss groesser als 0 sein
 IMPORT "geld"
 PRINT GELD_NEU("1,00") + 1.0
 --- fehler
-+ : GELD und eine gewoehnliche Zahl mischen sich nicht -- genau dafuer gibt es den Typ. Entweder GELD_NEU(zahl) daraus machen oder mit GELD_ZAHL(betrag) bewusst herausgehen.
++ : GELD und eine gewoehnliche Zahl mischen sich nicht -- genau dafuer gibt es den Typ. Entweder MONEY_NEW(zahl) daraus machen oder mit GELD_ZAHL(betrag) bewusst herausgehen.
 
 === euro mal euro
 IMPORT "geld"
@@ -226,13 +226,13 @@ IMPORT "geld"
 DIM x AS GELD
 x = 5
 --- fehler
-Zuweisung an 'x': Erwartet GELD, erhalten INTEGER -- mit GELD_NEU(5) einen Betrag daraus machen
+Zuweisung an 'x': Erwartet GELD, erhalten INTEGER -- mit MONEY_NEW(5) einen Betrag daraus machen
 
 === builtin will wirklich geld
 IMPORT "geld"
 PRINT GELD_CENT(5)
 --- fehler
-GELD_CENT: erwartet GELD, erhalten INTEGER -- mit GELD_NEU() einen Betrag daraus machen
+GELD_CENT: erwartet GELD, erhalten INTEGER -- mit MONEY_NEW() einen Betrag daraus machen
 
 === text ohne betrag
 IMPORT "geld"

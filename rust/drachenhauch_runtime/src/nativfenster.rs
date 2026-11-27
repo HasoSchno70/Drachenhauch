@@ -19,7 +19,7 @@
 //! liefert dort `None`, und die gui bleibt beim Rueckfall (ein gui-Fenster im
 //! Hauptfenster). Im Browser gibt es ohnehin nur eine Zeichenflaeche.
 
-#![allow(dead_code)]
+#![cfg_attr(not(all(feature = "graphics", any(windows, target_os = "linux"))), allow(dead_code))]
 
 use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void, CString};
@@ -331,15 +331,15 @@ pub fn os_handle(f: *mut c_void) -> usize {
 /// Gibt es echte Fenster auf diesem System? (Fuer den Rueckfall der gui.)
 pub fn moeglich() -> bool {
     cfg!(all(feature = "graphics", any(windows, target_os = "linux")))
-        && std::env::var("DHRT_OHNE_NATIVE_FENSTER").map(|v| v != "1").unwrap_or(true)
+        && crate::umgebung::var("DHRT_NO_NATIVE_WINDOWS").map(|v| v != "1").unwrap_or(true)
 }
 
 /// Duerfen Popups als eigene Fenster ueber den Rand eines nativen Fensters
 /// hinaus? Nicht unter Wayland: dort bestimmt der Compositor die Lage, ein
 /// Menue stuende irgendwo -- dann bleibt es im Fenster und weicht am Rand
-/// aus wie bisher. `DHRT_OHNE_POPUP_FENSTER=1` schaltet es ab.
+/// aus wie bisher. `DHRT_NO_POPUP_WINDOWS=1` schaltet es ab.
 pub fn popups_moeglich() -> bool {
-    if !moeglich() || std::env::var("DHRT_OHNE_POPUP_FENSTER").map(|v| v == "1").unwrap_or(false) { return false; }
+    if !moeglich() || crate::umgebung::var("DHRT_NO_POPUP_WINDOWS").map(|v| v == "1").unwrap_or(false) { return false; }
     #[cfg(all(feature = "graphics", target_os = "linux"))]
     unsafe { return glfw::glfwGetPlatform() == glfw::PLATFORM_X11; }
     #[allow(unreachable_code)]
@@ -381,7 +381,7 @@ impl Fenster {
             glfwWindowHint(DECORATED, rahmen as c_int);
             // Ein Popup nimmt dem Fenster, aus dem es kommt, nicht den Fokus.
             if popup.is_some() { glfwWindowHint(FOCUS_ON_SHOW, 0); }
-            // Unter `dhrt test` (DHRT_OHNE_EINGABE) wie das Hauptfenster
+            // Unter `dhrt test` (DHRT_NO_INPUT) wie das Hauptfenster
             // (stillfenster.rs): ohne Fokus auf, die echte Maus geht durch --
             // geschickte Nachrichten kommen trotzdem an. Sonst meldete Windows
             // den echten Zeiger, sobald er ueber dem Fenster stand, und ein
@@ -543,6 +543,7 @@ impl Fenster {
     }
     /// Das Fenster des Betriebssystems (unter Windows das HWND), 0 sonst --
     /// fuer die Eingabemethode (ImmSetCompositionWindow).
+    #[cfg_attr(not(windows), allow(dead_code))]
     pub fn os_handle(&self) -> usize { os_handle(self.handle) }
 
     /// Das Hauptfenster als Besitzer (Weg E, Stufe 2): unter Windows bleibt
@@ -684,7 +685,7 @@ pub fn zeiger_flaeche(gefangen: Option<u32>, drinnen: &[(u32, bool)]) -> u32 {
 /// Massstab eines nativen Fensters: Dichte seines Schirms durch die des
 /// Hauptfensters -- die gui ist fuer den Schirm des Hauptfensters gebaut
 /// (`GUI_SCALE(WINDOW_DPI_X())`), ein Fenster auf einem dichteren Schirm
-/// soll dort genauso gross aussehen. `vorgabe` (DHRT_NATIV_MASSSTAB) gilt
+/// soll dort genauso gross aussehen. `vorgabe` (DHRT_NATIVE_SCALE) gilt
 /// vor allem anderen; auf eine Hundertstel gerundet, damit ein Schirm mit
 /// 125 % neben einem mit 150 % nicht bei jedem Bild ein anderes Ergebnis gibt.
 pub fn verhaeltnis(nativ: f32, haupt: f32, vorgabe: Option<f32>) -> f32 {
@@ -696,11 +697,11 @@ pub fn verhaeltnis(nativ: f32, haupt: f32, vorgabe: Option<f32>) -> f32 {
 pub fn pixel(n: i32, k: f32) -> i32 { if k == 1.0 { n } else { ((n as f32 * k).round() as i32).max(1) } }
 /// Pixel des Fensters -> Punkte der gui (Maus, Groesse vom System).
 pub fn punkte(n: f64, k: f32) -> f64 { if k == 1.0 { n } else { n / k as f64 } }
-/// DHRT_NATIV_MASSSTAB: fester Massstab fuer alle nativen Fenster -- fuer
+/// DHRT_NATIVE_SCALE: fester Massstab fuer alle nativen Fenster -- fuer
 /// Pruefungen ohne zweiten Schirm, und wer es auf einem Schirm groesser will.
 pub fn massstab_vorgabe() -> Option<f32> {
     static V: std::sync::OnceLock<Option<f32>> = std::sync::OnceLock::new();
-    *V.get_or_init(|| std::env::var("DHRT_NATIV_MASSSTAB").ok().and_then(|s| s.trim().parse::<f32>().ok()))
+    *V.get_or_init(|| crate::umgebung::var("DHRT_NATIVE_SCALE").ok().and_then(|s| s.trim().parse::<f32>().ok()))
 }
 
 #[cfg(test)]

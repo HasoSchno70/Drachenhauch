@@ -110,7 +110,7 @@ PLAYSOUND(s)
 
 ## Testing without a microphone
 
-`DHRT_MIKROFON=datei.wav` turns a WAV file into a microphone: it is then the
+`DHRT_MICROPHONE=datei.wav` turns a WAV file into a microphone: it is then the
 only device (`Datei: name.wav`) and is fed in real time and in a loop —
 through the same path as the values of a real device. That is how
 `tests/pruef/ton/mikrofon.dhtest` tests level, pitch, spectrum, waveform and

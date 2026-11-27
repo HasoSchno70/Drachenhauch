@@ -293,7 +293,7 @@ module.exports = (H) => [
       'SLEEP(3000)',
       'PRINT MIC_RECORD_SAVE("stimme.wav"); " Werte"',
     ]),
-  H.note("Ohne Mikrofon zum Ausprobieren: Die Umgebungsvariable DHRT_MIKROFON=datei.wav macht aus einer WAV-Datei ein Mikrofon, das sie in Schleife abspielt. Unter Windows muss in den Datenschutz-Einstellungen der Mikrofon-Zugriff für Desktop-Apps erlaubt sein; macOS fragt beim ersten MIC_START."),
+  H.note("Ohne Mikrofon zum Ausprobieren: Die Umgebungsvariable DHRT_MICROPHONE=datei.wav macht aus einer WAV-Datei ein Mikrofon, das sie in Schleife abspielt. Unter Windows muss in den Datenschutz-Einstellungen der Mikrofon-Zugriff für Desktop-Apps erlaubt sein; macOS fragt beim ersten MIC_START."),
 
   H.h2("Räumliches Audio: Listener & Emitter"),
   H.p("Für 2D-/3D-Spiele mit Ortsgefühl: Ein Listener ist das „Ohr“ der Szene (meist an Kamera oder Spielfigur gebunden), ein Emitter eine Klangquelle irgendwo in der Welt. Kira übernimmt selbst die Berechnung von Panning und Lautstärke-Abnahme mit der Entfernung – du musst nichts selbst rechnen."),

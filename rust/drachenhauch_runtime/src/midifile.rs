@@ -372,6 +372,7 @@ impl Datei {
     pub fn noten_zahl(&mut self) -> usize { self.ansicht().noten.len() }
     pub fn note(&mut self, i: usize) -> Option<Note> { self.ansicht().noten.get(i).cloned() }
     /// Alle Kanalnachrichten mit Zeit -- fuer das Abspielen.
+    #[cfg_attr(not(feature = "midi"), allow(dead_code))]
     pub fn ablauf(&mut self) -> Vec<(f64, Vec<u8>)> {
         self.ansicht().ereignisse.iter().map(|(t, _, m)| (*t, m.clone())).collect()
     }

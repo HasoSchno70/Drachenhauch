@@ -143,3 +143,11 @@ END TRY
 5.0
 PHYS3D_BODY_X: einen Koerper 7 gibt es nicht -- nie angelegt oder mit PHYS3D_REMOVE entfernt
 PHYS3D_SET_POS: einen Koerper 0 gibt es nicht -- nie angelegt oder mit PHYS3D_REMOVE entfernt
+
+=== die welt heisst auch phys3d_world
+' Bericht B7: zweiter Typname wie PHYS2D_WORLD (namen::TYPEN).
+IMPORT "physics3d"
+DIM w AS PHYS3D_WORLD = PHYS3D_NEW()
+PRINT w IS PHYS3D_WORLD; " "; w IS PHYS_WORLD; " "; TYPEOF(w)
+--- erwartet
+TRUE TRUE PHYS_WORLD

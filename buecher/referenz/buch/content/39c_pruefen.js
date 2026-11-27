@@ -49,7 +49,7 @@ module.exports = (H) => [
       'LOG_WARN("Kein Netz -- arbeite mit den gespeicherten Daten")',
       'LOG_ERROR("Datenbank nicht lesbar")',
     ]),
-  H.p("Wie viel davon erscheint, steuert die Umgebungsvariable DH_LOG: debug zeigt alles, info ist die Vorgabe (INFO, WARN, ERROR), warn zeigt nur noch Warnungen und Fehler, error nur Fehler, und aus schweigt ganz."),
+  H.p("Wie viel davon erscheint, steuert die Umgebungsvariable DHRT_LOG: debug zeigt alles, info ist die Vorgabe (INFO, WARN, ERROR), warn zeigt nur noch Warnungen und Fehler, error nur Fehler, und aus schweigt ganz."),
   H.tip("Debug-Meldungen dürfen stehenbleiben", "LOG_DEBUG schweigt, bis jemand es einschaltet. Damit müssen die Meldungen, die beim Suchen eines Fehlers geholfen haben, nicht wieder aus dem Code – sie stören den Normalbetrieb nicht und sind beim nächsten Mal sofort wieder da."),
 
   H.h2("Prüfsummen: sind das noch dieselben Daten?"),

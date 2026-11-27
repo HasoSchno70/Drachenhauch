@@ -31,7 +31,7 @@ IMPORT "sprite"
 | `SPRITE_COLLIDES(sp1, sp2)` → BOOLEAN | AABB of two sprites |
 | `SPRITE_HIT_BOX(sp, x, y, w, h)` → BOOLEAN | AABB test of the sprite against a rectangle `(x, y, w, h)` |
 | `SPRITE_HIT_POINT(sp, x, y)` → BOOLEAN | is the point `(x, y)` inside the sprite? (mouse click test) |
-| `SPRITE_COLLIDE(a, b)` → BOOLEAN | do two sprites overlap? (rectangle against rectangle) |
+| `SPRITE_COLLIDE(sp1, sp2)` → BOOLEAN | do two sprites overlap? (rectangle against rectangle) |
 
 ## Sheet layout
 

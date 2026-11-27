@@ -142,6 +142,7 @@ pub struct CoroState {
     pub try_handlers: Vec<(usize, usize)>,
 }
 
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub struct Particle {
     pub x: f64, pub y: f64, pub vx: f64, pub vy: f64,
     pub lifetime: i32, pub age: i32, pub size: i32, pub color: i64,
@@ -203,7 +204,11 @@ impl SaveHandle {
     pub fn set(&mut self, k: String, v: Value) {
         if let Some(e) = self.data.iter_mut().find(|(key, _)| key == &k) { e.1 = v; } else { self.data.push((k, v)); }
     }
-    pub fn remove(&mut self, k: &str) { self.data.retain(|(key, _)| key != k); }
+    pub fn remove(&mut self, k: &str) -> bool {
+        let vorher = self.data.len();
+        self.data.retain(|(key, _)| key != k);
+        self.data.len() != vorher
+    }
 }
 
 /// FILE-Handle. `r`-Modus nutzt BufReader (READLINE/ENDOFFILE), `w`/`a` File.
@@ -260,6 +265,7 @@ pub struct TweenObj {
 }
 
 /// Zustand eines `sprite`-Objekts (entspricht `_Sprite`).
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub struct SpriteObj {
     pub tex_idx: i64,
     pub frame_w: i32,
@@ -471,7 +477,9 @@ impl Cells {
 
     // Typisierte Direkt-Zugriffe fuer Bulk-Fast-Paths (weitere Varianten
     // bei Bedarf ergaenzen -- Konsumenten matchen sonst direkt auf Cells).
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     pub fn as_ints(&self) -> Option<&[i64]> { if let Cells::Int(v) = self { Some(v) } else { None } }
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     pub fn as_vals(&self) -> Option<&[Value]> { if let Cells::Val(v) = self { Some(v) } else { None } }
 }
 
@@ -624,7 +632,6 @@ impl DhMap {
     pub fn entries(&self) -> &indexmap::map::Slice<String, Value> { self.eintraege.as_slice() }
 
     pub fn len(&self) -> usize { self.eintraege.len() }
-    pub fn is_empty(&self) -> bool { self.eintraege.is_empty() }
 
     pub fn get(&self, k: &str) -> Option<&Value> { self.eintraege.get(k) }
 
@@ -802,6 +809,7 @@ impl Rueckruf {
     }
 
     /// Nur fuer das Wiederherstellen aus einer Datei (dort steht bloss ein Name).
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     pub fn benannt(name: &str) -> Rueckruf {
         Rueckruf { name: Rc::from(name), empfaenger: None, vorab: Vec::new() }
     }
@@ -812,6 +820,7 @@ impl Rueckruf {
     /// Ebenso ein Lambda: sein Name (`__lambda_3`) haengt an der Stelle im
     /// Quelltext und verschiebt sich mit jeder Aenderung davor -- in einer
     /// Datei zeigte er bald auf ein anderes Lambda.
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     pub fn ist_gebunden(&self) -> bool {
         self.empfaenger.is_some() || !self.vorab.is_empty() || self.name.starts_with("__lambda_")
     }

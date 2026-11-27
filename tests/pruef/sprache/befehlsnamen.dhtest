@@ -211,3 +211,96 @@ DE893704 TRUE TRUE TRUE TRUE FALSE
 TRUE
 1 6263
 FALSE a%20b
+
+=== zaehlen heisst count, laenge len, zweitnamen sind derselbe befehl
+' Bericht B2/B5: JSON_COUNT, ARRAY_DIM_LEN, XML_NAME_COUNT; SAVE_GET_KEYS
+' als Feld, SAVE_DELETE sagt, ob es den Schluessel gab, LEN nimmt einen
+' BUFFER; EOF ist ENDOFFILE (dieselbe Meldung, mit dem geschriebenen Namen).
+IMPORT "json"
+IMPORT "xml"
+IMPORT "save"
+DIM j AS JSON_HANDLE = JSON_PARSE("[1, 2, 3]")
+DIM f[2, 5] AS INTEGER
+DIM x AS XML_HANDLE = XML_PARSE("<a><b/><b/><c/></a>")
+PRINT JSON_COUNT(j, ""); " "; ARRAY_DIM_LEN(f, 1); " "; XML_NAME_COUNT(x, "b")
+DIM s AS SAVE_HANDLE = SAVE_NEW()
+SAVE_SET_INT(s, "zwei", 2)
+SAVE_SET_INT(s, "eins", 1)
+DIM k AS ARRAY OF STRING = SAVE_GET_KEYS(s)
+PRINT LEN(k); " "; k[0]; " "; SAVE_DELETE(s, "eins"); " "; SAVE_DELETE(s, "eins")
+PRINT LEN(BUFFER_FROM_HEX("0A0B0C"))
+WRITEALL("t.txt", "x")
+DIM d AS FILE = OPENFILE("t.txt", "w")
+TRY
+    PRINT EOF(d)
+CATCH e
+    PRINT e
+END TRY
+CLOSEFILE(d)
+--- erwartet
+3 5 2
+2 eins TRUE FALSE
+3
+EOF: Datei wurde nicht im Lese-Modus geoeffnet
+
+=== zweitnamen fuer parameter: x fuer x_mm, line1 fuer z1
+' Bericht B6.3: PDF_TEXT heisst (p, x_mm, y_mm, text$) -- `x:` meint x_mm;
+' GUI_TEXTAREA_SELECT hiess (z1, s1, z2, s2), heute (line1, column1, ...),
+' die alten Namen gehen weiter. Uebersetzt der Compiler, ist es bewiesen.
+IMPORT "pdf"
+DIM p AS PDF = PDF_NEW()
+PDF_TEXT(p, x: 20, y: 30, text: "Hallo")
+PRINT FILE_EXISTS(path: "gibtsnicht.txt")
+--- erwartet
+FALSE
+
+=== image sound und file sind namen, keine schluesselwoerter
+' Bericht C4.4: ein Parameter `file` oder eine Variable `sound` ging bis
+' 2026.53 nicht ("Erwartet Parametername"); als Typ gelten sie weiter.
+FUNCTION laenge(file AS STRING) AS INTEGER
+    RETURN LEN(file)
+END FUNCTION
+DIM sound AS INTEGER = 3
+WRITEALL("x.txt", "abc")
+DIM f AS FILE = OPENFILE("x.txt", "r")
+PRINT laenge("abcd"); " "; sound; " "; f IS FILE
+CLOSEFILE(f)
+--- erwartet
+4 3 TRUE
+
+=== ein zweitname darf in mehreren gruppen stehen
+' `v` hiess bei AUDIO_SET_VOLUME die Lautstaerke, bei anderen Befehlen die
+' Zahl; FONT_SET hiess sein Argument `handle`, SETFONT schon immer `font`.
+' Beide alten Namen gelten weiter (Bericht B6, E1).
+' Uebersetzt wird alles; die Laufzeit nennt danach den Kanal, an der Stelle,
+' an die der Name gehoert.
+PRINT "uebersetzt"
+AUDIO_MUSIC_SET_VOLUME(v: 0.25)
+PRINT "musik ok"
+TRY
+    AUDIO_SET_VOLUME(v: 0.5, ch: 7)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_NO_AUDIO=1
+--- erwartet
+uebersetzt
+musik ok
+AUDIO_SET_VOLUME: ungueltiges Handle 7
+
+=== font_set nimmt font wie setfont, handle bleibt gueltig
+TRY
+    SCREEN(100, 60, "t", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+FONT_SET(font: -1)
+FONT_SET(handle: -1, size: 14)
+SETFONT(font: -1)
+PRINT "ok"
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+ok

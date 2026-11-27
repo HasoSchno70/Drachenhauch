@@ -533,7 +533,7 @@ impl Effect for FftTapEffect {
         // Abholen -- ein verpasster Block waere ein Knacks in der Aufnahme.
         let g = f32::from_bits(MASTER_GAIN.load(Relaxed));
         let spitze = input.iter().fold(0.0f32, |m, f| m.max(f.left.abs()).max(f.right.abs())) * g;
-        let _ = PEAK.fetch_update(Relaxed, Relaxed, |alt| {
+        let _ = PEAK.try_update(Relaxed, Relaxed, |alt| {
             if spitze > f32::from_bits(alt) { Some(spitze.to_bits()) } else { None }
         });
         if let Ok(mut a) = AUFNAHME.lock() {
@@ -1085,7 +1085,7 @@ impl Audio {
     /// Abtastwerte teilt Kira (`StaticSoundData` haelt sie in einem Arc).
     pub fn sound_kopie(&mut self, idx: i64, fn_: &str) -> Result<i64, String> {
         let data = self.slot(idx, fn_)?.data.clone()
-            .ok_or_else(|| format!("{}: Klang wurde freigegeben (UNLOADSOUND)", fn_))?;
+            .ok_or_else(|| format!("{}: Klang wurde freigegeben (SOUND_FREE)", fn_))?;
         Ok(self.push_slot(data, 1.0))
     }
 
@@ -1096,7 +1096,7 @@ impl Audio {
 
     pub fn sound_dauer(&self, idx: i64) -> Result<Duration, String> {
         let d = self.slot(idx, "SPEAK")?.data.as_ref()
-            .ok_or_else(|| "SPEAK: Klang wurde freigegeben (UNLOADSOUND)".to_string())?;
+            .ok_or_else(|| "SPEAK: Klang wurde freigegeben (SOUND_FREE)".to_string())?;
         Ok(Duration::from_secs_f64(d.frames.len() as f64 / d.sample_rate.max(1) as f64))
     }
 
@@ -1109,7 +1109,7 @@ impl Audio {
     pub fn speech_play(&mut self, idx: i64, verzoegerung: Duration) -> Result<(), String> {
         let settings = StaticSoundSettings::new().start_time(StartTime::Delayed(verzoegerung));
         let data = self.slot(idx, "SPEAK")?.data.as_ref()
-            .ok_or_else(|| "SPEAK: Klang wurde freigegeben (UNLOADSOUND)".to_string())?
+            .ok_or_else(|| "SPEAK: Klang wurde freigegeben (SOUND_FREE)".to_string())?
             .clone().with_settings(settings);
         let handle = self.speech_track.play(data).map_err(|e| format!("SPEAK: {}", kira_text(&e)))?;
         self.speech_handles.retain(|h| h.state() != PlaybackState::Stopped);
@@ -1626,7 +1626,6 @@ resonance/reverb/distortion", other)),
 
     // ================= FFT =================
     /// Fuellt `out` mit B logarithmisch verteilten Band-Pegeln (0..1).
-    /// (Mathematik verbatim aus audio.rs.)
     pub fn fft_bands(&mut self, out: &mut [f32]) {
         let mut proben = [0.0f32; FFT_N];
         {
@@ -1898,7 +1897,7 @@ resonance/reverb/distortion", other)),
     fn spieldaten(&self, idx: i64, fn_: &str, endlos: bool) -> Result<StaticSoundData, String> {
         let s = self.slot(idx, fn_)?;
         let data = s.data.as_ref()
-            .ok_or_else(|| format!("{}: Sound {} wurde freigegeben (UNLOADSOUND)", fn_, idx))?;
+            .ok_or_else(|| format!("{}: Sound {} wurde freigegeben (SOUND_FREE)", fn_, idx))?;
         Ok(if endlos { s.schleife.as_ref().unwrap_or(data) } else { data }.clone())
     }
 
@@ -2018,7 +2017,7 @@ resonance/reverb/distortion", other)),
         let (src_frames, src_sr) = {
             let s = self.slot(quelle, "AUDIO_SOUND_MIX")?;
             let d = s.data.as_ref()
-                .ok_or("AUDIO_SOUND_MIX: die Quelle wurde bereits mit UNLOADSOUND freigegeben")?;
+                .ok_or("AUDIO_SOUND_MIX: die Quelle wurde bereits mit SOUND_FREE freigegeben")?;
             (d.frames.clone(), d.sample_rate)
         };
         let (gl, gr, mono) = match pan {
@@ -2032,7 +2031,7 @@ resonance/reverb/distortion", other)),
         let v = vol as f32;
         let z = self.slot_mut(ziel, "AUDIO_SOUND_MIX")?;
         let d = z.data.as_mut()
-            .ok_or("AUDIO_SOUND_MIX: das Ziel wurde bereits mit UNLOADSOUND freigegeben")?;
+            .ok_or("AUDIO_SOUND_MIX: das Ziel wurde bereits mit SOUND_FREE freigegeben")?;
         let dst_sr = d.sample_rate;
         let start = (offset_ms / 1000.0 * dst_sr as f64).round() as usize;
         // Der Puffer ist ein Arc: solange niemand sonst ihn haelt (der Klang
@@ -2074,7 +2073,7 @@ resonance/reverb/distortion", other)),
         }
         let z = self.slot_mut(idx, "AUDIO_SOUND_NORMALIZE")?;
         let d = z.data.as_mut()
-            .ok_or("AUDIO_SOUND_NORMALIZE: dieser Klang wurde bereits mit UNLOADSOUND freigegeben")?;
+            .ok_or("AUDIO_SOUND_NORMALIZE: dieser Klang wurde bereits mit SOUND_FREE freigegeben")?;
         let peak = d.frames.iter().fold(0.0f32, |m, f| m.max(f.left.abs()).max(f.right.abs()));
         if peak <= 0.0 { return Ok(1.0); }
         let faktor = spitze as f32 / peak;
@@ -2138,7 +2137,7 @@ resonance/reverb/distortion", other)),
         let slot = self.sounds.get(idx as usize)
             .ok_or_else(|| format!("AUDIO_SOUND_WAVE: ungueltiges SOUND-Handle {}", idx))?;
         let data = slot.data.as_ref()
-            .ok_or("AUDIO_SOUND_WAVE: dieser Klang wurde bereits mit UNLOADSOUND freigegeben")?;
+            .ok_or("AUDIO_SOUND_WAVE: dieser Klang wurde bereits mit SOUND_FREE freigegeben")?;
         let frames = &data.frames;
         let n = frames.len();
         if n == 0 { return Ok(vec![0.0; anzahl as usize]); }
@@ -2175,7 +2174,7 @@ resonance/reverb/distortion", other)),
         let slot = self.sounds.get(idx as usize)
             .ok_or_else(|| format!("AUDIO_SAVE_WAV: ungueltiges SOUND-Handle {}", idx))?;
         let data = slot.data.as_ref()
-            .ok_or("AUDIO_SAVE_WAV: dieser Klang wurde bereits mit UNLOADSOUND freigegeben")?;
+            .ok_or("AUDIO_SAVE_WAV: dieser Klang wurde bereits mit SOUND_FREE freigegeben")?;
         let sr = data.sample_rate;
         // Stereo nur, wenn die Kanaele sich unterscheiden -- AUDIO_TONE & Co.
         // legen denselben Wert auf beide, und eine doppelt so grosse Datei
@@ -2236,7 +2235,7 @@ resonance/reverb/distortion", other)),
         let slot = self.sounds.get(idx as usize)
             .ok_or_else(|| format!("SAMPLE_FROM_SOUND: ungueltiges SOUND-Handle {}", idx))?;
         let data = slot.data.as_ref()
-            .ok_or("SAMPLE_FROM_SOUND: dieser Klang wurde bereits mit UNLOADSOUND freigegeben")?;
+            .ok_or("SAMPLE_FROM_SOUND: dieser Klang wurde bereits mit SOUND_FREE freigegeben")?;
         let sr = data.sample_rate;
         let mono: Vec<f32> = data.frames.iter().map(|f| (f.left + f.right) * 0.5).collect();
         if mono.is_empty() { return Err("SAMPLE_FROM_SOUND: der Klang ist leer".into()); }
@@ -2770,7 +2769,7 @@ resonance/reverb/distortion", other)),
 }
 
 // ======================================================================
-// Pure DSP-Helfer (verbatim aus audio.rs -- gleiche Mathematik)
+// Reine DSP-Helfer: ohne Kira und ohne Geraet, darum mit Rust-Tests pruefbar
 // ======================================================================
 
 /// Die Wellenformen der Ton-Befehle: EINE Tafel fuer AUDIO_TONE, AUDIO_NOTE,

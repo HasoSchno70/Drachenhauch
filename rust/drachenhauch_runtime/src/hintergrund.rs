@@ -103,7 +103,7 @@ impl<T: Send + 'static> Auftraege<T> {
 
     /// Die Kurzbeschreibung eines Auftrags (`HTTP_URL$`); leer, wenn es die
     /// Nummer nicht (mehr) gibt.
-    #[allow(dead_code)] // nur http
+    #[cfg_attr(not(feature = "http"), allow(dead_code))]
     pub fn was(&self, id: i64) -> String {
         if id < 0 { return String::new(); }
         self.eintraege.get(id as usize).and_then(|e| e.as_ref())
@@ -132,15 +132,6 @@ pub fn shell_arbeit(prog: String, args: Vec<String>) -> Result<ShellErgebnis, St
     })
 }
 
-/// Ergebnis eines Auftrags (`TASK_*`).
-pub struct TaskErgebnis {
-    /// Der Rueckgabewert der Funktion, als Text.
-    pub ergebnis: String,
-    /// Was die Funktion selbst gedruckt hat -- getrennt, damit der Aufrufer
-    /// nicht Ergebnis und Ausgabe auseinanderfieseln muss.
-    pub ausgabe: String,
-}
-
 /// Eine DH-Funktion in einem EIGENEN dhrt-Prozess ausfuehren.
 ///
 /// Warum ein Prozess und kein Thread: `Value` haelt ueberall `Rc`, `Program`
@@ -151,7 +142,7 @@ pub struct TaskErgebnis {
 ///
 /// Laeuft ohne VM, also auf einem Auftrags-Thread wie `shell_arbeit`.
 pub fn task_arbeit(exe: std::path::PathBuf, datei: String, funktion: String,
-                   args: Vec<String>) -> Result<TaskErgebnis, String> {
+                   args: Vec<String>) -> Result<String, String> {
     // Die Argumente gehen ueber die STANDARDEINGABE, nicht ueber die
     // Befehlszeile: die ist unter Windows auf ~32 000 Zeichen begrenzt, und ein
     // Feed oder ein JSON-Dokument als Argument scheiterte mit "Der Dateiname
@@ -210,8 +201,7 @@ pub fn task_arbeit(exe: std::path::PathBuf, datei: String, funktion: String,
         Some(serde_json::Value::Null) | None => String::new(),
         Some(andere) => andere.to_string(),
     };
-    Ok(TaskErgebnis {
-        ergebnis,
-        ausgabe: v.get("ausgabe").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-    })
+    // Was die Funktion gedruckt hat (`ausgabe`), bleibt liegen: ein Auftrag
+    // rechnet, er redet nicht (TASK_RESULT$ im Handbuch).
+    Ok(ergebnis)
 }

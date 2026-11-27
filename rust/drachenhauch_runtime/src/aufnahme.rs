@@ -4,8 +4,8 @@
 //!
 //! dhrt startet sich selbst mit dem Programm; zwei Umgebungsvariablen sagen
 //! der Laufzeit, was sie tun soll (vm_grafik.rs nach SCREEN, `Vm::run` am
-//! Ende): `DHRT_AUFNEHMEN=datei` nimmt Maus und Tasten auf
-//! (AUTOMATION_RECORD), `DHRT_GUI_ZUSTAND_DATEI=datei` schreibt am Ende den
+//! Ende): `DHRT_RECORD=datei` nimmt Maus und Tasten auf
+//! (AUTOMATION_RECORD), `DHRT_GUI_STATE_FILE=datei` schreibt am Ende den
 //! Zustand der gui (GUI_STATE$). Daraus wird ein Fall:
 //!
 //! ```text
@@ -14,9 +14,9 @@
 //! --- datei aufnahme.txt          (die Ereignisse)
 //! --- umgebung
 //! DHRT_FRAMES=...                 (letztes Ereignis + 30 Bilder)
-//! DHRT_ABSPIELEN=aufnahme.txt     (spielt nach SCREEN ab)
-//! DHRT_GUI_ZUSTAND=1              (gibt am Ende GUI_STATE$ aus)
-//! DHRT_ABSEITS=1                  (Fenster aus dem Blick)
+//! DHRT_PLAYBACK=aufnahme.txt     (spielt nach SCREEN ab)
+//! DHRT_GUI_STATE=1              (gibt am Ende GUI_STATE$ aus)
+//! DHRT_OFFSCREEN=1                  (Fenster aus dem Blick)
 //! --- enthaelt
 //! gui-zustand
 //!   textinput#name "Hallo"
@@ -78,7 +78,7 @@ pub(crate) fn fall_text(name: &str, programm: &str, ereignisse: &[String], bilde
     for e in ereignisse { t.push_str(e); t.push('\n'); }
     t.push('\n');
     t.push_str("--- umgebung\n");
-    t.push_str(&format!("DHRT_FRAMES={}\nDHRT_ABSPIELEN=aufnahme.txt\nDHRT_GUI_ZUSTAND=1\nDHRT_ABSEITS=1\n", bilder));
+    t.push_str(&format!("DHRT_FRAMES={}\nDHRT_PLAYBACK=aufnahme.txt\nDHRT_GUI_STATE=1\nDHRT_OFFSCREEN=1\n", bilder));
     t.push_str("--- enthaelt\ngui-zustand\n");
     for z in zustand { if !z.trim().is_empty() { t.push_str(z.trim_end()); t.push('\n'); } }
     t
@@ -120,8 +120,8 @@ pub fn main(args: &[String]) -> ExitCode {
     let mut cmd = std::process::Command::new(exe);
     cmd.arg("run");
     if let Some(n) = bilder { cmd.arg("--bilder").arg(n.to_string()); }
-    cmd.arg(&programm).env("DHRT_AUFNEHMEN", &ev).env("DHRT_GUI_ZUSTAND_DATEI", &zu)
-        .env_remove("DHRT_FRAMES").env_remove("DHRT_ABSPIELEN");
+    cmd.arg(&programm).env("DHRT_RECORD", &ev).env("DHRT_GUI_STATE_FILE", &zu)
+        .env_remove("DHRT_FRAMES").env_remove("DHRT_PLAYBACK").env_remove("DHRT_ABSPIELEN");
     eprintln!("aufnehmen: '{}' -- bedienen, dann das Fenster schliessen", programm.display());
     let status = match cmd.status() { Ok(s) => s, Err(e) => { eprintln!("aufnehmen: {}", e); return ExitCode::from(1); } };
     if !status.success() { eprintln!("aufnehmen: das Programm endete mit {}", status); }
@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn der_fall_ist_vollstaendig() {
         let t = fall_text("klick", "../x.dh", &["e 0 7 1 2 0 0".into()], 40, &["fenster \"T\"".into(), "  label(1) \"ja\"".into()], "2026-11-15 10:00");
-        for s in ["=== klick\n", "--- programm ../x.dh\n", "c 1\ne 0 7 1 2 0 0\n\n", "DHRT_FRAMES=40\n", "DHRT_ABSPIELEN=aufnahme.txt\n", "--- enthaelt\ngui-zustand\nfenster \"T\"\n  label(1) \"ja\"\n"] {
+        for s in ["=== klick\n", "--- programm ../x.dh\n", "c 1\ne 0 7 1 2 0 0\n\n", "DHRT_FRAMES=40\n", "DHRT_PLAYBACK=aufnahme.txt\n", "--- enthaelt\ngui-zustand\nfenster \"T\"\n  label(1) \"ja\"\n"] {
             assert!(t.contains(s), "fehlt: {:?}", s);
         }
     }

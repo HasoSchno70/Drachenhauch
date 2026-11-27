@@ -9,6 +9,7 @@
 //!
 //! Das Textformat ist `YYYY-MM-DD` -- dasselbe, das `DATE$()` liefert. Zwei
 //! Datumsformate im selben System waeren eine Stolperfalle.
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
 
 /// Schaltjahr nach dem gregorianischen Kalender.
 pub fn schaltjahr(jahr: i32) -> bool {

@@ -320,7 +320,7 @@ PRINT STR$(v) = STR$(t)
 --- erwartet
 1
 0
-PLAYSOUND: Sound 0 wurde freigegeben (UNLOADSOUND)
+PLAYSOUND: Sound 0 wurde freigegeben (SOUND_FREE)
 FALSE
 
 === lautstaerke ist linear und hat eine grenze

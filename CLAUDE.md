@@ -71,7 +71,7 @@ Neuer Builtin:
 1. Einen Match-Arm ergänzen: Arity + Typen selbst prüfen (Validierung gehört in
    den Wrapper, nicht ins Backend), Fehlermeldung im gewohnten Wortlaut
    (`"NAME: erwartet …"`, deutsch -- siehe Meldungen).
-2. `daten/builtin_index.json` ergänzen (Name/kind/Signatur/Modul) --
+2. `daten/builtin_index.json` ergänzen (Name/Signatur/Modul) --
    Vervollständigung, Hover und `--check` ziehen daraus. **Die Signatur muss
    stimmen**, der Compiler leitet die erlaubte Argumentzahl daraus ab. Formen:
    `NAME(a, b [, c])`, `NAME(a, b = "")`, `NAME(a, b, ...)`,
@@ -129,7 +129,9 @@ anzuhängen: (1) gibt es den Pfad als Datei -> textuell einfügen
 (`IMPORT "helfer.dh"`), (2) sonst ein eingebautes Modul -> Zeile wird
 Kommentar, (3) sonst `pakete/` von der importierenden Datei aufwärts
 (`dhrt paket`), (4) sonst Fehler. `IMPORT "json"` nimmt also IMMER das
-eingebaute Modul. `IMPORT "x" AS name` = Namensraum (`namensraum.rs`),
+eingebaute Modul. `IMPORT "x.dh" AS name` = Namensraum (`name.Funktion`,
+`namensraum.rs`); bei einem eingebauten Modul gibt `AS` dem Präfix einen
+Zweitnamen (`IMPORT "json" AS j` -> `j_parse`, `preprocess.rs`),
 `IMPORT "serial" OPTIONAL` + `MODULE_AVAILABLE(...)` für Module, die nicht in
 jedem Bau stecken. Fehlerzeilen nennen `datei:zeile` der eingebundenen Datei.
 
@@ -203,7 +205,7 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   `model::func_bauen`/`programm_bauen`: Nachgetragenes nur dort.
 - Objektfelder über `feld_platz`; eine PROPERTY darf NIE in einen Merkplatz.
 - Wer `typ_von` ändert, lässt `dhrt test tests/pruef` mit
-  `DHRT_TYPEN_PRUEFEN=1` laufen.
+  `DHRT_CHECK_TYPES=1` laufen.
 
 **Maschinencode (`jit.rs`, an per Vorgabe, `DHRT_JIT=aus` = nur VM)**
 - Wer eine Regel der VM ändert (`div`, `modulo`, `int_div`, `cmp`, `coerce`,
@@ -214,7 +216,7 @@ Einzelheiten stehen in der Geschichte des Bereichs.
 - Ein Fall, der die VM allein meint, setzt `DHRT_JIT=aus` in `--- umgebung`;
   die CI fährt beide Wege.
 - Gemessen wird mit `dhrt run bench_dhrt.dh` mit UND ohne `DHRT_JIT=aus`,
-  nicht an gezählten Runden (`DHRT_JIT_BILANZ=1` zeigt nur, wo die VM rechnet).
+  nicht an gezählten Runden (`DHRT_JIT_STATS=1` zeigt nur, wo die VM rechnet).
 - Eine Schleife, die fast jede Runde mitten drin aussteigt, bleibt nach
   64 Ausstiegen in der VM (`Schleife::vergeblich`). Gezählt wird in
   `aussteigen_wenn`: ein neuer Weg, mitten drin auszusteigen, muss dort
@@ -277,6 +279,8 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   (`GUI_TABCONTROL_ITEM_RECT` & Co.), statt sie nachzurechnen.
 
 **Meldungen, Doku, Website**
+- Umgebungsvariablen heißen `DHRT_…`, englisch; die alten Namen liest
+  `umgebung.rs` weiter (Tafel dort, Liste in `docs/werkzeuge.md`).
 - Ohne `DHRT_LANG` spricht dhrt die Sprache des Systems (Deutsch nur auf
   einem deutschen, `meldung::sprache`); `dhrt test` spielt seinen Fällen ein
   deutsches System (`DHRT_SYSTEM_LANG=de`), damit die Erwartungen auf
@@ -317,7 +321,7 @@ Einzelheiten stehen in der Geschichte des Bereichs.
   Setter die Abfrage, wird sie gebaut.
 - `--- seriell` nur für echte Einzelstücke (fester Port, Soundkarte, Drucker,
   echte Zwischenablage, Fensternachrichten, MIDI-Port). Jedes Kind bekommt
-  `DHRT_ZWISCHENABLAGE=privat` und `DHRT_OHNE_EINGABE=1`.
+  `DHRT_CLIPBOARD=privat` und `DHRT_NO_INPUT=1`.
 - Aufnahmen (`AUTOMATION_PLAY`): die Wiedergabe beginnt beim ERSTEN Ereignis
   (ein Ereignis in Bild 0 voranstellen), eine Taste bleibt gedrückt bis KEY_UP,
   eine Beilage ohne Zeilenende verliert ihre letzte Zeile, und `KEY_ANY_HIT`
@@ -429,8 +433,8 @@ rust\drachenhauch_runtime\target\release\dhrt pruef      # Doku, Namen, Pfade, M
   alles. `dhrt test` läuft bis zu 8 Dateien nebeneinander, `--- seriell` danach
   allein; jeder Fall hat eine Zeitgrenze (Vorgabe 300 s).
 - Die CI fährt dasselbe auf Windows (mit Grafik), Linux und macOS (ohne
-  Grafik, `DHRT_OHNE_GRAFIK=1`), dazu `cargo check`/`cargo test` je System.
-  `DHRT_OHNE_AUDIO=1` (alter Name `DH_OHNE_AUDIO`) rechnet den Ton stumm in
+  Grafik, `DHRT_NO_GRAPHICS=1`), dazu `cargo check`/`cargo test` je System.
+  `DHRT_NO_AUDIO=1` (alte Namen `DHRT_OHNE_AUDIO`, `DH_OHNE_AUDIO`) rechnet den Ton stumm in
   Echtzeit -- Ton-Faelle laufen dann auch ohne Soundkarte (`AUDIO_IS_SILENT`).
 - **Headless prüfen:** `DHRT_FRAMES=n DHRT_SCREENSHOT=p.png dhrt run x.dh`
   liefert ein Bild; für alles, was sich über die Zeit falsch verhält, der

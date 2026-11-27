@@ -1,0 +1,105 @@
+' GUI_<W>_SET / GUI_<W>_GET nach einer Regel (Bericht A18,
+' gui_einstellungen.rs): Schluessel in jeder Schreibweise, deutsch oder
+' englisch, der Wert als Zahl oder BOOLEAN, jede Art mit ihrer Abfrage, eine
+' Meldungsform fuer unbekannte Schluessel. Format: docs/werkzeuge.md.
+
+=== jede art setzt und liest zurueck
+IMPORT "gui"
+SCREEN(640, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 620, 380)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 10, 10, 100, 80, ["a", "b"])
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 120, 10, 100, 80)
+DIM ak AS GUI_WIDGET : ak = GUI_ACCORDION(w, 230, 10, 100, 80)
+DIM wz AS GUI_WIDGET : wz = GUI_WIZARD(w, 340, 10, 200, 120)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 10, 140, 200, 80)
+DIM sl AS GUI_WIDGET : sl = GUI_SLIDER(w, 10, 230, 100, 0, 10)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 120, 230, 100, 24, ["x", "y"])
+DIM pr AS GUI_WIDGET : pr = GUI_PROGRESS(w, 230, 230, 100, 16)
+DIM ly AS GUI_WIDGET : ly = GUI_LAYOUT(w, "zeile", 10, 270, 200, 40)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 230, 270, 200, 60)
+DIM la AS GUI_WIDGET : la = GUI_LABEL(w, "Text", 450, 230)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 450, 270, 150, 80)
+GUI_LISTBOX_SET(lb, "MULTI_SELECT", TRUE)
+GUI_TREE_SET(tr, "multi_select", 1)
+GUI_ACCORDION_SET(ak, "Mehrere", TRUE)
+GUI_WIZARD_SET(wz, "validate", TRUE)
+GUI_TABCONTROL_SET(tc, "closable", 1)
+GUI_SLIDER_SET(sl, "ticks", 5)
+GUI_DROPDOWN_SET(dd, "editable", TRUE)
+GUI_PROGRESS_SET(pr, "circle", TRUE)
+GUI_LAYOUT_SET(ly, "spacing", 7)
+GUI_TEXTAREA_SET(ta, "tab_width", 3)
+GUI_LABEL_SET(la, "ellipsize", "mitte")
+GUI_TABLE_SET(tb, "zebra", TRUE)
+PRINT GUI_LISTBOX_GET(lb, "mehrfachauswahl"); GUI_TREE_GET(tr, "multi"); GUI_ACCORDION_GET(ak, "multiple"); GUI_WIZARD_GET(wz, "pruefen"); GUI_TABCONTROL_GET(tc, "schliessbar")
+PRINT GUI_SLIDER_GET(sl, "marken"); " "; GUI_DROPDOWN_GET(dd, "bearbeitbar"); GUI_PROGRESS_GET(pr, "kreis"); " "; GUI_LAYOUT_GET(ly, "abstand"); " "; GUI_TEXTAREA_GET(ta, "tabbreite"); " "; GUI_LABEL_GET(la, "kuerzen"); " "; GUI_TABLE_GET(tb, "zebra")
+DIM cp AS GUI_WIDGET : cp = GUI_COLORPICKER(w, 10, 320, 120, 50)
+DIM dp AS GUI_WIDGET : dp = GUI_DATEPICKER(w, 140, 320, 120, 50)
+DIM tp AS GUI_WIDGET : tp = GUI_TIMEPICKER(w, 270, 320)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 380, 320, 100, 50, ".")
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(w, 490, 320, 100, 50)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 490, 10, 100, 24)
+DIM tb2 AS GUI_WIDGET : tb2 = GUI_TOOLBAR(w, 490, 40, 100, 24)
+GUI_COLORPICKER_SET(cp, "alpha", TRUE)
+GUI_DATEPICKER_SET(dp, "week_start", 6)
+GUI_TIMEPICKER_SET(tp, "step", 5)
+GUI_FILETREE_SET(ft, "dirs_first", TRUE)
+GUI_RICHTEXT_SET(rt, "size", 18)
+GUI_TEXTINPUT_SET(tf, "maxlen", 9)
+GUI_TOOLBAR_SET(tb2, "symbol", 20)
+PRINT GUI_COLORPICKER_GET(cp, "deckkraft"); " "; GUI_DATEPICKER_GET(dp, "wochenbeginn"); " "; GUI_TIMEPICKER_GET(tp, "schritt"); " "; GUI_FILETREE_GET(ft, "ordner_zuerst"); " "; GUI_RICHTEXT_GET(rt, "groesse"); " "; GUI_TEXTINPUT_GET(tf, "maxlaenge"); " "; GUI_TOOLBAR_GET(tb2, "symbolgroesse")
+--- erwartet
+11111
+5 11 7 3 2 1
+1 6 5 1 18 9 20
+
+=== ein unbekannter schluessel meldet sich ueberall gleich
+IMPORT "gui"
+SCREEN(320, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 180)
+DIM ak AS GUI_WIDGET : ak = GUI_ACCORDION(w, 10, 10, 100, 80)
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 120, 10, 100, 80)
+TRY
+    GUI_ACCORDION_SET(ak, "viele", 1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT GUI_TREE_GET(tr, "x")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+GUI_ACCORDION_SET: unbekannter Schluessel 'viele' -- moeglich sind mehrere/multiple
+GUI_TREE_GET: unbekannter Schluessel 'x' -- moeglich sind mehrfachauswahl/multi_select, kaestchen/checkboxes, bearbeitbar/editable
+
+=== jede art mit platzhalter setzt und liest ihn
+' Bis 2026.53 liess sich der Hinweis mal nur setzen (Baum, Klappliste,
+' Tabelle), mal nur lesen (Textfeld) -- jetzt beides fuer jede Art.
+IMPORT "gui"
+SCREEN(640, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 620, 280)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 10, 10, 100, 24, "alt")
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 120, 10, 100, 60)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 230, 10, 100, 60, [])
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 340, 10, 100, 24, ["x"])
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 450, 10, 100, 60)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 100, 200, 100)
+GUI_TEXTINPUT_PLACEHOLDER(tf, "Name")
+GUI_TEXTAREA_PLACEHOLDER(ta, "Notiz")
+GUI_LISTBOX_PLACEHOLDER(lb, "leer")
+GUI_DROPDOWN_PLACEHOLDER(dd, "Bitte waehlen")
+GUI_TREE_PLACEHOLDER(tr, "kein Knoten")
+GUI_TABLE_PLACEHOLDER(tb, "Keine Treffer")
+PRINT GUI_TEXTINPUT_PLACEHOLDER$(tf); "|"; GUI_TEXTAREA_PLACEHOLDER$(ta); "|"; GUI_LISTBOX_PLACEHOLDER$(lb); "|"; GUI_DROPDOWN_PLACEHOLDER$(dd); "|"; GUI_TREE_PLACEHOLDER$(tr); "|"; GUI_TABLE_PLACEHOLDER$(tb)
+TRY
+    GUI_TEXTAREA_PLACEHOLDER(dd, "x")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+Name|Notiz|leer|Bitte waehlen|kein Knoten|Keine Treffer
+GUI_TEXTAREA_PLACEHOLDER: das Widget ist kein GUI_TEXTAREA

@@ -11,7 +11,7 @@
 ' Der Blocker haelt sie mit OpenClipboard echt fest (kein Nachbau): nur so
 ' laeuft die Probe durch denselben Weg wie der Fehler im Alltag.
 ' Die echte Zwischenablage des Systems: jeder Fall setzt
-' DHRT_ZWISCHENABLAGE=system (dhrt test gibt sonst jedem Programm eine eigene).
+' DHRT_CLIPBOARD=system (dhrt test gibt sonst jedem Programm eine eigene).
 --- seriell
 
 === eine belegte zwischenablage wird abgewartet
@@ -54,7 +54,7 @@ PROCESS_CLOSE(p)
 --- argumente
 {sammlung}/../_hilfen/zwischenablage_blocker.ps1
 --- umgebung
-DHRT_ZWISCHENABLAGE=system
+DHRT_CLIPBOARD=system
 --- erwartet
 angekommen
 
@@ -83,7 +83,7 @@ PRINT "haette nicht laufen duerfen"
 --- argumente
 {sammlung}/../_hilfen/zwischenablage_blocker.ps1
 --- umgebung
-DHRT_ZWISCHENABLAGE=system
+DHRT_CLIPBOARD=system
 --- fehler
 CLIPBOARD_SET: Text konnte nicht in die Zwischenablage gelegt werden
 
@@ -114,7 +114,7 @@ PRINT "und das Programm laeuft weiter"
 --- argumente
 {sammlung}/../_hilfen/zwischenablage_blocker.ps1
 --- umgebung
-DHRT_ZWISCHENABLAGE=system
+DHRT_CLIPBOARD=system
 --- erwartet
 gelesen: []
 und das Programm laeuft weiter
@@ -125,7 +125,7 @@ PRINT CLIPBOARD_GET()
 CLIPBOARD_SET("")
 PRINT "[" + CLIPBOARD_GET() + "]"
 --- umgebung
-DHRT_ZWISCHENABLAGE=system
+DHRT_CLIPBOARD=system
 --- erwartet
 ganz gewoehnlich
 []

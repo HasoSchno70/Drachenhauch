@@ -384,7 +384,7 @@ DIM k AS SOUND : k = AUDIO_TONE(440, 100)
 UNLOADSOUND(k)
 DIM s AS SAMPLE : s = SAMPLE_FROM_SOUND(k)
 --- fehler
-SAMPLE_FROM_SOUND: dieser Klang wurde bereits mit UNLOADSOUND freigegeben
+SAMPLE_FROM_SOUND: dieser Klang wurde bereits mit SOUND_FREE freigegeben
 
 === ein ungueltiges handle ist ein fehler
 IMPORT "audio"

@@ -944,7 +944,7 @@ extern "C" fn w_builtin_i(k: *mut Kontext, ins: u64, basis: u64, argc: u64, art:
         (1, Value::Int(x)) => x,
         (3, Value::Bool(b)) => b as i64,
         // Die Tabelle der Ergebnis-Typen (typen::builtin_typ) haette nicht
-        // gestimmt -- sie ist mit DHRT_TYPEN_PRUEFEN geprueft. Der Befehl ist
+        // gestimmt -- sie ist mit DHRT_CHECK_TYPES geprueft. Der Befehl ist
         // gelaufen; der Wert kommt als Wert, und der Bereich steigt aus.
         (_, v) => { *w_platz(k, basis) = v; w_fehler(k); 0 }
     }
@@ -1369,7 +1369,7 @@ pub struct Jit {
     arten: Vec<u8>,
     schatten: std::cell::UnsafeCell<Vec<u64>>,
     marken: std::cell::UnsafeCell<Vec<u8>>,
-    /// `DHRT_JIT_BILANZ`, einmal beim Start gelesen.
+    /// `DHRT_JIT_STATS`, einmal beim Start gelesen.
     bilanz: bool,
     /// Wie oft eine Schleife neu gebaut wurde, weil eine Globale dazukam.
     zahl_neu: std::cell::Cell<u32>,
@@ -4081,7 +4081,7 @@ impl Jit {
                  schleifen: RefCell::new(Vec::new()),
                  zahl_schleifen: std::cell::Cell::new(0), zahl_laeufe: std::cell::Cell::new(0),
                  zahl_aussteige: std::cell::Cell::new(0),
-                 bilanz: std::env::var_os("DHRT_JIT_BILANZ").is_some(),
+                 bilanz: crate::umgebung::var_os("DHRT_JIT_STATS").is_some(),
                  zahl_neu: std::cell::Cell::new(0),
                  vm_runden: RefCell::new(Vec::new()),
                  meldung: RefCell::new(None),
@@ -4120,7 +4120,7 @@ impl Jit {
             match self.schleife_bauen(prog, f, kopf, locals, selbst, slots) {
                 Ok(nr) => marke.set(nr as u32 + 2),
                 Err(e) => {
-                    // Mit DHRT_JIT_BILANZ: warum eine Schleife in der VM bleibt.
+                    // Mit DHRT_JIT_STATS: warum eine Schleife in der VM bleibt.
                     if self.bilanz {
                         let wo = format!("Stelle {} in {}", kopf, if f.name.is_empty() { "(Hauptprogramm)" } else { &f.name });
                         eprintln!("{}", crate::meldung::t(&format!("jit: Schleife an {} bleibt in der VM: {}", wo, e)));
@@ -4645,12 +4645,12 @@ impl Jit {
 
 }
 
-/// `DHRT_JIT_BILANZ=1`: am Ende auf stderr, wie viele Schleifen uebersetzt
+/// `DHRT_JIT_STATS=1`: am Ende auf stderr, wie viele Schleifen uebersetzt
 /// wurden und wie oft sie liefen -- fuer Pruefungen, die sehen wollen, DASS
 /// der Maschinencode lief.
 impl Drop for Jit {
     fn drop(&mut self) {
-        if std::env::var_os("DHRT_JIT_BILANZ").is_some() {
+        if crate::umgebung::var_os("DHRT_JIT_STATS").is_some() {
             let f = self.fns.iter().filter(|f| f.is_some()).count();
             eprintln!("{}", crate::meldung::t(&format!("jit: {} Funktionen, {} Schleifen, {} Schleifenlaeufe",
                       f, self.zahl_schleifen.get(), self.zahl_laeufe.get())));

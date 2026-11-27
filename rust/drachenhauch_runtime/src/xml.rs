@@ -53,12 +53,6 @@ impl Knoten {
 
     pub fn anzahl_kinder(&self) -> usize { self.kinder().count() }
 
-    /// Der unmittelbare Text dieses Elements (ohne den seiner Kinder).
-    pub fn text(&self) -> String {
-        self.teile.iter().filter_map(|t| match t { Teil::Text(s) => Some(s.as_str()), _ => None })
-            .collect::<Vec<_>>().join("")
-    }
-
     /// Der Text dieses Elements UND aller Nachfahren, in der richtigen
     /// Reihenfolge -- das, was ein Mensch als "Inhalt" sehen wuerde.
     pub fn text_tief(&self) -> String {

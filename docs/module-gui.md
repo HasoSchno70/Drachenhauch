@@ -97,6 +97,7 @@ IMPORT "gui"
 | `GUI_FORM_VERSION(win, column$[, form$])` | — | Versionsspalte: SAVE speichert nur, wenn die Zeile noch den Stand vom Laden trägt (leer = aus) — siehe [Datenbindung](#datenbindung) |
 | `GUI_FORM_CONFLICT$(win[, form$])` | STRING | warum das letzte SAVE nichts gespeichert hat: `geaendert`, `geloescht` oder leer |
 | `GUI_TEXTAREA_SET(ta, "umbruch", 1)` | — | Textbereich bricht an Wortgrenzen um (Notizen, Briefe) |
+| `GUI_TEXTAREA_GET(ta, key$)` | Zahl | liest jede Einstellung von `GUI_TEXTAREA_SET` zurück (Schalter als 1/0) |
 | `GUI_SET_MIN_SIZE(widget, min_w, min_h)` | — | Mindestmaß: ein gewichtetes Kind im Behälter und ein verankertes Widget schrumpfen nicht darunter |
 | `GUI_GET_MIN_W(widget)` / `GUI_GET_MIN_H(widget)` | INTEGER | das gesetzte Mindestmaß, 0 = keins |
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | was ein Behälter mindestens braucht — der Wert für `WINDOW_MIN_SIZE` |
@@ -107,6 +108,7 @@ IMPORT "gui"
 | `GUI_ERROR_LABEL(field, label)` / `GUI_VALIDATE_LIVE(win, on)` / `GUI_RULES_CLEAR(field)` | — | Beschriftung zeigt die Meldung / beim Verlassen eines Feldes prüfen / Regeln entfernen |
 | `GUI_VSLIDER(win, x, y, h, min, max, default)` | GUI_WIDGET | **senkrechter Schieber** — `h` ist die Länge, der Wert wächst nach oben |
 | `GUI_PROGRESS_SET(progress, "unbestimmt", 1)` | — | laufendes Band statt Wert, für alles, dessen Dauer man nicht kennt |
+| `GUI_PROGRESS_GET(progress, key$)` | Zahl | liest jede Einstellung von `GUI_PROGRESS_SET` zurück (Schalter als 1/0) |
 | `GUI_IMAGE_MODE(image, mode$)` / `GUI_IMAGE_MODE_GET(image)` | — / STRING | `strecken` (Vorgabe), `einpassen`, `fuellen`, `mitte`, `kacheln` |
 | `GUI_TREE_ICON(tree, node, image)` / `GUI_TREE_COLOR(tree, node, color)` | — | Sinnbild und Textfarbe je Baumknoten; statt eines Bildes auch der Name eines eingebauten Sinnbilds (`"ordner"`), `""` nimmt es weg |
 | `GUI_PANEL_ADD(panel, widget)` / `GUI_PANEL_REMOVE` / `GUI_PANEL_SCROLL(panel, y)` / `GUI_PANEL_SCROLL_GET(panel)` | — | ein **Panel, das seine Kinder rollt** (Mausrad, Rollbalken) — siehe [Feinschliff](#feinschliff-schieber-fortschritt-bild-baum-panel-ziehen) |
@@ -117,12 +119,15 @@ IMPORT "gui"
 | `GUI_LAYOUT(win, kind$, x, y, w, h)` | GUI_WIDGET | unsichtbarer **Layout-Behälter**: `zeile`, `spalte`, `fluss` (umbrechend) oder `raster:N` — verteilt seine Kinder in jedem `GUI_UPDATE` (siehe [Layout](#layout-größe-nach-inhalt-und-behälter)) |
 | `GUI_LAYOUT_ADD(layout, widget[, weight])` / `GUI_LAYOUT_SPACER(layout[, weight])` / `GUI_LAYOUT_REMOVE(layout, widget)` | — | Kind anhängen (Gewicht 0 = eigene Größe, ab 1 = Anteil am Restplatz), Leerraum, lösen |
 | `GUI_LAYOUT_SET(layout, key$, value)` | — | `abstand`, `rand`, `ausrichtung` (0/1/2 quer), `dehnen` (quer, Vorgabe an), `rahmen` (sichtbar zum Entwickeln), `auswahl` (Fließlayout: ein Klick wählt ein Kind) |
+| `GUI_LAYOUT_GET(layout, key$)` | Zahl | liest jede Einstellung von `GUI_LAYOUT_SET` zurück (Schalter als 1/0) |
 | `GUI_LAYOUT_SELECTED(layout)` | GUI_WIDGET | im Fließlayout mit `auswahl` gewähltes Kind (-1 = keins); ein Klick wählt, `GUI_CLICKED(layout)` meldet es -- siehe [Bausteine](#bausteine-fließlayout-alt-buchstaben-marken) |
 | `GUI_LAYOUT_SELECT(layout, widget)` | — | ein Kind wählen (-1 = keins) |
 | `GUI_MNEMONICS(on)` | — | Alt-Buchstaben: `&` im Text von Knopf, Kästchen, Radio, Kippschalter und Beschriftung markiert ihn (`&&` = ein `&`) |
 | `GUI_LABEL_SET(label, key$, value)` | — | `kuerzen` (`aus`, `ende`, `mitte`, `anfang` -- mit "..." auf die Breite, der Hilfetext zeigt den ganzen Text), `auswaehlbar` (mit der Maus markieren, Strg+C kopiert) |
+| `GUI_LABEL_GET(label, key$)` | Zahl | liest jede Einstellung von `GUI_LABEL_SET` zurück (Schalter als 1/0) |
 | `GUI_LABEL_SELECTION$(label)` | STRING | was in einer markierbaren Beschriftung markiert ist |
 | `GUI_SLIDER_SET(sl, key$, value)` | — | `marken` (so viele gleichmäßig verteilte, 0 oder 2..101), `wert_zeigen`, `einrasten` (an den Marken), `stellen` (Nachkommastellen der Anzeige) |
+| `GUI_SLIDER_GET(sl, key$)` | Zahl | liest jede Einstellung von `GUI_SLIDER_SET` zurück (Schalter als 1/0) |
 | `GUI_SLIDER_MARK(sl, value [, text$])` | — | eine Marke an diesem Wert, beschriftet unter dem Regler |
 | `GUI_SLIDER_CLEAR_MARKS(sl)` | — | alle Marken weg |
 | `GUI_BUSY(win, x, y, d)` | GUI_WIDGET | ein Kreisel (drehende Punkte) für etwas ohne bekannte Dauer; mit `GUI_PROGRESS_SET(k, "unbestimmt", 0)` ein Ring, der den Wert zeigt |
@@ -161,7 +166,7 @@ IMPORT "gui"
 | `GUI_TOOLBAR_SET_TIP(tb, entry, tip$)` | — | Tooltip eines Eintrags |
 | `GUI_TOOLBAR_SET_TEXT(tb, entry, text$)` | — | Beschriftung eines Eintrags |
 | `GUI_TOOLBAR_SET(tb, key$, value)` | — | `beschriftung` (0/1: Text neben dem Sinnbild), `symbolgroesse` (Punkte, 0 = aus der Höhe) |
-| `GUI_TOOLBAR_GET(tb, key$)` | INTEGER | liest `beschriftung` und `symbolgroesse` zurück |
+| `GUI_TOOLBAR_GET(tb, key$)` | Zahl | liest `beschriftung` und `symbolgroesse` zurück (Schalter als 1/0) |
 | `GUI_TOOLBAR_ITEM_X(tb, entry)` | INTEGER | linke Kante eines Eintrags im Fenster (wie `GUI_GET_X`); ein Eintrag im Überlauf (`GUI_TOOLBAR_OVERFLOW`) hat keine und ist ein Fehler |
 | `GUI_TOOLBAR_ITEM_W(tb, entry)` | INTEGER | Breite eines Eintrags |
 | `GUI_TOOLBAR_OVERFLOW(tb)` | INTEGER | wie viele Knöpfe gerade im »-Menü stehen (0 = alles passt) |
@@ -201,6 +206,8 @@ IMPORT "gui"
 | `GUI_TEXTINPUT_SET(tf, key$, value)` | — | `passwort`, `nur_lesen`, `maxlaenge`, `zahlen` (0 frei, 1 ganze Zahl, 2 Kommazahl, 3 Geldbetrag in Cent), `suche` (Suchfeld mit Lupe und Kreuz) |
 | `GUI_TEXTINPUT_GET(tf, key$)` | INTEGER | liest dieselben Schlüssel zurück (Schalter als 0/1) |
 | `GUI_TEXTINPUT_PLACEHOLDER$(tf)` | STRING | der graue Text im leeren Feld (auch eines `GUI_TEXTAREA`) |
+| `GUI_TEXTINPUT_PLACEHOLDER(tf, text$)` | — | den grauen Text im leeren Feld später ändern |
+| `GUI_TEXTAREA_PLACEHOLDER(ta, text$)` / `GUI_TEXTAREA_PLACEHOLDER$(ta)` | — / STRING | der graue Text im leeren Textbereich |
 | `GUI_UNDO(tf)` / `GUI_REDO(tf)` | BOOLEAN | einen Schritt zurück bzw. wieder vor, wie Strg+Z / Strg+Y (Textfeld und Textbereich); `TRUE`, wenn es einen gab |
 | `GUI_CAN_UNDO(tf)` / `GUI_CAN_REDO(tf)` | BOOLEAN | gibt es einen Schritt? -- etwa für einen Menüeintrag, der sonst ausgegraut ist |
 | `GUI_UNDO_CLEAR(tf)` | — | den Verlauf vergessen (nach dem Laden einer Datei) |
@@ -229,10 +236,12 @@ IMPORT "gui"
 | `GUI_TREE_EXPAND(tree, node, flag)` | — | Knoten auf-/zuklappen |
 | `GUI_TREE_EXPANDED(tree, node)` | BOOLEAN | ist der Knoten aufgeklappt? |
 | `GUI_TREE_SET(tree, key$, value)` | — | Einstellung am Baum: `mehrfachauswahl`, `kaestchen`, `bearbeitbar` (F2 benennt um) |
+| `GUI_TREE_GET(tree, key$)` | Zahl | liest jede Einstellung von `GUI_TREE_SET` zurück (Schalter als 1/0) |
 | `GUI_TREE_EDIT(tree, node)` | — | Knoten umbenennen: Eingabefeld über dem Namen, alles markiert (nicht beim Dateibaum) |
 | `GUI_TREE_EDITED(tree)` | INTEGER | in diesem Bild umbenannter Knoten, -1 = keiner |
 | `GUI_TREE_EDITING(tree)` | INTEGER | Knoten, der gerade umbenannt wird, -1 = keiner |
 | `GUI_TREE_PLACEHOLDER(tree, text$)` | — | Hinweis, wenn der Baum leer ist |
+| `GUI_TREE_PLACEHOLDER$(tree)` | STRING | der gesetzte Hinweis (`""` = keiner) |
 | `GUI_TREE_SEL_COUNT(tree)` | INTEGER | wie viele Knoten ausgewählt sind |
 | `GUI_TREE_SEL_NODE(tree, i)` | INTEGER | die i-te ausgewählte Knoten-id (-1 = keine mehr) |
 | `GUI_TREE_IS_SELECTED(tree, node)` | BOOLEAN | ist dieser Knoten ausgewählt? |
@@ -242,6 +251,7 @@ IMPORT "gui"
 | `GUI_TREE_SET_CHECKED(tree, node, on)` | — | Haken setzen oder wegnehmen |
 | `GUI_FILETREE(win, x, y, w, h, root$ = ".")` | GUI_WIDGET | Dateibaum: holt seine Knoten selbst von der Platte, jeden Ordner erst beim Aufklappen |
 | `GUI_FILETREE_SET(ft, key$, value)` | — | `ordner_zuerst`, `verborgene`, `nur_ordner`, `mehrfachauswahl`, `kaestchen`, `klick_klappt`, `nach_art` (Dateien eines Ordners nach der Reihenfolge der Muster von `GUI_FILETREE_ICON`, ersatzweise `GUI_FILETREE_COLOR`, erst darin nach dem Namen), `auffrischen` (Millisekunden, 0 = nie) |
+| `GUI_FILETREE_GET(ft, key$)` | Zahl | liest jede Einstellung von `GUI_FILETREE_SET` zurück (Schalter als 1/0) |
 | `GUI_FILETREE_FILTER(ft, pattern$)` | — | welche Dateien er zeigt (`*.dh;*.md`, leer = alle) |
 | `GUI_FILETREE_SKIP(ft, names$)` | — | Namen oder Muster, die er überspringt — Ordner wie Dateien (`target;__pycache__;_*`) |
 | `GUI_FILETREE_SET_ROOT(ft, path$)` / `GUI_FILETREE_ROOT$(ft)` | — / STRING | Wurzelordner setzen und lesen |
@@ -266,10 +276,12 @@ IMPORT "gui"
 | `GUI_TABCONTROL_TITLE$(tc, i)` / `GUI_TABCONTROL_SET_TITLE(tc, i, title$)` | STRING / — | Beschriftung einer Seite lesen und setzen |
 | `GUI_TABCONTROL_REMOVE(tc, i)` | — | eine Seite entfernen; ihre Kinder bleiben als Widgets bestehen |
 | `GUI_TABCONTROL_SET(tc, "schliessbar", an)` | — | jeder Reiter bekommt ein Kreuz; geschlossen wird nichts, gemeldet wird über `GUI_TABCONTROL_CLOSED` |
+| `GUI_TABCONTROL_GET(tc, key$)` | Zahl | liest jede Einstellung von `GUI_TABCONTROL_SET` zurück (Schalter als 1/0) |
 | `GUI_TABCONTROL_CLOSED(tc)` | INTEGER | welche Seite in diesem Bild zu soll (Kreuz oder mittlere Maustaste), -1 = keine; das Programm entfernt sie selbst |
 | `GUI_RICHTEXT(win, x, y, w, h, text$ = "")` | GUI_WIDGET | **gesetzter Text**: Markdown wird gesetzt statt nur angezeigt |
 | `GUI_RICHTEXT_SET_TEXT(rt, text$)` | — | neuen Markdown-Quelltext setzen (`GUI_SET_TEXT` tut dasselbe) |
 | `GUI_RICHTEXT_SET(rt, key$, value)` | — | `groesse` (Grundschrift), `codeschrift` (FONT-Handle für Codeblöcke) und die Farben der Codeblöcke `farbe_kommentar`/`farbe_text`/`farbe_zahl`/`farbe_schluessel`/`farbe_name`/`farbe_operator` (-1 = Vorgabe passend zum Grund) |
+| `GUI_RICHTEXT_GET(rt, key$)` | Zahl | liest jede Einstellung von `GUI_RICHTEXT_SET` zurück (Schalter als 1/0) |
 | `GUI_RICHTEXT_HEADINGS(rt)` | ARRAY OF STRING | die Überschriften (`#` bis `###`) ohne Auszeichnung, aus der Quelle -- stimmen gleich nach `SET_TEXT` |
 | `GUI_RICHTEXT_HEADING_LEVELS(rt)` | ARRAY OF INTEGER | ihre Stufen 1..3, in derselben Reihenfolge |
 | `GUI_RICHTEXT_CODE_BUTTONS(rt, buttons$)` | — | Knöpfe an jedem Codeblock, getrennt mit `\|` (z. B. `"Kopieren\|Starten"`); leer = keine. Der Block bekommt oben einen Streifen dafür |
@@ -291,6 +303,7 @@ IMPORT "gui"
 | `GUI_TIME$(tp)` | STRING | die Uhrzeit als `HH:MM:SS` — wie `TIME$()`, auch ohne Sekundenfeld |
 | `GUI_SET_TIME(tp, time$)` | — | Uhrzeit setzen (`HH:MM` oder `HH:MM:SS`; krumme Werte sind ein Fehler) |
 | `GUI_TIMEPICKER_SET(tp, key$, value)` | — | `sekunden` (drittes Feld) und `schritt` (Schrittweite der Minute) |
+| `GUI_TIMEPICKER_GET(tp, key$)` | Zahl | liest jede Einstellung von `GUI_TIMEPICKER_SET` zurück (Schalter als 1/0) |
 | `GUI_ACCORDION(win, x, y, w, h)` | GUI_WIDGET | **Akkordeon**: Abschnitte mit Kopf, die auf- und zuklappen; was darunter liegt, rückt beim Aufklappen nach unten |
 | `GUI_ACCORDION_ADD(acc, title$)` | INTEGER | einen Abschnitt anhängen (zu), liefert seine Nummer |
 | `GUI_ACCORDION_ADD_WIDGET(acc, widget, section)` | — | ein Widget in einen Abschnitt legen; seine Lage gilt ab dem Abschnitt (unter dem Kopf) |
@@ -300,6 +313,7 @@ IMPORT "gui"
 | `GUI_ACCORDION_TITLE$(acc, section)` / `GUI_ACCORDION_SET_TITLE(acc, section, title$)` | STRING / — | Kopf eines Abschnitts lesen und setzen |
 | `GUI_ACCORDION_SET_HEIGHT(acc, section, px)` | — | feste Höhe eines offenen Abschnitts (0 = nach Inhalt) |
 | `GUI_ACCORDION_SET(acc, key$, value)` | — | `mehrere`: mehrere Abschnitte zugleich offen (aus per Vorgabe) |
+| `GUI_ACCORDION_GET(acc, key$)` | Zahl | liest jede Einstellung von `GUI_ACCORDION_SET` zurück (Schalter als 1/0) |
 | `GUI_ACCORDION_TOGGLED(acc)` | INTEGER | welcher Abschnitt in diesem Bild umgeklappt wurde (-1 = keiner) |
 | `GUI_WIZARD(win, x, y, w, h)` | GUI_WIDGET | **Assistent**: Schritte mit Schrittanzeige und Zurück/Weiter/Fertig/Abbrechen |
 | `GUI_WIZARD_ADD(wz, title$)` | INTEGER | einen Schritt anhängen, liefert seine Nummer |
@@ -314,6 +328,7 @@ IMPORT "gui"
 | `GUI_WIZARD_CANCELLED(wz)` | BOOLEAN | in diesem Bild Abbrechen gedrückt? |
 | `GUI_WIZARD_LABELS(wz, back$, next$, finish$, cancel$)` | — | Beschriftung der vier Knöpfe (etwa für eine englische Oberfläche) |
 | `GUI_WIZARD_SET(wz, key$, value)` | — | `pruefen`: Weiter erst, wenn die Felder dieses Schritts ihre `GUI_RULE`n erfüllen |
+| `GUI_WIZARD_GET(wz, key$)` | Zahl | liest jede Einstellung von `GUI_WIZARD_SET` zurück (Schalter als 1/0) |
 | `GUI_TREETABLE(win, x, y, w, h [, header])` | GUI_WIDGET | **Baumtabelle**: Tabelle, deren Zeilen einen Baum bilden (Einzug und Dreieck in der ersten Spalte) |
 | `GUI_TREETABLE_ADD(tt, parent, cells)` | INTEGER | eine Zeile unter `parent` anhängen (-1 = oben); liefert die Datenzeile |
 | `GUI_TREETABLE_EXPAND(tt, row, on)` | — | eine Zeile auf- oder zuklappen |
@@ -443,7 +458,9 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_DROPDOWN_SET_SELECTED(dd, i)` | — | Auswahl vom Programm aus setzen |
 | `GUI_SET_DROPDOWN(dd, items)` | — | Eintraege ersetzen |
 | `GUI_DROPDOWN_PLACEHOLDER(dd, text$)` | — | Hinweis in der Box, solange nichts gewählt ist („Bitte wählen“) |
+| `GUI_DROPDOWN_PLACEHOLDER$(dd)` | STRING | der gesetzte Hinweis (`""` = keiner) |
 | `GUI_DROPDOWN_SET(dd, key$, value)` | — | Einstellung der Klappliste; `bearbeitbar` = in das Feld darf getippt werden, auch was nicht in der Liste steht (Combobox) |
+| `GUI_DROPDOWN_GET(dd, key$)` | Zahl | liest jede Einstellung von `GUI_DROPDOWN_SET` zurück (Schalter als 1/0) |
 | `GUI_LISTBOX(win, x, y, w, h, items)` | GUI_WIDGET | scrollbare Auswahlliste (Mausrad scrollt; mit gedrückter Strg-Taste rollt kein Widget, siehe Abschnitt „Strg+Rad gehört dem Programm“) |
 | `GUI_LISTBOX_SELECTED(lb)` | INTEGER | Index der Auswahl (`-1` = keine) |
 | `GUI_LISTBOX_TEXT(lb)` | STRING | Text der Auswahl |
@@ -452,6 +469,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_LISTBOX_ADD(lb, text$[, pos])` / `GUI_LISTBOX_REMOVE(lb, i)` / `GUI_LISTBOX_CLEAR(lb)` | INTEGER / — / — | Einträge einzeln (auch bei Klapplisten); `pos` weglassen = hinten anhängen |
 | `GUI_LISTBOX_COUNT(lb)` / `GUI_LISTBOX_ITEM(lb, i)` / `GUI_LISTBOX_SET_ITEM(lb, i, text$)` / `GUI_LISTBOX_MOVE(lb, from, to)` | — | zählen, lesen, umbeschriften, verschieben |
 | `GUI_LISTBOX_SET(lb, key$, value)` | — | `mehrfachauswahl`, `kaestchen`, `bearbeitbar` (F2 benennt um) |
+| `GUI_LISTBOX_GET(lb, key$)` | Zahl | liest jede Einstellung von `GUI_LISTBOX_SET` zurück (Schalter als 1/0) |
 | `GUI_LISTBOX_ICON(lb, i, image)` / `GUI_LISTBOX_COLOR(lb, i, color)` | — | Sinnbild und Textfarbe je Eintrag (-1 = keins / Thema) |
 | `GUI_LISTBOX_CHECKED(lb, i)` / `GUI_LISTBOX_SET_CHECKED(lb, i, on)` | BOOLEAN / — | Haken je Eintrag (mit `kaestchen`) |
 | `GUI_LISTBOX_IS_SELECTED(lb, i)` / `GUI_LISTBOX_SELECT(lb, i, on)` / `GUI_LISTBOX_SEL_COUNT(lb)` / `GUI_LISTBOX_SEL_ROW(lb, k)` / `GUI_LISTBOX_CLEAR_SELECTION(lb)` | — | Mehrfachauswahl wie bei der Tabelle |
@@ -518,7 +536,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_WINDOW_GET_Y(win)` / `GUI_WINDOW_GET_W(win)` / `GUI_WINDOW_GET_H(win)` | INTEGER | Lage und Groesse des Fensters auf dem Bildschirm |
 | `GUI_WINDOW_CONTENT_W(win)` / `GUI_WINDOW_CONTENT_H(win)` | INTEGER | Breite und Hoehe des Inhaltsbereichs unter Titel-, Menue- und Reiterleiste -- dort zaehlen die Widget-Koordinaten; so sitzt eine Statusleiste unten, ohne die Hoehe der Menueleiste zu raten |
 | `GUI_TABLE_SET(tbl, key$, value)` | — | Einstellung der Tabelle setzen (`zebra`, `gitter`, `zeilenhoehe`, `filterzeile`, `feste_spalten`, ...) |
-| `GUI_TABLE_GET(tbl, key$)` | FLOAT | eine dieser Einstellungen zurueckreisen |
+| `GUI_TABLE_GET(tbl, key$)` | Zahl | eine dieser Einstellungen zurücklesen, dazu `spalten` (Schalter als 1/0) |
 | `GUI_TABLE_CLICKED_COL(tbl)` | INTEGER | welche Spalte wurde angeklickt? -- fuer Zellen der Art `knopf` |
 | `GUI_TABLE_VIEW_COUNT(tbl)` | INTEGER | wie viele Zeilen sind gerade SICHTBAR? (nach Filtern) |
 | `GUI_TABLE_VIEW_ROW(tbl, i)` | INTEGER | welche **Datenzeile** steht an sichtbarer Stelle `i`? -- Sortieren und Filtern stellen die Daten nicht um |
@@ -765,7 +783,7 @@ WEND
 - **Rückfall:** wo es keine echten Fenster gibt, liefert der Befehl
   `FALSE` und das Fenster bleibt, wie es war -- im Browser, ohne
   Bildschirm (vor `SCREEN`), unter macOS (dort noch nicht geprüft) und mit
-  `DHRT_OHNE_NATIVE_FENSTER=1`. Ein Programm läuft also überall gleich.
+  `DHRT_NO_NATIVE_WINDOWS=1`. Ein Programm läuft also überall gleich.
 - **Modal** (`GUI_WINDOW_MODAL(win, TRUE)`) wird das Hauptfenster sein
   **Besitzer** (Windows; unter Linux mit X11 `WM_TRANSIENT_FOR`): der
   Dialog bleibt darüber und hat keinen eigenen Eintrag in der Taskleiste, das Hauptfenster ist abgedunkelt, ein
@@ -781,7 +799,7 @@ WEND
   nativen Fensters ragt, bekommt ein eigenes randloses Fenster ohne Fokus
   und ohne Eintrag in der Taskleiste -- ausweichen muss es erst am Rand des
   Schirms. Klicks darin wirken wie im nativen Fenster. Unter Wayland (der
-  Compositor bestimmt die Lage) und mit `DHRT_OHNE_POPUP_FENSTER=1` weicht
+  Compositor bestimmt die Lage) und mit `DHRT_NO_POPUP_WINDOWS=1` weicht
   es stattdessen am Rand seines nativen Fensters aus. `GUI_POPUP_WINDOWS()`
   zählt die offenen Popup-Fenster. Im Hauptfenster bleibt es, wie es war:
   Popups weichen an seinem Rand aus.
@@ -791,7 +809,7 @@ WEND
   gesetzt statt vergrößert. Zieht man es hinüber, passt es sich an.
   `GUI_WINDOW_NATIVE_SCALE(win)` nennt den Faktor (1.0 bei gleicher
   Dichte); alle Maße nach außen bleiben in Punkten der gui.
-  `DHRT_NATIV_MASSSTAB=1.5` setzt ihn fest (Prüfungen ohne zweiten Schirm).
+  `DHRT_NATIVE_SCALE=1.5` setzt ihn fest (Prüfungen ohne zweiten Schirm).
 - **Bildschirmleser:** jedes echte Fenster hat seinen eigenen Baum für
   Hilfsprogramme (Windows UI Automation; macOS und Linux über AccessKit wie
   das Hauptfenster). Ein Leser findet die Widgets im Fenster, in dem sie
@@ -1622,6 +1640,7 @@ Was eine Liste bequem macht, kann die Tabelle im **Zeilenmodus** genauso:
 | Built-in | Wirkung |
 |---|---|
 | `GUI_TABLE_PLACEHOLDER(tbl, text$)` | Hinweis, wenn keine Zeile zu sehen ist („Keine Treffer“); steht in der `.dhform` |
+| `GUI_TABLE_PLACEHOLDER$(tbl)` | der gesetzte Hinweis (`""` = keiner) |
 
 ### Feste Spalten
 
@@ -2080,11 +2099,10 @@ oder aus, genau wie die Fenster-Reiter es tun. Nichts wird verschoben, ein
 Layout-Behälter auf einer Seite rechnet mit denselben Koordinaten weiter. Ein
 Behälter nimmt seine Kinder mit auf die Seite.
 
-Die **Breite der Köpfe** wird an der Zeichenzahl geschätzt, nicht gemessen:
-der Treffertest läuft an einer Stelle, an der es keine Grafik gibt, und eine
-zweite, genauere Rechnung beim Zeichnen wäre der sicherste Weg, Klick und
-Beschriftung auseinander laufen zu lassen. Bei sehr langen Beschriftungen
-steht der Text deshalb etwas enger im Kopf, als er dürfte.
+Die **Breite der Köpfe** misst die gui je Bild an der echten Schrift; Zeichnen,
+Treffertest und `GUI_TABCONTROL_ITEM_RECT` fragen dieselbe Rechnung. Nur vor dem
+ersten Bild gilt eine Schätzung an der Zeichenzahl. Passen die Köpfe nicht in
+die Breite, werden die breitesten zuerst schmaler und ihr Titel endet mit „…“.
 
 ## Gesetzter Text
 
@@ -2294,7 +2312,7 @@ GUI_THEME_PRESET("system")        ' wie das Betriebssystem: modern hell oder dun
 `modern_dark`, sonst `modern_light`, und die Akzentfarbe ist die des Systems,
 wo es eine nennt. Wer während des Laufs nachzieht, fragt `GUI_SYSTEM_DARK()`
 (die Antwort gilt zwei Sekunden) und ruft das Preset erneut. Für Prüfungen
-legen `DHRT_SYSTEM_DUNKEL=1|0` und `DHRT_SYSTEM_AKZENT=#RRGGBB` die Antwort
+legen `DHRT_SYSTEM_DARK=1|0` und `DHRT_SYSTEM_ACCENT=#RRGGBB` die Antwort
 fest.
 
 Die beiden **`modern_*`**-Presets sind ein *kompletter* Look: sie setzen nicht nur
@@ -2329,7 +2347,7 @@ GUI_METRIC_GET(schluessel$)         ' -> aktueller Wert
 ```
 
 Schlüssel: `title_h` (Titelleisten-Höhe), `slider_h`, `check_size`,
-`slider_handle_w`, `caret_period` (Cursor-Blink), `pad` (Text-Innenabstand),
+`slider_handle_w`, `caret_period` (Cursor-Blink, eine Phase in Sechzigstelsekunden, Vorgabe 16), `pad` (Text-Innenabstand),
 `corner_radius` (runde Ecken für Fenster/Titelleiste/Buttons/TextInput/Dropdown/
 Progress/Panel + Häkchen-Checkbox; 0 = eckig/flach), `shadow` (weicher
 Fenster-Schatten in Pixeln; 0 = aus), `uebergang` (Dauer der Übergänge in
@@ -2578,7 +2596,7 @@ solange sie gilt.
 |---|---|---|
 | `GUI_SET_CONTRAST(mode$)` | — | `"system"` (Vorgabe): wie das Betriebssystem; `"hoch"`: `@hochkontrast` gilt immer; `"normal"`: nie |
 | `GUI_HIGH_CONTRAST()` | BOOLEAN | gilt gerade hoher Kontrast? |
-| `GUI_SYSTEM_HIGH_CONTRAST()` | BOOLEAN | will das System hohen Kontrast? (`DHRT_SYSTEM_HOHER_KONTRAST=1` legt die Antwort fest) |
+| `GUI_SYSTEM_HIGH_CONTRAST()` | BOOLEAN | will das System hohen Kontrast? (`DHRT_SYSTEM_HIGH_CONTRAST=1` legt die Antwort fest) |
 
 ### 8. Eigene Formen, Bildhäute und Animationen
 
@@ -2637,13 +2655,14 @@ Drei Hilfen fürs Gestalten und für die Barrierefreiheit:
 | `GUI_INSPECT$(widget)` | STRING | was der Inspektor über ein Widget zeigt: Art, Name, Klassen, Lage, Zustand, Form, die passenden Regeln der Stildatei mit Zeile und was je Zustand gilt |
 | `GUI_STATE$()` | STRING | der Zustand aller sichtbaren Fenster als Text: je Widget mit Zustand eine Zeile (Texte, Haken, Werte, Auswahl, Zeilen einer Tabelle, Titel und Beschreibung einer Kachel; am Ende die letzte Ansage an den Bildschirmleser) -- die Erwartung, die `dhrt aufnehmen` schreibt ([werkzeuge.md](werkzeuge.md#dhrt-aufnehmen--bedienung-als-prüffall)) |
 | `GUI_SET_MOTION(mode$)` | — | `"system"` (Vorgabe): wie das Betriebssystem; `"an"`: Animationen immer; `"aus"`: nie |
+| `GUI_GET_MOTION_MODE$()` | STRING | der Modus aus `GUI_SET_MOTION`: `"system"`, `"an"` oder `"aus"` (`GUI_GET_MOTION` sagt dagegen, ob gerade bewegt wird) |
 | `GUI_MOTION()` | BOOLEAN | spielt die gui gerade Bewegung ab? |
 
 **Inspektor.** Wie die Entwicklerwerkzeuge eines Browsers: ist er offen,
 umrandet er das Widget unter dem Zeiger und nennt Art, Name und Größe; ein
 Klick wählt es -- der Klick erreicht das Widget **nicht** -- und eine Tafel
 zeigt, was `GUI_INSPECT$` liefert. ESC schließt ihn. Mit der
-Umgebungsvariablen `DHRT_INSPEKTOR=1` öffnet und schließt **Strg+Umschalt+I**
+Umgebungsvariablen `DHRT_INSPECTOR=1` öffnet und schließt **Strg+Umschalt+I**
 ihn in jedem Programm, ohne dass es dafür eine Zeile braucht; ohne sie ist
 die Taste frei für das Programm. In einem echten Fenster
 (`GUI_WINDOW_NATIVE`) wählt er dessen Widgets, und die Tafel steht dort.
@@ -4059,7 +4078,7 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_HINT$(ta, line)` | der Hinweis hinter einer Zeile (ab 1), "" ohne -- nach dem Mitwandern beim Tippen, so wie er gezeichnet wird |
 | `GUI_TEXTAREA_HINT_COUNT(ta)` | wie viele Zeilen einen Hinweis tragen |
 | `GUI_TEXTAREA_SCROLL(ta, line)` | den Ausschnitt rollen, sodass die Zeile oben steht -- ohne die Marke zu bewegen, wie das Mausrad (fuer eine Uebersichtskarte) |
-| `GUI_TEXTAREA_SELECT(ta, z1, s1, z2, s2)` | einen Bereich markieren, Marke am Ende |
+| `GUI_TEXTAREA_SELECT(ta, line1, column1, line2, column2)` | einen Bereich markieren, Marke am Ende |
 | `GUI_TEXTAREA_SELECTION$(ta)` → STRING | der markierte Text |
 | `GUI_TEXTAREA_SELECTION_RANGE(ta)` → (z1, s1, z2, s2) | Anfang und Ende der Auswahl (ab 1, geordnet); ohne Auswahl steht die Marke an beiden Enden — damit weiß ein Editor, WELCHE Zeilen er einrücken oder auskommentieren soll |
 | `GUI_TEXTAREA_INSERT(ta, text$)` | ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, `GUI_ON_CHANGE` feuert wie beim Tippen |
@@ -4243,7 +4262,9 @@ nachbauen müsste.
 | `GUI_DATE(picker)` → STRING | gewähltes Datum als `JJJJ-MM-TT` |
 | `GUI_SET_DATE(picker, date$)` | Datum setzen |
 | `GUI_COLORPICKER_SET(picker, key$, value)` | `alpha` (0/1) — Deckkraft-Streifen zeigen |
+| `GUI_COLORPICKER_GET(picker, key$)` | Zahl | liest jede Einstellung von `GUI_COLORPICKER_SET` zurück (Schalter als 1/0) |
 | `GUI_DATEPICKER_SET(picker, key$, value)` | `wochenbeginn` (0 = Montag … 6 = Sonntag) |
+| `GUI_DATEPICKER_GET(picker, key$)` | Zahl | liest jede Einstellung von `GUI_DATEPICKER_SET` zurück (Schalter als 1/0) |
 | `GUI_DATE_RANGE(picker, from$, to$)` | erlaubter Bereich (leerer Text = keine Grenze) |
 
 Beide melden Änderungen über `GUI_ON_CHANGE`.
@@ -4521,7 +4542,7 @@ Das Wörterbuch kommt aus dem System oder aus Dateien. Unter Windows ist
 installierten Sprachen; unter Linux und macOS sind es Hunspell-Wörterbücher
 (`.dic` + `.aff`) aus `~/.local/share/hunspell`, `/usr/share/hunspell` und
 `/usr/share/myspell` (unter Linux etwa das Paket `hunspell-de-de`). Die
-Umgebungsvariable `DHRT_WOERTERBUECHER` nennt eigene Ordner und geht auf
+Umgebungsvariable `DHRT_DICTIONARIES` nennt eigene Ordner und geht auf
 jedem System vor -- dann nimmt auch Windows die Dateien. `SPELL_LOAD` lädt
 ein Hunspell-Wörterbuch direkt, etwa eines, das ein Programm mitbringt.
 
@@ -4684,7 +4705,7 @@ gemessen, eines mit fester Größe nimmt seine Größe beim Eintritt.
 Liste der Systemschriften (vorn die eingebauten `sans`, `serif`, `mono`),
 der Größe und einer Vorschau in der gewählten Schrift. Nach der Antwort
 (`GUI_ANSWER` 1 = OK) liefert `GUI_FONT_DIALOG_PATH$` den Pfad für
-`LOADFONT`, `GUI_FONT_DIALOG_SIZE` die Größe. `DHRT_SCHRIFT_ORDNER` legt den
+`LOADFONT`, `GUI_FONT_DIALOG_SIZE` die Größe. `DHRT_FONT_DIR` legt den
 Ordner fest, den die Liste zeigt (für Prüfungen).
 
 In der `.dhform` stehen `kuerzen`, `auswaehlbar`, die Reglermarken, `kreis`,

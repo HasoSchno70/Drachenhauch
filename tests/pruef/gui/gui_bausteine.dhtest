@@ -518,7 +518,7 @@ e 4 2 257 0 0 0
 e 6 1 257 0 0 0
 
 --- umgebung
-DHRT_SCHRIFT_ORDNER={sammlung}/../../../examples/assets
+DHRT_FONT_DIR={sammlung}/../../../examples/assets
 DHRT_FRAMES=20
 --- erwartet
 eintraege 1 erster roboto_medium
@@ -603,7 +603,7 @@ CATCH e
 END TRY
 --- erwartet
 GUI_LABEL_SET: das Widget ist kein GUI_LABEL
-GUI_LABEL_SET: kuerzen ist aus, ende, mitte oder anfang -- nicht 'links'
+GUI_LABEL_SET: kuerzen ist aus, ende, mitte oder anfang (0..3) -- nicht 'links'
 GUI_SLIDER_MARK: 20 liegt ausserhalb des Reglers (0..10)
 GUI_SLIDER_SET: marken ist 0 oder 2..101
 GUI_DATE_MARK: '31.12.2026' ist kein Datum JJJJ-MM-TT

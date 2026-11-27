@@ -9,6 +9,7 @@
 //! verliert ihn genau dann -- der Zeiger im Farbfeld springt beim Herunterziehen
 //! auf Schwarz nach links, und beim Hochziehen kommt Rot statt der Farbe zurueck,
 //! die man gewaehlt hatte.
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
 
 /// Eine Farbe der Laufzeit in [r, g, b, a]: das oberste Byte ist die
 /// Deckkraft, **0 heisst deckend** -- so bleiben `&Hrrggbb` und RGB(r, g, b)

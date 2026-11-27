@@ -1178,7 +1178,7 @@ fn rueckruf_einstieg(rr: &str, wert: &Value) -> Result<u64, String> {
     let einstieg = ZUSTAND.with(|z| -> Result<_, String> {
         let mut z = z.borrow_mut();
         if z.bauer.is_none() { z.bauer = Some(uebergang::Bauer::neu()?); }
-        z.bauer.as_mut().unwrap().rueckruf_plan(&stellen, &rf, &groessen, rueck_groesse, nummer, eingang as usize)
+        z.bauer.as_mut().unwrap().rueckruf_plan(&stellen, &rf, &groessen, rueck_groesse, nummer, eingang as *const () as usize)
     })? as usize;
     ZUSTAND.with(|z| z.borrow_mut().rueckrufe.push(Rc::new(Rueckruf {
         sig: rr.to_string(), rueck, params, wert: wert.clone(), name: funktionsname(wert), einstieg })));
@@ -1688,7 +1688,7 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     // Die Plaetze liegen bis 16 Argumente auf dem Stapel -- ein Aufruf in
     // einer heissen Schleife legt dann nichts an.
     let (mut p_fest, mut r_fest) = ([0u64; 16], [0u64; 16]);
-    let (mut p_vec, mut r_vec) = (Vec::new(), Vec::new());
+    let (mut p_vec, mut r_vec): (Vec<u64>, Vec<u64>);
     let plaetze: &mut [u64] = if n <= 16 { &mut p_fest[..] } else { p_vec = vec![0u64; n]; &mut p_vec[..] };
     // Was fuer die Dauer des Aufrufs leben muss: kopierte Texte und die
     // Plaetze der BYREF-Werte (feste Groesse, damit ihre Adressen halten).
@@ -1814,7 +1814,8 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     // Der Platz fuer die Rueckgabe: ein Wert, die Teile eines Structs aus
     // den Registern oder der ganze Struct, den die Funktion selbst schreibt.
     let worte = auf.rueck_struct.as_ref().map(|s| (s.groesse as usize).div_ceil(8)).unwrap_or(0).max(4);
-    let (mut rp_fest, mut rp_vec) = ([0u64; 4], Vec::new());
+    let mut rp_fest = [0u64; 4];
+    let mut rp_vec: Vec<u64>;
     let rueck_platz: &mut [u64] = if worte <= 4 { &mut rp_fest[..] } else { rp_vec = vec![0u64; worte]; &mut rp_vec[..] };
     let tiefe = LAUFEND.with(|l| { let mut l = l.borrow_mut(); l.push(sig.name.clone()); l.len() });
     let gerufen = if variadisch {

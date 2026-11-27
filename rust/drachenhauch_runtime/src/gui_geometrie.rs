@@ -223,23 +223,11 @@ impl Gui {
     pub(super) fn winscroll_geom(&self, wi: usize) -> Option<(i32, i32, i32, i32, i32, i32)> {
         let content = self.content_height(wi);
         let view = self.view_height(wi);
-        if !self.windows[wi].scrollable || content <= view { return None; }
+        if !self.windows[wi].scrollable || content <= view || view <= 2 { return None; }
         let w = &self.windows[wi];
-        let bw = self.sk(10);
-        let tx = w.x + w.w - bw - 2;
-        let ty = w.y + self.content_top(wi) + 1;
-        // Review-Fund: `th` (Scrollbar-Spurlaenge) hat keine Untergrenze --
-        // ein kleines/schmales scrollbares Fenster (z.B. `GUI_WINDOW_SET_
-        // BOUNDS win, x, y, w, 40`) liess `th < 24` werden, und
-        // `.clamp(24, th)` paniked hart ("assertion failed: min <= max"),
-        // reproduzierbar in JEDEM GUI_DRAW eines solchen Fensters. `lo`
-        // haelt sich selbst unter 24, wenn die Spur kuerzer ist.
-        let th = (view - 2).max(0);
-        let max_s = content - view;
-        let lo = th.min(self.sk(24));
-        let thh = if th > 0 { ((th * view) / content.max(1)).clamp(lo, th) } else { 0 };
-        let thy = ty + if max_s > 0 { (w.scroll_y * (th - thh)) / max_s } else { 0 };
-        Some((tx, ty, bw, th, thy, thh))
+        // Rechts im Fenster, gespiegelt links -- wie jeder Rollbalken
+        // (`rollbalken_lage`).
+        Some(self.rollbalken_lage((w.x, w.y + self.content_top(wi), w.w - 1, view), w.rtl, view, content, w.scroll_y as f64))
     }
     pub(super) fn in_rect(mx: i32, my: i32, r: (i32, i32, i32, i32)) -> bool {
         mx >= r.0 && mx < r.0 + r.2 && my >= r.1 && my < r.1 + r.3

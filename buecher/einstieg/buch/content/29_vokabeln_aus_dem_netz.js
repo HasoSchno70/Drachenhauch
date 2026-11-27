@@ -246,7 +246,7 @@ module.exports = (H) => [
 
   H.table([
     [{ text: "HTTP 404 Not Found", mono: true }, "Die Adresse stimmt nicht. Kopier sie in einen Browser — steht der Text da?"],
-    [{ text: "Unbekanntes Builtin 'HTTP_GET'", mono: true }, "IMPORT \"html\" fehlt."],
+    [{ text: "Unbekannter Befehl 'HTTP_GET'", mono: true }, "IMPORT \"html\" fehlt."],
     ["Das Fenster hängt beim Start", "Blockierendes HTTP_GET bei langsamer Leitung. HTTP_GET_START nehmen."],
     ["Die letzte Vokabel fehlt", "Die Datei endet ohne Zeilenumbruch, oder die Prüfung auf Leerzeilen wirft sie weg."],
     ["Hinter jeder Vokabel steht etwas Unsichtbares", "Wagenrücklauf am Zeilenende. TRIM$ um jede Zeile."],

@@ -1,5 +1,4 @@
-//! Character-Controller (CHAR_*) -- nativer Port von
-//! `drachenhauch/modules/controller.py`. Reine Platformer-Physik mit
+//! Character-Controller (CHAR_*). Reine Platformer-Physik mit
 //! Coyote-Time, Jump-Buffering und Variable-Jump-Height. Nutzt
 //! `TiledMap::sweep_axis` (tile_collide-Port) fuer die Kollision.
 

@@ -183,7 +183,7 @@ wieder fenster TRUE
 
 === ohne echte fenster bleibt die leiste schwebend
 ' Der Rueckfall: wo es keine echten Fenster gibt (Browser, macOS, hier
-' DHRT_OHNE_NATIVE_FENSTER), laesst GUI_DOCK_MOVE mit "fenster" sie
+' DHRT_NO_NATIVE_WINDOWS), laesst GUI_DOCK_MOVE mit "fenster" sie
 ' schwebend im Gastfenster.
 IMPORT "gui"
 SCREEN(700, 500, "Widgets", 1)
@@ -198,7 +198,7 @@ GUI_UPDATE()
 PRINT GUI_DOCK_WHERE$(w, "liste")
 --- umgebung
 DHRT_FRAMES=5
-DHRT_OHNE_NATIVE_FENSTER=1
+DHRT_NO_NATIVE_WINDOWS=1
 --- system windows
 --- erwartet
 schwebend

@@ -133,7 +133,7 @@ DIM s AS SAVE_HANDLE
 s = SAVE_NEW()
 PRINT SAVE_GET_INT(s, "fehlt")
 --- fehler
-SAVE_GET_INT: Key 'fehlt' nicht im Save
+SAVE_GET_INT: Schluessel 'fehlt' nicht im Save
 
 === get wrong type raises
 IMPORT "save"

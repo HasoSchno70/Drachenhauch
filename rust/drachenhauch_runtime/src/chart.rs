@@ -13,6 +13,7 @@
 //!
 //! Winkel durchgehend in Grad, 0 = rechts, wachsend im Uhrzeigersinn (raylib,
 //! Bildschirm-y nach unten).
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
 
 use std::collections::HashMap;
 

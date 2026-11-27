@@ -18,14 +18,13 @@ program could set.
 | Function | Effect |
 |---|---|
 | `AUDIO_INIT([frequency[, channels[, buffer]]])` | makes sure the audio system is running. **Accepts arguments and ignores them** -- they date from the mixer era and are only tolerated for compatibility |
-| `AUDIO_SET_NUM_CHANNELS(n)` | number of simultaneous channels (default **16**, raise it for bullet hell) |
-| `AUDIO_NUM_CHANNELS()` → INTEGER | current channel count |
+| `AUDIO_SET_NUM_CHANNELS(n)` | remembers the number for `AUDIO_NUM_CHANNELS` -- **limits nothing**: Kira plays as many sounds at once as are started (a leftover from the mixer era) |
+| `AUDIO_NUM_CHANNELS()` → INTEGER | the remembered number (default 16) |
 | `AUDIO_BUSY_CHANNELS()` → INTEGER | how many channels are playing right now |
 
-```basic
-AUDIO_INIT(48000, 2, 256)         ' low latency for action
-AUDIO_SET_NUM_CHANNELS(32)        ' 32 sounds possible at once
-```
+So a program does not set latency or the number of voices; `AUDIO_INIT()`
+without arguments starts the sound in advance (otherwise the first sound
+command starts it).
 
 ## Sound playback
 
@@ -479,7 +478,7 @@ independent of the individual volumes (they multiply in the mixer).
 | Function | Effect |
 |---|---|
 | `AUDIO_BUS_VOLUME(bus$, vol)` | master volume of a bus (0..1) |
-| `AUDIO_IS_SILENT()` | is the sound silent? With `DHRT_OHNE_AUDIO=1` (old name `DH_OHNE_AUDIO`) the mix is computed in real time but not output -- positions, levels and `AUDIO_SAVE_WAV` run as with a sound card |
+| `AUDIO_IS_SILENT()` | is the sound silent? With `DHRT_NO_AUDIO=1` (old names `DHRT_OHNE_AUDIO`, `DH_OHNE_AUDIO`) the mix is computed in real time but not output -- positions, levels and `AUDIO_SAVE_WAV` run as with a sound card |
 | `AUDIO_BUS_GET_VOLUME(bus$)` → FLOAT | current bus volume |
 
 `bus$` is `"sfx"`, `"music"`, `"master"` or `"speech"` (case-insensitive;

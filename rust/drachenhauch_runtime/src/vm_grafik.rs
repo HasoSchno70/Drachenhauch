@@ -7,6 +7,7 @@ use super::*;
 
 /// INPUT_BIND mit einem Buchstaben: der Buchstabe steht in den unteren Bits,
 /// die Taste dazu wird je Bild nach der Belegung gesucht.
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 const BUCHSTABEN_MARKE: i64 = 1 << 40;
 
 impl<'p> Vm<'p> {
@@ -296,9 +297,9 @@ impl<'p> Vm<'p> {
                 let k = punkte * 2;
                 if a.len() < k || a.len() > k + 2 {
                     return Err(if name == "bezier" {
-                        format!("BEZIER: erwartet (x1, y1, kx, ky, x2, y2[, farbe[, breite]]), erhalten {} Argumente", a.len())
+                        crate::vm::falsche_argumente("BEZIER", a.len())
                     } else {
-                        format!("BEZIER3: erwartet (x1, y1, k1x, k1y, k2x, k2y, x2, y2[, farbe[, breite]]), erhalten {} Argumente", a.len())
+                        crate::vm::falsche_argumente("BEZIER3", a.len())
                     });
                 }
                 let mut xs = Vec::with_capacity(punkte);
@@ -315,7 +316,7 @@ impl<'p> Vm<'p> {
             "spline_basis" | "spline_bezier" => {
                 let n = if name == "spline_basis" { "SPLINE_BASIS" } else { "SPLINE_BEZIER" };
                 if a.len() < 2 || a.len() > 4 {
-                    return Err(format!("{}: erwartet (xs, ys[, farbe[, breite]]), erhalten {} Argumente", n, a.len()));
+                    return Err(crate::vm::falsche_argumente(n, a.len()));
                 }
                 let xs = arr_i32(&a[0], n)?;
                 let ys = arr_i32(&a[1], n)?;
@@ -402,12 +403,13 @@ impl<'p> Vm<'p> {
             // Bilder und Dateien ueber die Zwischenablage, Ziehen hinaus
             // (ablage.rs) -- Text geht oben ueber GLFW.
             "clipboard_set_image" => { let n = "CLIPBOARD_SET_IMAGE";
-                if a.len() != 1 { return Err(format!("{}: erwartet (bild)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let (px, b, h) = g!().image_rgba(gi(a,0,n)?, n)?;
-                match crate::ablage::bild_setzen(b, h, px) {
-                    Ok(()) => Value::Bool(true),
-                    Err(e) => return Err(format!("{}: {}", n, e)),
-                } }
+                // Wie CLIPBOARD_SET und _SET_FILES: gelingt es nicht, ist es ein
+                // Fehler; ein Rueckgabewert, der nie FALSE wird, sagte nichts
+                // (bis 2026.53 BOOLEAN, Bericht E2).
+                if let Err(e) = crate::ablage::bild_setzen(b, h, px) { return Err(format!("{}: {}", n, e)); }
+                Value::Nil }
             "clipboard_get_image" => { let n = "CLIPBOARD_GET_IMAGE";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 match crate::ablage::bild_holen() {
@@ -422,19 +424,19 @@ impl<'p> Vm<'p> {
                 if !a.is_empty() { return Err("CLIPBOARD_HAS_IMAGE: erwartet keine Argumente".into()); }
                 Value::Bool(crate::ablage::bild_holen().is_some()) }
             "clipboard_set_files" => { let n = "CLIPBOARD_SET_FILES";
-                if a.len() != 1 { return Err(format!("{}: erwartet (pfade)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 if let Err(e) = crate::ablage::dateien_setzen(&crate::builtins::str_array(&a[0], n)?) { return Err(format!("{}: {}", n, e)); }
                 Value::Nil }
             "clipboard_get_files" => {
                 if !a.is_empty() { return Err("CLIPBOARD_GET_FILES: erwartet keine Argumente".into()); }
                 crate::builtins::new_str_array(crate::ablage::dateien_holen()) }
             "drag_out_files" => { let n = "DRAG_OUT_FILES";
-                if a.len() != 1 { return Err(format!("{}: erwartet (pfade)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let pfade = crate::builtins::str_array(&a[0], n)?;
                 if pfade.is_empty() { return Err(format!("{}: keine Dateien", n)); }
                 Value::str_rc(crate::ablage::ziehen(g!().haupt_os_handle(), &pfade, "")) }
             "drag_out_text" => { let n = "DRAG_OUT_TEXT";
-                if a.len() != 1 { return Err(format!("{}: erwartet (text$)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let s = gs(a,0,n)?.to_string();
                 Value::str_rc(crate::ablage::ziehen(g!().haupt_os_handle(), &[], &s)) }
             "files_dropped" => Value::Int(g!().dropped_files().len() as i64),
@@ -509,7 +511,7 @@ impl<'p> Vm<'p> {
             "pie" | "pieoutline" => {
                 let n = if name == "pie" { "PIE" } else { "PIEOUTLINE" };
                 if a.len() < 5 || a.len() > 6 {
-                    return Err(format!("{}: erwartet (x, y, r, von_grad, bis_grad[, farbe]), erhalten {} Argumente", n, a.len()));
+                    return Err(crate::vm::falsche_argumente(n, a.len()));
                 }
                 let c = if a.len() == 6 { gi(a, 5, n)? } else { 0xFFFFFF };
                 g!().ring(gi(a,0,n)? as i32, gi(a,1,n)? as i32, 0, gi(a,2,n)? as i32,
@@ -518,7 +520,7 @@ impl<'p> Vm<'p> {
             }
             "circle_gradient" => {
                 if a.len() != 5 {
-                    return Err(format!("CIRCLE_GRADIENT: erwartet (x, y, r, innen, aussen), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("CIRCLE_GRADIENT", a.len()));
                 }
                 g!().circle_gradient(gi(a,0,"CIRCLE_GRADIENT")? as i32, gi(a,1,"CIRCLE_GRADIENT")? as i32,
                     gi(a,2,"CIRCLE_GRADIENT")? as i32, gi(a,3,"CIRCLE_GRADIENT")?, gi(a,4,"CIRCLE_GRADIENT")?);
@@ -526,7 +528,7 @@ impl<'p> Vm<'p> {
             }
             "boxrot" => {
                 if a.len() < 5 || a.len() > 6 {
-                    return Err(format!("BOXROT: erwartet (x, y, breite, hoehe, winkel[, farbe]), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("BOXROT", a.len()));
                 }
                 let c = if a.len() == 6 { gi(a, 5, "BOXROT")? } else { 0xFFFFFF };
                 g!().box_rot(gi(a,0,"BOXROT")? as i32, gi(a,1,"BOXROT")? as i32, gi(a,2,"BOXROT")? as i32,
@@ -535,7 +537,7 @@ impl<'p> Vm<'p> {
             }
             "gradient4" => {
                 if a.len() != 8 {
-                    return Err(format!("GRADIENT4: erwartet (x1, y1, x2, y2, oben_links, oben_rechts, unten_rechts, unten_links), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("GRADIENT4", a.len()));
                 }
                 g!().gradient4(gi(a,0,"GRADIENT4")? as i32, gi(a,1,"GRADIENT4")? as i32, gi(a,2,"GRADIENT4")? as i32,
                     gi(a,3,"GRADIENT4")? as i32,
@@ -547,9 +549,9 @@ impl<'p> Vm<'p> {
                 let max = if name == "ngon" { 6 } else { 7 };
                 if a.len() < 5 || a.len() > max {
                     return Err(if name == "ngon" {
-                        format!("NGON: erwartet (x, y, ecken, r, winkel[, farbe]), erhalten {} Argumente", a.len())
+                        crate::vm::falsche_argumente("NGON", a.len())
                     } else {
-                        format!("NGONOUTLINE: erwartet (x, y, ecken, r, winkel[, farbe[, breite]]), erhalten {} Argumente", a.len())
+                        crate::vm::falsche_argumente("NGONOUTLINE", a.len())
                     });
                 }
                 let ecken = gi(a, 2, n)?;
@@ -564,7 +566,7 @@ impl<'p> Vm<'p> {
             }
             "linedashed" => {
                 if a.len() < 6 || a.len() > 7 {
-                    return Err(format!("LINEDASHED: erwartet (x1, y1, x2, y2, strich, luecke[, farbe]), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("LINEDASHED", a.len()));
                 }
                 let (st, lu) = (gi(a,4,"LINEDASHED")?, gi(a,5,"LINEDASHED")?);
                 if st < 1 || lu < 1 {
@@ -577,7 +579,7 @@ impl<'p> Vm<'p> {
             }
             "drawimage9" => {
                 if a.len() < 9 || a.len() > 10 {
-                    return Err(format!("DRAWIMAGE9: erwartet (bild, x, y, breite, hoehe, links, oben, rechts, unten[, farbe]), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("DRAWIMAGE9", a.len()));
                 }
                 let tint = if a.len() == 10 { Some(gi(a, 9, "DRAWIMAGE9")?) } else { None };
                 g!().draw_image_9(gi(a,0,"DRAWIMAGE9")?, gi(a,1,"DRAWIMAGE9")? as i32, gi(a,2,"DRAWIMAGE9")? as i32,
@@ -629,10 +631,10 @@ impl<'p> Vm<'p> {
                 let bits = crate::schnitt::stil_parsen(&gs(a,0,"TEXT_STYLE")?).map_err(|e| format!("TEXT_STYLE: {}", e))?;
                 g!().set_text_stil(bits); Value::Nil
             }
-            "text_get_style$" | "text_get_style" => Value::Str(crate::schnitt::stil_text(g!().text_stil()).into()),
+            "text_get_style$" => Value::Str(crate::schnitt::stil_text(g!().text_stil()).into()),
             "font_style" | "font_has_style" => {
                 let f = if name == "font_style" { "FONT_STYLE" } else { "FONT_HAS_STYLE" };
-                if a.len() != 2 { return Err(format!("{}: erwartet (font, stil$)", f)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(f, a.len())); }
                 let bits = crate::schnitt::stil_parsen(&gs(a,1,f)?).map_err(|e| format!("{}: {}", f, e))?;
                 let (h, echt) = g!().font_schnitt(gi(a,0,f)?, bits)?;
                 if name == "font_style" { Value::Int(h) } else { Value::Bool(echt) }
@@ -643,11 +645,11 @@ impl<'p> Vm<'p> {
             // Notenschluessel auf seine Linie, ein Symbol mittig in einen
             // Knopf), ohne die Datei selbst auszulesen.
             "font_baseline" => {
-                if a.len() != 2 { return Err("FONT_BASELINE: erwartet (font, groesse)".into()); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente("FONT_BASELINE", a.len())); }
                 Value::Float(g!().font_baseline(gi(a,0,"FONT_BASELINE")?, zahl_arg(a,1,"FONT_BASELINE")?)?)
             }
             "font_glyph_box" => {
-                if a.len() != 3 { return Err("FONT_GLYPH_BOX: erwartet (font, zeichen$, groesse)".into()); }
+                if a.len() != 3 { return Err(crate::vm::falsche_argumente("FONT_GLYPH_BOX", a.len())); }
                 let t = gs(a,1,"FONT_GLYPH_BOX")?;
                 let mut it = t.chars();
                 let c = match (it.next(), it.next()) {
@@ -660,7 +662,7 @@ impl<'p> Vm<'p> {
             // Ligaturen einer Schrift (formung.rs): ihre Laeufe gehen durch
             // die Formung (rustybuzz) statt Glyphe fuer Glyphe durch raylib.
             "font_ligatures" => { let n = "FONT_LIGATURES";
-                if a.len() != 2 { return Err(format!("{}: erwartet (font, an)", n)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let h = gi(a,0,n)?;
                 let _ = g!();
                 if !crate::formung::ligaturen_setzen(h, crate::argument::a_schalter(a, 1, n)?) {
@@ -668,7 +670,7 @@ impl<'p> Vm<'p> {
                 }
                 Value::Nil }
             "loadfont" => {
-                if a.len() > 3 { return Err("LOADFONT: erwartet (pfad$, groesse[, zeichen$])".into()); }
+                if a.len() > 3 { return Err(crate::vm::falsche_argumente("LOADFONT", a.len())); }
                 if a.len() == 3 {
                     Value::Int(g!().load_font_mit(gs(a,0,"LOADFONT")?, gi(a,1,"LOADFONT")? as i32, &gs(a,2,"LOADFONT")?)?)
                 } else {
@@ -692,7 +694,7 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "loadfont_sdf" => {
-                if a.len() < 2 || a.len() > 3 { return Err("LOADFONT_SDF: erwartet (pfad$, groesse[, zeichen$])".into()); }
+                if a.len() < 2 || a.len() > 3 { return Err(crate::vm::falsche_argumente("LOADFONT_SDF", a.len())); }
                 let z = if a.len() == 3 { Some(gs(a,2,"LOADFONT_SDF")?) } else { None };
                 Value::Int(g!().load_font_sdf(gs(a,0,"LOADFONT_SDF")?, gi(a,1,"LOADFONT_SDF")? as i32, z.as_deref())?)
             }
@@ -715,7 +717,7 @@ impl<'p> Vm<'p> {
                 }
             }
             "font_to_image" => {
-                if a.is_empty() || a.len() > 3 { return Err("FONT_TO_IMAGE: erwartet (font[, erstes[, letztes]])".into()); }
+                if a.is_empty() || a.len() > 3 { return Err(crate::vm::falsche_argumente("FONT_TO_IMAGE", a.len())); }
                 let erstes = if a.len() > 1 { gi(a,1,"FONT_TO_IMAGE")? } else { 32 };
                 let letztes = if a.len() > 2 { gi(a,2,"FONT_TO_IMAGE")? } else if a.len() > 1 { erstes.max(126) } else { 126 };
                 if erstes < 0 || letztes < 0 || erstes > 0x10FFFF || letztes > 0x10FFFF {
@@ -724,7 +726,7 @@ impl<'p> Vm<'p> {
                 Value::Int(g!().font_to_image(gi(a,0,"FONT_TO_IMAGE")?, erstes as u32, letztes as u32)?)
             }
             "drawfps" => {
-                if a.len() != 2 && a.len() != 3 { return Err("DRAWFPS: erwartet (x, y[, farbe])".into()); }
+                if a.len() != 2 && a.len() != 3 { return Err(crate::vm::falsche_argumente("DRAWFPS", a.len())); }
                 let farbe = if a.len() == 3 { Some(gi(a,2,"DRAWFPS")?) } else { None };
                 g!().draw_fps(gi(a,0,"DRAWFPS")? as i32, gi(a,1,"DRAWFPS")? as i32, farbe);
                 Value::Nil
@@ -785,19 +787,20 @@ impl<'p> Vm<'p> {
                 // Gesammelte PRINT-Zeilen eines Spiels gehen spaetestens nach
                 // 50 ms hinaus, nicht erst beim Beenden.
                 if !self.out.is_empty() && self.out_zeit.elapsed() >= std::time::Duration::from_millis(50) { self.flush_out(); }
-                // Musik-Stream nachfuettern (sonst stockt die Wiedergabe).
+                // Ton je Bild: endliche Loops, AUTOPAN, Musik-Warteschlange
+                // (`Audio::update`; Kira spielt selbst, hier wird nur gesteuert).
                 if let Some(au) = self.audio.as_mut() { au.update(); }
                 Value::Nil
             }
             "keypressed" => { let k = taste(g!(), a, "KEYPRESSED")?; Value::Bool(g!().key_down(k)) }
             "inkey$" | "inkey" => Value::Str(g!().inkey().into()),
             "waitkey" => Value::Int(g!().waitkey()),
-            // SCROLL verschiebt persistente Framebuffer-Pixel -- die native
-            // Runtime zeichnet jeden Frame neu aus dem Command-Buffer (Layer
-            // werden pro FLIP geleert), es gibt also keine persistenten Pixel
-            // zum Verschieben. Graceful No-Op (Programm laeuft); SCROLL ist
-            // Tree-Walker-only (siehe docs/intern/befehlssatz-roadmap.md).
-            "scroll" => { let _ = (gi(a,0,"SCROLL")?, gi(a,1,"SCROLL")?); Value::Nil }
+            // SCROLL verschob einst die Pixel eines bleibenden Bildspeichers.
+            // dhrt zeichnet jedes Bild neu, es gibt keine bleibenden Pixel --
+            // bis 2026.53 tat SCROLL darum still nichts. Jetzt sagt es, was
+            // stattdessen geht (Bericht C4.1).
+            "scroll" => { let _ = (gi(a,0,"SCROLL")?, gi(a,1,"SCROLL")?);
+                return Err("SCROLL: verschiebt in Drachenhauch nichts -- jedes Bild wird neu gezeichnet; zum Verschieben CAMERA_SET(x, y) oder ein Render-Ziel (RENDERTARGET_DRAW) nehmen".into()); }
             "joystick_count" => Value::Int(g!().joystick_count()),
             "joystick_name" => Value::Str(g!().joystick_name(gi(a,0,"JOYSTICK_NAME")?)?.into()),
             "joystick_axis" => Value::Float(g!().joystick_axis(gi(a,0,"JOYSTICK_AXIS")?, gi(a,1,"JOYSTICK_AXIS")?)?),
@@ -828,7 +831,7 @@ impl<'p> Vm<'p> {
             "mouse_on_screen" => Value::Bool(g!().mouse_on_screen()),
             "mouse_cursor" => { let s = gs(a,0,"MOUSE_CURSOR")?.to_string();
                                 g!().mouse_cursor(&s)?; Value::Nil }
-            "mouse_cursor_get$" | "mouse_cursor_get" => Value::str_rc(g!().zeiger_jetzt()),
+            "mouse_cursor_get$" => Value::str_rc(g!().zeiger_jetzt()),
             "mouse_cursor_new" => { let (b, x, y) = (gi(a,0,"MOUSE_CURSOR_NEW")?, gi(a,1,"MOUSE_CURSOR_NEW")?, gi(a,2,"MOUSE_CURSOR_NEW")?);
                                     Value::str_rc(g!().zeiger_neu(b, x, y)?) }
             "joystick_hit" => Value::Bool(g!().joystick_hit(gi(a,0,"JOYSTICK_HIT")?,
@@ -864,7 +867,7 @@ impl<'p> Vm<'p> {
             "window_hide" => { g!().window_hide(true); Value::Nil }
             "window_show" => { g!().window_hide(false); Value::Nil }
             "tray_show" => {
-                if a.len() > 2 { return Err("TRAY_SHOW: erwartet ([bild[, hinweis$]])".into()); }
+                if a.len() > 2 { return Err(crate::vm::falsche_argumente("TRAY_SHOW", a.len())); }
                 // Ein Bild ist ein Handle (Zahl); ein Text allein ist der Hinweis.
                 let (bild, tipp) = match (a.first(), a.get(1)) {
                     (Some(Value::Str(s)), None) => (None, Some(s.to_string())),
@@ -892,10 +895,10 @@ impl<'p> Vm<'p> {
             "tray_shown" => { let _ = g!(); Value::Bool(crate::tray::sichtbar()) }
             "tray_clicked" => { let _ = g!(); Value::Bool(crate::tray::bild().klick) }
             "tray_double_clicked" => { let _ = g!(); Value::Bool(crate::tray::bild().doppel) }
-            "tray_menu_clicked$" | "tray_menu_clicked" => { let _ = g!(); Value::str_rc(crate::tray::bild().menue.unwrap_or_default()) }
+            "tray_menu_clicked$" => { let _ = g!(); Value::str_rc(crate::tray::bild().menue.unwrap_or_default()) }
             "notify" => {
                 let (titel, text) = (gs(a,0,"NOTIFY")?.to_string(), if a.len() > 1 { gs(a,1,"NOTIFY")?.to_string() } else { String::new() });
-                if a.len() > 2 { return Err("NOTIFY: erwartet (titel$[, text$])".into()); }
+                if a.len() > 2 { return Err(crate::vm::falsche_argumente("NOTIFY", a.len())); }
                 g!().notify(&titel, &text)?;
                 Value::Nil
             }
@@ -1160,7 +1163,7 @@ impl<'p> Vm<'p> {
             }
             "postfx" => {
                 if a.is_empty() || a.len() > 2 {
-                    return Err("POSTFX: erwartet (shader [, massstab])".into());
+                    return Err(crate::vm::falsche_argumente("POSTFX", a.len()));
                 }
                 let m = if a.len() == 2 { Some(need_f(a, 1, "POSTFX")? as f64) } else { None };
                 g!().set_postfx(gi(a, 0, "POSTFX")?, m)?;
@@ -1409,7 +1412,7 @@ impl<'p> Vm<'p> {
             }
             "billboard_part" => {
                 if a.len() != 10 {
-                    return Err(format!("BILLBOARD_PART: erwartet (bild, sx, sy, sb, sh, x, y, z, groesse, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("BILLBOARD_PART", a.len()));
                 }
                 let f = "BILLBOARD_PART";
                 g!().billboard_part(gi(a,0,f)?,
@@ -1420,7 +1423,7 @@ impl<'p> Vm<'p> {
             }
             "billboard_ex" => {
                 if a.len() != 8 {
-                    return Err(format!("BILLBOARD_EX: erwartet (bild, x, y, z, breite, hoehe, winkel, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("BILLBOARD_EX", a.len()));
                 }
                 let f = "BILLBOARD_EX";
                 g!().billboard_ex(gi(a,0,f)?, need_f(a,1,f)? as f32, need_f(a,2,f)? as f32, need_f(a,3,f)? as f32,
@@ -1430,7 +1433,7 @@ impl<'p> Vm<'p> {
             "capsule" | "capsule_wires" => {
                 let f = if name == "capsule" { "CAPSULE" } else { "CAPSULE_WIRES" };
                 if a.len() != 8 {
-                    return Err(format!("{}: erwartet (x1, y1, z1, x2, y2, z2, r, farbe), erhalten {} Argumente", f, a.len()));
+                    return Err(crate::vm::falsche_argumente(f, a.len()));
                 }
                 let mut p = [0f32; 6];
                 for (i, v) in p.iter_mut().enumerate() { *v = need_f(a, i, f)? as f32; }
@@ -1440,7 +1443,7 @@ impl<'p> Vm<'p> {
             "cylinder_ex" => {
                 let f = "CYLINDER_EX";
                 if a.len() != 9 {
-                    return Err(format!("CYLINDER_EX: erwartet (x1, y1, z1, x2, y2, z2, r_anfang, r_ende, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("CYLINDER_EX", a.len()));
                 }
                 let mut p = [0f32; 6];
                 for (i, v) in p.iter_mut().enumerate() { *v = need_f(a, i, f)? as f32; }
@@ -1450,7 +1453,7 @@ impl<'p> Vm<'p> {
             "cylinder_wires" => {
                 let f = "CYLINDER_WIRES";
                 if a.len() != 7 {
-                    return Err(format!("CYLINDER_WIRES: erwartet (x, y, z, r_oben, r_unten, hoehe, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("CYLINDER_WIRES", a.len()));
                 }
                 g!().cylinder_wires(need_f(a,0,f)? as f32, need_f(a,1,f)? as f32, need_f(a,2,f)? as f32,
                     need_f(a,3,f)? as f32, need_f(a,4,f)? as f32, need_f(a,5,f)? as f32, gi(a,6,f)?);
@@ -1459,7 +1462,7 @@ impl<'p> Vm<'p> {
             "triangle3d" => {
                 let f = "TRIANGLE3D";
                 if a.len() != 10 {
-                    return Err(format!("TRIANGLE3D: erwartet (x1, y1, z1, x2, y2, z2, x3, y3, z3, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("TRIANGLE3D", a.len()));
                 }
                 let mut p = [0f32; 9];
                 for (i, v) in p.iter_mut().enumerate() { *v = need_f(a, i, f)? as f32; }
@@ -1469,7 +1472,7 @@ impl<'p> Vm<'p> {
             "circle3d" => {
                 let f = "CIRCLE3D";
                 if a.len() != 5 {
-                    return Err(format!("CIRCLE3D: erwartet (x, y, z, r, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("CIRCLE3D", a.len()));
                 }
                 g!().circle3d(need_f(a,0,f)? as f32, need_f(a,1,f)? as f32, need_f(a,2,f)? as f32,
                     need_f(a,3,f)? as f32, gi(a,4,f)?);
@@ -1478,7 +1481,7 @@ impl<'p> Vm<'p> {
             "bbox_wires" => {
                 let f = "BBOX_WIRES";
                 if a.len() != 7 {
-                    return Err(format!("BBOX_WIRES: erwartet (x1, y1, z1, x2, y2, z2, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("BBOX_WIRES", a.len()));
                 }
                 let mut p = [0f32; 6];
                 for (i, v) in p.iter_mut().enumerate() { *v = need_f(a, i, f)? as f32; }
@@ -1558,9 +1561,23 @@ impl<'p> Vm<'p> {
             "mouse_ground_hit" => Value::Bool(g!().mouse_ground(need_f(a,0,"MOUSE_GROUND_HIT")? as f32).2),
 
             // --- Kamera-Modi (raylib UpdateCamera) ---
-            "camera3d_update" => { g!().camera3d_update(gi(a,0,"CAMERA3D_UPDATE")?); Value::Nil }
+            // Der Modus als Zahl (1..4) oder als Text wie bei den anderen
+            // Modus-Befehlen (Bericht B9; bis 2026.53 nur die Zahl).
+            "camera3d_update" => {
+                let f = "CAMERA3D_UPDATE";
+                let m = match a.first() {
+                    Some(Value::Str(s)) => match s.trim().to_lowercase().as_str() {
+                        "free" | "frei" => 1, "orbital" | "umkreisend" => 2,
+                        "first_person" | "ego" => 3, "third_person" | "verfolger" => 4,
+                        "custom" | "eigen" => 0,
+                        x => return Err(format!("{}: unbekannter Modus '{}' -- free/frei, orbital/umkreisend, first_person/ego, third_person/verfolger, custom/eigen", f, x)),
+                    },
+                    _ => gi(a,0,f)?,
+                };
+                g!().camera3d_update(m); Value::Nil
+            }
             "camera3d_move" => {
-                if a.len() != 5 && a.len() != 6 { return Err("CAMERA3D_MOVE: erwartet (vor, rechts, hoch, gieren, neigen[, zoom])".into()); }
+                if a.len() != 5 && a.len() != 6 { return Err(crate::vm::falsche_argumente("CAMERA3D_MOVE", a.len())); }
                 let mut v = [0f32; 6];
                 for (i, w) in v.iter_mut().enumerate().take(a.len()) {
                     let x = need_f(a, i, "CAMERA3D_MOVE")?;
@@ -1660,7 +1677,7 @@ impl<'p> Vm<'p> {
                     Some(Value::Buffer(b)) => b.borrow().clone(),
                     Some(v) => return Err(format!(
                         "SAMPLE_FROM_BUFFER: erwartet BUFFER, erhalten {}", v.type_name())),
-                    None => return Err("SAMPLE_FROM_BUFFER: erwartet (puffer, abtastrate)".into()),
+                    None => return Err(crate::vm::falsche_argumente("SAMPLE_FROM_BUFFER", a.len())),
                 };
                 let sr = gi(a, 1, "SAMPLE_FROM_BUFFER")?;
                 Value::Int(self.audio_mut()?.sample_from_pcm16(&bytes, sr)?)
@@ -1675,7 +1692,7 @@ impl<'p> Vm<'p> {
                 //   release, vol[, slide_halbtoene]) -> SOUND
                 let f = "SAMPLE_NOTE";
                 if a.len() < 8 || a.len() > 9 {
-                    return Err("SAMPLE_NOTE: erwartet (sample, halbtoene, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_halbtoene])".into());
+                    return Err(crate::vm::falsche_argumente("SAMPLE_NOTE", a.len()));
                 }
                 let idx = gi(a, 0, f)?;
                 let semis = need_f(a, 1, f)?;
@@ -1723,7 +1740,7 @@ impl<'p> Vm<'p> {
                 // Argument-Pruefung VOR der Audio-Initialisierung (golden-testbar).
                 let on = match a.first() {
                     Some(_) => crate::argument::a_schalter(a, 0, "AUDIO_LOFI")?,
-                    None => return Err("AUDIO_LOFI: erwartet (an[, bits[, cutoff_hz]])".into()),
+                    None => return Err(crate::vm::falsche_argumente("AUDIO_LOFI", a.len())),
                 };
                 let bits = if a.len() >= 2 {
                     let b = gi(a, 1, "AUDIO_LOFI")?;
@@ -2114,7 +2131,7 @@ impl<'p> Vm<'p> {
             "speak" => {
                 let text = gs(a, 0, "SPEAK")?.to_string();
                 let unterbrechen = a.len() > 1 && gb(a, 1, name)?;
-                if a.len() > 2 { return Err("SPEAK: erwartet (text$[, unterbrechen])".into()); }
+                if a.len() > 2 { return Err(crate::vm::falsche_argumente("SPEAK", a.len())); }
                 if self.gfx.as_ref().map_or(false, |g| g.a11y_aktiv()) {
                     self.gui.announce(text.clone(), unterbrechen);
                     if let Some(g) = self.gfx.as_mut() { g.a11y_ansagen(text, unterbrechen); }
@@ -2151,7 +2168,7 @@ impl<'p> Vm<'p> {
             "speak_rate" => { self.sprecher.tempo_setzen(need_f(a, 0, "SPEAK_RATE")?)?; Value::Nil }
             "speak_sound" => {
                 let text = gs(a, 0, "SPEAK_SOUND")?.to_string();
-                if a.len() != 1 { return Err("SPEAK_SOUND: erwartet (text$)".into()); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente("SPEAK_SOUND", a.len())); }
                 self.audio_mut()?;
                 let au = self.audio.as_mut().unwrap();
                 // Eine eigene Kopie: der Slot im Vorrat gehoert SPEAK und wird
@@ -2388,7 +2405,7 @@ impl<'p> Vm<'p> {
             }
             "drawimagepartex" => {
                 let idx = gi(a,0,"DRAWIMAGEPARTEX")?;
-                if a.len() < 9 || a.len() > 10 { return Err("DRAWIMAGEPARTEX: erwartet (img, sx, sy, sw, sh, x, y, w, h [, farbe])".into()); }
+                if a.len() < 9 || a.len() > 10 { return Err(crate::vm::falsche_argumente("DRAWIMAGEPARTEX", a.len())); }
                 // Die Farbe toent das Bild; ihr Alpha-Byte ist die Deckkraft
                 // (RGBA(255, 255, 255, 128) = halb durchsichtig, Farben wie ueberall).
                 let tint = if a.len() == 10 { Some(gi(a,9,"DRAWIMAGEPARTEX")?) } else { None };
@@ -2446,7 +2463,7 @@ impl<'p> Vm<'p> {
 
             // --- Sprite-Atlas ---
             "atlas_load" => Value::Int(g!().atlas_load(gs(a,0,"ATLAS_LOAD")?)?),
-            "atlas_draw" | "batch_draw" => {
+            "atlas_draw" => {
                 let atlas = gi(a,0,"ATLAS_DRAW")?;
                 let name = gs(a,1,"ATLAS_DRAW")?.to_string();
                 let tint = if a.len() > 4 { Some(gi(a,4,"ATLAS_DRAW")?) } else { None };
@@ -2617,7 +2634,7 @@ impl<'p> Vm<'p> {
             // --- Modul: imgfx (immutable, liefern neues IMAGE-Handle) ---
             "image_scale" => {
                 let (b, h) = (gi(a,1,"IMAGE_SCALE")? as i32, gi(a,2,"IMAGE_SCALE")? as i32);
-                if a.len() > 4 { return Err("IMAGE_SCALE: erwartet (bild, breite, hoehe [, filter$])".into()); }
+                if a.len() > 4 { return Err(crate::vm::falsche_argumente("IMAGE_SCALE", a.len())); }
                 if a.len() == 4 {
                     let name = gs(a, 3, "IMAGE_SCALE")?;
                     let f = crate::resample::Filter::aus_namen(&name).ok_or_else(|| format!(
@@ -2628,7 +2645,7 @@ impl<'p> Vm<'p> {
                 }
             }
             "image_enhance" => {
-                if a.len() != 3 { return Err("IMAGE_ENHANCE: erwartet (bild, art$, faktor)".into()); }
+                if a.len() != 3 { return Err(crate::vm::falsche_argumente("IMAGE_ENHANCE", a.len())); }
                 let name = gs(a, 1, "IMAGE_ENHANCE")?;
                 let art = crate::resample::Anpassung::aus_namen(&name).ok_or_else(|| format!(
                     "IMAGE_ENHANCE: unbekannte Art '{}' -- moeglich sind helligkeit, kontrast, saettigung", name))?;
@@ -2661,8 +2678,7 @@ impl<'p> Vm<'p> {
                     Some((gi(a,4,"IMAGE_DRAW_IMAGE")? as i32, gi(a,5,"IMAGE_DRAW_IMAGE")? as i32,
                           gi(a,6,"IMAGE_DRAW_IMAGE")? as i32, gi(a,7,"IMAGE_DRAW_IMAGE")? as i32))
                 } else if a.len() == 4 || a.len() == 5 { None } else {
-                    return Err("IMAGE_DRAW_IMAGE: erwartet (ziel, quelle, x, y), \
-optional dahinter (qx, qy, qb, qh) und eine Faerbung".into());
+                    return Err(crate::vm::falsche_argumente("IMAGE_DRAW_IMAGE", a.len()));
                 };
                 // Die Faerbung steht hinter der Quelle, bei kurzer Form direkt
                 // hinter y. WEISS ist "unveraendert".
@@ -2692,14 +2708,14 @@ optional dahinter (qx, qy, qb, qh) und eine Faerbung".into());
             "atlas_free" => { g!().atlas_free(gi(a,0,"ATLAS_FREE")?)?; Value::Nil }
             "image_from_buffer" => {
                 if a.len() != 1 {
-                    return Err(format!("IMAGE_FROM_BUFFER: erwartet (puffer), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("IMAGE_FROM_BUFFER", a.len()));
                 }
                 let bytes = crate::builtins::buf_h(&a[0], "IMAGE_FROM_BUFFER")?.borrow().clone();
                 Value::Int(g!().image_from_buffer(&bytes)?)
             }
             "image_to_buffer" => {
                 if a.is_empty() || a.len() > 2 {
-                    return Err(format!("IMAGE_TO_BUFFER: erwartet (bild[, mit_alpha]), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("IMAGE_TO_BUFFER", a.len()));
                 }
                 let ohne_alpha = match a.get(1) {
                     None => false,
@@ -2824,7 +2840,7 @@ wie viele Plaetze gelten", i + 1)),
             "image_invert" => Value::Int(g!().image_invert(gi(a,0,"IMAGE_INVERT")?)?),
             "image_color_to_alpha" => {
                 const F: &str = "IMAGE_COLOR_TO_ALPHA";
-                if a.len() != 2 && a.len() != 3 { return Err(format!("{}: erwartet (bild, farbe [, schwelle])", F)); }
+                if a.len() != 2 && a.len() != 3 { return Err(crate::vm::falsche_argumente(F, a.len())); }
                 let s = if a.len() == 3 { need_f(a, 2, F)? as f32 } else { 0.0 };
                 if !(0.0..1.0).contains(&s) { return Err(format!("{}: die Schwelle liegt zwischen 0 und 1 (nicht {})", F, s)); }
                 Value::Int(g!().image_color_to_alpha(gi(a, 0, F)?, gi(a, 1, F)?, s)?)
@@ -2836,14 +2852,14 @@ wie viele Plaetze gelten", i + 1)),
             // --- Formen mit Kommazahlen und Deckkraft (leinwand.rs) ---
             "image_fill_rect" => {
                 const F: &str = "IMAGE_FILL_RECT";
-                if a.len() != 6 && a.len() != 7 { return Err(format!("{}: erwartet (bild, x0, y0, x1, y1, farbe [, deckkraft])", F)); }
+                if a.len() != 6 && a.len() != 7 { return Err(crate::vm::falsche_argumente(F, a.len())); }
                 let (x0, y0, x1, y1) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
                 let c = lw_farbe(a, 5, Some(6), F)?;
                 g!().image_leinwand(gi(a,0,F)?, F, |l| l.rechteck(x0, y0, x1, y1, c))?; Value::Nil
             }
             "image_frame" => {
                 const F: &str = "IMAGE_FRAME";
-                if a.len() != 7 && a.len() != 8 { return Err(format!("{}: erwartet (bild, x0, y0, x1, y1, breite, farbe [, deckkraft])", F)); }
+                if a.len() != 7 && a.len() != 8 { return Err(crate::vm::falsche_argumente(F, a.len())); }
                 let (x0, y0, x1, y1) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
                 let b = need_f(a,5,F)? as f32;
                 let c = lw_farbe(a, 6, Some(7), F)?;
@@ -2851,7 +2867,7 @@ wie viele Plaetze gelten", i + 1)),
             }
             "image_fill_roundrect" => {
                 const F: &str = "IMAGE_FILL_ROUNDRECT";
-                if a.len() != 7 && a.len() != 8 { return Err(format!("{}: erwartet (bild, x0, y0, x1, y1, radius, farbe [, deckkraft])", F)); }
+                if a.len() != 7 && a.len() != 8 { return Err(crate::vm::falsche_argumente(F, a.len())); }
                 let (x0, y0, x1, y1) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
                 let r = need_f(a,5,F)? as f32;
                 let c = lw_farbe(a, 6, Some(7), F)?;
@@ -2859,14 +2875,14 @@ wie viele Plaetze gelten", i + 1)),
             }
             "image_fill_ellipse" => {
                 const F: &str = "IMAGE_FILL_ELLIPSE";
-                if a.len() != 6 && a.len() != 7 { return Err(format!("{}: erwartet (bild, cx, cy, rx, ry, farbe [, deckkraft])", F)); }
+                if a.len() != 6 && a.len() != 7 { return Err(crate::vm::falsche_argumente(F, a.len())); }
                 let (cx, cy, rx, ry) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
                 let c = lw_farbe(a, 5, Some(6), F)?;
                 g!().image_leinwand(gi(a,0,F)?, F, |l| l.ellipse(cx, cy, rx, ry, c))?; Value::Nil
             }
             "image_ring" => {
                 const F: &str = "IMAGE_RING";
-                if a.len() != 6 && a.len() != 7 { return Err(format!("{}: erwartet (bild, cx, cy, r, breite, farbe [, deckkraft])", F)); }
+                if a.len() != 6 && a.len() != 7 { return Err(crate::vm::falsche_argumente(F, a.len())); }
                 let (cx, cy, r, b) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
                 let c = lw_farbe(a, 5, Some(6), F)?;
                 g!().image_leinwand(gi(a,0,F)?, F, |l| l.ring(cx, cy, r, b, c))?; Value::Nil
@@ -2876,7 +2892,7 @@ wie viele Plaetze gelten", i + 1)),
                 let f: &str = if linie { "IMAGE_POLYLINE" } else { "IMAGE_FILL_POLY" };
                 let (soll, extra) = if linie { (5, "breite, ") } else { (4, "") };
                 if a.len() != soll && a.len() != soll + 1 {
-                    return Err(format!("{}: erwartet (bild, xs, ys, {}farbe [, deckkraft])", f, extra));
+                    let _ = extra; return Err(crate::vm::falsche_argumente(f, a.len()));
                 }
                 let xs = gfloats(a, 1, f)?;
                 let ys = gfloats(a, 2, f)?;
@@ -2897,7 +2913,7 @@ wie viele Plaetze gelten", i + 1)),
             "image_gradient" => {
                 const F: &str = "IMAGE_GRADIENT";
                 if a.len() != 7 && a.len() != 8 && a.len() != 10 {
-                    return Err(format!("{}: erwartet (bild, x0, y0, x1, y1, farbe1, farbe2 [, senkrecht [, deckkraft1, deckkraft2]])", F));
+                    return Err(crate::vm::falsche_argumente(F, a.len()));
                 }
                 let (x0, y0, x1, y1) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
                 let (d1, d2) = if a.len() == 10 { (Some(8), Some(9)) } else { (None, None) };
@@ -2907,7 +2923,7 @@ wie viele Plaetze gelten", i + 1)),
                 g!().image_leinwand(gi(a,0,F)?, F, |l| l.verlauf(x0, y0, x1, y1, c1, c2, senkrecht))?; Value::Nil
             }
             "image_draw_text" => {
-                if a.len() != 6 && a.len() != 7 { return Err("IMAGE_DRAW_TEXT: erwartet (bild, x, y, text$, groesse, farbe[, font])".into()); }
+                if a.len() != 6 && a.len() != 7 { return Err(crate::vm::falsche_argumente("IMAGE_DRAW_TEXT", a.len())); }
                 let txt = gs(a,3,"IMAGE_DRAW_TEXT")?.to_string();
                 let (b, x, y) = (gi(a,0,"IMAGE_DRAW_TEXT")?, gi(a,1,"IMAGE_DRAW_TEXT")? as i32, gi(a,2,"IMAGE_DRAW_TEXT")? as i32);
                 let (sz, c) = (gi(a,4,"IMAGE_DRAW_TEXT")? as i32, gi(a,5,"IMAGE_DRAW_TEXT")?);
@@ -2917,7 +2933,7 @@ wie viele Plaetze gelten", i + 1)),
                 Value::Nil
             }
             "image_text" => {
-                if a.len() != 3 && a.len() != 4 { return Err("IMAGE_TEXT: erwartet (text$, groesse, farbe[, font])".into()); }
+                if a.len() != 3 && a.len() != 4 { return Err(crate::vm::falsche_argumente("IMAGE_TEXT", a.len())); }
                 let txt = gs(a,0,"IMAGE_TEXT")?.to_string();
                 let font = if a.len() == 4 { gi(a,3,"IMAGE_TEXT")? } else { -1 };
                 Value::Int(g!().image_text(&txt, gi(a,1,"IMAGE_TEXT")? as i32, gi(a,2,"IMAGE_TEXT")?, font)?)
@@ -3327,7 +3343,7 @@ wie viele Plaetze gelten", i + 1)),
 /// Ein Feld ohne Plaetze fuer AUDIO_FFT, MIC_FFT, MIC_WAVE: Sie fuellen so
 /// viele Werte, wie das Feld Plaetze hat -- bei `DIM sp AS ARRAY OF FLOAT`
 /// (leer) also still keinen (Buch "Kleine Wunder", Kapitel 19).
-#[allow(dead_code)]
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub(crate) fn leeres_feld(f: &str) -> String {
     format!("{}: das Feld hat keine Plaetze -- es bekommt so viele Werte, wie es Plaetze hat: DIM werte[64] AS FLOAT", f)
 }

@@ -1,6 +1,6 @@
 ' M1 aus docs/intern/entwurf-maschinencode.md: der Compiler schreibt jedem Ausdruck
 ' einen Typ zu (`Compiler::typ_von`, `typen.rs`). `dhrt --typen` zeigt ihn;
-' mit `DHRT_TYPEN_PRUEFEN=1` steht hinter jedem getypten Ausdruck eine Probe,
+' mit `DHRT_CHECK_TYPES=1` steht hinter jedem getypten Ausdruck eine Probe,
 ' die zur Laufzeit abbricht, wenn der Typ nicht stimmt -- damit laeuft die
 ' ganze Pruefsammlung, und das ist der eigentliche Beleg.
 ' Format: docs/werkzeuge.md.
@@ -81,7 +81,7 @@ DIM feld[3] AS FLOAT
 feld[1] = a
 PRINT feld[1] + a; " "; "ab" * 2; " "; "z" + STR$(a)
 --- umgebung
-DHRT_TYPEN_PRUEFEN=1
+DHRT_CHECK_TYPES=1
 --- erwartet
 4.0 2.6666666666666665 64 0.5 2 12.0
 8 x 1 -1.5
@@ -92,7 +92,7 @@ DHRT_TYPEN_PRUEFEN=1
 ' ersetzt -- der Lauf muss mit der Meldung ueber den Compiler abbrechen.
 IMPORT "helfer.dh"
 WRITEALL("tiny.dh", "DIM a AS INTEGER : a = 4" + CHR$(10) + "PRINT a + 1" + CHR$(10))
-SETENV("DHRT_TYPEN_PRUEFEN", "1")
+SETENV("DHRT_CHECK_TYPES", "1")
 dlStarten(["--dumpbc", CWD$() + "/tiny.dh"])
 PRINT "probe drin "; (INSTR(dlAus, CHR$(34) + "INTEGER" + CHR$(34)) >= 0)
 WRITEALL("falsch.dhc", REPLACE$(dlAus, CHR$(34) + "INTEGER" + CHR$(34), CHR$(34) + "STRING" + CHR$(34)))

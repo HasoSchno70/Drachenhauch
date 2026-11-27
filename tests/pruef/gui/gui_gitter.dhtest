@@ -48,7 +48,7 @@ b[]
 7 3
 0,0 bis 2,2
 a|5/b|/c|7
-1.0
+1
 
 === unbekannte spaltenart ist ein fehler
 IMPORT "gui"
@@ -219,4 +219,4 @@ e 13 1 265 0 0 0
 --- umgebung
 DHRT_FRAMES=22
 --- erwartet
-1 0.0
+1 0

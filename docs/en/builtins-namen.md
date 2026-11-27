@@ -32,8 +32,11 @@ shows the new one; completion and signature help know both.
    `PRESSED` does not appear in new names: it meant "held" in `KEYPRESSED`
    and "just pressed" in `INPUT_PRESSED`.
 4. **Words with a fixed meaning:** `_FREE` releases, `_COUNT` is a number of
-   things (`MAP_COUNT`, `SET_COUNT`), `LEN` a length (text, bytes, array),
-   `_LOAD`/`_SAVE` read and write files.
+   things (`MAP_COUNT`, `SET_COUNT`, `JSON_COUNT`), `LEN` a length in
+   characters, bytes or elements of a dimension (`ARRAY_DIM_LEN`), a duration
+   is `_DURATION` (seconds, `SAMPLE_DURATION`), `_DONE` means "finished"
+   (`TWEEN_DONE`, `SPRITE_DONE`), `_NEXT` fetches the next one (`WS_NEXT`,
+   `MQTT_NEXT`), `_LOAD`/`_SAVE` read and write files.
 5. **The `$`:** a command that returns text may be written with or without
    `$` — `ENV_GET$("HOME")` and `ENV_GET("HOME")` are the same, and so are
    `CLIPBOARD_GET()` and `CLIPBOARD_GET$()`. Only where both forms exist as
@@ -59,7 +62,8 @@ shows the new one; completion and signature help know both.
    also takes the second name of the same group: `p`/`path`,
    `digits`/`decimals`, `vol`/`volume`, `n`/`count`, `v`/`number`,
    `wf`/`waveform`, `alt`/`old`, `fn`/`handler`, `flag`/`on`,
-   `bind`/`bind_addr`, `wdg`/`widget` — `FILE_EXISTS(path: "a.txt")` works
+   `bind`/`bind_addr`, `wdg`/`widget`, `x`/`x_mm`, `h`/`handle`, `c`/`conn`,
+   `r`/`result` — `FILE_EXISTS(path: "a.txt")` works
    although the parameter is called `p`.
 9. **Time:** time spans and time limits count **milliseconds** (parameter
    `ms` or `…_ms`): `TWEEN_NEW`, `TIMER_AFTER`, `SLEEP`, the fades, every
@@ -121,7 +125,7 @@ hand are callback timers from the `timer` module.
 
 | Name | What it does |
 |---|---|
-| `KEY_DOWN(key: Code oder Buchstabe)` | TRUE as long as the key with SDL code code is held — every frame again. For moving/steering — formerly `KEYPRESSED` |
+| `KEY_DOWN(key: Code oder Buchstabe)` | TRUE as long as the key `key` (a `KEY_*` constant or a letter) is held — every frame again. For moving/steering — formerly `KEYPRESSED` |
 | `KEY_HIT(key: Code oder Buchstabe)` | TRUE only in the one frame in which the key goes down. For shooting, jumping, toggling — formerly `KEYHIT` |
 | `KEY_RELEASED(key: Code oder Buchstabe)` | TRUE in the frame in which the key is released — for “charge up and fire on release”, say — formerly `KEYRELEASED` |
 | `KEY_REPEAT(key: Code oder Buchstabe)` | like KEYHIT, but while held it also fires with the system key repeat. For text cursors and quantity input — formerly `KEYREPEAT` |
@@ -219,7 +223,7 @@ hand are callback timers from the `timer` module.
 | `IMAGE_GET_ALPHA(image, x, y)` | opacity at (x, y), 0..255; -1 for an index outside. Needed because GETPIXEL returns a colour, and there … — formerly `GETALPHA` |
 | `FONT_LOAD(path$, size[, chars$])` | load TTF/OTF/TTC → FONT handle (INTEGER); chars$ = script blocks ("kyrillisch, griechisch", "japanisch", … — formerly `LOADFONT` |
 | `FONT_LOAD_IMAGE(image: IMAGE, separator_color: Zahl, first_char: Zahl)` | Loads a pixel font from a PNG in which the characters are set apart by a separator colour — formerly `LOADFONT_IMAGE` |
-| `FONT_SET(handle: INTEGER [, size: INTEGER])` | set the active font; SETFONT(-1) = default font. Without size the size the font was loaded at applies … — formerly `SETFONT` |
+| `FONT_SET(font: INTEGER [, size: INTEGER])` | set the active font; SETFONT(-1) = default font. Without size the size the font was loaded at applies … — formerly `SETFONT` |
 | `SOUND_LOAD(path: STRING)` | load a sample (short effects: WAV, OGG) — formerly `LOADSOUND` |
 | `SOUND_PLAY(s[, loops[, volume]])` | play, default loops=0, volume=1.0 — formerly `PLAYSOUND` |
 | `SOUND_STOP(s)` | formerly `STOPSOUND` |
@@ -229,8 +233,8 @@ hand are callback timers from the `timer` module.
 | `MODEL_LOAD(path$: STRING)` | INTEGER — load a model from a file (OBJ, GLTF, IQM …) — formerly `LOADMODEL` |
 | `IMAGE_WIDTH(image)` | width of an image in pixels — formerly `IMAGEWIDTH` |
 | `IMAGE_HEIGHT(image)` | height of an image in pixels — formerly `IMAGEHEIGHT` |
-| `AUDIO_SET_VOLUME(ch, v)` | volume of a channel 0..1 — formerly `AUDIO_VOLUME` |
-| `AUDIO_MUSIC_SET_VOLUME(v)` | volume of the music 0..1 — formerly `AUDIO_MUSIC_VOLUME` |
+| `AUDIO_SET_VOLUME(ch, volume)` | volume of a channel 0..1 — formerly `AUDIO_VOLUME` |
+| `AUDIO_MUSIC_SET_VOLUME(volume)` | volume of the music 0..1 — formerly `AUDIO_MUSIC_VOLUME` |
 | `FONT_LOAD_SDF(path$, size[, chars$]) AS INTEGER` | a font that stays sharp at any size (distance field) — formerly `LOADFONT_SDF` |
 | `MIC_PEAK() AS FLOAT` | highest peak at the input since the last call (like AUDIO_PEAK at the output) — formerly `MIC_LEVEL` |
 
@@ -348,6 +352,68 @@ hand are callback timers from the `timer` module.
 | `SYSTEM_EXE_PATH$() AS STRING` | path of the running program file — formerly `EXEPATH$` |
 | `CLOUD_LEADERBOARD_SUBMIT(board$, name$, score[, best_low])` | submit a score; best_low = TRUE for "lower is better" — formerly `LEADERBOARD_SUBMIT` |
 | `CLOUD_LEADERBOARD_FETCH(board$, n[, ascending]) AS ARRAY OF TUPLE` | the best n entries as (name$, score) tuples, sorted (descending by default) — formerly `LEADERBOARD_FETCH` |
+
+### Setting is SET, reading is GET
+
+| Name | What it does |
+|---|---|
+| `MODBUS_SET_UNIT(m: MODBUS, unit)` | device address for the following requests (0..255; with RTU, 0 means "to all", and no answer comes) — formerly `MODBUS_UNIT` |
+| `SPI_SET_SPEED(spi: SPI_DEVICE, clock_hz: INTEGER)` | Changes the clock — formerly `SPI_SPEED` |
+| `SPI_SET_MODE(spi: SPI_DEVICE, mode: INTEGER)` | Changes the mode (0–3, clock polarity and phase) — formerly `SPI_MODE` |
+| `HOTPLUG_SET_INTERVAL(ms)` | how often to look (100..10000, default 500) — formerly `HOTPLUG_INTERVAL` |
+| `VIDEO_SET_LOOP(video: VIDEO, on)` | start over at the end instead of stopping — formerly `VIDEO_LOOP` |
+| `TRAY_SET_TOOLTIP(hint$)` | change the hint (to show progress, say) — formerly `TRAY_TOOLTIP` |
+| `TRAY_SET_MENU(entries$)` | the right-click menu (on macOS also Ctrl+click); the entries stand in one text separated by vertical bars, a … — formerly `TRAY_MENU` |
+| `FIRMATA_STEPPER_SET_SPEED(handle: FIRMATA_HANDLE, motor: INTEGER, steps_per_s: FLOAT)` | maximum speed — formerly `FIRMATA_STEPPER_SPEED` |
+| `FIRMATA_STEPPER_SET_ACCEL(handle: FIRMATA_HANDLE, motor: INTEGER, steps_per_s2: FLOAT)` | acceleration, 0 = none — formerly `FIRMATA_STEPPER_ACCEL` |
+| `AUDIO_SET_PITCH(ch, factor)` | pitch/speed: 1.0 = normal, 2.0 = an octave higher, 0.5 = lower — formerly `AUDIO_PITCH` |
+| `AUDIO_SET_PAN_POS(ch, p)` | set the position directly, 0 = left .. 1 = right (ends a running animation) — formerly `AUDIO_PAN_POS` |
+| `AUDIO_BUS_SET_VOLUME(bus$, vol)` | master volume of a bus (0..1) — formerly `AUDIO_BUS_VOLUME` |
+| `AUDIO_BUS_SET_PAN(bus: STRING, pos: Zahl)` | Moves a whole bus in the stereo image (-1 = left, 0 = centre, +1 = right). — formerly `AUDIO_BUS_PAN` |
+| `SPEAK_SET_RATE(factor)` | rate 0.5 (half as fast) .. 2.0 (double), default 1.0 — formerly `SPEAK_RATE` |
+| `SPRITE_SET_TINT(sp: ?, color: INTEGER)` | colour tint (RGB multiply) — formerly `SPRITE_TINT` |
+| `MODEL_SET_TEXTURE(model, image: IMAGE)` | apply an image as the surface — formerly `MODEL_TEXTURE` |
+| `TEXT_SET_SIZE(size: Zahl)` | font size for subsequent TEXT calls (4–400) — formerly `TEXT_SIZE` |
+| `MOUSE_SET_LOCK(on: BOOLEAN)` | capture the cursor: hide it + lock it into the window (relative movement) — for first-person/camera mouse … — formerly `MOUSE_LOCK` |
+| `BLEND_SET_MODE(name: STRING)` | blend mode for subsequent draws: "alpha" (default), "add" (additive – glow/light), "mult" (multiplicative – … — formerly `BLEND_MODE` |
+| `GUI_WINDOW_SET_TITLE(win: GUI_WINDOW, title$)` | change the title bar text later (name of the document, "Commands" / "Open file") — formerly `GUI_WINDOW_TITLE` |
+| `GUI_WINDOW_SET_MOVABLE(win: GUI_WINDOW, flag)` | movable by its title bar (default: on) — formerly `GUI_WINDOW_MOVABLE` |
+| `GUI_WINDOW_SET_VISIBLE(win: GUI_WINDOW, flag)` | set visibility — formerly `GUI_WINDOW_VISIBLE` |
+| `GUI_MENU_SET_ENABLED(item, on)` | disable an entry (grey, no click, no shortcut) or enable it — formerly `GUI_MENU_ENABLE` |
+| `GUI_LISTBOX_SET_ENABLED(lb: GUI_WIDGET, i, on)` | disable an entry: visible, but neither clickable nor reachable with the arrow keys — formerly `GUI_LISTBOX_ENABLE` |
+| `GUI_MENU_SET_CHECKED(item, on)` | makes the entry a check-mark entry and sets it; afterwards a click toggles it by itself — formerly `GUI_MENU_CHECK` |
+| `GUI_STATUSBAR_SET_TEXT(sb: GUI_WIDGET, field, text$)` | text of a field (GUI_SET_TEXT means field 0) — formerly `GUI_STATUSBAR_SET` |
+| `GUI_BREADCRUMB_SET_ITEMS(bc: GUI_WIDGET, parts)` | all parts at once (ARRAY OF STRING); the same path again changes nothing — formerly `GUI_BREADCRUMB_SET` |
+| `CAMERA_GET_ROTATION()` | read the current values — formerly `CAMERA_ROTATION` |
+| `AUDIO_MUSIC_GET_POSITION()` | seconds since start (from position 0) — formerly `AUDIO_MUSIC_POSITION` |
+| `AUDIO_CHANNEL_COUNT()` | current channel count — formerly `AUDIO_NUM_CHANNELS` |
+| `CHAR_GET_X(c)` | FLOAT — current position — formerly `CHAR_X` |
+| `CHAR_GET_Y(c)` | FLOAT — current position — formerly `CHAR_Y` |
+| `CHAR_GET_VX(c)` | FLOAT — current velocity per axis — formerly `CHAR_VX` |
+| `CHAR_GET_VY(c)` | FLOAT — current velocity per axis — formerly `CHAR_VY` |
+| `CHAR_GET_W(c)` | FLOAT — size of the collision box — formerly `CHAR_W` |
+| `CHAR_GET_H(c)` | FLOAT — size of the collision box — formerly `CHAR_H` |
+| `CHAR_GET_FACING(c)` | INTEGER (-1 = left, +1 = right) facing direction -- for mirroring the sprite — formerly `CHAR_FACING` |
+| `GUI_PALETTE_IS_OPEN() AS BOOLEAN` | is the command palette open? (GUI_PALETTE without an argument) — formerly `GUI_PALETTE` |
+| `GUI_PALETTE_SET_OPEN(on)` | open (TRUE) or close the command palette — formerly `GUI_PALETTE` |
+| `GUI_WINDOW_IS_CLOSED(win: GUI_WINDOW)` | is the window closed? (a state, not an event of one frame) — formerly `GUI_WINDOW_CLOSED` |
+| `WINDOW_GET_WAIT_EVENTS() AS FLOAT` | how long the window sleeps without an event (seconds) — formerly `WINDOW_WAIT_EVENTS` |
+| `WINDOW_SET_WAIT_EVENTS(seconds)` | wait up to this many seconds for an event when idle — formerly `WINDOW_WAIT_EVENTS` |
+
+### Counting, done, receiving: `_COUNT`, `_LEN`, `_DONE`, `_NEXT`
+
+| Name | What it does |
+|---|---|
+| `JSON_COUNT(h: ?, path: STRING)` | number of elements of a list or fields of an object — formerly `JSON_LEN` |
+| `ASTAR_PATH_COUNT(g)` | number of points of the path found — formerly `ASTAR_PATH_LEN` |
+| `SAMPLE_DURATION(sample: SAMPLE)` | length of the sample in seconds — formerly `SAMPLE_LEN` |
+| `ARRAY_DIM_LEN(arr, n)` | length of the n-th dimension (0-based) — formerly `ARRAY_DIM_SIZE` |
+| `XML_NAME_COUNT(k: XML_HANDLE, path$) AS INTEGER` | how many children of this name (next to XML_CHILD_COUNT, which counts all) — formerly `XML_COUNT` |
+| `TILED_GID_COUNT(m: ?, layer_idx: INTEGER, gid: INTEGER)` | how often a tile (GID) occurs in a layer — formerly `TILED_COUNT_GID` |
+| `SPRITE_DONE(sp)` | has the animation run through? (like TWEEN_DONE, VIDEO_DONE) — formerly `SPRITE_IS_FINISHED` |
+| `MQTT_NEXT(handle: MQTT_HANDLE) AS BOOLEAN` | fetch the next message (like WS_NEXT, OSC_NEXT) — formerly `MQTT_NEXT_MESSAGE` |
+| `MQTT_MESSAGE$(handle: MQTT_HANDLE) AS STRING` | the content of the fetched message (like WS_MESSAGE$) — formerly `MQTT_MESSAGE_PAYLOAD` |
+| `MQTT_TOPIC$(handle: MQTT_HANDLE) AS STRING` | the topic of the fetched message — formerly `MQTT_MESSAGE_TOPIC` |
 
 ### Time limits: `_SET_TIMEOUT` in milliseconds
 

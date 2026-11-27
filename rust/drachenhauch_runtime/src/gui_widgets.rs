@@ -226,10 +226,10 @@ impl Gui {
     /// `symbolgroesse` (Punkte, 0 = aus der Hoehe).
     pub fn toolbar_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let l = self.tb_mut(h, "GUI_TOOLBAR_SET")?;
-        match key.to_lowercase().as_str() {
-            "beschriftung" | "text" => l.mit_text = wert != 0.0,
-            "symbolgroesse" | "symbol" => l.symbol = (wert as i32).clamp(0, 64),
-            _ => return Err(format!("GUI_TOOLBAR_SET: unbekannte Einstellung '{}' -- bekannt sind: beschriftung, symbolgroesse", key)),
+        match super::einstellungen::schluessel("GUI_TOOLBAR_SET", key, super::einstellungen::TOOLBAR)? {
+            "beschriftung" => l.mit_text = wert != 0.0,
+            "symbolgroesse" => l.symbol = (wert as i32).clamp(0, 64),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -237,10 +237,10 @@ impl Gui {
     pub fn toolbar_get(&self, h: i64, key: &str) -> Result<f64, String> {
         let l = self.tb_ref(h, "GUI_TOOLBAR_GET")?;
         let (mit_text, symbol) = l.map(|l| (l.mit_text, l.symbol)).unwrap_or((false, 0));
-        Ok(match key.to_lowercase().as_str() {
-            "beschriftung" | "text" => if mit_text { 1.0 } else { 0.0 },
-            "symbolgroesse" | "symbol" => symbol as f64,
-            _ => return Err(format!("GUI_TOOLBAR_GET: unbekannte Einstellung '{}' -- bekannt sind: beschriftung, symbolgroesse", key)),
+        Ok(match super::einstellungen::schluessel("GUI_TOOLBAR_GET", key, super::einstellungen::TOOLBAR)? {
+            "beschriftung" => if mit_text { 1.0 } else { 0.0 },
+            "symbolgroesse" => symbol as f64,
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         })
     }
     /// Lage eines Eintrags (x, Breite) in logischen Koordinaten, wie GUI_GET_X.
@@ -910,11 +910,11 @@ impl Gui {
     /// GUI_LISTBOX_SET(lb, key$, wert): `mehrfachauswahl`, `kaestchen`.
     pub fn list_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let l = self.list_mut(h, "GUI_LISTBOX_SET")?;
-        match key.to_lowercase().as_str() {
-            "mehrfachauswahl" | "multi_select" | "multi" => { l.multi = wert != 0.0; if !l.multi { for x in l.sel.iter_mut() { *x = false; } } }
-            "kaestchen" | "checkboxes" => l.kaestchen = wert != 0.0,
-            "bearbeitbar" | "editable" => { l.bearbeitbar = wert != 0.0; if !l.bearbeitbar { l.edit = None; } }
-            _ => return Err(format!("GUI_LISTBOX_SET: unbekannter Schluessel '{}' -- mehrfachauswahl, kaestchen, bearbeitbar", key)),
+        match super::einstellungen::schluessel("GUI_LISTBOX_SET", key, super::einstellungen::LISTBOX)? {
+            "mehrfachauswahl" => { l.multi = wert != 0.0; if !l.multi { for x in l.sel.iter_mut() { *x = false; } } }
+            "kaestchen" => l.kaestchen = wert != 0.0,
+            "bearbeitbar" => { l.bearbeitbar = wert != 0.0; if !l.bearbeitbar { l.edit = None; } }
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -1148,14 +1148,6 @@ impl Gui {
         let w = self.list_ref(h, "GUI_LISTBOX_VIEW_ROW")?;
         Ok(liste_ansicht(&w.items, w.list.as_deref()).get(k.max(0) as usize).filter(|_| k >= 0).map(|&x| x as i64).unwrap_or(-1))
     }
-    pub fn list_placeholder(&mut self, h: i64, text: String) -> Result<(), String> {
-        self.list_mut(h, "GUI_LISTBOX_PLACEHOLDER")?.leer_text = text; Ok(())
-    }
-    /// GUI_LISTBOX_PLACEHOLDER$(lb): der Hinweis der leeren Liste ("" = keiner).
-    pub fn list_placeholder_get(&self, h: i64) -> Result<String, String> {
-        let w = self.list_ref(h, "GUI_LISTBOX_PLACEHOLDER$")?;
-        Ok(w.list.as_ref().map(|l| l.leer_text.clone()).unwrap_or_default())
-    }
     /// Sortieren -- natuerlich ("Datei 9" vor "Datei 10"), und INNERHALB der
     /// Gruppen, wenn es Gruppenkoepfe gibt: sonst risse Sortieren die Koepfe
     /// von ihren Eintraegen weg. Alles, was an einem Eintrag haengt, reist mit,
@@ -1237,16 +1229,8 @@ impl Gui {
         if !matches!(w.kind, Kind::ListBox | Kind::Tree) || !self.widget_shown(wi, w) { return None; }
         let max = self.list_max_scroll(wi, i);
         if max <= 0 { return None; }
-        let (ax, ay, aw, ah) = self.abs_rect(wi, w);
-        let bw = self.sk(8);
         // Gespiegelt stehen Baum und Liste mit dem Balken links.
-        let links = self.windows[wi].rtl;
-        let tx = if links { ax + 1 } else { ax + aw - 1 - bw };
-        let (ty, th) = (ay + 1, (ah - 2).max(1));
-        let inhalt = max + w.h;
-        let thh = ((th as i64 * w.h as i64 / inhalt.max(1) as i64) as i32).clamp(self.sk(16).min(th), th);
-        let thy = ty + ((th - thh) as f64 * (Self::roll_ist(w) / max as f64).clamp(0.0, 1.0)) as i32;
-        Some((tx, ty, bw, th, thy, thh))
+        Some(self.rollbalken_lage(self.abs_rect(wi, w), self.windows[wi].rtl, w.h, max + w.h, Self::roll_ist(w)))
     }
     pub(super) fn list_bar_at(&self, wi: usize, i: usize, mx: i32, my: i32) -> bool {
         self.list_bar_geom(wi, i).map(|(tx, ty, bw, th, _, _)| Self::in_rect(mx, my, (tx, ty, bw, th))).unwrap_or(false)
@@ -1429,27 +1413,14 @@ impl Gui {
     }
     /// Tippen springt (Baum): wie bei der Liste, ueber die SICHTBAREN Knoten.
     pub(super) fn baum_tippen(&mut self, wi: usize, i: usize, vis: &[usize], g: &mut Graphics) -> bool {
-        let mut s = g.pop_text_input();
-        s.retain(|c| !c.is_control() && c != ' ');
-        if s.is_empty() && !g.key_ctrl() {
-            for c in (b'a'..=b'z').chain(b'0'..=b'9') {
-                if g.key_pressed(c as i64) { s.push(c as char); }
-            }
-        }
+        let s = super::bausteine::getippt(g);
         if s.is_empty() || vis.is_empty() { return false; }
         let jetzt = g.uhr_jetzt();
         let ziel = {
             let t = self.windows[wi].widgets[i].tree.as_mut().unwrap();
-            if jetzt - t.tipp_zeit > 1.0 { t.tipp.clear(); }
-            t.tipp_zeit = jetzt;
-            t.tipp.push_str(&s.to_lowercase());
-            let tipp = t.tipp.clone();
-            let erster = tipp.chars().next().unwrap();
-            let wiederholt = tipp.chars().all(|c| c == erster);
-            let such: String = if wiederholt { erster.to_string() } else { tipp };
+            let (such, wiederholt) = super::bausteine::tipp_merken(&mut t.tipp, &mut t.tipp_zeit, jetzt, &s);
             let sel = t.selected;
-            let pos = vis.iter().position(|&k| k as i32 == sel);
-            let start = match pos { Some(p) if wiederholt => p + 1, Some(p) => p, None => 0 };
+            let start = super::bausteine::tipp_start(vis.iter().position(|&k| k as i32 == sel), wiederholt);
             (0..vis.len()).map(|d| vis[(start + d) % vis.len()])
                 .find(|&k| t.nodes[k].label.to_lowercase().starts_with(&such))
         };
@@ -1472,10 +1443,6 @@ impl Gui {
     }
     pub fn tree_editing(&self, h: i64) -> Result<i64, String> {
         Ok(self.tree_ref(h, "GUI_TREE_EDITING")?.edit.as_ref().map(|e| e.k as i64).unwrap_or(-1))
-    }
-    pub fn tree_placeholder(&mut self, h: i64, text: String) -> Result<(), String> {
-        self.tree_mut(h, "GUI_TREE_PLACEHOLDER")?.leer_text = text;
-        Ok(())
     }
     // --- GUI_LISTBOX_EDIT / EDITED / EDITING ---
     pub fn list_edit(&mut self, h: i64, i: i64) -> Result<(), String> {

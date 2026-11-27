@@ -839,22 +839,21 @@ impl Gui {
         if w.kind != Kind::TextInput {
             return Err("GUI_TEXTINPUT_SET: das Widget ist kein GUI_TEXTINPUT".into());
         }
-        match key.to_lowercase().as_str() {
-            "passwort" | "password" => w.passwort = wert != 0.0,
-            "nur_lesen" | "readonly" => w.nur_lesen = wert != 0.0,
-            "maxlaenge" | "maxlen" => {
+        match super::einstellungen::schluessel("GUI_TEXTINPUT_SET", key, super::einstellungen::TEXTINPUT)? {
+            "passwort" => w.passwort = wert != 0.0,
+            "nur_lesen" => w.nur_lesen = wert != 0.0,
+            "maxlaenge" => {
                 if wert < 0.0 { return Err("GUI_TEXTINPUT_SET: maxlaenge muss >= 0 sein (0 = frei)".into()); }
                 w.maxlaenge = wert as i32;
             }
-            "zahlen" | "numeric" => {
+            "zahlen" => {
                 if !(0.0..=3.0).contains(&wert) || wert.fract() != 0.0 {
                     return Err("GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl), 2 (Kommazahl) oder 3 (Geldbetrag in Cent)".into());
                 }
                 w.zahlen = wert as u8;
             }
-            "suche" | "search" => return self.feld_suche_setzen(h, wert != 0.0),
-            _ => return Err(format!(
-                "GUI_TEXTINPUT_SET: unbekannter Schluessel '{}' -- passwort, nur_lesen, maxlaenge, zahlen, suche", key)),
+            "suche" => return self.feld_suche_setzen(h, wert != 0.0),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -868,23 +867,14 @@ impl Gui {
             return Err("GUI_TEXTINPUT_GET: das Widget ist kein GUI_TEXTINPUT".into());
         }
         let b = |x: bool| if x { 1.0 } else { 0.0 };
-        Ok(match key.to_lowercase().as_str() {
-            "passwort" | "password" => b(w.passwort),
-            "nur_lesen" | "readonly" => b(w.nur_lesen),
-            "maxlaenge" | "maxlen" => w.maxlaenge as f64,
-            "zahlen" | "numeric" => w.zahlen as f64,
-            "suche" | "search" => b(Self::feld_ist_suche(w)),
-            _ => return Err(format!(
-                "GUI_TEXTINPUT_GET: unbekannter Schluessel '{}' -- passwort, nur_lesen, maxlaenge, zahlen, suche", key)),
+        Ok(match super::einstellungen::schluessel("GUI_TEXTINPUT_GET", key, super::einstellungen::TEXTINPUT)? {
+            "passwort" => b(w.passwort),
+            "nur_lesen" => b(w.nur_lesen),
+            "maxlaenge" => w.maxlaenge as f64,
+            "zahlen" => w.zahlen as f64,
+            "suche" => b(Self::feld_ist_suche(w)),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         })
-    }
-    /// GUI_TEXTINPUT_PLACEHOLDER$(tf): der graue Text im leeren Feld.
-    pub fn textinput_placeholder(&self, h: i64) -> Result<String, String> {
-        let w = self.wdg(h, "GUI_TEXTINPUT_PLACEHOLDER$")?;
-        if !matches!(w.kind, Kind::TextInput | Kind::TextArea) {
-            return Err("GUI_TEXTINPUT_PLACEHOLDER$: das Widget ist kein GUI_TEXTINPUT oder GUI_TEXTAREA".into());
-        }
-        Ok(w.placeholder.clone())
     }
 
     /// GUI_ENTERED(tf) -- wurde in DIESEM Bild Enter im Textfeld gedrueckt?
@@ -982,15 +972,7 @@ impl Gui {
     /// Text auf `breite` Pixel kuerzen: passt er, unveraendert, sonst so viele
     /// Zeichen, wie mit "..." dahinter passen.
     pub(super) fn text_kuerzen(&self, g: &Graphics, wdg: &Widget, text: &str, breite: i32) -> String {
-        if self.wtext_width(g, wdg, text) <= breite { return text.to_string(); }
-        let zeichen: Vec<char> = text.chars().collect();
-        let mut n = zeichen.len();
-        while n > 0 {
-            n -= 1;
-            let probe: String = zeichen[..n].iter().collect::<String>() + "...";
-            if self.wtext_width(g, wdg, &probe) <= breite { return probe; }
-        }
-        String::new()
+        super::bausteine::kuerzen_mit(text, 1, breite, &|s| self.wtext_width(g, wdg, s))
     }
 
     /// Text an Wortgrenzen auf `breite` Pixel umbrechen. Ein Wort, das allein

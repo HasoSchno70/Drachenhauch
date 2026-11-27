@@ -622,6 +622,7 @@ fn sekunden_lesen(arg: &str, nr: usize) -> Result<u64, String> {
 }
 
 /// Die Faelle einer Sammlung lesen (ohne den Kopf; siehe `sammlung_parsen`).
+#[cfg(test)]
 pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
     sammlung_parsen(text).map(|s| s.faelle)
 }
@@ -953,7 +954,7 @@ fn unterschied(erwartet: &str, ist: &str) -> String {
     "Ausgabe weicht ab".into()
 }
 
-/// Einen abgeschlossenen Lauf bewerten. `ohne_grafik`: ist `DHRT_OHNE_GRAFIK`
+/// Einen abgeschlossenen Lauf bewerten. `ohne_grafik`: ist `DHRT_NO_GRAPHICS`
 /// gesetzt, ist ein fehlender Grafik-Builtin kein Fehlschlag (Build ohne raylib).
 /// Darunter dasselbe Netz: **was an einer fehlenden Anzeige scheitert, ist
 /// nicht falsch, sondern hier nicht pruefbar.**

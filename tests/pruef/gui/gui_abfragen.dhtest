@@ -255,7 +255,7 @@ DHRT_FRAMES=2
 GUI_CAN_UNDO: nur ein Textfeld oder Textbereich hat einen Verlauf
 
 === das thema system folgt einem hellen system mit eigenem akzent
-' DHRT_SYSTEM_DUNKEL/DHRT_SYSTEM_AKZENT legen die Antwort des Systems fest.
+' DHRT_SYSTEM_DARK/DHRT_SYSTEM_ACCENT legen die Antwort des Systems fest.
 IMPORT "gui"
 SCREEN(400, 300, "T", 1)
 SET_WINDOW_POS(-3000, -3000)
@@ -265,8 +265,8 @@ GUI_THEME_PRESET("system")
 PRINT "grund "; HEX$(GUI_THEME_GET("widget_bg")); " akzent "; HEX$(GUI_THEME_GET("accent")); " rund "; GUI_METRIC_GET("corner_radius") > 0
 --- umgebung
 DHRT_FRAMES=2
-DHRT_SYSTEM_DUNKEL=0
-DHRT_SYSTEM_AKZENT=#FF8800
+DHRT_SYSTEM_DARK=0
+DHRT_SYSTEM_ACCENT=#FF8800
 --- erwartet
 dunkel FALSE akzent FF8800
 grund FFFFFF akzent FF8800 rund TRUE
@@ -281,8 +281,8 @@ GUI_THEME_PRESET("system")
 PRINT "grund "; HEX$(GUI_THEME_GET("widget_bg")); " akzent "; HEX$(GUI_THEME_GET("accent"))
 --- umgebung
 DHRT_FRAMES=2
-DHRT_SYSTEM_DUNKEL=1
-DHRT_SYSTEM_AKZENT=-
+DHRT_SYSTEM_DARK=1
+DHRT_SYSTEM_ACCENT=-
 --- erwartet
 dunkel TRUE akzent -1
 grund 2A3542 akzent 2BC4E8

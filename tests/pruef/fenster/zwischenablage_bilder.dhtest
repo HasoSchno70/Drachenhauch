@@ -3,7 +3,7 @@
 ' hineinlegt, liest das andere Programm, und umgekehrt. Dazu das Ziehen
 ' hinaus: ohne gedrueckte Maustaste beginnt es nicht (sonst legte das
 ' System sofort dort ab, wo der Zeiger steht).
-' Jeder Fall setzt DHRT_ZWISCHENABLAGE=system; seriell, weil die Ablage
+' Jeder Fall setzt DHRT_CLIPBOARD=system; seriell, weil die Ablage
 ' systemweit ist.
 ' Format: docs/werkzeuge.md, dhrt test.
 --- seriell
@@ -17,7 +17,7 @@ CATCH e
 END TRY
 IMPORT "helfer.dh"
 DIM b AS INTEGER : b = IMAGE_NEW(40, 30, RGB(200, 30, 60))
-PRINT "gesetzt "; CLIPBOARD_SET_IMAGE(b)
+CLIPBOARD_SET_IMAGE(b) : PRINT "gesetzt"
 PRINT "fremd liest "; ps$("bild_lesen", "")
 PRINT ps$("bild_setzen", "17x9")
 DIM c AS INTEGER : c = CLIPBOARD_GET_IMAGE()
@@ -64,9 +64,9 @@ switch ($Was) {
 }
 --- system windows
 --- umgebung
-DHRT_ZWISCHENABLAGE=system
+DHRT_CLIPBOARD=system
 --- erwartet
-gesetzt TRUE
+gesetzt
 fremd liest 40x30 C81E3C
 fremd gesetzt 17x9
 herein 17x9
@@ -106,7 +106,7 @@ switch ($Was) {
 }
 --- system windows
 --- umgebung
-DHRT_ZWISCHENABLAGE=system
+DHRT_CLIPBOARD=system
 --- erwartet
 fremd liest eins.txt,zwei.txt
 fremd gesetzt

@@ -8,7 +8,8 @@ collision maths: here real dynamic bodies are simulated.
 
 > **Native runtime only** (`dhrt` / F6 in the editor). The `PHYS_WORLD` holds the
 > simulation pipeline; individual bodies are addressed via an **integer index**
-> (the return value of `PHYS3D_ADD_*`).
+> (the return value of `PHYS3D_ADD_*`). The type is also called
+> `PHYS3D_WORLD` (like `PHYS2D_WORLD`); `DIM w AS PHYS3D_WORLD` is the same.
 
 ```basic
 IMPORT "physics3d"

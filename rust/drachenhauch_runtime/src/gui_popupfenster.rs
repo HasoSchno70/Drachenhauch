@@ -10,7 +10,7 @@
 //! sind; nur die Grenze, an der ein Popup ausweicht, ist dann der
 //! Arbeitsbereich des Schirms statt des Fensterrands (`grenze`).
 //!
-//! Wo es keine Popup-Fenster gibt (Wayland, `DHRT_OHNE_POPUP_FENSTER=1`),
+//! Wo es keine Popup-Fenster gibt (Wayland, `DHRT_NO_POPUP_WINDOWS=1`),
 //! weicht ein Popup am Rand seines Fensters aus. Im Hauptfenster bleibt es
 //! wie immer: dort weicht es am Rand des Hauptfensters aus.
 
@@ -18,7 +18,7 @@ use super::*;
 
 /// Ein Popup-Fenster: zeigt den Ausschnitt `r` (x, y, b, h) der Flaeche
 /// `flaeche`.
-pub(super) struct PopupFenster {
+pub(crate) struct PopupFenster {
     pub(super) flaeche: u32,
     pub(super) id: u32,
     pub(super) r: (i32, i32, i32, i32),

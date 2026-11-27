@@ -46,8 +46,8 @@ PRINT BASENAME(JSON_GET_STRING(d, "d.0.file")); " Zeile "; JSON_GET_INT(d, "d.0.
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
-teil.dh Zeile 4 Unbekanntes Builtin 'GIBTSNICHT_
-haupt Zeile 2 Unbekanntes Builtin 'UNBEKANNT_Y
+teil.dh Zeile 4 Unbekannter Befehl 'GIBTSNICHT_
+haupt Zeile 2 Unbekannter Befehl 'UNBEKANNT_Y
 teil.dh Zeile 2 parse
 
 === break und return am falschen ort nennen die zeile
@@ -221,7 +221,7 @@ auch die fehlende gut.dh weg.dh
 === kein beispiel meldet einen fehler, ein unbekanntes builtin oder eine dim-warnung
 ' Kein Fehlalarm auf dem eigenen Bestand. Warnungen wegen eines fehlenden
 ' Hardware-Moduls sind erlaubt (Bau ohne --hardware), Fehler nicht; ein
-' "Unbekanntes Builtin" hiesse, dass builtin_index.json hinterherhinkt.
+' "Unbekannter Befehl" hiesse, dass builtin_index.json hinterherhinkt.
 IMPORT "helfer.dh"
 IMPORT "json"
 DIM ordner AS STRING : ordner = ARG$(0)
@@ -257,8 +257,8 @@ NEXT
 PRINT "genug dateien "; (LEN(dateien) > 150)
 PRINT "teile von programmen uebergangen "; (teile > 0)
 ' Plugins der IDE (examples/plugins/) importieren dh_plugin.dh -- das findet
-' ein Plugin ueber DH_PATH, das die IDE beim Start auf ihren Ordner setzt.
-SETENV("DH_PATH", ordner + "/../ide")
+' ein Plugin ueber DHRT_PATH, das die IDE beim Start auf ihren Ordner setzt.
+SETENV("DHRT_PATH", ordner + "/../ide")
 DIM zeilen AS ARRAY OF STRING : zeilen = dlCheckViele(dateien)
 PRINT "je datei eine zeile "; (LEN(zeilen) = LEN(dateien))
 DIM fehler AS INTEGER : fehler = 0
@@ -276,7 +276,7 @@ FOR i = 0 TO LEN(zeilen) - 1
             fehler = fehler + 1
             PRINT "fehler: "; name; ":"; JSON_GET_INT(e, wo + "line"); " "; m
         END IF
-        IF INSTR(m, "Unbekanntes Builtin") >= 0 THEN
+        IF INSTR(m, "Unbekannter Befehl") >= 0 THEN
             unbekannt = unbekannt + 1
             PRINT "unbekannt: "; name; " "; m
         END IF

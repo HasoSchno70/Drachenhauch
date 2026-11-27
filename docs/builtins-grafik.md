@@ -59,7 +59,7 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `FILE_DROPPED(i)` → STRING | Pfad der `i`-ten davon |
 | `CLIPBOARD_GET()` → STRING | Text aus der Zwischenablage lesen; leer, wenn sie gerade ein anderes Programm hält |
 | `CLIPBOARD_SET(text$)` | Text in die Zwischenablage legen — **Fehler**, wenn das nicht gelingt |
-| `CLIPBOARD_SET_IMAGE(image)` → BOOLEAN | ein `IMAGE` in die Zwischenablage legen (andere Programme fügen es als Bild ein) — **Fehler**, wenn das nicht gelingt |
+| `CLIPBOARD_SET_IMAGE(image)` | ein `IMAGE` in die Zwischenablage legen (andere Programme fügen es als Bild ein) — **Fehler**, wenn das nicht gelingt |
 | `CLIPBOARD_GET_IMAGE()` → INTEGER | das Bild aus der Zwischenablage als neues `IMAGE`; `-1`, wenn keines darin ist |
 | `CLIPBOARD_HAS_IMAGE()` → BOOLEAN | liegt gerade ein Bild darin? |
 | `CLIPBOARD_SET_FILES(paths)` | Dateien (`ARRAY OF STRING`, relativ oder absolut) in die Zwischenablage legen — „Einfügen“ im Explorer/Finder kopiert sie |
@@ -144,7 +144,7 @@ END IF
 
 Ziehen hinaus gibt es bisher **nur unter Windows** (über die Shell, wie der
 Explorer selbst); unter macOS und Linux liefert es `""`. Mit
-`DHRT_ZWISCHENABLAGE=privat` (jedes Programm unter `dhrt test`) bleiben auch
+`DHRT_CLIPBOARD=privat` (jedes Programm unter `dhrt test`) bleiben auch
 Bilder und Dateilisten im Prozess.
 
 Klassischer Game-Loop:
@@ -926,7 +926,7 @@ Sampler bliebe schwarz.
 
 | Funktion | Zweck |
 |---|---|
-| `KEYPRESSED(key)` → BOOLEAN | TRUE **solange** die Taste mit SDL-Code `code` gehalten wird — jedes Frame erneut. Für Bewegen/Lenken. |
+| `KEYPRESSED(key)` → BOOLEAN | TRUE **solange** die Taste `key` (eine `KEY_*`-Konstante oder ein Buchstabe) gehalten wird — jedes Frame erneut. Für Bewegen/Lenken. |
 | `KEYHIT(key)` → BOOLEAN | TRUE nur in **dem einen Frame**, in dem die Taste heruntergeht. Für Schießen, Springen, Umschalten. |
 | | *Buchstaben:* `KEY_A`…`KEY_Z` sind die klare Schreibweise. `ASC("s")` und `ASC("S")` meinen beide dieselbe Taste — bis 2026-08-31 traf die **große** Schreibweise still gar nichts, was wie ein vergessener Aufruf aussah. |
 | | *Lage oder Beschriftung:* ein Tastencode meint die **Lage** der Taste nach der US-Tastatur — `KEY_Z` ist auf einer deutschen Tastatur die Taste mit dem Y, auf einer französischen die mit dem W. Für WASD ist das richtig. Für Kürzel wie Strg+Z schreibt man den **Buchstaben als Text**: `KEYHIT("z")` meint die Taste, auf der das Z steht (auch für `KEYPRESSED`, `KEYRELEASED`, `KEYREPEAT`; Buchstaben, Ziffern und das Leerzeichen). |
@@ -987,9 +987,9 @@ Verfügbare Konstanten:
 | Pfeile | `KEY_LEFT`, `KEY_RIGHT`, `KEY_UP`, `KEY_DOWN` |
 | Buchstaben/Ziffern | `KEY_A` bis `KEY_Z`, `KEY_0` bis `KEY_9` |
 | Funktionstasten | `KEY_F1` bis `KEY_F12` |
-| Modifier | `KEY_LSHIFT`, `KEY_RSHIFT`, `KEY_LCTRL`, `KEY_RCTRL`, `KEY_LALT`, `KEY_RALT`, `KEY_LSUPER`, `KEY_RSUPER`, `KEY_CAPSLOCK` |
-| Navigation | `KEY_INSERT`, `KEY_DELETE`, `KEY_HOME`, `KEY_END`, `KEY_PAGEUP`, `KEY_PAGEDOWN` |
-| Ziffernblock | `KEY_KP0` bis `KEY_KP9`, `KEY_KP_ENTER`, `KEY_KP_PLUS`, `KEY_KP_MINUS`, `KEY_KP_MULTIPLY`, `KEY_KP_DIVIDE`, `KEY_KP_PERIOD` |
+| Modifier | `KEY_LSHIFT`, `KEY_RSHIFT`, `KEY_LCTRL`, `KEY_RCTRL`, `KEY_LALT`, `KEY_RALT`, `KEY_LSUPER`, `KEY_RSUPER`, `KEY_CAPSLOCK` — auch `KEY_LEFT_SHIFT`, `KEY_RIGHT_SHIFT`, `KEY_LEFT_CTRL`, `KEY_RIGHT_CTRL`, `KEY_LEFT_ALT`, `KEY_RIGHT_ALT`, `KEY_LEFT_SUPER`, `KEY_RIGHT_SUPER`, `KEY_CAPS_LOCK` |
+| Navigation | `KEY_INSERT`, `KEY_DELETE`, `KEY_HOME`, `KEY_END`, `KEY_PAGEUP`/`KEY_PAGE_UP`, `KEY_PAGEDOWN`/`KEY_PAGE_DOWN`, `KEY_NUM_LOCK`, `KEY_SCROLL_LOCK`, `KEY_PRINT_SCREEN`, `KEY_PAUSE` |
+| Ziffernblock | `KEY_KP0` bis `KEY_KP9` (auch `KEY_KP_0` bis `KEY_KP_9`), `KEY_KP_ENTER`, `KEY_KP_PLUS`, `KEY_KP_MINUS`, `KEY_KP_MULTIPLY`, `KEY_KP_DIVIDE`, `KEY_KP_PERIOD` |
 
 Der Ziffernblock hat eigene Codes — eine Spielsteuerung darf ihn getrennt von
 der oberen Ziffernreihe belegen. Gamepad-Codes (`JOY_BUTTON_A`, `JOY_DPAD_UP`

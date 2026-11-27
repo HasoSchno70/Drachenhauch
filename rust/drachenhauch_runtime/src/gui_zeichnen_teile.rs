@@ -189,12 +189,8 @@ impl Gui {
         // Rollbalken, sobald es mehr gibt als hineinpasst -- ohne ihn sieht
         // ein langes Dokument aus wie ein kurzes.
         if r.inhalt_h > h {
-            let sw = self.sk(4);
-            let anteil = (h as f64 / r.inhalt_h as f64).min(1.0);
-            let griff = ((h - 4) as f64 * anteil) as i32;
-            let oben = ((h - 4 - griff) as f64
-                * (r.scroll as f64 / (r.inhalt_h - h) as f64).clamp(0.0, 1.0)) as i32;
-            g.box_fill(ax + w - sw - 2, ay + 2 + oben, ax + w - 3, ay + 2 + oben + griff, shade(leise, -20));
+            let lage = self.rollbalken_lage((ax, ay, w, h), self.windows[wi].rtl, h, r.inhalt_h, r.scroll as f64);
+            self.rollbalken_zeichnen(g, lage, self.wcol(wdg, "bg", "widget_bg"), shade(leise, -20), false);
         }
     }
 
@@ -301,13 +297,10 @@ impl Gui {
             if teil { g.pop_clip(); }
         }
         // Rollbalken wie bei der Liste.
-        if let Some((tx, ty, bw, th, thy, thh)) = bar {
-            let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
-            g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(self.wcol(wdg, "bg", "widget_bg"), -10));
+        if let Some(lage) = bar {
             let aktiv = self.listbar_zug.map(|(a, b, _)| (a, b) == (wi, idx)).unwrap_or(false)
-                || (mx >= tx && mx < tx + bw && my >= thy && my < thy + thh);
-            let rc = self.wcol(wdg, "border", "widget_border");
-            g.round_rect(tx + 1, thy, tx + bw - 2, thy + thh - 1, 3, if aktiv { mischen(rc, acc, 0.5) } else { rc }, true);
+                || Self::rollbalken_unter(lage, g.mouse_x() as i32, g.mouse_y() as i32);
+            self.rollbalken_zeichnen(g, lage, self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"), aktiv);
         }
         // Umbenennen: Eingabefeld ueber dem Namen, wie bei der Liste.
         if let (Some(e), Some((ex, ey, ew, eh))) = (t.edit.as_ref(), self.baum_edit_rect(wi, idx)) {
@@ -488,11 +481,10 @@ impl Gui {
         let rows = (ph_voll / ih).max(1);
         let scroll = if self.dd_auf_von == Some((wi, idx)) { self.dd_scroll } else { 0 };
         let bar = n > rows;
-        let bw = self.sk(8);
+        let bw = self.rollbalken_w();
         let pz = if bar { pw - bw - 2 } else { pw };
         g.push_clip(px, clip_y, pw, ph);
-        g.box_fill(px, py, px + pw - 1, py + ph_voll - 1, bg);
-        g.rect(px, py, px + pw - 1, py + ph_voll - 1, border);
+        self.popup_kasten(g, (px, py, pw, ph_voll), t, bg, border);
         let mark = if self.dd_auf_von == Some((wi, idx)) { self.dd_mark } else { -1 };
         for k in scroll..(scroll + rows).min(n) {
             let it = &wdg.items[k as usize];
@@ -513,11 +505,9 @@ impl Gui {
         }
         // Rollbalken, wenn nicht alles hineinpasst.
         if bar {
-            let (tx, ty, th) = (px + pw - 1 - bw, py + 1, (ph_voll - 2).max(1));
-            let thh = ((th as i64 * rows as i64 / n.max(1) as i64) as i32).clamp(self.sk(12).min(th), th);
-            let thy = ty + ((th - thh) as f64 * (scroll as f64 / (n - rows).max(1) as f64)) as i32;
-            g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(bg, -10));
-            g.round_rect(tx + 1, thy, tx + bw - 2, thy + thh - 1, 3, border, true);
+            let lage = self.rollbalken_lage((px, py, pw, ph_voll), false, rows, n, scroll as f64);
+            let aktiv = Self::rollbalken_unter(lage, g.mouse_x() as i32, g.mouse_y() as i32);
+            self.rollbalken_zeichnen(g, lage, bg, border, aktiv);
         }
         g.pop_clip();
     }
@@ -828,19 +818,19 @@ impl Gui {
             let handle = Self::handle_height(track, body_h, gm.total_h);
             let ratio = if gm.max_scroll_y > 0 { t.scroll_y as f64 / gm.max_scroll_y as f64 } else { 0.0 };
             let hy = body_y + ((track - handle) as f64 * ratio) as i32;
-            g.box_fill(sb_x, body_y, sb_x + self.sk(TBL_SCROLL_W) - 1, body_y + track - 1, shade(bg, -8));
-            g.box_fill(sb_x + 2, hy, sb_x + self.sk(TBL_SCROLL_W) - 3, hy + handle - 1,
-                       if t.drag_v { accent } else { border });
+            let lage = (sb_x, body_y, self.rollbalken_w(), track, hy, handle);
+            let aktiv = t.drag_v || Self::rollbalken_unter(lage, g.mouse_x() as i32, g.mouse_y() as i32);
+            self.rollbalken_zeichnen(g, lage, bg, border, aktiv);
         }
         // Waagerechte Bildlaufleiste.
         if gm.need_h {
-            let hs_y = ay + h - self.sk(TBL_SCROLL_W) - 1;
+            let hs_y = ay + h - self.rollbalken_w() - 1;
             let track = body_w;
             let handle = Self::handle_height(track, body_w, gm.total_w);
             let ratio = if gm.max_scroll_x > 0 { t.scroll_x as f64 / gm.max_scroll_x as f64 } else { 0.0 };
             let hx = body_x + ((track - handle) as f64 * ratio) as i32;
-            g.box_fill(body_x, hs_y, body_x + track - 1, hs_y + self.sk(TBL_SCROLL_W) - 1, shade(bg, -8));
-            g.box_fill(hx, hs_y + 2, hx + handle - 1, hs_y + self.sk(TBL_SCROLL_W) - 3,
+            g.box_fill(body_x, hs_y, body_x + track - 1, hs_y + self.rollbalken_w() - 1, shade(bg, -8));
+            g.box_fill(hx, hs_y + 2, hx + handle - 1, hs_y + self.rollbalken_w() - 3,
                        if t.drag_h { accent } else { border });
         }
     }

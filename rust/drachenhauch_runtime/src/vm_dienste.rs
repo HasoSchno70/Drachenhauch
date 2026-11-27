@@ -6,7 +6,6 @@
 use super::*;
 
 impl<'p> Vm<'p> {
-    /// Modul `scene` (globaler Stack-State, kein Grafik-Bezug).
     // ===================================================================
     // Modul db (SQLite, Feature `db`)
     // ===================================================================
@@ -204,7 +203,7 @@ impl<'p> Vm<'p> {
             }
             // Absender getrennt: "::1:5000" laesst sich nur zerlegen, wenn man
             // weiss, dass am LETZTEN Doppelpunkt geschnitten werden muss.
-            "net_udp_last_host$" | "net_udp_last_host" => Value::str_rc(&self.net_udp(bi_int(a, 0, "NET_UDP_LAST_HOST$")?, name)?.last_from.0),
+            "net_udp_last_host$" => Value::str_rc(&self.net_udp(bi_int(a, 0, "NET_UDP_LAST_HOST$")?, name)?.last_from.0),
             "net_udp_last_port" => Value::Int(self.net_udp(bi_int(a, 0, "NET_UDP_LAST_PORT")?, name)?.last_from.1),
             "net_udp_recv" => { let i = bi_int(a, 0, "NET_UDP_RECV")?; let n = bi_int(a, 1, "NET_UDP_RECV")?; Value::str_rc(net::udp_recv(self.net_udp_mut(i, name)?, n)?) }
             "net_udp_last_from" => {
@@ -218,9 +217,6 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
-    // ===================================================================
-    // Modul mqtt (baut auf std::net auf, Feature `net`)
-    // ===================================================================
     /// Modul `geld` -- ein Betrag als eigener Wert (Weg C des Entwurfs).
     pub(super) fn try_geld(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("geld_") { return Ok(None); }
@@ -231,7 +227,7 @@ impl<'p> Vm<'p> {
         let wert = |i: usize, fn_: &str| -> R<i64> {
             match a.get(i) {
                 Some(Value::Geld(w)) => Ok(*w),
-                Some(other) => Err(format!("{}: erwartet GELD, erhalten {} -- mit GELD_NEU() \
+                Some(other) => Err(format!("{}: erwartet GELD, erhalten {} -- mit MONEY_NEW() \
                                       einen Betrag daraus machen", fn_, other.type_name())),
                 None => Err(crate::argument::fehlt(fn_, i + 1)),
             }
@@ -871,11 +867,11 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "HTTPD_ACCEPT")?;
                 Value::Bool(httpd::annehmen(self.httpd_srv(i, name)?)?)
             }
-            "httpd_method$" | "httpd_method" => {
+            "httpd_method$" => {
                 let i = bi_int(a, 0, "HTTPD_METHOD$")?;
                 Value::str_rc(&Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_METHOD$")?.methode.clone())
             }
-            "httpd_path$" | "httpd_path" => {
+            "httpd_path$" => {
                 let i = bi_int(a, 0, "HTTPD_PATH$")?;
                 Value::str_rc(&Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_PATH$")?.pfad.clone())
             }
@@ -886,12 +882,12 @@ impl<'p> Vm<'p> {
                 let r = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_BODY_BYTES")?;
                 crate::argument::buffer_wert(r.rumpf.clone())
             }
-            "httpd_body$" | "httpd_body" => {
+            "httpd_body$" => {
                 let i = bi_int(a, 0, "HTTPD_BODY$")?;
                 let r = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_BODY$")?;
                 Value::str_rc(String::from_utf8_lossy(&r.rumpf).into_owned())
             }
-            "httpd_query$" | "httpd_query" => {
+            "httpd_query$" => {
                 let i = bi_int(a, 0, "HTTPD_QUERY$")?;
                 let k = bi_str(a, 1, "HTTPD_QUERY$")?.to_lowercase();
                 let r = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_QUERY$")?;
@@ -900,7 +896,7 @@ impl<'p> Vm<'p> {
                 Value::str_rc(r.abfrage.iter().find(|(n, _)| n.to_lowercase() == k)
                                .map(|(_, v)| v.as_str()).unwrap_or(""))
             }
-            "httpd_header$" | "httpd_header" => {
+            "httpd_header$" => {
                 let i = bi_int(a, 0, "HTTPD_HEADER$")?;
                 let k = bi_str(a, 1, "HTTPD_HEADER$")?.to_lowercase();
                 let r = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_HEADER$")?;
@@ -978,6 +974,9 @@ impl<'p> Vm<'p> {
             .ok_or_else(|| format!("{}: es liegt keine Anfrage an -- erst HTTPD_ACCEPT abfragen", fn_))
     }
 
+    // ===================================================================
+    // Modul mqtt (baut auf std::net auf, Feature `net`)
+    // ===================================================================
     pub(super) fn try_mqtt(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("mqtt_")) { return Ok(None); }
         #[cfg(feature = "net")]
@@ -1280,7 +1279,7 @@ impl<'p> Vm<'p> {
             }
             "http_cancel" => { self.http_abrufe.abbrechen(bi_int(a, 0, "HTTP_CANCEL")?); Value::Nil }
             "http_pending" => Value::Int(self.http_abrufe.offen()),
-            "http_url$" | "http_url" => Value::str_rc(&self.http_abrufe.was(bi_int(a, 0, "HTTP_URL$")?)),
+            "http_url$" => Value::str_rc(&self.http_abrufe.was(bi_int(a, 0, "HTTP_URL$")?)),
 
             "http_status" => Value::Int(self.http_status),
             "http_header" => {
@@ -1341,7 +1340,7 @@ impl<'p> Vm<'p> {
                     Err(e) => { self.cloud_last_error = e.msg; Value::Bool(false) }
                 }
             }
-            "cloud_load" | "cloud_load$" => {
+            "cloud_load" => {
                 self.cloud_require_configured("CLOUD_LOAD")?;
                 let player_id = bi_str(a, 0, "CLOUD_LOAD")?.to_string();
                 self.cloud_last_error.clear();
@@ -1351,7 +1350,7 @@ impl<'p> Vm<'p> {
                     Err(e) => { self.cloud_last_error = e.msg; Value::str_rc("") }
                 }
             }
-            "cloud_last_error$" | "cloud_last_error" => Value::str_rc(&self.cloud_last_error),
+            "cloud_last_error$" => Value::str_rc(&self.cloud_last_error),
             "leaderboard_submit" => {
                 self.cloud_require_configured("LEADERBOARD_SUBMIT")?;
                 let board = bi_str(a, 0, "LEADERBOARD_SUBMIT")?.to_string();

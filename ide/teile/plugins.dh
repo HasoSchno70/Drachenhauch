@@ -47,7 +47,7 @@ SUB pluginAusSetzen(name AS STRING, aus AS BOOLEAN)
     konfigSichern()
 END SUB
 
-' Die Bibliothek dh_plugin.dh liegt neben der IDE; DH_PATH zeigt dorthin,
+' Die Bibliothek dh_plugin.dh liegt neben der IDE; DHRT_PATH zeigt dorthin,
 ' damit ein Plugin schlicht IMPORT "dh_plugin.dh" schreibt. Ein Kind erbt
 ' die Umgebung beim Start.
 FUNCTION pluginBibOrdner$() AS STRING
@@ -59,9 +59,9 @@ END FUNCTION
 SUB pluginPfadSetzen()
     DIM bib AS STRING : bib = pluginBibOrdner$()
     DIM trenner AS STRING : trenner = IIF(MID$(bib, 1, 1) = ":", ";", ":")
-    DIM alt AS STRING : alt = GETENV$("DH_PATH")
+    DIM alt AS STRING : alt = GETENV$("DHRT_PATH")
     IF INSTR(alt, bib) >= 0 THEN RETURN
-    SETENV("DH_PATH", IIF(alt = "", bib, bib + trenner + alt))
+    SETENV("DHRT_PATH", IIF(alt = "", bib, bib + trenner + alt))
 END SUB
 
 ' Die mitgelieferten Plugins: examples/plugins/ (kommen mit dem Installer).
@@ -984,7 +984,7 @@ FUNCTION pluginAnlegen(name AS STRING) AS BOOLEAN
     c = c + "WEND" + NL
     WRITEALL(PATHJOIN(ordner, "plugin.dh"), c)
     ' Eine Pruefung mit der Schein-IDE (ide/dh_plugin_probe.dh): sie laeuft
-    ' ohne Fenster und ohne IDE, mit dhrt test oder Strg+Alt+F5. DH_PATH
+    ' ohne Fenster und ohne IDE, mit dhrt test oder Strg+Alt+F5. DHRT_PATH
     ' zeigt auf den Ordner dieser IDE, dort liegen dh_plugin.dh und die Probe.
     DIM t AS STRING : t = "' Pruefung des Plugins " + q + name + q + " mit der Schein-IDE (dh_plugin_probe.dh)." + NL
     t = t + "' Laufen lassen: dhrt test <dieser Ordner>, in der IDE Strg+Alt+F5." + NL
@@ -999,7 +999,7 @@ FUNCTION pluginAnlegen(name AS STRING) AS BOOLEAN
     t = t + "PRINT PROBE_WIDGET$(" + q + "leiste" + q + ", " + q + "kopf" + q + ", " + q + "text" + q + ")" + NL
     t = t + "PROBE_ENDE()" + NL
     t = t + "--- argumente" + NL + "{sammlung}" + NL
-    t = t + "--- umgebung" + NL + "DH_PATH=" + REALPATH$(pluginBibOrdner$()) + NL
+    t = t + "--- umgebung" + NL + "DHRT_PATH=" + REALPATH$(pluginBibOrdner$()) + NL
     t = t + "--- erwartet" + NL + "TRUE" + NL + "TRUE" + NL + "TRUE" + NL + "a: 3 mal" + NL
     WRITEALL(PATHJOIN(ordner, "test.dhtest"), t)
     protokoll("plugin angelegt " + name)

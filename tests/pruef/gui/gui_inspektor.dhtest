@@ -113,7 +113,7 @@ e 10 1 256 0 0 0
 
 --- umgebung
 DHRT_FRAMES=25
-DHRT_INSPEKTOR=1
+DHRT_INSPECTOR=1
 --- erwartet
 an TRUE wieder aus TRUE
 
@@ -142,7 +142,7 @@ e 4 1 341 0 0 0
 
 --- umgebung
 DHRT_FRAMES=20
-DHRT_INSPEKTOR=
+DHRT_INSPECTOR=
 --- erwartet
 je an FALSE
 
@@ -189,7 +189,7 @@ CATCH e2
 END TRY
 --- umgebung
 DHRT_FRAMES=200
-DHRT_SYSTEM_WENIGER_BEWEGUNG=1
+DHRT_SYSTEM_REDUCED_MOTION=1
 --- erwartet
 system ruhig TRUE
 system: bewegung FALSE rot oben FALSE laeuft FALSE

@@ -29,7 +29,10 @@
 //! Druckdialog. Beides waere der Anfang von Weg D.
 
 #[cfg(feature = "pdf")]
-use crate::pdf::{Dokument, Op};
+use crate::pdf::Dokument;
+// Die Zeichenbefehle setzt nur der GDI-Weg einzeln um; CUPS bekommt die PDF.
+#[cfg(all(feature = "pdf", windows))]
+use crate::pdf::Op;
 
 /// Endungen, die `OPENDOC` oeffnet -- Dokumente und Bilder, nichts, was laeuft.
 const OEFFENBAR: &[&str] = &[
@@ -75,7 +78,7 @@ pub fn drucken(doc: &Dokument, drucker: &str, kopien: i64, zieldatei: &str) -> R
 }
 
 /// GDI-Schrift zu einer Standardschrift des pdf-Moduls: (Name, fett, kursiv).
-#[cfg_attr(not(feature = "pdf"), allow(dead_code))]
+#[cfg_attr(not(all(feature = "pdf", windows)), allow(dead_code))]
 pub fn gdi_schrift(programmname: &str) -> (&'static str, bool, bool) {
     let n = programmname.to_ascii_lowercase();
     // Die eingebauten Schriften sind DejaVu; auf dem Drucker nehmen ihre
@@ -175,6 +178,7 @@ mod plattform {
         }
     }
 
+    #[cfg_attr(not(feature = "pdf"), allow(dead_code))]
     fn farbe(f: (f64, f64, f64)) -> COLORREF {
         let k = |x: f64| (x.clamp(0.0, 1.0) * 255.0).round() as u32;
         COLORREF(k(f.0) | (k(f.1) << 8) | (k(f.2) << 16))
@@ -319,7 +323,8 @@ mod plattform {
 // ================================================================ macOS / Linux: CUPS
 #[cfg(not(windows))]
 mod plattform {
-    use super::*;
+    #[cfg(feature = "pdf")]
+    use super::Dokument;
 
     pub fn oeffnen(pfad: &std::path::Path) -> Result<(), String> {
         let prog = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };

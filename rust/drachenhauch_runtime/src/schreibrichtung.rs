@@ -14,6 +14,7 @@
 //! Ein Text ohne Zeichen aus einem Rechts-nach-links-Block geht unberuehrt
 //! durch (`braucht`), damit Messen und Zeichnen der gewoehnlichen Faelle
 //! nicht langsamer werden.
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
 
 use unicode_bidi::{Level, ParagraphBidiInfo};
 

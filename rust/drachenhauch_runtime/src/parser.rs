@@ -30,8 +30,7 @@ fn is_assign_op(tt: Tt) -> bool {
 fn type_token(tt: Tt) -> Option<&'static str> {
     Some(match tt {
         Tt::Integer => "integer", Tt::Float => "float", Tt::StringType => "string",
-        Tt::Boolean => "boolean", Tt::Image => "image", Tt::Sound => "sound",
-        Tt::File => "file", Tt::Tuple => "tuple", Tt::Funcref => "funcref",
+        Tt::Boolean => "boolean", Tt::Tuple => "tuple", Tt::Funcref => "funcref",
         Tt::Coroutine => "coroutine",
         _ => return None,
     })
@@ -216,8 +215,8 @@ impl Parser {
             "line" if tt(1) == Tt::Input =>
                 "LINE INPUT gibt es nicht -- INPUT liest schon die ganze Zeile, wenn die Variable ein STRING ist",
             "open" if tt(1) == Tt::Str =>
-                "OPEN ... AS #1 gibt es nicht. Dateien: f = OPENFILE(\"name.txt\", \"w\") (r/w/a), \
-                 WRITELINE(f, text), READLINE(f), CLOSEFILE(f) -- oder alles auf einmal mit WRITEALL/READLINES",
+                "OPEN ... AS #1 gibt es nicht. Dateien: f = FILE_OPEN(\"name.txt\", \"w\") (r/w/a), \
+                 FILE_WRITE_LINE(f, text), FILE_READ_LINE$(f), FILE_CLOSE(f) -- oder alles auf einmal mit FILE_WRITE/FILE_READ_LINES",
             "endif" => "END IF schreibt man in zwei Woertern",
             "screen" if tt(1) == Tt::Number =>
                 "Bildschirmmodi wie SCREEN 12 gibt es nicht -- ein Fenster oeffnet SCREEN(breite, hoehe, \"Titel\")",
@@ -953,6 +952,10 @@ impl Parser {
                 return Ok(format!("{}.{}", v, teil));
             }
             if self.enum_names.contains(&v.to_lowercase()) { return Ok("integer".into()); }
+            // Die Typnamen aus der pygame-Zeit, heute gewoehnliche Namen.
+            let klein = v.to_lowercase();
+            if matches!(klein.as_str(), "image" | "sound" | "file") { return Ok(klein); }
+            if let Some(t) = crate::namen::typ(&v) { return Ok(t.to_string()); }
             return Ok(v);
         }
         self.err("Erwartet Typ")
@@ -1559,9 +1562,6 @@ impl Parser {
             body.push(self.statement()?);
         }
         Ok(body)
-    }
-    fn block_until_end(&mut self, what: &str) -> R<Vec<Node>> {
-        self.block_until(&[Tt::End], what)
     }
 
     /// `block_until`, waehrend `art` als offener Block gilt (fuer EXIT).

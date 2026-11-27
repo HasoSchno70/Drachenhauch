@@ -1,8 +1,8 @@
-//! Networking-Modul (NET_*) -- nativer Port von `drachenhauch/modules/net.py`
-//! via `std::net`. Feature `net` (nur stdlib, kein Crate).
+//! Networking-Modul (NET_*) ueber `std::net`. Feature `net` (nur stdlib).
 //!
-//! NET_LISTENER/NET_SOCKET/NET_UDP sind INTEGER-Handles (Index in VM-Vecs).
-//! Default non-blocking (wie Python). Encoding UTF-8.
+//! NET_LISTENER/NET_SOCKET/NET_UDP sind Handles (Index in VM-Vecs, getaggt
+//! nach `handle.rs`). Sockets sind nicht-blockierend: ein Programm mit
+//! Bildschleife fragt je Bild nach, statt zu warten. Text ist UTF-8.
 #![cfg(feature = "net")]
 
 use std::io::{Read, Write};

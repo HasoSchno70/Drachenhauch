@@ -1,13 +1,15 @@
-//! HTTP- + HTML-Modul (HTTP_*/URL_*/HTML_*) -- nativer Port von
-//! `drachenhauch/modules/html.py`. HTTP via `ureq`, HTML-Parsing als
-//! handgeschriebener Scanner (funktional, nicht byte-identisch zu Pythons
-//! html.parser bei kaputtem HTML). Feature `http`.
+//! HTTP- + HTML-Modul (HTTP_*/URL_*/HTML_*). HTTP via `ureq` ueber EINEN
+//! Weg (`http_request`), HTML-Parsing als handgeschriebener Scanner, der
+//! kaputtes HTML hinnimmt statt abzubrechen. Feature `http`.
 #![cfg(feature = "http")]
 
 use std::io::Read;
 use std::time::Duration;
 
-const USER_AGENT: &str = "Drachenhauch/0.1 (+https://github.com/anthropic-ai)";
+/// Wie sich dhrt bei einem Server meldet: Name, Fassung und wo es zu Hause
+/// ist (bis 2026.53 "Drachenhauch/0.1" mit einer fremden Adresse, Bericht C6).
+pub(crate) const USER_AGENT: &str = concat!("Drachenhauch/", env!("CARGO_PKG_VERSION"),
+    " (+https://github.com/HasoSchno70/Drachenhauch)");
 const TIMEOUT_SECS: u64 = 10;
 // Review-Fund: `read_to_end` hatte KEINE Groessenbegrenzung -- jedes andere
 // Read-Builtin in diesem Projekt (NET_RECV/SERIAL_READ/USB_READ) deckelt bei

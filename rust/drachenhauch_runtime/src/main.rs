@@ -58,24 +58,24 @@ mod pdf;
 mod schriften;
 mod xlsx;
 mod gifschreiber;
-#[allow(dead_code)]
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 mod leinwand;
-#[allow(dead_code)]
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 mod resample;
-#[allow(dead_code)]
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 mod objschreiber;
 mod schnitt;
 mod rechtschreibung;
 mod schreibrichtung;
 #[cfg(any(feature = "graphics", feature = "pdf"))]
-#[allow(dead_code)]
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 mod formung;
 // Farbige Glyphen (Emoji): COLR-Maler und Bitmaps aus sbix/CBDT.
 #[cfg(feature = "graphics")]
 mod farbglyphe;
 mod geld;
 // Lesehilfen fuer Shader-Quelltext (SHADER_LOAD, SHADER_SET).
-#[allow(dead_code)]
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 mod glsl;
 mod httpd;
 #[cfg(feature = "smtp")]
@@ -138,6 +138,7 @@ mod doku;
 mod pruef;
 mod pruefsammlung;
 mod prozess;
+mod umgebung;
 mod text_stream;
 #[cfg(test)]
 mod zufallsprobe;
@@ -175,7 +176,7 @@ mod gui;
 // die macOS-/Linux-Adapter mit `cargo check --features a11y --target ...`
 // ohne raylib-Bau pruefbar sind. Ohne Grafik wird das Modul nicht benutzt.
 #[cfg(feature = "a11y")]
-#[allow(dead_code)]
+#[cfg_attr(not(feature = "graphics"), allow(dead_code, unused_imports))]
 mod a11y;
 #[cfg(feature = "graphics")]
 mod ime;
@@ -253,14 +254,14 @@ fn ist_quelldatei(pfad: &str) -> bool {
 /// `.gb` -- getrennt gehalten, siehe `ist_quelldatei`.
 const ALTE_QUELL_ENDUNG: &str = ".gb";
 
-fn embedded_gbc() -> Option<String> {
+fn eingebettetes_dhc() -> Option<String> {
     let exe = std::env::current_exe().ok()?;
     let data = std::fs::read(&exe).ok()?;
-    embedded_gbc_in(&data)
+    eingebettetes_dhc_in(&data)
 }
 
 /// Der reine Teil davon -- ohne Dateizugriff, damit er testbar ist.
-fn embedded_gbc_in(data: &[u8]) -> Option<String> {
+fn eingebettetes_dhc_in(data: &[u8]) -> Option<String> {
     if data.len() < 16 { return None; }
     // Von hinten nach vorne. Der letzte Treffer ist der echte Footer: die
     // .dhc-Nutzlast liegt DAVOR, ein zufaelliges Vorkommen der acht Bytes im
@@ -340,6 +341,14 @@ fn eingebaut() -> String {
     bau::version_zeilen()
 }
 
+/// Eine Quelle (oder .dhc) lesen; die Meldung nennt den Pfad, wie er
+/// geschrieben war, und spricht die Sprache der Laufzeit (`meldung::t`).
+/// Bis 2026.53 standen dreizehn gleiche Bloecke hier, nur einer uebersetzt
+/// (Bericht E5).
+fn quelle_lesen(pfad: impl AsRef<std::path::Path>, anzeige: &str) -> Result<String, String> {
+    std::fs::read_to_string(pfad).map_err(|e| meldung::t(&format!("Kann '{}' nicht lesen: {}", anzeige, e)))
+}
+
 const HILFE: &str = "\
 dhrt -- die Drachenhauch-Runtime
 
@@ -347,31 +356,48 @@ dhrt -- die Drachenhauch-Runtime
   dhrt run <datei.dh> [-- ...] ausfuehren; alles hinter `--` gehoert dem Programm
   dhrt run --bilder N <datei.dh>  nach N Bildern von selbst beenden (headless pruefen)
   dhrt test [pfad ...]         Pruefprogramme suchen und laufen lassen
+                               (--schnell ohne langsame Sammlungen, --filter TEXT)
+  dhrt aufnehmen <programm.dh> <sammlung.dhtest> [\"Fall\"] [--bilder N]
+                               Bedienung aufnehmen und als Pruefall anhaengen
   dhrt fmt <datei ...>         Schluesselwoerter gross schreiben
                                (--einruecken richtet auch die Einrueckung,
                                 --pruefen schreibt nicht, meldet nur)
   dhrt --check <datei.dh> ...  nur uebersetzen und Probleme als JSON melden
-  dhrt --export <datei.dh>     zu einer eigenstaendigen .exe buendeln, mit der
-                               kleinsten Laufzeit, der nichts fehlt (--voll: die ganze)
+  dhrt --export <datei.dh> [ziel]  zu einer eigenstaendigen .exe buendeln, mit der
+                               kleinsten Laufzeit, der nichts fehlt (--voll: die ganze,
+                               --mit-daten: auch SQLite-Datenbanken mitnehmen)
   dhrt debug <datei.dh>        Debug-Sitzung (JSON-Protokoll, fuer den Editor)
   dhrt profile <datei.dh>      Laufzeit je Zeile messen
   dhrt lsp                     Sprachserver (LSP ueber stdin/stdout, fuer VS Code)
   dhrt doku <prosa|grammatik|aenderungen|referenz>  Doku-Werkzeuge (dhrt doku fuer die Uebersicht)
-  dhrt pruef [bloecke|namen|zaehlungen|konstanten|pfade]  Doku gegen die Wirklichkeit
+  dhrt pruef [bloecke|namen|parameter|zaehlungen|konstanten|pfade|uebersetzung|
+              beispiele|meldungen [--offen]|tray]  Doku gegen die Wirklichkeit
   dhrt paket <hole|entferne|liste|neu>  Bibliotheken holen und teilen (dhrt paket fuer die Uebersicht)
   dhrt bild <datei> <ziel.png> [bilder]
                                ein Bild vom laufenden Programm sichern
   dhrt --version               Fassung und eingebaute Bestandteile
   dhrt --help                  diese Uebersicht
 
-Entwickler-Einstiege: --tokens, --ast, --dumpbc, --preprocess, --runsrc, call
+  dhrt call <datei.dh> <funktion> [argument]
+                               eine Funktion rufen, Ergebnis als JSON (TASK_START)
+
+Entwickler-Einstiege: --tokens, --ast, --dumpbc, --preprocess, --typen, --jit,
+--verschmolzen, --fehlende
 
 Handbuch: docs/README.md";
+
+/// Unterbefehle und Schalter, die ein Argument brauchen -- ohne es meldet
+/// `main` die passende Zeile der Hilfe.
+const UNTERBEFEHLE: &[&str] = &["run", "debug", "profile", "bild", "call", "--check", "--export",
+    "--tokens", "--ast", "--dumpbc", "--preprocess", "--typen", "--jit", "--verschmolzen"];
 
 fn main() -> ExitCode {
     // MILLIS/TIMER zaehlen ab hier: "seit Programmstart" soll auch dann
     // stimmen, wenn das Programm erst nach dem Laden von Bildern misst.
     builtins::uhr_starten();
+    // Die Testvariablen, mit denen wir gestartet wurden -- nur sie gehen
+    // nicht an Kinder weiter (prozess::test_variablen_entfernen).
+    prozess::start_merken();
     // Front-End-Debug: `dhrt --tokens <datei.dh>` gibt den Token-Strom als
     // kanonisches JSON aus (Parity-Vergleich mit dem Python-Lexer).
     {
@@ -399,12 +425,12 @@ fn main() -> ExitCode {
         // M1: welchen Typ der Compiler jedem Ausdruck zuschreibt
         // (`? ` = unbekannt). Uebersetzt nur, laeuft nicht.
         if raw.len() >= 3 && raw[1] == "--typen" {
-            let src = match std::fs::read_to_string(&raw[2]) {
+            let src = match quelle_lesen(&raw[2], &raw[2]) {
                 Ok(t) => t,
-                Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", raw[2], e); return ExitCode::from(1); }
+                Err(m) => { eprintln!("{}", m); return ExitCode::from(1); }
             };
             let base = std::path::Path::new(&raw[2]).parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
-            std::env::set_var("DHRT_TYPEN_LISTE", "1");
+            std::env::set_var("DHRT_TYPES_LIST", "1");
             return match compile_source(&src, &base, &raw[2]) {
                 Ok(_) => ExitCode::SUCCESS,
                 Err(code) => code,
@@ -416,9 +442,9 @@ fn main() -> ExitCode {
         // nicht. Uebersetzt nur (das Programm laeuft nicht).
         #[cfg(feature = "jit")]
         if raw.len() >= 3 && raw[1] == "--jit" {
-            let src = match std::fs::read_to_string(&raw[2]) {
+            let src = match quelle_lesen(&raw[2], &raw[2]) {
                 Ok(t) => t,
-                Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", raw[2], e); return ExitCode::from(1); }
+                Err(m) => { eprintln!("{}", m); return ExitCode::from(1); }
             };
             let base = std::path::Path::new(&raw[2]).parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
             let prog = match compile_source_programm(&src, &base, &raw[2]) { Ok(p) => p, Err(c) => return c };
@@ -427,9 +453,9 @@ fn main() -> ExitCode {
             return ExitCode::SUCCESS;
         }
         if raw.len() >= 3 && raw[1] == "--verschmolzen" {
-            let src = match std::fs::read_to_string(&raw[2]) {
+            let src = match quelle_lesen(&raw[2], &raw[2]) {
                 Ok(t) => t,
-                Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", raw[2], e); return ExitCode::from(1); }
+                Err(m) => { eprintln!("{}", m); return ExitCode::from(1); }
             };
             let base = std::path::Path::new(&raw[2]).parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
             let prog = match compile_source_programm(&src, &base, &raw[2]) { Ok(p) => p, Err(c) => return c };
@@ -458,9 +484,9 @@ fn main() -> ExitCode {
         }
         // Debug: kompiliert die Quelle und gibt das .dhc-JSON aus (Bytecode-Dump).
         if raw.len() >= 3 && raw[1] == "--dumpbc" {
-            let src = match std::fs::read_to_string(&raw[2]) {
+            let src = match quelle_lesen(&raw[2], &raw[2]) {
                 Ok(t) => t,
-                Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", raw[2], e); return ExitCode::from(1); }
+                Err(m) => { eprintln!("{}", m); return ExitCode::from(1); }
             };
             let base = std::path::Path::new(&raw[2]).parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
             return match compile_source(&src, &base, &raw[2]) {
@@ -471,23 +497,17 @@ fn main() -> ExitCode {
         // Editor/LSP-Diagnostik: kompiliert die Quelle und gibt gefundene
         // Probleme als JSON-Array auf stdout aus (leer = sauber). Exit 0 auch
         // bei Diagnosen -- so unterscheidet der Editor "Probleme gefunden" von
-        // "Tool-Fehler" (I/O -> Exit 1). Ersetzt die Python-Compiler-Pruefung.
+        // "Tool-Fehler" (I/O -> Exit 1).
         if raw.len() >= 3 && raw[1] == "--check" {
             return check_main(&raw[2..]);
         }
-        // Stufe 4: IMPORT-Preprocessor -- gibt die gemergte Quelle aus
-        // (Merge-Parity gegen preprocess.process()).
+        // Entwickler-Einstieg: die Quelle nach dem IMPORT-Preprocessor, so wie
+        // der Lexer sie sieht (`--tokens`, `--ast` und `--dumpbc` zeigen die
+        // Stufen danach; docs/werkzeuge.md). `--runsrc` gibt es seit 2026.54
+        // nicht mehr -- `dhrt run` tut dasselbe (Bericht C5).
         if raw.len() >= 3 && raw[1] == "--preprocess" {
             return preprocess_main(&raw[2]);
         }
-        // Stufe 3: Quelltext in Rust kompilieren + ausfuehren (Output-Parity).
-        if raw.len() >= 3 && raw[1] == "--runsrc" {
-            setze_programm_args(&raw);
-            return runsrc_main(&raw[2]);
-        }
-        // Stufe 5: `dhrt run datei.dh` -- eigenstaendiger End-to-End-Lauf
-        // (preprocess+lex+parse+compile+run, chdir ins Datei-Verzeichnis fuer
-        // relative Asset-Pfade). dhrt ist damit ohne Python lauffaehig.
         // `dhrt fmt [--pruefen] <datei ...>` -- Einrueckung richten.
         if raw.len() >= 2 && raw[1] == "fmt" {
             let nur_pruefen = raw[2..].iter().any(|a| a == "--pruefen");
@@ -574,11 +594,11 @@ fn main() -> ExitCode {
             std::env::set_var("DHRT_FRAMES", bilder.to_string());
             std::env::set_var("DHRT_SCREENSHOT", &raw[3]);
             // Aus dem Blick: ein Bild zu machen soll nicht die Arbeit stoeren.
-            std::env::set_var("DHRT_ABSEITS", "1");
+            std::env::set_var("DHRT_OFFSCREEN", "1");
             // Nach dem Bild ENDEN: das Bildlimit wirkt sonst nur ueber
             // QUITREQUESTED, und ein Programm mit `WHILE TRUE` liefe nach dem
             // gesicherten Bild endlos weiter -- der Aufrufer wartet dann ewig.
-            std::env::set_var("DHRT_BILD_ENDE", "1");
+            std::env::set_var("DHRT_FRAME_END", "1");
             setze_programm_args(&raw);
             return run_main(&raw[2]);
         }
@@ -647,7 +667,7 @@ fn main() -> ExitCode {
     }
 
     // Bundle-Modus: eingebettete .dhc am Ende der eigenen Exe?
-    if let Some(text) = embedded_gbc() {
+    if let Some(text) = eingebettetes_dhc() {
         // WP A: die exportierte Exe IST das Programm -- es gibt keine
         // Runtime-Argumente, von denen zu trennen waere. Also gehoeren alle
         // hinter dem Programmnamen ihm, ohne `--`-Konvention (`meins.exe datei.csv`
@@ -713,6 +733,17 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
     let path = &args[1];
+    // Ein Unterbefehl, dem sein Argument fehlt (`dhrt run`): seine Zeile aus
+    // der Hilfe statt "Kann 'run' nicht lesen" (Bericht E5). Eine Datei, die
+    // wirklich so heisst, laeuft weiter wie bisher.
+    if UNTERBEFEHLE.contains(&path.as_str()) && !std::path::Path::new(path).exists() {
+        eprintln!("{}", meldung::t(&format!("dhrt {}: es fehlt, was der Befehl braucht", path)));
+        for z in HILFE.lines().filter(|z| z.trim_start().starts_with(&format!("dhrt {} ", path))
+                                         || z.trim_start() == format!("dhrt {}", path)) {
+            eprintln!("{}", z);
+        }
+        return ExitCode::from(2);
+    }
     // Hier ist klar: keine eingebettete Exe (Bundle-Zweig oben hat nicht
     // gegriffen), also ein Runtime-Aufruf -- `--`-Konvention.
     setze_programm_args(&args);
@@ -723,10 +754,10 @@ fn main() -> ExitCode {
     }
     // Optionales Quell-Label fuer Fehlermeldungen; sonst der .dhc-Pfad.
     let source_label = args.get(2).cloned().unwrap_or_else(|| path.clone());
-    let text = match std::fs::read_to_string(path) {
+    let text = match quelle_lesen(path, path) {
         Ok(t) => t,
-        Err(e) => {
-            eprintln!("Kann '{}' nicht lesen: {}", path, e);
+        Err(m) => {
+            eprintln!("{}", m);
             return ExitCode::from(1);
         }
     };
@@ -1019,7 +1050,7 @@ fn fmt_main(dateien: &[String], nur_pruefen: bool, einruecken: bool, schreibweis
         let crlf = roh.contains("\r\n");
         let endet_mit_umbruch = roh.ends_with('\n');
         let Some(neu) = formatiere(&roh, einruecken, "    ") else {
-            eprintln!("dhrt fmt: {}: laesst sich nicht lesen (Syntaxfehler?) -- unveraendert gelassen", d);
+            eprintln!("{}", meldung::t(&format!("dhrt fmt: {}: laesst sich nicht lesen (Syntaxfehler?) -- unveraendert gelassen", d)));
             fehler += 1;
             continue;
         };
@@ -1082,7 +1113,12 @@ const SAMMLUNG_ENDUNG: &str = ".dhtest";
 
 /// Warum ein Bild fuer `--- bild` nicht zu lesen war: kein raylib im Bau
 /// (dann ist der Fall uebersprungen, nicht falsch) oder die Datei selbst.
-enum BildFehler { KeinGrafikBau, Lesen(String) }
+enum BildFehler {
+    #[cfg_attr(feature = "graphics", allow(dead_code))]
+    KeinGrafikBau,
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
+    Lesen(String),
+}
 
 /// Das Bild einer `--- bild`-Probe lesen -- ueber raylib, das PNG/BMP/TGA
 /// ohne Fenster dekodiert. Ohne Grafik-Feature gibt es keinen Decoder, und
@@ -1281,7 +1317,7 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
         .filter(|f| filter.map_or(true, |t| if genau { f.name == t } else { f.name.contains(t) }))
         .collect();
     if faelle.is_empty() { return Ok((0, 0, 0, Vec::new())); }
-    let ohne_grafik = std::env::var("DHRT_OHNE_GRAFIK").is_ok();
+    let ohne_grafik = crate::umgebung::var("DHRT_NO_GRAPHICS").is_ok();
     let stamm = pfad.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "sammlung".into());
     // Ordner der Sammlung, absolut: `--- programm` ist relativ dazu, und
     // `{sammlung}` meint ihn -- der Fall laeuft in einem ANDEREN Ordner.
@@ -1437,11 +1473,11 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         .env_remove("DHRT_LANG").env("DHRT_SYSTEM_LANG", "de")
                         // Fenster ohne echte Tastatur/Maus (stillfenster.rs): wer
                         // waehrend des Laufs tippt, schreibt sonst in einen Fall.
-                        .env("DHRT_OHNE_EINGABE", "1")
+                        .env("DHRT_NO_INPUT", "1")
                         // Eine Zwischenablage je Prozess (graphics.rs
                         // private_ablage): Faelle, die ueber Strg+V tippen,
                         // laufen sonst nur nacheinander.
-                        .env("DHRT_ZWISCHENABLAGE", "privat");
+                        .env("DHRT_CLIPBOARD", "privat");
                     if let Some(b) = &f.bild {
                         if b.datei.is_none() {
                             cmd.env("DHRT_SCREENSHOT", dir.join("bild.png"));
@@ -1461,8 +1497,8 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         .current_dir(&dir)
                         .stdin(std::process::Stdio::null())
                         .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
-                        .env_remove("DHRT_LANG").env("DHRT_SYSTEM_LANG", "de").env("DHRT_OHNE_EINGABE", "1")
-                        .env("DHRT_ZWISCHENABLAGE", "privat");
+                        .env_remove("DHRT_LANG").env("DHRT_SYSTEM_LANG", "de").env("DHRT_NO_INPUT", "1")
+                        .env("DHRT_CLIPBOARD", "privat");
                     let l = test_lauf(cmd, None, frist).map_err(|e| format!("{}: {}", name, e))?;
                     if l.abgelaufen {
                         return Err(zeitgrenze_meldung(grenze.unwrap_or(0), &format!("--- {}", name.trim_end_matches(".dh")), &l));
@@ -1726,8 +1762,8 @@ fn test_main(args: &[String]) -> ExitCode {
         let mut cmd = std::process::Command::new(&exe);
         cmd.arg("run").arg(d)
             .stdin(std::process::Stdio::null())
-            .env_remove("DHRT_LANG").env("DHRT_SYSTEM_LANG", "de").env("DHRT_OHNE_EINGABE", "1")
-            .env("DHRT_ZWISCHENABLAGE", "privat");
+            .env_remove("DHRT_LANG").env("DHRT_SYSTEM_LANG", "de").env("DHRT_NO_INPUT", "1")
+            .env("DHRT_CLIPBOARD", "privat");
         let r = test_lauf(cmd, None, grenze.map(|s| t0 + std::time::Duration::from_secs(s)));
         let dauer = t0.elapsed().as_secs_f64();
         let name = d.display().to_string();
@@ -1779,9 +1815,9 @@ fn test_main(args: &[String]) -> ExitCode {
 /// `dhrt --tokens <datei.dh>` -- lext die Quelldatei und gibt pro Token eine
 /// JSON-Zeile `[TYP, wert, zeile]` aus (fuer Lexer-Parity gegen Python).
 fn tokens_main(path: &str) -> ExitCode {
-    let source = match std::fs::read_to_string(path) {
+    let source = match quelle_lesen(path, path) {
         Ok(t) => t,
-        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+        Err(m) => { eprintln!("{}", m); return ExitCode::from(1); }
     };
     match lexer::dump_tokens_json(&source) {
         Ok(dump) => {
@@ -1801,9 +1837,9 @@ fn tokens_main(path: &str) -> ExitCode {
 /// `dhrt --ast <datei.dh>` -- lext + parst und gibt den AST als JSON aus
 /// (Parser-Parity gegen Python).
 fn ast_main(path: &str) -> ExitCode {
-    let source = match std::fs::read_to_string(path) {
+    let source = match quelle_lesen(path, path) {
         Ok(t) => t,
-        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+        Err(m) => { eprintln!("{}", m); return ExitCode::from(1); }
     };
     match parser::dump_ast_json(&source) {
         Ok(json) => {
@@ -1821,9 +1857,9 @@ fn ast_main(path: &str) -> ExitCode {
 /// `dhrt --preprocess <datei.dh>` -- expandiert IMPORTs und gibt die gemergte
 /// Quelle auf stdout aus (Merge-Parity gegen preprocess.process(), Stufe 4).
 fn preprocess_main(path: &str) -> ExitCode {
-    let source = match std::fs::read_to_string(path) {
+    let source = match quelle_lesen(path, path) {
         Ok(t) => t,
-        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+        Err(m) => { eprintln!("{}", m); return ExitCode::from(1); }
     };
     let base = std::path::Path::new(path).parent()
         .map(|p| p.to_path_buf())
@@ -1843,9 +1879,9 @@ fn preprocess_main(path: &str) -> ExitCode {
 /// Volle Front-End-Kette in Rust: Preprocess (IMPORT) -> Lexer -> Parser ->
 /// Compiler. `base` = Verzeichnis fuer relative IMPORT-Pfade. Liefert das
 /// `.dhc`-JSON oder einen Exit-Code (Fehler bereits auf stderr gemeldet).
-/// Geteilt von `--runsrc`, `run` und `--export`.
+/// Geteilt von `run` und `--export`.
 fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Result<serde_json::Value, ExitCode> {
-    compile_source_mit(raw_source, base, label, compiler::compile_to_gbc)
+    compile_source_mit(raw_source, base, label, compiler::compile_to_dhc)
 }
 
 /// Wie `compile_source`, aber gleich das Programm fuer die VM (ohne JSON-Umweg).
@@ -1954,9 +1990,9 @@ fn profile_main(path: &str, stoppable: bool) -> ExitCode {
     let abs = std::fs::canonicalize(path).map(strip_extended_prefix).unwrap_or_else(|_| std::path::PathBuf::from(path));
     let base = abs.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
     let label = abs.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string());
-    let raw_source = match std::fs::read_to_string(&abs) {
+    let raw_source = match quelle_lesen(&abs, path) {
         Ok(t) => t,
-        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+        Err(m) => { eprintln!("{}", m); return ExitCode::from(1); }
     };
     ins_quellverzeichnis(&base);
     let json = match compile_source(&raw_source, &base, &label) {
@@ -2047,9 +2083,9 @@ fn debug_main(path: &str) -> ExitCode {
     let abs = std::fs::canonicalize(path).map(strip_extended_prefix).unwrap_or_else(|_| std::path::PathBuf::from(path));
     let base = abs.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
     let label = abs.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string());
-    let raw_source = match std::fs::read_to_string(&abs) {
+    let raw_source = match quelle_lesen(&abs, path) {
         Ok(t) => t,
-        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+        Err(m) => { eprintln!("{}", m); return ExitCode::from(1); }
     };
     ins_quellverzeichnis(&base);
     let json = match compile_source(&raw_source, &base, &label) {
@@ -2113,10 +2149,10 @@ fn debug_main(path: &str) -> ExitCode {
 fn check_main(pfade: &[String]) -> ExitCode {
     let einzeln = pfade.len() == 1;
     for pfad in pfade {
-        let raw_source = match std::fs::read_to_string(pfad) {
+        let raw_source = match quelle_lesen(pfad, pfad) {
             Ok(t) => t,
-            Err(e) => {
-                eprintln!("Kann '{}' nicht lesen: {}", pfad, e);
+            Err(m) => {
+                eprintln!("{}", m);
                 if einzeln { return ExitCode::from(1); }
                 // Bei mehreren nicht abbrechen: eine unlesbare Datei soll die
                 // 184 anderen nicht um ihre Diagnose bringen.
@@ -2124,7 +2160,7 @@ fn check_main(pfade: &[String]) -> ExitCode {
                     "datei": pfad,
                     "probleme": [{"line": 1, "col": 1, "severity": "error",
                                   "phase": "datei",
-                                  "message": meldung::t(&format!("nicht lesbar: {}", e))}]}));
+                                  "message": m}]}));
                 continue;
             }
         };
@@ -2225,7 +2261,7 @@ fn check_source_roh(raw_source: &str, base: &std::path::Path, label: &str) -> Ve
             "line": zeile, "col": 1, "severity": "error",
             "phase": "namensraum", "message": msg })];
     }
-    match compiler::compile_to_gbc(&ast, &ext_types, &aliases, &module, &herkunft, label) {
+    match compiler::compile_to_dhc(&ast, &ext_types, &aliases, &module, &herkunft, label) {
         // E1: Bei fehlerfreiem Compile noch Warnungen fuer IMPORTs von
         // Hardware-Modulen ergaenzen, die in diesem dhrt-Build fehlen -- damit
         // der Editor das schon auf der IMPORT-Zeile markiert (nicht erst beim
@@ -2273,18 +2309,6 @@ fn compile_and_run_source(raw_source: &str, base: &std::path::Path, label: &str)
     }
 }
 
-/// `dhrt --runsrc <datei.dh>` -- volle Front-End-Kette in Rust, OHNE chdir
-/// (Dev-/Parity-Einstieg: Output gegen Python-Tree-Walker, Stufe 3/4).
-fn runsrc_main(path: &str) -> ExitCode {
-    let raw_source = match std::fs::read_to_string(path) {
-        Ok(t) => t,
-        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
-    };
-    let base = std::path::Path::new(path).parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
-    compile_and_run_source(&raw_source, &base, path)
-}
 
 /// `dhrt run <datei.dh>` (Stufe 5) -- eigenstaendiger End-to-End-Lauf aus
 /// Quelltext, ohne Python. Wechselt wie `dhrun.py` ins Verzeichnis der Datei,
@@ -2297,9 +2321,9 @@ fn run_main(path: &str) -> ExitCode {
         .unwrap_or_else(|| std::path::PathBuf::from("."));
     let label = abs.file_name().map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| path.to_string());
-    let raw_source = match std::fs::read_to_string(&abs) {
+    let raw_source = match quelle_lesen(&abs, path) {
         Ok(t) => t,
-        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+        Err(m) => { eprintln!("{}", m); return ExitCode::from(1); }
     };
     // Ins Datei-Verzeichnis wechseln (wie dhrun.py os.chdir(file.parent)).
     ins_quellverzeichnis(&base);
@@ -2317,9 +2341,9 @@ fn call_main(path: &str, fn_name: &str, args: Vec<String>) -> ExitCode {
         .unwrap_or_else(|| std::path::PathBuf::from("."));
     let label = abs.file_name().map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| path.to_string());
-    let raw_source = match std::fs::read_to_string(&abs) {
+    let raw_source = match quelle_lesen(&abs, path) {
         Ok(t) => t,
-        Err(e) => { return call_fehler(&format!("Kann {} nicht lesen: {}", path, e)); }
+        Err(m) => { return call_fehler(&m); }
     };
     ins_quellverzeichnis(&base);
     builtins::set_quelldatei(label.clone());
@@ -2488,9 +2512,9 @@ fn bibliotheken_mitnehmen(json: &serde_json::Value, base: &std::path::Path, out:
 /// Grafik-Bau auf eine Taste und werden darum nicht gerufen, sondern nach
 /// dem Bau entschieden.
 fn fehlende_main(namen: &[String]) -> ExitCode {
-    // Ein Grafik-Befehl legt ein verstecktes Fenster an; DHRT_ABSEITS haelt
+    // Ein Grafik-Befehl legt ein verstecktes Fenster an; DHRT_OFFSCREEN haelt
     // es auch dann aus dem Blick, wenn einer davon es zeigen will.
-    unsafe { std::env::set_var("DHRT_ABSEITS", "1"); }
+    unsafe { std::env::set_var("DHRT_OFFSCREEN", "1"); }
     let prog = match compile_source_programm("", std::path::Path::new("."), "fehlende") {
         Ok(p) => p,
         Err(code) => return code,
@@ -2595,9 +2619,9 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
         .unwrap_or_else(|| std::path::PathBuf::from("."));
     let stem = abs.file_stem().map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "programm".into());
-    let raw_source = match std::fs::read_to_string(&abs) {
+    let raw_source = match quelle_lesen(&abs, path) {
         Ok(t) => t,
-        Err(e) => { eprintln!("{}", meldung::t(&format!("Kann '{}' nicht lesen: {}", path, e))); return ExitCode::from(1); }
+        Err(m) => { eprintln!("{}", m); return ExitCode::from(1); }
     };
     // 1) Quelltext -> .dhc-JSON (kompakt).
     let label = abs.file_name().map(|s| s.to_string_lossy().into_owned())
@@ -2608,10 +2632,10 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
     };
     // Review-Fund: `unwrap_or_default()` liess einen Serialisierungsfehler
     // lautlos zu einem LEEREN Payload werden -- das Bundle wurde trotzdem
-    // geschrieben und "Exportiert: ..." gemeldet, obwohl `embedded_gbc()`
+    // geschrieben und "Exportiert: ..." gemeldet, obwohl `eingebettetes_dhc()`
     // `len == 0` ablehnt und die ausgelieferte Exe beim Start nur noch
     // "Verwendung: dhrt <datei.dhc>" ausgibt.
-    let gbc_bytes = match serde_json::to_string(&json) {
+    let dhc_bytes = match serde_json::to_string(&json) {
         Ok(s) => s.into_bytes(),
         Err(e) => { eprintln!("{}", meldung::t(&format!("Kann .dhc nicht serialisieren: {}", e))); return ExitCode::from(1); }
     };
@@ -2626,9 +2650,9 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
         let namen: Vec<String> = gerufene_befehle(&json).into_iter().collect();
         let eigene = exe.metadata().map(|m| m.len()).unwrap_or(0);
         let kandidaten = kleine_laufzeiten(&exe);
-        // DHRT_FASSUNG_SPIELEN: nur fuer die Pruefung, dass eine kleine
+        // DHRT_PLAY_VERSION: nur fuer die Pruefung, dass eine kleine
         // Laufzeit einer anderen Fassung uebergangen wird (export_schlank).
-        let eigene_fassung = std::env::var("DHRT_FASSUNG_SPIELEN").ok()
+        let eigene_fassung = crate::umgebung::var("DHRT_PLAY_VERSION").ok()
             .filter(|s| !s.is_empty()).unwrap_or_else(fassung);
         let mut gruende: Vec<String> = Vec::new();
         for (k, groesse) in &kandidaten {
@@ -2668,8 +2692,8 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
         Ok(b) => b,
         Err(e) => { eprintln!("{}", meldung::t(&format!("Kann Runtime '{}' nicht lesen: {}", laufzeit.display(), e))); return ExitCode::from(1); }
     };
-    bundle.extend_from_slice(&gbc_bytes);
-    bundle.extend_from_slice(&(gbc_bytes.len() as u64).to_le_bytes());
+    bundle.extend_from_slice(&dhc_bytes);
+    bundle.extend_from_slice(&(dhc_bytes.len() as u64).to_le_bytes());
     bundle.extend_from_slice(PAYLOAD_MAGIC);
     // 3) Zielordner + Exe-Name. Endet das Ziel auf .exe (und ist kein
     // vorhandener Ordner), ist es der DATEINAME -- bis 2026.28 entstand ein
@@ -2962,7 +2986,7 @@ fn run_program(prog: model::Program, source_label: &str) -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::{embedded_gbc_in, ist_quelldatei, PAYLOAD_MAGIC};
+    use super::{eingebettetes_dhc_in, ist_quelldatei, PAYLOAD_MAGIC};
 
     // --- ziel = ziel + e: verschmolzene Befehle und BYREF-Leihe ------------
 
@@ -3078,10 +3102,10 @@ liest(h)
     }
 
     /// Baut, was `--export` schreibt: <exe><gbc><laenge><magic>.
-    fn bundle(exe: &[u8], gbc: &str) -> Vec<u8> {
+    fn bundle(exe: &[u8], dhc: &str) -> Vec<u8> {
         let mut v = exe.to_vec();
-        v.extend_from_slice(gbc.as_bytes());
-        v.extend_from_slice(&(gbc.len() as u64).to_le_bytes());
+        v.extend_from_slice(dhc.as_bytes());
+        v.extend_from_slice(&(dhc.len() as u64).to_le_bytes());
         v.extend_from_slice(PAYLOAD_MAGIC);
         v
     }
@@ -3089,7 +3113,7 @@ liest(h)
     #[test]
     fn findet_die_nutzlast_am_dateiende() {
         let b = bundle(b"MZ....exe....", r#"{"main":1}"#);
-        assert_eq!(embedded_gbc_in(&b).as_deref(), Some(r#"{"main":1}"#));
+        assert_eq!(eingebettetes_dhc_in(&b).as_deref(), Some(r#"{"main":1}"#));
     }
 
     #[test]
@@ -3098,22 +3122,22 @@ liest(h)
         // Zertifikatsblock HINTER unseren Footer.
         let mut b = bundle(b"MZ....exe....", r#"{"main":2}"#);
         b.extend_from_slice(&[0u8; 4096]);
-        assert_eq!(embedded_gbc_in(&b).as_deref(), Some(r#"{"main":2}"#));
+        assert_eq!(eingebettetes_dhc_in(&b).as_deref(), Some(r#"{"main":2}"#));
     }
 
     #[test]
     fn ohne_nutzlast_kein_treffer() {
-        assert_eq!(embedded_gbc_in(b"MZ....einfach nur eine exe...."), None);
-        assert_eq!(embedded_gbc_in(b"kurz"), None);          // < 16 Bytes
+        assert_eq!(eingebettetes_dhc_in(b"MZ....einfach nur eine exe...."), None);
+        assert_eq!(eingebettetes_dhc_in(b"kurz"), None);          // < 16 Bytes
     }
 
     #[test]
     fn zufaelliges_vorkommen_im_json_verwirrt_nicht() {
         // Die acht Bytes stehen mitten in der Nutzlast -- der ECHTE Footer
         // liegt weiter hinten und muss gewinnen.
-        let gbc = format!(r#"{{"s":"{}"}}"#, String::from_utf8_lossy(PAYLOAD_MAGIC));
-        let b = bundle(b"MZ....exe....", &gbc);
-        assert_eq!(embedded_gbc_in(&b).as_deref(), Some(gbc.as_str()));
+        let dhc = format!(r#"{{"s":"{}"}}"#, String::from_utf8_lossy(PAYLOAD_MAGIC));
+        let b = bundle(b"MZ....exe....", &dhc);
+        assert_eq!(eingebettetes_dhc_in(&b).as_deref(), Some(dhc.as_str()));
     }
 
     #[test]
@@ -3124,7 +3148,7 @@ liest(h)
         let mut b = bundle(b"MZ....exe....", r#"{"main":3}"#);
         b.extend_from_slice(&u64::MAX.to_le_bytes());   // unmoegliche Laenge
         b.extend_from_slice(PAYLOAD_MAGIC);
-        assert_eq!(embedded_gbc_in(&b).as_deref(), Some(r#"{"main":3}"#));
+        assert_eq!(eingebettetes_dhc_in(&b).as_deref(), Some(r#"{"main":3}"#));
     }
     // --- Export: Datenbanken sind keine Assets ---------------------------
     //

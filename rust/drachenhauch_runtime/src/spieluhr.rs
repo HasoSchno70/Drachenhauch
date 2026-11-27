@@ -23,6 +23,7 @@ fn wanduhr_ms() -> f64 {
 
 /// Graphics meldet je Bild den Stand seiner Bilduhr (`uhr_jetzt`), solange
 /// die Bildzahl fest ist.
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub fn bild(sekunden: f64) {
     FEST.with(|f| {
         let neu = match f.get() {

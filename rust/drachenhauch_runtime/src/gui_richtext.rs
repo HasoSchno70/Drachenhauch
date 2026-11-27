@@ -42,18 +42,15 @@ impl Gui {
     }
     pub fn richtext_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let r = self.rt_mut(h, "GUI_RICHTEXT_SET")?;
-        const ARTEN: [&str; 6] = ["farbe_kommentar", "farbe_text", "farbe_zahl",
-                                  "farbe_schluessel", "farbe_name", "farbe_operator"];
-        let k = key.to_lowercase();
-        match k.as_str() {
-            "groesse" | "size" => { r.basis = wert.max(0.0) as i32; r.stand = (usize::MAX, 0, 0, 0, 0); }
-            "codeschrift" | "code_font" => { r.code_font = wert as i64; r.stand = (usize::MAX, 0, 0, 0, 0); }
-            _ if ARTEN.contains(&k.as_str()) => {
-                let n = ARTEN.iter().position(|a| *a == k).unwrap();
+        let tafel = super::einstellungen::RICHTEXT;
+        match super::einstellungen::schluessel("GUI_RICHTEXT_SET", key, tafel)? {
+            "groesse" => { r.basis = wert.max(0.0) as i32; r.stand = (usize::MAX, 0, 0, 0, 0); }
+            "codeschrift" => { r.code_font = wert as i64; r.stand = (usize::MAX, 0, 0, 0, 0); }
+            // Die sechs Farben der Codebloecke, in der Reihenfolge der Tafel.
+            k => {
+                let n = tafel.iter().skip(2).position(|(de, _)| *de == k).unwrap_or(0);
                 r.code_farben[n] = if wert < 0.0 { None } else { Some(wert as i64) };
             }
-            _ => return Err(format!(
-                "GUI_RICHTEXT_SET: unbekannte Einstellung '{}' (gueltig: groesse, codeschrift, {})", key, ARTEN.join(", "))),
         }
         Ok(())
     }
@@ -833,7 +830,7 @@ impl Gui {
         let roh: Vec<i32> = match &t.col_widths {
             Some(cw) if cw.len() == n_cols => cw.clone(),
             _ => {
-                let avail = ww - self.sk(TBL_SCROLL_W) - 2;
+                let avail = ww - self.rollbalken_w() - 2;
                 let per = if n_cols > 0 { (avail / n_cols as i32).max(self.sk(TBL_MIN_COL_W)) } else { 0 };
                 vec![per; n_cols]
             }
@@ -846,14 +843,14 @@ impl Gui {
         let total_w: i32 = col_widths.iter().sum();
         let total_h = n_rows as i32 * row_h;
         let mut need_v = total_h > body_h_raw;
-        let need_h = total_w > body_w_raw - if need_v { self.sk(TBL_SCROLL_W) } else { 0 };
-        if need_h && total_h > body_h_raw - self.sk(TBL_SCROLL_W) { need_v = true; }
-        let body_w = body_w_raw - if need_v { self.sk(TBL_SCROLL_W) } else { 0 };
-        let body_h = body_h_raw - if need_h { self.sk(TBL_SCROLL_W) } else { 0 };
+        let need_h = total_w > body_w_raw - if need_v { self.rollbalken_w() } else { 0 };
+        if need_h && total_h > body_h_raw - self.rollbalken_w() { need_v = true; }
+        let body_w = body_w_raw - if need_v { self.rollbalken_w() } else { 0 };
+        let body_h = body_h_raw - if need_h { self.rollbalken_w() } else { 0 };
         // Gespiegelt steht der senkrechte Balken links, der Rumpf rechts davon.
         let rtl = self.windows[wi].rtl;
-        let body_x = if rtl && need_v { body_x_ltr + self.sk(TBL_SCROLL_W) } else { body_x_ltr };
-        let vbar_x = if rtl { ax + 1 } else { ax + body_w_raw - self.sk(TBL_SCROLL_W) + 1 };
+        let body_x = if rtl && need_v { body_x_ltr + self.rollbalken_w() } else { body_x_ltr };
+        let vbar_x = if rtl { ax + 1 } else { ax + body_w_raw - self.rollbalken_w() + 1 };
         let frozen_w: i32 = col_widths.iter().take(frozen).sum();
         TGeom {
             ax, ay, w: ww, h: hh, rtl, vbar_x, n_cols, n_rows, col_widths, row_h, header_h,
@@ -921,7 +918,7 @@ impl Gui {
         let gm = self.table_geom(wi, idx);
         if gm.need_v {
             let sb_x = gm.vbar_x;
-            if Self::in_rect(mx, my, (sb_x, gm.body_y, self.sk(TBL_SCROLL_W), gm.body_h)) {
+            if Self::in_rect(mx, my, (sb_x, gm.body_y, self.rollbalken_w(), gm.body_h)) {
                 let off = Self::handle_height(gm.body_h, gm.body_h, gm.total_h) / 2;
                 { let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap(); t.drag_v = true; t.drag_off = off; }
                 self.active_table = Some((wi, idx));
@@ -930,8 +927,8 @@ impl Gui {
             }
         }
         if gm.need_h {
-            let hs_y = gm.ay + gm.h - self.sk(TBL_SCROLL_W) - 1;
-            if Self::in_rect(mx, my, (gm.body_x, hs_y, gm.body_w, self.sk(TBL_SCROLL_W))) {
+            let hs_y = gm.ay + gm.h - self.rollbalken_w() - 1;
+            if Self::in_rect(mx, my, (gm.body_x, hs_y, gm.body_w, self.rollbalken_w())) {
                 let off = Self::handle_height(gm.body_w, gm.body_w, gm.total_w) / 2;
                 { let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap(); t.drag_h = true; t.drag_off = off; }
                 self.active_table = Some((wi, idx));
@@ -1254,28 +1251,16 @@ impl Gui {
     /// innerhalb einer Sekunde getippt wird, ist ein Wort, dieselbe Taste
     /// mehrmals laeuft durch alle mit diesem Anfang. TRUE = eine Taste kam an.
     pub(super) fn tabelle_tippen(&mut self, wi: usize, i: usize, gm: &TGeom, g: &mut Graphics) -> bool {
-        let mut s = g.pop_text_input();
-        s.retain(|c| !c.is_control() && c != ' ');
-        if s.is_empty() && !g.key_ctrl() {
-            for c in (b'a'..=b'z').chain(b'0'..=b'9') {
-                if g.key_pressed(c as i64) { s.push(c as char); }
-            }
-        }
+        let s = super::bausteine::getippt(g);
         if s.is_empty() || gm.order.is_empty() { return false; }
         let jetzt = g.uhr_jetzt();
         let t = self.windows[wi].widgets[i].tbl.as_mut().unwrap();
-        if jetzt - t.tipp_zeit > 1.0 { t.tipp.clear(); }
-        t.tipp_zeit = jetzt;
-        t.tipp.push_str(&s.to_lowercase());
-        let tipp = t.tipp.clone();
-        let erster = tipp.chars().next().unwrap();
-        let wiederholt = tipp.chars().all(|c| c == erster);
-        let such: String = if wiederholt { erster.to_string() } else { tipp };
+        let (such, wiederholt) = super::bausteine::tipp_merken(&mut t.tipp, &mut t.tipp_zeit, jetzt, &s);
         let spalte = if t.sort_col >= 0 { t.sort_col as usize } else { gm.order[0] };
         let n = t.ansicht_len();
         if n == 0 { return true; }
         let pos = t.view_of(t.selected);
-        let start = match pos { p if p >= 0 && wiederholt => p as usize + 1, p if p >= 0 => p as usize, _ => 0 };
+        let start = super::bausteine::tipp_start(if pos >= 0 { Some(pos as usize) } else { None }, wiederholt);
         // Virtuell sucht es nur in den gelieferten Zeilen (die anderen kennt
         // die Tabelle nicht).
         let treffer = (0..n).map(|d| (start + d) % n).take(if t.virt.is_some() { 5000 } else { n }).find(|&v| {
@@ -1335,11 +1320,11 @@ impl Gui {
                 else if g.key_repeat(KEY_PAGEUP) { (vi - seite).max(0) }
                 else if g.key_pressed(KEY_HOME) { 0 }
                 else if g.key_pressed(KEY_END) { nv - 1 }
-                else if t.baum && t.selected >= 0 && (g.key_pressed(KEY_RIGHT) || g.key_pressed(KEY_LEFT)) {
+                else if t.baum && t.selected >= 0 && (g.key_repeat(KEY_RIGHT) || g.key_repeat(KEY_LEFT)) {
                     // Rechts klappt auf bzw. geht zum ersten Kind, links klappt
                     // zu bzw. geht zu den Eltern -- wie in jedem Dateibaum.
                     let r = t.selected as usize;
-                    let rechts = g.key_pressed(KEY_RIGHT);
+                    let rechts = g.key_repeat(KEY_RIGHT);
                     let kinder = t.hat_kinder.get(r).copied().unwrap_or(false);
                     let auf = t.offen.get(r).copied().unwrap_or(false);
                     if kinder && rechts != auf {

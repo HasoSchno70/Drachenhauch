@@ -2,6 +2,10 @@
 //! Windows via `netsh wlan`, Linux via `nmcli` (NetworkManager), macOS via
 //! `networksetup`/`airport` (std::process, Text-Parsing). Feature `wifi`.
 //!
+//! Fehlschlag-Form: ein Fehler fuer ungueltige Eingaben und ein fehlendes
+//! Werkzeug/Geraet, FALSE, wenn das System ablehnt (WIFI_CONNECT, _DISCONNECT,
+//! _DELETE_PROFILE). Ein verstecktes Netz hat einen leeren Namen.
+//!
 //! **Cross-Platform-Status:** Windows-Zweig ist gegen echte Hardware
 //! verifiziert. Linux-Zweig (nmcli) ist nach oeffentlicher, stabiler
 //! nmcli-Doku geschrieben, aber NICHT auf echter Linux-Hardware getestet
@@ -140,7 +144,7 @@ mod imp {
                     blocks.push((s, cur_sig.take()));
                 }
                 let name = c.get(1).map(|m| m.as_str().trim().to_string()).unwrap_or_default();
-                cur_ssid = Some(if name.is_empty() { "(versteckt)".to_string() } else { name });
+                cur_ssid = Some(name);
                 cur_sig = None;
                 continue;
             }
@@ -176,14 +180,15 @@ mod imp {
         }
         let xml = profile_xml(ssid, password);
         let mut tmp = std::env::temp_dir();
-        tmp.push(format!("_gb_wifi_{}.xml", ssid.chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>()));
+        tmp.push(format!("_dh_wifi_{}.xml", ssid.chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>()));
         std::fs::write(&tmp, xml).map_err(|e| format!("WIFI_CONNECT: temp-Datei: {}", e))?;
         let add = run_netsh(&["wlan", "add", "profile", &format!("filename={}", tmp.display()), "user=current"]);
         let _ = std::fs::remove_file(&tmp);
-        let (rc, out) = add?;
-        if rc != 0 {
-            return Err(format!("WIFI_CONNECT: Profil konnte nicht angelegt werden\n{}", out.trim()));
-        }
+        let (rc, _) = add?;
+        // Ein abgelehntes Profil (z.B. ein Kennwort, das WPA2 nicht nimmt) ist
+        // wie ein abgelehnter Connect ein FALSE -- auf allen drei Systemen
+        // gleich (bis 2026.53 hier ein Fehler, unter Linux/macOS jeder).
+        if rc != 0 { return Ok(false); }
         let (rc2, _) = run_netsh(&["wlan", "connect", &format!("name={}", ssid)])?;
         Ok(rc2 == 0)
     }
@@ -298,7 +303,7 @@ mod imp {
             if f.len() < 2 {
                 continue;
             }
-            let ssid = if f[0].is_empty() { "(versteckt)".to_string() } else { f[0].clone() };
+            let ssid = f[0].clone();
             let sig = f[1].parse::<i64>().unwrap_or(0);
             rows.push((ssid, sig));
         }
@@ -310,15 +315,12 @@ mod imp {
         if ssid.is_empty() {
             return Err("WIFI_CONNECT: SSID darf nicht leer sein".into());
         }
-        let (rc, out) = if password.is_empty() {
+        let (rc, _) = if password.is_empty() {
             run_nmcli(&["dev", "wifi", "connect", ssid])?
         } else {
             run_nmcli(&["dev", "wifi", "connect", ssid, "password", password])?
         };
-        if rc != 0 {
-            return Err(format!("WIFI_CONNECT: {}", out.trim()));
-        }
-        Ok(true)
+        Ok(rc == 0)
     }
 
     pub fn disconnect() -> Result<bool, String> {
@@ -505,15 +507,12 @@ mod imp {
             return Err("WIFI_CONNECT: SSID darf nicht leer sein".into());
         }
         let dev = device_or_err()?;
-        let (rc, out) = if password.is_empty() {
+        let (rc, _) = if password.is_empty() {
             run_networksetup(&["-setairportnetwork", &dev, ssid])?
         } else {
             run_networksetup(&["-setairportnetwork", &dev, ssid, password])?
         };
-        if rc != 0 {
-            return Err(format!("WIFI_CONNECT: {}", out.trim()));
-        }
-        Ok(true)
+        Ok(rc == 0)
     }
 
     pub fn disconnect() -> Result<bool, String> {
@@ -521,9 +520,9 @@ mod imp {
         // Workaround: Funk kurz aus- und wieder einschalten (deassoziiert von
         // jedem Netz, WLAN bleibt danach an).
         let dev = device_or_err()?;
-        run_networksetup(&["-setairportpower", &dev, "off"])?;
-        run_networksetup(&["-setairportpower", &dev, "on"])?;
-        Ok(true)
+        let aus = run_networksetup(&["-setairportpower", &dev, "off"])?.0;
+        let an = run_networksetup(&["-setairportpower", &dev, "on"])?.0;
+        Ok(aus == 0 && an == 0)
     }
 
     pub fn profiles() -> Result<String, String> {

@@ -6,9 +6,6 @@
 use super::*;
 
 impl<'p> Vm<'p> {
-    // ===================================================================
-    // Modul serial (Feature `serial`)
-    // ===================================================================
     /// Modul `midi` (midi.rs) -- Noten lesen und schicken.
     ///
     /// Die beiden Umrechner (`MIDI_NOTE_NAME$`, `MIDI_NOTE_FREQ`) stehen VOR
@@ -164,7 +161,7 @@ impl<'p> Vm<'p> {
             "video_loop" => {
                 let i = self.video_z(a, "VIDEO_LOOP")?;
                 let an = match a.get(1) { Some(Value::Bool(b)) => *b, Some(Value::Int(n)) => *n != 0,
-                    _ => return Err("VIDEO_LOOP: erwartet (video, an)".into()) };
+                    _ => return Err(crate::vm::falsche_argumente("VIDEO_LOOP", a.len())) };
                 self.videos[i].as_mut().unwrap().schleife = an;
                 Value::Nil
             }
@@ -175,7 +172,7 @@ impl<'p> Vm<'p> {
             }
             "video_draw" => {
                 let i = self.video_z(a, "VIDEO_DRAW")?;
-                if !(a.len() == 3 || a.len() == 5) { return Err("VIDEO_DRAW: erwartet (video, x, y [, breite, hoehe])".into()); }
+                if !(a.len() == 3 || a.len() == 5) { return Err(crate::vm::falsche_argumente("VIDEO_DRAW", a.len())); }
                 let x = bi_int(a, 1, "VIDEO_DRAW")? as i32;
                 let y = bi_int(a, 2, "VIDEO_DRAW")? as i32;
                 self.video_weiter(i)?;
@@ -278,7 +275,7 @@ impl<'p> Vm<'p> {
             "midi_file_ppq" => Value::Int(datei!("MIDI_FILE_PPQ").ppq().map(|p| p as i64).unwrap_or(0)),
             "midi_file_duration" => Value::Float(datei!("MIDI_FILE_DURATION").dauer()),
             "midi_file_tempo" => Value::Float(datei!("MIDI_FILE_TEMPO").anfangstempo()),
-            "midi_file_track_name$" | "midi_file_track_name" => {
+            "midi_file_track_name$" => {
                 const F: &str = "MIDI_FILE_TRACK_NAME$";
                 let k = spur_nr(a, 1, F)?;
                 Value::str_rc(datei!(F).spuren.get(k).map(|s| s.name.clone()).unwrap_or_default())
@@ -418,17 +415,17 @@ impl<'p> Vm<'p> {
                 let n = midi::in_count()?;
                 let mut v = Vec::new();
                 for i in 0..n { v.push(midi::in_name(i)?); }
-                crate::builtins::new_string_array(v)
+                crate::builtins::new_str_array(v)
             }
             "midi_out_devices" => {
                 let n = midi::out_count()?;
                 let mut v = Vec::new();
                 for i in 0..n { v.push(midi::out_name(i)?); }
-                crate::builtins::new_string_array(v)
+                crate::builtins::new_str_array(v)
             }
-            "midi_in_name$" | "midi_in_name" =>
+            "midi_in_name$" =>
                 Value::str_rc(midi::in_name(bi_int(a, 0, "MIDI_IN_NAME$")?)?),
-            "midi_out_name$" | "midi_out_name" =>
+            "midi_out_name$" =>
                 Value::str_rc(midi::out_name(bi_int(a, 0, "MIDI_OUT_NAME$")?)?),
             // --- Oeffnen und schliessen ---
             "midi_in_open" => {
@@ -507,6 +504,9 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
+    // ===================================================================
+    // Modul serial (Feature `serial`)
+    // ===================================================================
     pub(super) fn try_serial(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("serial_")) { return Ok(None); }
         #[cfg(feature = "serial")]
@@ -525,7 +525,7 @@ impl<'p> Vm<'p> {
             "serial_ports" => Value::str_rc(serial::ports()),
             // Die Liste als ARRAY OF STRING (Bericht A16; SERIAL_PORTS liefert
             // einen Text mit ", ").
-            "serial_devices" => crate::builtins::new_string_array(serial::port_liste()),
+            "serial_devices" => crate::builtins::new_str_array(serial::port_liste()),
             "serial_open" => {
                 let p = serial::open(bi_str(a, 0, "SERIAL_OPEN")?, bi_int(a, 1, "SERIAL_OPEN")?)?;
                 self.serial_ports.push(Some(p));
@@ -550,16 +550,6 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
-    // ===================================================================
-    // Module gpio/i2c/spi: die Pins des Kernels (pins.rs). In jedem Bau;
-    // ausserhalb von Linux meldet jeder Aufruf "nur unter Linux".
-    // ===================================================================
-    // ===================================================================
-    // Mikrofon (MIC_*, src/mikrofon.rs): ein Eingang zur Zeit
-    // ===================================================================
-    // ===================================================================
-    // Modul webcam (src/webcam.rs): Bilder einer Kamera in ein IMAGE
-    // ===================================================================
     // ===================================================================
     // WebSocket (WS_*), OSC (OSC_*), mDNS (MDNS_*): src/websocket.rs,
     // src/osc.rs, src/mdns.rs
@@ -759,12 +749,7 @@ impl<'p> Vm<'p> {
 
     pub(super) fn try_hotplug(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         use crate::hotplug;
-        fn text_feld(v: Vec<String>) -> Value {
-            let n = v.len() as i64;
-            let mut arr = crate::value::DhArray::new("string".to_string(), vec![n], || Value::str_rc(String::new()));
-            for (k, x) in v.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(x)); }
-            Value::Array(Rc::new(RefCell::new(arr)))
-        }
+        let text_feld = crate::builtins::new_str_array;
         let v = match name {
             "hotplug_kinds" => text_feld(hotplug::arten().into_iter().map(String::from).collect()),
             "hotplug_list" => text_feld(hotplug::aktuelle(bi_str(a, 0, "HOTPLUG_LIST")?)?),
@@ -773,8 +758,8 @@ impl<'p> Vm<'p> {
                 self.hotplug_aktuell = hotplug::naechstes();
                 Value::Bool(self.hotplug_aktuell.is_some())
             }
-            "hotplug_kind$" | "hotplug_kind" => Value::str_rc(self.hotplug_aktuell.as_ref().map(|e| e.art.clone()).unwrap_or_default()),
-            "hotplug_name$" | "hotplug_name" => Value::str_rc(self.hotplug_aktuell.as_ref().map(|e| e.name.clone()).unwrap_or_default()),
+            "hotplug_kind$" => Value::str_rc(self.hotplug_aktuell.as_ref().map(|e| e.art.clone()).unwrap_or_default()),
+            "hotplug_name$" => Value::str_rc(self.hotplug_aktuell.as_ref().map(|e| e.name.clone()).unwrap_or_default()),
             "hotplug_added" => Value::Bool(self.hotplug_aktuell.as_ref().map(|e| e.dazu).unwrap_or(false)),
             _ => return Ok(None),
         };
@@ -823,7 +808,7 @@ impl<'p> Vm<'p> {
                 Value::Bool(vb!(F).senden(&daten, binaer)?)
             }
             "ws_next" => Value::Bool(vb!("WS_NEXT").naechste()),
-            "ws_message$" | "ws_message" => {
+            "ws_message$" => {
                 let n = vb!("WS_MESSAGE$").aktuell().map(|n| String::from_utf8_lossy(&n.daten).into_owned()).unwrap_or_default();
                 Value::str_rc(n)
             }
@@ -832,10 +817,10 @@ impl<'p> Vm<'p> {
             "ws_pending" => Value::Int(vb!("WS_PENDING").wartend() as i64),
             "ws_connected" => Value::Bool(vb!("WS_CONNECTED").offen()),
             "ws_ping" => Value::Bool(vb!("WS_PING").ping()),
-            "ws_path$" | "ws_path" => Value::str_rc(vb!("WS_PATH$").pfad.clone()),
-            "ws_peer$" | "ws_peer" => Value::str_rc(vb!("WS_PEER$").gegenstelle.clone()),
+            "ws_path$" => Value::str_rc(vb!("WS_PATH$").pfad.clone()),
+            "ws_peer$" => Value::str_rc(vb!("WS_PEER$").gegenstelle.clone()),
             "ws_close_code" => Value::Int(vb!("WS_CLOSE_CODE").schliess_code),
-            "ws_close_reason$" | "ws_close_reason" => Value::str_rc(vb!("WS_CLOSE_REASON$").schliess_grund.clone()),
+            "ws_close_reason$" => Value::str_rc(vb!("WS_CLOSE_REASON$").schliess_grund.clone()),
             "ws_close" => {
                 const F: &str = "WS_CLOSE";
                 let code = if a.len() >= 2 { bi_int(a, 1, F)? } else { 1000 };
@@ -869,7 +854,7 @@ impl<'p> Vm<'p> {
             "osc_port" => Value::Int(anschluss!("OSC_PORT").port as i64),
             "osc_send" => {
                 const F: &str = "OSC_SEND";
-                if a.len() < 4 { return Err(format!("{}: erwartet (osc, host$, port, adresse$, werte...)", F)); }
+                if a.len() < 4 { return Err(crate::vm::falsche_argumente(F, a.len())); }
                 let host = bi_str(a, 1, F)?.to_string();
                 let port = bi_int(a, 2, F)?;
                 if !(1..=65535).contains(&port) { return Err(format!("{}: Port {} ausserhalb 1..65535", F, port)); }
@@ -892,8 +877,8 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "osc_next" => Value::Bool(anschluss!("OSC_NEXT").naechste()),
-            "osc_address$" | "osc_address" => Value::str_rc(anschluss!("OSC_ADDRESS$").aktuell().map(|(n, _)| n.adresse.clone()).unwrap_or_default()),
-            "osc_types$" | "osc_types" => Value::str_rc(anschluss!("OSC_TYPES$").aktuell().map(|(n, _)| n.werte.iter().map(|w| w.kennung()).collect::<String>()).unwrap_or_default()),
+            "osc_address$" => Value::str_rc(anschluss!("OSC_ADDRESS$").aktuell().map(|(n, _)| n.adresse.clone()).unwrap_or_default()),
+            "osc_types$" => Value::str_rc(anschluss!("OSC_TYPES$").aktuell().map(|(n, _)| n.werte.iter().map(|w| w.kennung()).collect::<String>()).unwrap_or_default()),
             "osc_count" => Value::Int(anschluss!("OSC_COUNT").aktuell().map_or(0, |(n, _)| n.werte.len() as i64)),
             "osc_arg" => {
                 const F: &str = "OSC_ARG";
@@ -918,7 +903,7 @@ impl<'p> Vm<'p> {
                     osc::Wert::Midi(m) => Value::Int(u32::from_be_bytes(*m) as i64),
                 }
             }
-            "osc_sender$" | "osc_sender" => Value::str_rc(anschluss!("OSC_SENDER$").aktuell().map(|(_, s)| s.ip().to_string()).unwrap_or_default()),
+            "osc_sender$" => Value::str_rc(anschluss!("OSC_SENDER$").aktuell().map(|(_, s)| s.ip().to_string()).unwrap_or_default()),
             "osc_sender_port" => Value::Int(anschluss!("OSC_SENDER_PORT").aktuell().map_or(0, |(_, s)| s.port() as i64)),
             "osc_match" => {
                 let m = bi_str(a, 0, "OSC_MATCH")?.to_string();
@@ -944,7 +929,7 @@ impl<'p> Vm<'p> {
                 .ok_or_else(|| format!("{}: Dienst {} gibt es nicht -- die letzte Suche fand {} (gezaehlt ab 0)", $f, i, n))?
         }}; }
         let v = match name {
-            "mdns_resolve$" | "mdns_resolve" => {
+            "mdns_resolve$" => {
                 let n = bi_str(a, 0, "MDNS_RESOLVE$")?.to_string();
                 let ms = frist(a, 1, "MDNS_RESOLVE$", 1500)?;
                 Value::str_rc(mdns::aufloesen(&n, ms)?)
@@ -957,11 +942,11 @@ impl<'p> Vm<'p> {
                 self.mdns_dienste = mdns::suchen(&d, ms)?;
                 Value::Int(self.mdns_dienste.len() as i64)
             }
-            "mdns_service_name$" | "mdns_service_name" => { let t = self.mdns_typ.clone(); let d = dienst!("MDNS_SERVICE_NAME$"); Value::str_rc(mdns::kurzname(&d.name, &t)) }
-            "mdns_service_host$" | "mdns_service_host" => Value::str_rc(dienst!("MDNS_SERVICE_HOST$").host.clone()),
-            "mdns_service_address$" | "mdns_service_address" => Value::str_rc(dienst!("MDNS_SERVICE_ADDRESS$").adresse.clone()),
+            "mdns_service_name$" => { let t = self.mdns_typ.clone(); let d = dienst!("MDNS_SERVICE_NAME$"); Value::str_rc(mdns::kurzname(&d.name, &t)) }
+            "mdns_service_host$" => Value::str_rc(dienst!("MDNS_SERVICE_HOST$").host.clone()),
+            "mdns_service_address$" => Value::str_rc(dienst!("MDNS_SERVICE_ADDRESS$").adresse.clone()),
             "mdns_service_port" => Value::Int(dienst!("MDNS_SERVICE_PORT").port as i64),
-            "mdns_service_txt$" | "mdns_service_txt" => {
+            "mdns_service_txt$" => {
                 let k = bi_str(a, 1, "MDNS_SERVICE_TXT$")?.to_string();
                 let d = dienst!("MDNS_SERVICE_TXT$");
                 Value::str_rc(d.txt.iter().find(|(n, _)| n.eq_ignore_ascii_case(&k)).map(|(_, w)| w.clone()).unwrap_or_default())
@@ -993,6 +978,9 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
+    // ===================================================================
+    // Modul webcam (src/webcam.rs): Bilder einer Kamera in ein IMAGE
+    // ===================================================================
     pub(super) fn try_webcam(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("webcam_") { return Ok(None); }
         #[cfg(feature = "graphics")]
@@ -1092,6 +1080,9 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
+    // ===================================================================
+    // Mikrofon (MIC_*, src/mikrofon.rs): ein Eingang zur Zeit
+    // ===================================================================
     pub(super) fn try_mikrofon(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("mic_") { return Ok(None); }
         #[cfg(feature = "graphics")]
@@ -1222,6 +1213,10 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
+    // ===================================================================
+    // Module gpio/i2c/spi: die Pins des Kernels (pins.rs). In jedem Bau;
+    // ausserhalb von Linux meldet jeder Aufruf "nur unter Linux".
+    // ===================================================================
     pub(super) fn try_pins(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("gpio_") || name.starts_with("i2c_") || name.starts_with("spi_")) { return Ok(None); }
         use crate::pins;
@@ -1510,7 +1505,7 @@ impl<'p> Vm<'p> {
         use crate::usb;
         let v = match name {
             "usb_list" => Value::str_rc(usb::list()?),
-            "usb_devices" => crate::builtins::new_string_array(usb::geraete()?),
+            "usb_devices" => crate::builtins::new_str_array(usb::geraete()?),
             "usb_open" => { let d = usb::open(bi_int(a, 0, "USB_OPEN")?, bi_int(a, 1, "USB_OPEN")?)?; self.usb_devs.push(Some(d)); Value::Int((self.usb_devs.len() - 1) as i64) }
             "usb_open_path" => { let d = usb::open_path(bi_str(a, 0, "USB_OPEN_PATH")?)?; self.usb_devs.push(Some(d)); Value::Int((self.usb_devs.len() - 1) as i64) }
             "usb_close" => { let i = bi_int(a, 0, "USB_CLOSE")? as usize; if let Some(s) = self.usb_devs.get_mut(i) { *s = None; } Value::Nil }
@@ -1528,7 +1523,7 @@ impl<'p> Vm<'p> {
     }
 
     // ===================================================================
-    // Modul wifi (Feature `wifi`, Windows-only)
+    // Modul wifi (Feature `wifi`: Windows netsh, Linux nmcli, macOS networksetup)
     // ===================================================================
     pub(super) fn try_wifi(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("wifi_")) { return Ok(None); }
@@ -1547,7 +1542,7 @@ impl<'p> Vm<'p> {
             "wifi_signal" => Value::Int(wifi::signal()?),
             "wifi_scan" => Value::str_rc(wifi::scan()?),
             // Dieselben Netze als ARRAY OF STRING, je eins eine Zeile (A16).
-            "wifi_networks" => crate::builtins::new_string_array(wifi::scan()?.lines().filter(|z| !z.is_empty()).map(str::to_string).collect()),
+            "wifi_networks" => crate::builtins::new_str_array(wifi::scan()?.lines().filter(|z| !z.is_empty()).map(str::to_string).collect()),
             "wifi_connect" => Value::Bool(wifi::connect(bi_str(a, 0, "WIFI_CONNECT")?, bi_str(a, 1, "WIFI_CONNECT")?)?),
             "wifi_disconnect" => Value::Bool(wifi::disconnect()?),
             "wifi_profiles" => Value::str_rc(wifi::profiles()?),
@@ -1581,7 +1576,7 @@ impl<'p> Vm<'p> {
             // (Bericht A16: Listen sind Felder); BT_SCAN liefert sie als Text.
             "bt_scan_ms" => {
                 let t = bt::scan(bi_num(a, 0, "BT_SCAN_MS")? / 1000.0)?;
-                crate::builtins::new_string_array(t.lines().filter(|z| !z.is_empty()).map(str::to_string).collect())
+                crate::builtins::new_str_array(t.lines().filter(|z| !z.is_empty()).map(str::to_string).collect())
             }
             "bt_connect" => { let p = bt::connect(bi_str(a, 0, "BT_CONNECT")?)?; self.bt_periphs.push(Some(p)); Value::Int((self.bt_periphs.len() - 1) as i64) }
             "bt_disconnect" => { let i = bi_int(a, 0, "BT_DISCONNECT")?; if Self::schon_frei(&self.bt_periphs, i) { return Ok(Some(Value::Nil)); } bt::disconnect(self.bt_periph(i, name)?)?; if let Some(s) = self.bt_periphs.get_mut(i as usize) { *s = None; } Value::Nil }

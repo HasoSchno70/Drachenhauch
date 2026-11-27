@@ -217,7 +217,7 @@ Drachenhauch.icns TRUE
 
 === das dhrt im bundle startet ohne argumente die ide mit den beispielen
 ' Wie ein Start aus dem Finder oder Dock: kein Argument. Gebaut wird das
-' Bundle mit der ECHTEN Laufzeit; DHRT_KEIN_FENSTER laesst die IDE an ihrem
+' Bundle mit der ECHTEN Laufzeit; DHRT_NO_WINDOW laesst die IDE an ihrem
 ' SCREEN enden -- bis dahin muss sie gekommen sein. Unter Windows heisst die
 ' Datei im Bundle wie unter macOS "dhrt" (ohne .exe); der Weg haengt am
 ' Aufbau des Ordners, nicht am System.
@@ -249,7 +249,7 @@ DIM app AS STRING : app = hier + "/raus/paket/Drachenhauch/Drachenhauch.app/Cont
 MKDIR("home/Documents")
 SETENV("HOME", hier + "/home")
 SETENV("USERPROFILE", hier + "/home")
-SETENV("DHRT_KEIN_FENSTER", "1")
+SETENV("DHRT_NO_WINDOW", "1")
 DIM s AS INTEGER : s = PROCESS_START(app + "/MacOS/dhrt")
 DIM a AS STRING : a = lauf$(s)
 DIM bsp AS STRING : bsp = "home/Documents/Drachenhauch/examples"

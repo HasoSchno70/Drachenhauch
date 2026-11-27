@@ -6,7 +6,7 @@
 
 #![cfg(feature = "http")]
 
-const USER_AGENT: &str = "Drachenhauch-cloud/0.1";
+const USER_AGENT: &str = crate::html::USER_AGENT;
 const TIMEOUT_SECS: u64 = 10;
 
 pub struct CloudErr {

@@ -28,8 +28,10 @@
 
 /// Die Nachricht, mit der das Symbol meldet (WM_APP + 0x2D). Pruefungen
 /// schicken sie selbst, um einen Klick nachzustellen.
+#[cfg(windows)]
 pub const WM_TRAY: u32 = 0x8000 + 0x2D;
 /// Menueeintraege kommen als WM_COMMAND mit dieser Nummer plus Platz (ab 0).
+#[cfg(windows)]
 pub const MENUE_ID: usize = 0x7100;
 
 /// Was in diesem Bild geschehen ist.
@@ -277,7 +279,7 @@ fn mitteilen_extern(titel: &str, text: &str) -> Result<(), String> {
 }
 
 /// Ein Probebild fuer den Selbsttest: 32x32, oben links (255, 10, 20, 30).
-#[allow(dead_code)]
+#[cfg_attr(any(windows, not(feature = "tray")), allow(dead_code))]
 fn probebild() -> Vec<u8> {
     let mut p = Vec::with_capacity(32 * 32 * 4);
     for i in 0..32 * 32 {

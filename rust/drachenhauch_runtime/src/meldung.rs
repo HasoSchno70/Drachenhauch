@@ -3,7 +3,7 @@
 //!
 //! Die Laufzeit schreibt ihre Meldungen an rund 1600 Stellen deutsch -- und
 //! dort bleiben sie: der Code, die Pruefsammlungen und die Schnellkorrekturen
-//! (`lsp::korrekturen` liest den deutschen Satz) haengen daran. Uebersetzt
+//! (`lsp::korrekturen_mit` liest den deutschen Satz) haengen daran. Uebersetzt
 //! wird erst an der GRENZE, dort wo eine Meldung den Menschen erreicht
 //! (Konsole, `--check`, Sprachserver, `CODE_CHECK$`, Debugger), und zwar
 //! ueber einen Katalog: je Zeile eine deutsche Vorlage und ihre englische
@@ -33,7 +33,6 @@ const KATALOG: &str = include_str!("../../../daten/meldungen.en.txt");
 const TIEFE: usize = 6;
 
 pub struct Vorlage {
-    pub deutsch: String,
     pub englisch: String,
     muster: Regex,
     /// Laengstes festes Stueck -- ein billiger Vorfilter vor dem Muster.
@@ -50,6 +49,7 @@ pub fn englisch() -> bool { sprache() == "en" }
 /// Ein eingebauter Text in der Sprache der Laufzeit (Knoepfe der gui,
 /// Tastennamen, Wochentage) -- deutsch auf einem deutschen System, sonst
 /// englisch. Bis 2026.53 waren sie fest deutsch (Bericht A14.5).
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub fn text(de: &'static str, en: &'static str) -> &'static str {
     if englisch() { en } else { de }
 }
@@ -300,7 +300,7 @@ fn vorlage_bauen(de: &str, en: &str) -> Option<Vorlage> {
     muster.push('$');
     let anker = teile.iter().max_by_key(|t| t.len()).cloned().unwrap_or_default();
     let gewicht = teile.iter().map(|t| t.chars().count()).sum();
-    Some(Vorlage { deutsch: de.to_string(), englisch: en.to_string(),
+    Some(Vorlage { englisch: en.to_string(),
                    muster: Regex::new(&muster).ok()?, anker, gewicht })
 }
 
@@ -315,9 +315,6 @@ pub fn vorlagen() -> &'static [Vorlage] {
         v
     })
 }
-
-/// Der eingebettete Katalog als Text (fuer `dhrt pruef meldungen`).
-pub fn katalog_text() -> &'static str { KATALOG }
 
 #[cfg(test)]
 mod tests {
@@ -361,8 +358,8 @@ mod tests {
                   feststeht (eine mit festem Wert wie `CONST BREITE = 640` setzt der Compiler ein). Gib der \
                   Funktion als Parameter mit, was sie braucht.";
         assert!(uebersetzen(de).starts_with("TASK: Access to a global variable"), "{}", uebersetzen(de));
-        // Der Hinweis hinter "Unbekanntes Builtin" kommt mit seinem Punkt.
-        let de = "Unbekanntes Builtin 'BITAND' -- dhrt kennt es nicht (Tippfehler? oder veraltet/entfernt). \
+        // Der Hinweis hinter "Unbekannter Befehl" kommt mit seinem Punkt.
+        let de = "Unbekannter Befehl 'BITAND' -- dhrt kennt ihn nicht (Tippfehler? oder veraltet/entfernt). \
                   Der Aufruf schlaegt sonst erst zur Laufzeit fehl. BITAND: ist in Drachenhauch der Operator \
                   BAND: a BAND b.";
         assert!(uebersetzen(de).ends_with("BITAND: is the operator BAND in Drachenhauch: a BAND b."), "{}", uebersetzen(de));

@@ -4,7 +4,7 @@
 //! Anders als `Compiler::statischer_typ` (ein vorsichtiger Helfer fuer
 //! WARNUNGEN, der auch mal "weiss nicht" sagen darf, wo er es wuesste) ist
 //! das hier fuer den CODE gedacht: was hier steht, muss zur Laufzeit stimmen.
-//! Geprueft wird das mit `DHRT_TYPEN_PRUEFEN=1` -- dann setzt der Compiler
+//! Geprueft wird das mit `DHRT_CHECK_TYPES=1` -- dann setzt der Compiler
 //! hinter jeden getypten Ausdruck eine Probe (`TYP_PRUEFEN`), und die ganze
 //! Pruefsammlung laeuft damit.
 //!
@@ -123,7 +123,7 @@ impl fmt::Display for Typ {
 /// Argumentzahl (hier nicht in der Tabelle).
 pub fn builtin_typ(name: &str) -> Option<Typ> {
     // Ein neuer Name der Leitlinie (`namen.rs`) hat den Typ des bisherigen.
-    let name = crate::namen::bisher(name).unwrap_or(name);
+    let name = crate::namen::kanonisch(name).unwrap_or(name);
     Some(match name {
         "str$" | "str" | "chr$" | "chr" | "left$" | "left" | "right$" | "right"
         | "mid$" | "mid" | "upper$" | "upper" | "lower$" | "lower" | "trim$" | "trim" | "ltrim$" | "rtrim$"

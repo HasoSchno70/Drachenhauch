@@ -239,12 +239,12 @@ impl Gui {
         let m = self.rs_menue.as_mut().unwrap();
         let n = m.eintraege.len() as i32;
         let waehlbar = |m: &RsMenue, k: i32| m.eintraege.get(k as usize).map(|e| e.1 != 2).unwrap_or(false);
-        if g.key_pressed(KEY_DOWN) {
+        if g.key_repeat(KEY_DOWN) {
             let mut k = m.mark;
             for _ in 0..n { k = (k + 1).rem_euclid(n); if waehlbar(m, k) { break; } }
             m.mark = k;
         }
-        if g.key_pressed(KEY_UP) {
+        if g.key_repeat(KEY_UP) {
             let mut k = m.mark;
             for _ in 0..n { k = (k - 1).rem_euclid(n); if waehlbar(m, k) { break; } }
             m.mark = k;
@@ -335,9 +335,7 @@ impl Gui {
         let fg = self.th("text_fg");
         let acc = self.th("accent");
         let border = self.th("widget_border");
-        g.round_rect(x + 1, y + 3, x + b, y + h + 2, 3, (0x40i64) << 24, true);
-        g.box_fill(x, y, x + b - 1, y + h - 1, bg);
-        g.rect(x, y, x + b - 1, y + h - 1, border);
+        self.popup_kasten(g, (x, y, b, h), 1.0, bg, border);
         let th = self.ctext_height(g);
         let pad = self.sk(10);
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);

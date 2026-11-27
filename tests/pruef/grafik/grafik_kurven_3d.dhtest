@@ -206,3 +206,29 @@ BILLBOARD_PART: Breite und Hoehe des Ausschnitts muessen groesser als 0 sein
 BEZIER(0, 0, 10, 10)
 --- fehler
 BEZIER: erwartet 6 bis 8 Argumente, erhalten 4 -- Aufruf: BEZIER(
+
+=== camera3d_update nimmt den modus als wort, scroll sagt was stattdessen
+' CAMERA3D_UPDATE nahm nur Zahlen 0..4; jetzt auch das Wort, englisch oder
+' deutsch (Bericht B9.1). SCROLL tat still nichts und sagt jetzt, was
+' verschiebt (Bericht C4.1).
+IMPORT "g3d"
+SCREEN(160, 120, "t")
+CAMERA3D(6, 5, 8, 0, 0, 0, 45)
+CAMERA3D_UPDATE("orbital") : CAMERA3D_UPDATE("ego") : CAMERA3D_UPDATE("eigen") : CAMERA3D_UPDATE(1)
+PRINT "woerter ok"
+TRY
+    CAMERA3D_UPDATE("kreisel")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    SCROLL(4, 0)
+CATCH e
+    PRINT LEFT$(e, 55)
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+woerter ok
+CAMERA3D_UPDATE: unbekannter Modus 'kreisel' -- free/frei, orbital/umkreisend, first_person/ego, third_person/verfolger, custom/eigen
+SCROLL: verschiebt in Drachenhauch nichts -- jedes Bild

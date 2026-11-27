@@ -353,7 +353,7 @@ use crate::tls::Strom;
 /// bekannte Luecke.
 fn lies_antwort(s: &mut Strom) -> Result<(u16, String), String> {
     let mut text = String::new();
-    let mut code = 0u16;
+    let mut code: u16;
     loop {
         let mut zeile = Vec::new();
         loop {

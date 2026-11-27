@@ -28,7 +28,6 @@ impl Strom {
     }
 
     /// Auf TLS hochschalten (SMTP STARTTLS).
-    #[allow(dead_code)] // nur smtp
     pub fn verschluesseln(self, host: &str, fn_: &str) -> Result<Strom, String> {
         match self {
             Strom::Klar(tcp) => strom(tcp, host, None, fn_),

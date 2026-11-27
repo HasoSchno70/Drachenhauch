@@ -5,7 +5,7 @@
 '   Leertaste   eine Aufnahme von fuenf Sekunden beginnen; danach wird sie
 '               abgespielt und als stimmgeraet.wav gesichert
 '
-' Ohne Mikrofon zum Ausprobieren: DHRT_MIKROFON=datei.wav spielt eine
+' Ohne Mikrofon zum Ausprobieren: DHRT_MICROPHONE=datei.wav spielt eine
 ' WAV-Datei als Mikrofon.
 
 IMPORT "audio"
@@ -21,7 +21,7 @@ IF LEN(geraete) = 0 THEN
     WHILE NOT QUITREQUESTED()
         CLS(&H101018)
         TEXT(20, 20, "Kein Mikrofon gefunden.", &HFFFFFF)
-        TEXT(20, 50, "Zum Ausprobieren: DHRT_MIKROFON=datei.wav", &HA0A0B0)
+        TEXT(20, 50, "Zum Ausprobieren: DHRT_MICROPHONE=datei.wav", &HA0A0B0)
         FLIP()
     WEND
     END

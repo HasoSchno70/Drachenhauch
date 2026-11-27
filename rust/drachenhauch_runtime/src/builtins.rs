@@ -1,8 +1,7 @@
-//! Pure/deterministische Builtins fuer die Rust-VM (Schritt 3).
-//!
-//! Semantik 1:1 aus `drachenhauch/interpreter.py` (BUILTINS). Nicht-determi-
-//! nistische (RND/MILLIS/TIME$/…) und Grafik-Builtins sind NICHT hier --
-//! sie liefern einen klaren Fehler (Grafik = Schritt 4).
+//! Die reinen Builtins: alles, was ohne VM- und Fensterzustand auskommt
+//! (Text, Zahlen, Felder, Dateien, JSON, Zeit, Zufall ...). Was Zustand
+//! braucht, steht in den `try_*`-Familien der VM (`vm_*.rs`); die letzte
+//! Familie ruft hier herein (`Vm::familie_rufen`).
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -71,6 +70,7 @@ pub fn datei_fehler(befehl: &str, pfad: &str, e: &std::io::Error) -> String {
 /// type is unsupported" -- ohne Dateinamen, und "doesnt exist" fuehrt in
 /// die Irre (gefunden mit dem Buch "Kleine Wunder", Kapitel 23: drei kaputte
 /// Dateien in einer Diaschau gaben drei gleiche Zeilen).
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub fn bild_unlesbar(pfad: &str, befehl: &str) -> String {
     use std::io::Read;
     let laenge = std::fs::metadata(pfad).map(|m| m.len()).unwrap_or(0);
@@ -79,6 +79,7 @@ pub fn bild_unlesbar(pfad: &str, befehl: &str) -> String {
     bild_unlesbar_aus(pfad, befehl, laenge, &kopf[..n])
 }
 
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 fn bild_unlesbar_aus(pfad: &str, befehl: &str, laenge: u64, kopf: &[u8]) -> String {
     if laenge == 0 {
         return format!("{}: '{}' ist leer (0 Byte)", befehl, pfad);
@@ -732,6 +733,9 @@ pub(crate) fn str_array(v: &Value, fn_: &str) -> Result<Vec<String>, String> {
     }
 }
 
+/// `ARRAY OF STRING` aus einer Rust-Liste -- der EINE Bauer (bis 2026.53
+/// standen daneben `new_string_array` und `text_feld` mit derselben Arbeit,
+/// Bericht D3).
 pub(crate) fn new_str_array(items: Vec<String>) -> Value {
     let n = items.len() as i64;
     let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
@@ -769,6 +773,7 @@ pub fn new_geld_array(items: Vec<i64>) -> Value {
 
 /// 1D `ARRAY OF INTEGER` aus einer Zahlenliste (Gegenstueck zu new_str_array).
 /// `ARRAY OF FLOAT` aus einer Rust-Liste (Gegenstueck zu `new_int_array`).
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub fn new_float_array(items: Vec<f64>) -> Value {
     let n = items.len() as i64;
     let mut arr = DhArray::new("float".to_string(), vec![n], || Value::Float(0.0));
@@ -778,15 +783,6 @@ pub fn new_float_array(items: Vec<f64>) -> Value {
     Value::Array(Rc::new(RefCell::new(arr)))
 }
 
-/// `ARRAY OF STRING` aus einer Rust-Liste.
-pub fn new_string_array(items: Vec<String>) -> Value {
-    let n = items.len() as i64;
-    let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
-    for (i, v) in items.into_iter().enumerate() {
-        arr.cells.set(i, Value::str_rc(&v));
-    }
-    Value::Array(Rc::new(RefCell::new(arr)))
-}
 
 pub fn new_int_array(items: Vec<i64>) -> Value {
     let n = items.len() as i64;
@@ -1230,7 +1226,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         };
         // Spanne, fuer Builtins mit optionalen Argumenten.
         ($lo:expr, $hi:expr) => {
-            if a.len() < $lo || a.len() > $hi {
+            if !($lo..=$hi).contains(&a.len()) {
                 return err(format!("{}: erwartet {} bis {} Argumente, erhalten {}",
                                    name.to_uppercase(), $lo, $hi, a.len()));
             }
@@ -1249,7 +1245,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // FLT(x): Int/Float -> Float (Gegenstueck zu INT). Im Tree-Walker laengst
         // vorhanden; hier nachgezogen, damit `FLT(...)` auch nativ laeuft.
         "flt" => { arity!(1); Ok(Value::Float(need_num(&a[0], "FLT")?)) }
-        "numfmt$" | "numfmt" => {
+        "numfmt$" => {
             if a.is_empty() || a.len() > 2 {
                 return err(format!("NUMFMT$: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
             }
@@ -1493,6 +1489,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             match &a[0] {
                 Value::Str(s) => { text_anmelden(&a[0]); Ok(Value::Int(zeichen_zahl(s) as i64)) }
                 Value::Tuple(t) => Ok(Value::Int(t.len() as i64)),
+                // Die Bytes eines BUFFER, wie BUFFER_LEN (Bericht B5).
+                Value::Buffer(b) => Ok(Value::Int(b.borrow().len() as i64)),
                 Value::Array(arr) => {
                     let arr = arr.borrow();
                     Ok(Value::Int(if arr.dims.is_empty() { 0 } else { arr.dims[0] }))
@@ -1586,7 +1584,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // `&H`-Literale gibt es nur im Quelltext, nicht zur Laufzeit. Ohne
         // diese beiden kann ein Programm also weder eine Farbe aus einer
         // Einstellungsdatei lesen noch eine eingetippte uebernehmen.
-        "color_hex$" | "color_hex" => {
+        "color_hex$" => {
             arity!(1);
             let c = need_int_gerundet(&a[0], "COLOR_HEX$")?;
             let a8 = (c >> 24) & 0xFF;
@@ -1969,7 +1967,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Int(crate::rechtschreibung::system(need_str(&a[0], "SPELL_SYSTEM")?)?))
         }
         "spell_languages" => { arity!(0); Ok(new_str_array(crate::rechtschreibung::sprachen())) }
-        "spell_language$" | "spell_language" => {
+        "spell_language$" => {
             arity!(1);
             Ok(Value::str_rc(crate::rechtschreibung::sprache(need_int(&a[0], "SPELL_LANGUAGE$")?)?))
         }
@@ -2568,11 +2566,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             };
             Ok(Value::str_rc(out))
         }
-        "between$" | "between" => {
+        "between$" => {
             // BETWEEN$(text$, links$, rechts$ [, ab]) -> was zwischen dem ersten
             // `links` (ab Zeichen `ab`, 0-basiert wie MID$) und dem naechsten
             // `rechts` danach steht; "" wenn eins fehlt.
-            if a.len() < 3 || a.len() > 4 { return Err("BETWEEN$: erwartet (text$, links$, rechts$[, ab])".into()); }
+            if a.len() < 3 || a.len() > 4 { return Err(crate::vm::falsche_argumente("BETWEEN$", a.len())); }
             let s = need_str(&a[0], "BETWEEN$")?;
             let (l, r) = (need_str(&a[1], "BETWEEN$")?, need_str(&a[2], "BETWEEN$")?);
             if l.is_empty() || r.is_empty() { return Err("BETWEEN$: die Markierungen duerfen nicht leer sein".into()); }
@@ -2584,7 +2582,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 None => "",
             }))
         }
-        "replace_between$" | "replace_between" => {
+        "replace_between$" => {
             // REPLACE_BETWEEN$(text$, links$, rechts$, neu$) -> jedes Stueck
             // zwischen links und rechts ersetzt; die Markierungen bleiben.
             arity!(4);
@@ -2603,7 +2601,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             out.push_str(&s[pos..]);
             Ok(Value::str_rc(out))
         }
-        "nospaces$" | "nospaces" => {
+        "nospaces$" => {
             // NOSPACES$(s$) -> ohne jeden Leerraum (Leerzeichen, Tabulator,
             // Umbruch) -- fuer Eingaben wie "12 34 56" oder "DE89 3704 ...".
             arity!(1);
@@ -3312,7 +3310,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // Bildgroesse mal SPRITE_SET_SCALE. Bis 2026.53 ohne Skala -- ein
         // dreifach gross gezeichneter Sprite traf nur in seiner linken oberen
         // Ecke (Bericht A6.6).
-        "sprite_collides" | "sprite_collide" => {
+        "sprite_collides" => {
             arity!(2);
             let (ax, ay, aw, ah) = sprite_kasten(&spr(&a[0], "SPRITE_COLLIDES")?.borrow());
             let (bx, by, bw, bh) = sprite_kasten(&spr(&a[1], "SPRITE_COLLIDES")?.borrow());
@@ -3454,7 +3452,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let dir = std::path::Path::new(p).parent().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
             Ok(Value::str_rc(&dir))
         }
-        "realpath$" | "realpath" => {
+        "realpath$" => {
             // REALPATH$(pfad$) -> der volle, bereinigte Pfad: absolut, `.`/`..`
             // aufgeloest, Verknuepfungen verfolgt, die Schreibweise der Platte.
             // Gibt es die Datei nicht, wird nur absolut gemacht und bereinigt.
@@ -3505,20 +3503,6 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             f.borrow_mut().h = FileH::Closed;
             Ok(Value::Nil)
         }
-        "eof" => {
-            // Am Ende der Datei? READLINE liefert dort "", genau wie bei einer
-            // leeren Zeile -- ohne EOF liess sich beides nicht unterscheiden.
-            arity!(1);
-            let f = file_h(&a[0], "EOF")?;
-            let mut f = f.borrow_mut();
-            match f.leser() {
-                Some(r) => {
-                    let leer = r.fill_buf().map_err(|e| format!("EOF: {}", e))?.is_empty();
-                    Ok(Value::Bool(leer))
-                }
-                None => err("EOF: Datei wurde nicht im Lese-Modus geoeffnet"),
-            }
-        }
         "readline" => {
             arity!(1);
             let f = file_h(&a[0], "READLINE")?;
@@ -3556,7 +3540,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 return Ok(Value::str_rc(text_lesen(pfad, kod, "READALL$")?));
             }
             if a.len() > 1 {
-                return err("READALL$: die Kodierung einer offenen Datei steht schon bei OPENFILE(pfad, modus, kodierung)");
+                return err("READALL$: die Kodierung einer offenen Datei steht schon bei FILE_OPEN(pfad, modus, kodierung)");
             }
             let f = file_h(&a[0], "READALL$")?;
             let mut f = f.borrow_mut();
@@ -3576,6 +3560,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "endoffile" => {
             arity!(1);
             let f = file_h(&a[0], "ENDOFFILE")?;
+            // EOF ist derselbe Befehl (namen::GLEICH); die Meldung nennt den
+            // geschriebenen Namen (Vm::fehler_benennen).
             let mut f = f.borrow_mut();
             match f.leser() {
                 // fill_buf blockiert an einer Pipe, bis entweder Daten da sind
@@ -3584,7 +3570,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 // Schleife `WHILE NOT ENDOFFILE(f)` auch an der
                 // Standardeingabe.
                 Some(r) => Ok(Value::Bool(r.fill_buf().map_err(|e| format!("ENDOFFILE: {}", e))?.is_empty())),
-                None => err("ENDOFFILE: erwartet Lese-FILE"),
+                None => err("ENDOFFILE: Datei wurde nicht im Lese-Modus geoeffnet"),
             }
         }
         "writeline" | "write" => {
@@ -3683,11 +3669,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // von heute: eine Datei vom Juli stand im Winter eine Stunde frueh.
             Ok(Value::Int(crate::zeit::aus_unix_mit(utc, lokaler_versatz)))
         }
-        "tempdir$" | "tempdir" => {
+        "tempdir$" => {
             arity!(0);
             Ok(Value::str_rc(std::env::temp_dir().to_string_lossy()))
         }
-        "dir_user_data$" | "dir_user_data" => {
+        "dir_user_data$" => {
             // DIR_USER_DATA$(app$) -- der Ordner, in dem ein Programm die Daten
             // seines Benutzers ablegt, angelegt, wenn es ihn noch nicht gibt.
             // Ein Programm unter "Programme" darf neben sich nichts schreiben
@@ -3704,7 +3690,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             std::fs::create_dir_all(&ordner).map_err(|e| format!("DIR_USER_DATA$: {}: {}", ordner.display(), e))?;
             Ok(Value::str_rc(ordner.to_string_lossy()))
         }
-        "tempfile$" | "tempfile" => {
+        "tempfile$" => {
             // TEMPFILE$([praefix$ [, endung$]]) -- ein noch nicht vergebener
             // Name im Temp-Ordner. Die Datei wird LEER ANGELEGT: sonst
             // koennte zwischen "Name ausgedacht" und "Datei geschrieben" ein
@@ -3965,7 +3951,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let text = text_lesen(pfad, kod, "CSV_LOAD")?;
             Ok(csv_tabelle(crate::csv::lesen(&text, t)))
         }
-        "csv_format$" | "csv_format" => {
+        "csv_format$" => {
             arity!(1, 2);
             let t = crate::csv::trenner_aus(
                 if a.len() > 1 { Some(need_str(&a[1], "CSV_FORMAT$")?) } else { None },
@@ -3984,7 +3970,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             text_schreiben(pfad, &crate::csv::schreiben(&zeilen, t), kod, "CSV_SAVE", false)?;
             Ok(Value::Nil)
         }
-        "csv_row$" | "csv_row" => {
+        "csv_row$" => {
             arity!(1, 2);
             let t = crate::csv::trenner_aus(
                 if a.len() > 1 { Some(need_str(&a[1], "CSV_ROW$")?) } else { None },
@@ -3998,7 +3984,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // CRC32/HASH (weiter oben) sind zum WIEDERERKENNEN da -- sie sagen
         // "vermutlich dieselben Daten". Die hier sind fuer Faelle, in denen
         // jemand die Antwort faelschen KOENNTE: Signaturen, Tokens, Belege.
-        "sha256$" | "sha256" | "sha1$" | "sha1" | "md5$" | "md5" => {
+        "sha256$" | "sha256" | "sha1$" | "sha1" | "md5$" => {
             arity!(1);
             let anz = name.to_uppercase();
             let daten = need_daten(&a[0], &anz)?;
@@ -4011,14 +3997,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 _ => hex_string(&md5::Md5::digest(&daten)),
             }))
         }
-        "sha256_file$" | "sha256_file" | "sha1_file$" | "sha1_file" | "md5_file$" | "md5_file" => {
+        "sha256_file$" | "sha1_file$" | "md5_file$" => {
             arity!(1);
             let anz = name.to_uppercase();
             let pfad = need_str(&a[0], &anz)?;
             let algo = name.trim_end_matches('$').trim_end_matches("_file");
             Ok(Value::str_rc(datei_hash(pfad, algo, &anz)?))
         }
-        "hmac_sha256$" | "hmac_sha256" => {
+        "hmac_sha256$" => {
             // HMAC_SHA256$(schluessel, daten) -- der Standard fuer signierte
             // Web-Aufrufe (Webhooks, S3, viele APIs).
             arity!(2);
@@ -4052,7 +4038,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             for i in 0..x.len() { diff |= x[i] ^ y[i]; }
             Ok(Value::Bool(diff == 0))
         }
-        "uuid4$" | "uuid4" => {
+        "uuid4$" => {
             arity!(0);
             Ok(Value::str_rc(&uuid::Uuid::new_v4().to_string()))
         }
@@ -4162,7 +4148,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(1);
             Ok(neuer_buffer(need_str(&a[0], "BUFFER_FROM_STRING")?.as_bytes().to_vec()))
         }
-        "buffer_to_string$" | "buffer_to_string" => {
+        "buffer_to_string$" => {
             arity!(1);
             let b = buf_h(&a[0], "BUFFER_TO_STRING$")?.borrow();
             // STRENG, nicht ersetzend: bei Bytes, die kein UTF-8 sind, ist ein
@@ -4176,7 +4162,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                      enthaelt keinen Text (fuer Binaerdaten BUFFER_TO_HEX$ nehmen)", e.valid_up_to())),
             }
         }
-        "buffer_to_hex$" | "buffer_to_hex" => {
+        "buffer_to_hex$" => {
             arity!(1);
             let b = buf_h(&a[0], "BUFFER_TO_HEX$")?.borrow();
             let mut s = String::with_capacity(b.len() * 2);
@@ -4200,7 +4186,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
             Ok(neuer_buffer(out))
         }
-        "buffer_to_base64$" | "buffer_to_base64" => {
+        "buffer_to_base64$" => {
             arity!(1);
             Ok(Value::str_rc(b64_encode(&buf_h(&a[0], "BUFFER_TO_BASE64$")?.borrow())))
         }
@@ -4407,7 +4393,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // EXIT/EPRINT/SHELL brauchen VM-Zustand (Ausgabe-Puffer, Abbruch) und
         // stehen darum in vm.rs `try_os` -- hier nur die zustandsfreien.
         "argc" => { arity!(0); Ok(Value::Int(programm_args().len() as i64)) }
-        "arg$" | "arg" => {
+        "arg$" => {
             arity!(1);
             let i = need_int(&a[0], "ARG$")?;
             let args = programm_args();
@@ -4422,11 +4408,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // Bilder und Klaenge gefunden werden) -- ein relativer Pfad, den der
         // Nutzer aus SEINEM Ordner angibt, zeigte dann ins Leere. Auch
         // examples/172_filter.dh als Exe fand `daten/obst.txt` nicht.
-        "startdir$" | "startdir" => {
+        "startdir$" => {
             arity!(0);
             Ok(Value::str_rc(startort().map_err(|e| format!("STARTDIR$: {}", e))?))
         }
-        "argpath$" | "argpath" => {
+        "argpath$" => {
             arity!(1);
             let i = need_int(&a[0], "ARGPATH$")?;
             let args = programm_args();
@@ -4443,9 +4429,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // und die, in der die Laufzeit gerade spricht (`"de"`/`"en"`:
         // DHRT_LANG, sonst das System). IDE und Studio nehmen die zweite als
         // Vorgabe; ein Programm kann mit der ersten seine Texte waehlen.
-        "system_language$" | "system_language" => { arity!(0); Ok(Value::str_rc(crate::meldung::systemsprache())) }
-        "runtime_language$" | "runtime_language" => { arity!(0); Ok(Value::str_rc(crate::meldung::sprache().to_string())) }
-        "getenv$" | "getenv" => {
+        "system_language$" => { arity!(0); Ok(Value::str_rc(crate::meldung::systemsprache())) }
+        "runtime_language$" => { arity!(0); Ok(Value::str_rc(crate::meldung::sprache().to_string())) }
+        "getenv$" => {
             if a.is_empty() || a.len() > 2 { return err(format!("GETENV$: erwartet 1 bis 2 Argumente, erhalten {}", a.len())); }
             let name_ = need_str(&a[0], "GETENV$")?;
             let vorgabe = if a.len() == 2 { need_str(&a[1], "GETENV$")? } else { "" };
@@ -4469,7 +4455,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             std::env::set_var(name_, wert);
             Ok(Value::Nil)
         }
-        "cwd$" | "cwd" => {
+        "cwd$" => {
             arity!(0);
             let p = std::env::current_dir().map_err(|e| format!("CWD$: {}", e))?;
             Ok(Value::str_rc(p.to_string_lossy().into_owned()))
@@ -4480,7 +4466,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             std::env::set_current_dir(p).map_err(|e| format!("CHDIR: {} ({})", e, p))?;
             Ok(Value::Nil)
         }
-        "exepath$" | "exepath" => {
+        "exepath$" => {
             arity!(0);
             // Die Datei, die gerade LAEUFT: unter `dhrt run x.dh` die Laufzeit,
             // in einem exportierten Spiel dessen eigene Exe. Ein Programm hatte
@@ -4568,12 +4554,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Err(e) => err(format!("XML_LOAD: {}: Zeile {}: {}", pfad, e.zeile, e.was)),
             }
         }
-        "xml_escape$" | "xml_escape" => {
+        "xml_escape$" => {
             arity!(1);
             Ok(Value::str_rc(crate::xml::entity_zu(need_str(&a[0], "XML_ESCAPE$")?)))
         }
-        "xml_name$" | "xml_name" => { arity!(1); Ok(Value::str_rc(&xml_h(&a[0], "XML_NAME$")?.name)) }
-        "xml_text$" | "xml_text" => {
+        "xml_name$" => { arity!(1); Ok(Value::str_rc(&xml_h(&a[0], "XML_NAME$")?.name)) }
+        "xml_text$" => {
             arity!(1, 2);
             let k = xml_h(&a[0], "XML_TEXT$")?;
             let ziel = match a.get(1) {
@@ -4585,7 +4571,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // XML_CHILD den genauen Knoten.
             Ok(Value::str_rc(ziel.text_tief().trim()))
         }
-        "xml_attr$" | "xml_attr" => {
+        "xml_attr$" => {
             arity!(2, 3);
             let k = xml_h(&a[0], "XML_ATTR$")?;
             let name = need_str(&a[1], "XML_ATTR$")?;
@@ -4657,7 +4643,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let text = text_lesen(pfad, kod, "INI_LOAD")?;
             Ok(ini_map(crate::ini::lesen(&text)))
         }
-        "ini_text$" | "ini_text" => {
+        "ini_text$" => {
             arity!(1);
             Ok(Value::str_rc(crate::ini::schreiben(&ini_paare(&a[0], "INI_TEXT$")?)))
         }
@@ -4887,10 +4873,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "save_set_float" => { arity!(3); let k = need_str(&a[1], "SAVE_SET_FLOAT")?.to_string(); let v = Value::Float(need_num(&a[2], "SAVE_SET_FLOAT")?); save_h(&a[0], "SAVE_SET_FLOAT")?.borrow_mut().set(k, v); Ok(Value::Nil) }
         "save_set_string" => { arity!(3); let k = need_str(&a[1], "SAVE_SET_STRING")?.to_string(); let v = Value::str_rc(need_str(&a[2], "SAVE_SET_STRING")?); save_h(&a[0], "SAVE_SET_STRING")?.borrow_mut().set(k, v); Ok(Value::Nil) }
         "save_set_bool" => { arity!(3); let k = need_str(&a[1], "SAVE_SET_BOOL")?.to_string(); let v = Value::Bool(need_bool(&a[2], "SAVE_SET_BOOL")?); save_h(&a[0], "SAVE_SET_BOOL")?.borrow_mut().set(k, v); Ok(Value::Nil) }
-        "save_get_int" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_INT")?.borrow(); let k = need_str(&a[1], "SAVE_GET_INT")?; match s.get(k) { Some(Value::Int(i)) => Ok(Value::Int(*i)), Some(Value::Float(f)) if f.fract() == 0.0 => Ok(Value::Int(*f as i64)), Some(_) => err("SAVE_GET_INT: kein INTEGER"), None => err(format!("SAVE_GET_INT: Key '{}' nicht im Save", k)) } }
-        "save_get_float" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_FLOAT")?.borrow(); let k = need_str(&a[1], "SAVE_GET_FLOAT")?; match s.get(k) { Some(v) if is_num(v) => Ok(Value::Float(as_f64(v))), Some(_) => err("SAVE_GET_FLOAT: keine Zahl"), None => err(format!("SAVE_GET_FLOAT: Key '{}' nicht im Save", k)) } }
-        "save_get_string" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_STRING")?.borrow(); let k = need_str(&a[1], "SAVE_GET_STRING")?; match s.get(k) { Some(Value::Str(st)) => Ok(Value::Str(st.clone())), Some(_) => err("SAVE_GET_STRING: kein STRING"), None => err(format!("SAVE_GET_STRING: Key '{}' nicht im Save", k)) } }
-        "save_get_bool" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_BOOL")?.borrow(); let k = need_str(&a[1], "SAVE_GET_BOOL")?; match s.get(k) { Some(Value::Bool(b)) => Ok(Value::Bool(*b)), Some(_) => err("SAVE_GET_BOOL: kein BOOLEAN"), None => err(format!("SAVE_GET_BOOL: Key '{}' nicht im Save", k)) } }
+        "save_get_int" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_INT")?.borrow(); let k = need_str(&a[1], "SAVE_GET_INT")?; match s.get(k) { Some(Value::Int(i)) => Ok(Value::Int(*i)), Some(Value::Float(f)) if f.fract() == 0.0 => Ok(Value::Int(*f as i64)), Some(_) => err("SAVE_GET_INT: kein INTEGER"), None => err(format!("SAVE_GET_INT: Schluessel '{}' nicht im Save", k)) } }
+        "save_get_float" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_FLOAT")?.borrow(); let k = need_str(&a[1], "SAVE_GET_FLOAT")?; match s.get(k) { Some(v) if is_num(v) => Ok(Value::Float(as_f64(v))), Some(_) => err("SAVE_GET_FLOAT: keine Zahl"), None => err(format!("SAVE_GET_FLOAT: Schluessel '{}' nicht im Save", k)) } }
+        "save_get_string" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_STRING")?.borrow(); let k = need_str(&a[1], "SAVE_GET_STRING")?; match s.get(k) { Some(Value::Str(st)) => Ok(Value::Str(st.clone())), Some(_) => err("SAVE_GET_STRING: kein STRING"), None => err(format!("SAVE_GET_STRING: Schluessel '{}' nicht im Save", k)) } }
+        "save_get_bool" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_BOOL")?.borrow(); let k = need_str(&a[1], "SAVE_GET_BOOL")?; match s.get(k) { Some(Value::Bool(b)) => Ok(Value::Bool(*b)), Some(_) => err("SAVE_GET_BOOL: kein BOOLEAN"), None => err(format!("SAVE_GET_BOOL: Schluessel '{}' nicht im Save", k)) } }
         // Die Vorgabe hat den Typ des Getters -- bis 2026.53 pruefte das nur
         // FLOAT_OR; SAVE_GET_INT_OR(s, k, "kein int") lieferte den Text aus
         // einem INT-Getter. Dazu nannten die Meldungen "S" statt des Befehls.
@@ -4899,8 +4885,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "save_get_string_or" => { arity!(3); const F: &str = "SAVE_GET_STRING_OR"; let vorgabe = need_str(&a[2], F)?.to_string(); let s = save_h(&a[0], F)?.borrow(); match s.get(need_str(&a[1], F)?) { Some(Value::Str(st)) => Ok(Value::Str(st.clone())), _ => Ok(Value::str_rc(&vorgabe)) } }
         "save_get_bool_or" => { arity!(3); const F: &str = "SAVE_GET_BOOL_OR"; let vorgabe = need_bool(&a[2], F)?; let s = save_h(&a[0], F)?.borrow(); match s.get(need_str(&a[1], F)?) { Some(Value::Bool(b)) => Ok(Value::Bool(*b)), _ => Ok(Value::Bool(vorgabe)) } }
         "save_has" => { arity!(2); Ok(Value::Bool(save_h(&a[0], "SAVE_HAS")?.borrow().get(need_str(&a[1], "SAVE_HAS")?).is_some())) }
-        "save_delete" => { arity!(2); let k = need_str(&a[1], "SAVE_DELETE")?.to_string(); save_h(&a[0], "SAVE_DELETE")?.borrow_mut().remove(&k); Ok(Value::Nil) }
+        // TRUE, wenn es den Schluessel gab -- wie die _REMOVE-Befehle (bis
+        // 2026.53 NIL, Bericht B5).
+        "save_delete" => { arity!(2); let k = need_str(&a[1], "SAVE_DELETE")?.to_string(); Ok(Value::Bool(save_h(&a[0], "SAVE_DELETE")?.borrow_mut().remove(&k))) }
         "save_clear" => { arity!(1); save_h(&a[0], "SAVE_CLEAR")?.borrow_mut().data.clear(); Ok(Value::Nil) }
+        // Die Schluessel als Feld, sortiert -- wie MAP_KEYS und JSON_KEYS.
+        // SAVE_KEYS liefert sie als einen Text "a, b" (Bericht B5).
+        "save_get_keys" => { arity!(1); let s = save_h(&a[0], "SAVE_GET_KEYS")?.borrow(); let mut keys: Vec<String> = s.data.iter().map(|(k, _)| k.clone()).collect(); keys.sort(); Ok(new_str_array(keys)) }
         "save_keys" => { arity!(1); let s = save_h(&a[0], "SAVE_KEYS")?.borrow(); let mut keys: Vec<String> = s.data.iter().map(|(k, _)| k.clone()).collect(); keys.sort(); Ok(Value::str_rc(&keys.join(", "))) }
 
         // ===== Modul: astar =====
@@ -5138,7 +5129,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // --- Interaktion: von CHART_DRAW gefuellt, hier nur ausgelesen ---
         "chart_hover" => { arity!(1); Ok(Value::Int(chart_h(&a[0], "CHART_HOVER")?.borrow().hover as i64)) }
         "chart_hover_series" => { arity!(1); Ok(Value::Int(chart_h(&a[0], "CHART_HOVER_SERIES")?.borrow().hover_serie as i64)) }
-        "chart_hover_label$" | "chart_hover_label" => {
+        "chart_hover_label$" => {
             arity!(1);
             Ok(Value::str_rc(chart_h(&a[0], "CHART_HOVER_LABEL$")?.borrow().hover_label()))
         }
@@ -5877,7 +5868,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // Suchbeginn fuer eine Wortgrenze.
         "regex_find_pos" => {
             if a.len() < 2 || a.len() > 3 {
-                return err("REGEX_FIND_POS: erwartet (text, pattern [, ab])".to_string());
+                return err(crate::vm::falsche_argumente("REGEX_FIND_POS", a.len()));
             }
             let t = need_str(&a[0], "REGEX_FIND_POS")?;
             let re = regex_compile(need_str(&a[1], "REGEX_FIND_POS")?)?;
@@ -5901,7 +5892,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // Text als Muster, das nur sich selbst trifft -- fuer eine Suche, die
         // wahlweise woertlich oder als Ausdruck laeuft und dafuer EINEN Weg
         // nehmen will.
-        "regex_escape$" | "regex_escape" => {
+        "regex_escape$" => {
             arity!(1);
             Ok(Value::str_rc(regex::escape(need_str(&a[0], "REGEX_ESCAPE$")?)))
         }
@@ -6548,9 +6539,9 @@ fn file_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<DhFile>>, String
         // OPENFILE eins liefert. Ohne diesen Zweig stand da "WRITE erwartet
         // FILE", und die Datei war ja als FILE deklariert.
         Value::Nil => Err(format!(
-            concat!("{}: die Datei ist nicht geoeffnet -- f = OPENFILE(\"name.txt\", \"w\") ",
+            concat!("{}: die Datei ist nicht geoeffnet -- f = FILE_OPEN(\"name.txt\", \"w\") ",
                     "(\"r\" zum Lesen, \"a\" zum Anhaengen) muss davor stehen"), fn_)),
-        v => Err(format!("{}: erwartet eine Datei aus OPENFILE, erhalten {}", fn_, v.type_name())),
+        v => Err(format!("{}: erwartet eine Datei aus FILE_OPEN, erhalten {}", fn_, v.type_name())),
     }
 }
 

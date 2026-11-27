@@ -120,11 +120,11 @@ pub fn einhaengen() {
         // Zweimal eingehaengt waere der Vorgaenger der eigene Rueckruf -- eine
         // Schleife ohne Ende.
         if let Some(a) = alt {
-            if a as usize != rueckruf as usize { VORHER.store(a as usize, Ordering::SeqCst); }
+            if a as usize != rueckruf as *const () as usize { VORHER.store(a as usize, Ordering::SeqCst); }
         }
         let alt = glfwSetKeyCallback(f, Some(tasten_rueckruf));
         if let Some(a) = alt {
-            if a as usize != tasten_rueckruf as usize { T_VORHER.store(a as usize, Ordering::SeqCst); }
+            if a as usize != tasten_rueckruf as *const () as usize { T_VORHER.store(a as usize, Ordering::SeqCst); }
         }
     }
 }

@@ -27,7 +27,7 @@
 //! `PRINT h`); eine Zuweisung an INTEGER nimmt die Nummer, eine an den Typ
 //! der Art taggt eine nackte Zahl (`coerce`).
 
-use std::collections::HashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::OnceLock;
 
 /// Die Handle-Arten. Die Stelle in der Liste ist die Art im Wert (`u16`) --
@@ -71,10 +71,10 @@ pub const ROH: &[&str] = &[
 
 /// Die Tafel aller Befehle mit Handles, aus den Signaturen im Index
 /// (Schluessel klein, wie die Laufzeit Namen sieht).
-pub fn tafel() -> &'static HashMap<String, Befehl> {
-    static T: OnceLock<HashMap<String, Befehl>> = OnceLock::new();
+pub fn tafel() -> &'static FxHashMap<String, Befehl> {
+    static T: OnceLock<FxHashMap<String, Befehl>> = OnceLock::new();
     T.get_or_init(|| {
-        let mut m = HashMap::new();
+        let mut m = FxHashMap::default();
         for (name, sig, _) in crate::compiler::builtin_eintraege() {
             let b = lesen(sig);
             if b.liefert.is_some() || !b.nimmt.is_empty() {
@@ -123,9 +123,9 @@ pub fn lesen(sig: &str) -> Befehl {
     b
 }
 
-/// Die Argumente eines Befehls ohne Tags -- vorher geprueft: ein Handle an
-/// einem Parameter einer anderen Art ist ein Fehler.
-pub fn auspacken(name: &str, a: &[crate::value::Value]) -> Result<Vec<crate::value::Value>, String> {
+/// Ein Handle an einem Parameter einer anderen Art ist ein Fehler (die Arten
+/// stehen in den Signaturen des Index, `tafel`).
+pub fn arten_pruefen(name: &str, a: &[crate::value::Value]) -> Result<(), String> {
     use crate::value::Value;
     if let Some(b) = tafel().get(name) {
         for &(stelle, soll) in &b.nimmt {
@@ -134,7 +134,21 @@ pub fn auspacken(name: &str, a: &[crate::value::Value]) -> Result<Vec<crate::val
             }
         }
     }
+    Ok(())
+}
+
+/// Die Arten pruefen und die Handles zu nackten Nummern machen -- so sehen
+/// die Befehle sie.
+pub fn auspacken(name: &str, a: &[crate::value::Value]) -> Result<Vec<crate::value::Value>, String> {
+    arten_pruefen(name, a)?;
     Ok(a.iter().map(|v| v.ohne_handle()).collect())
+}
+
+/// Nimmt der Befehl Handles roh (`ROH`)? Eine Menge statt der Liste: das
+/// fragt jeder Aufruf mit Handle-Argument.
+pub fn roh(name: &str) -> bool {
+    static M: OnceLock<FxHashSet<&'static str>> = OnceLock::new();
+    M.get_or_init(|| ROH.iter().copied().collect()).contains(name)
 }
 
 /// Ein Handle an einem Parameter einer anderen Art.

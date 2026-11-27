@@ -70,8 +70,27 @@ fn sammler<R: Read + Send + 'static>(quelle: R, ziel: Arc<Mutex<String>>) {
 pub(crate) const TEST_VARIABLEN: &[&str] = &["DHRT_FRAMES", "DHRT_SCREENSHOT", "DHRT_CONTACT",
     "DHRT_CONTACT_MAX", "DHRT_CONTACT_COLS", "DHRT_CONTACT_EVERY"];
 
+/// Die Werte, mit denen DIESE Laufzeit gestartet wurde (`start_merken`).
+static START: std::sync::OnceLock<Vec<Option<std::ffi::OsString>>> = std::sync::OnceLock::new();
+
+/// Beim Start aufrufen, bevor das Programm etwas mit SETENV setzt.
+pub(crate) fn start_merken() {
+    START.get_or_init(|| TEST_VARIABLEN.iter().map(|v| std::env::var_os(v)).collect());
+}
+
+/// Nur was die Laufzeit beim Start vorfand, bleibt beim Kind weg -- was das
+/// Programm selbst gesetzt hat (`SETENV("DHRT_FRAMES", "20")` vor einem
+/// `SHELL_OUT$`, damit ein gebautes Fenster-Programm endet), gilt fuer das
+/// Kind. Bis 2026.53 nahm PROCESS_START auch das weg, und eine
+/// Zusammenlegung auf diesem Zweig nahm es kurz auch SHELL weg -- dort lief
+/// das Kind dann ewig (Studio "bauen", werkzeug_studio3.dhtest).
 pub(crate) fn test_variablen_entfernen(cmd: &mut Command) {
-    for v in TEST_VARIABLEN { cmd.env_remove(v); }
+    let start = START.get();
+    for (i, v) in TEST_VARIABLEN.iter().enumerate() {
+        let jetzt = std::env::var_os(v);
+        let geerbt = match start { Some(s) => s[i] == jetzt, None => true };
+        if geerbt { cmd.env_remove(v); }
+    }
 }
 
 /// Der Befehl fuer ein Kind: "dhrt" meint die eigene Laufzeit, die
@@ -88,11 +107,7 @@ pub(crate) fn befehl(programm: &str, args: &[String], fn_: &str) -> Result<Comma
 }
 
 impl Prozess {
-    pub fn starten(programm: &str, args: &[String]) -> Result<Prozess, String> {
-        Self::starten_mit(programm, args, &[])
-    }
-
-    /// Wie `starten`, mit zusaetzlicher Umgebung nur fuer dieses Kind.
+    /// Ein Kind mit Leitungen fuer Ein- und Ausgabe starten; `umgebung` gilt nur fuer dieses Kind.
     pub fn starten_mit(programm: &str, args: &[String], umgebung: &[(String, String)]) -> Result<Prozess, String> {
         let mut cmd = befehl(programm, args, "PROCESS_START")?;
         cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());

@@ -72,31 +72,87 @@ pub(super) fn ohne_marke(s: &str) -> (String, Option<usize>) {
     (o, stelle)
 }
 
-/// Text auf `breite` kuerzen, das "..." am Ende, in der Mitte oder vorn.
-fn kuerzen_mit(text: &str, art: u8, breite: i32, mass: &dyn Fn(&str) -> i32) -> String {
-    if art == 0 || mass(text) <= breite { return text.to_string(); }
-    let z: Vec<char> = text.chars().collect();
-    let n = z.len();
-    for weg in 1..=n {
-        let rest = n - weg;
-        let probe: String = match art {
-            3 => "...".to_string() + &z[weg..].iter().collect::<String>(),
-            2 => {
-                let vorn = rest.div_ceil(2);
-                z[..vorn].iter().collect::<String>() + "..." + &z[n - (rest - vorn)..].iter().collect::<String>()
-            }
-            _ => z[..rest].iter().collect::<String>() + "...",
-        };
-        if mass(&probe) <= breite { return probe; }
-    }
-    "...".to_string()
+/// Der EINE Erkenner fuer Mehrfachklicks in Text (Doppelklick = Wort,
+/// Dreifachklick = Zeile): ein Klick innerhalb `DBL_TIME` an hoechstens
+/// `DBL_ZEICHEN` Zeichen daneben zaehlt weiter, sonst beginnt er bei 1. Bis
+/// 2026.53 stand das Literal 0.4 dreimal neben `DBL_TIME` (Bericht A18).
+pub(super) fn klick_zaehlen(jetzt: f64, alt_zeit: f64, alt_idx: i32, idx: i32, alt_n: u8, max_n: u8) -> u8 {
+    if jetzt - alt_zeit < super::DBL_TIME && (idx - alt_idx).abs() <= super::DBL_ZEICHEN { alt_n % max_n + 1 } else { 1 }
 }
 
-/// Die Systemschriften: (Anzeigename, Pfad). `DHRT_SCHRIFT_ORDNER` legt den
+/// "Tippen springt" (Liste, Klappliste, Baum, Tabelle): was in diesem Bild
+/// getippt wurde. Zeichen aus der Tipp-Warteschlange; ist sie leer, zaehlen
+/// die Buchstaben- und Zifferntasten (die Wiedergabe einer Aufnahme fuellt
+/// nur Tasten). Bis 2026.53 stand dieser Teil viermal da (Bericht A18).
+pub(super) fn getippt(g: &mut Graphics) -> String {
+    let mut s = g.pop_text_input();
+    s.retain(|c| !c.is_control() && c != ' ');
+    if s.is_empty() && !g.key_ctrl() {
+        for c in (b'a'..=b'z').chain(b'0'..=b'9') {
+            if g.key_pressed(c as i64) { s.push(c as char); }
+        }
+    }
+    s
+}
+
+/// Das Getippte an den Puffer haengen: nach einer Sekunde Pause beginnt ein
+/// neues Wort. Liefert den Suchtext und ob nur ein Buchstabe wiederholt wurde
+/// (dann laeuft die Suche durch alle Eintraege mit diesem Anfang).
+pub(super) fn tipp_merken(puffer: &mut String, zeit: &mut f64, jetzt: f64, neu: &str) -> (String, bool) {
+    if jetzt - *zeit > 1.0 { puffer.clear(); }
+    *zeit = jetzt;
+    puffer.push_str(&neu.to_lowercase());
+    let erster = puffer.chars().next().unwrap_or(' ');
+    let wiederholt = puffer.chars().all(|c| c == erster);
+    (if wiederholt { erster.to_string() } else { puffer.clone() }, wiederholt)
+}
+
+/// Wo die Suche beginnt: ein neues Wort an der AKTUELLEN Stelle (sie passt
+/// vielleicht schon), ein wiederholter Buchstabe an der naechsten.
+pub(super) fn tipp_start(pos: Option<usize>, wiederholt: bool) -> usize {
+    match pos { Some(p) if wiederholt => p + 1, Some(p) => p, None => 0 }
+}
+
+/// Text auf `breite` kuerzen, das "..." am Ende (`art` 1), in der Mitte (2)
+/// oder vorn (3); 0 = nie kuerzen. Der EINE Weg der gui (Bericht A18): bis
+/// 2026.53 kuerzten Menue, Meldungen, Listen und Palette je auf eigene Art,
+/// mit "..." oder "…", und nur einer schuetzte vor Riesentexten.
+///
+/// Gemessen werden nie mehr Zeichen, als in die Breite passen KOENNEN (keins
+/// ist schmaler als ein Punkt) -- ein Eintrag mit einer Million Zeichen
+/// kostete sonst je Bild Messungen ueber den ganzen Text. Wie viele Zeichen
+/// bleiben, sucht eine Binaersuche. Passt nicht einmal "...", bleibt "".
+pub(super) fn kuerzen_mit(text: &str, art: u8, breite: i32, mass: &dyn Fn(&str) -> i32) -> String {
+    if art == 0 { return text.to_string(); }
+    let cap = breite.max(0) as usize + 8;
+    let z: Vec<char> = text.chars().collect();
+    let n = z.len();
+    if n <= cap && mass(text) <= breite { return text.to_string(); }
+    let probe = |k: usize| -> String {
+        match art {
+            3 => "...".to_string() + z[n - k..].iter().collect::<String>().trim_start(),
+            2 => {
+                let vorn = k.div_ceil(2);
+                z[..vorn].iter().collect::<String>() + "..." + &z[n - (k - vorn)..].iter().collect::<String>()
+            }
+            _ => z[..k].iter().collect::<String>().trim_end().to_string() + "...",
+        }
+    };
+    // Groesstes k (behaltene Zeichen) mit mass(probe(k)) <= breite.
+    if mass(&probe(0)) > breite { return String::new(); }
+    let (mut lo, mut hi) = (0usize, n.saturating_sub(1).min(cap));
+    while lo < hi {
+        let m = (lo + hi + 1) / 2;
+        if mass(&probe(m)) <= breite { lo = m; } else { hi = m - 1; }
+    }
+    probe(lo)
+}
+
+/// Die Systemschriften: (Anzeigename, Pfad). `DHRT_FONT_DIR` legt den
 /// Ordner fest (fuer Pruefungen); vorn stehen die eingebauten.
 fn systemschriften() -> Vec<(String, String)> {
     let mut ordner: Vec<std::path::PathBuf> = Vec::new();
-    if let Ok(o) = std::env::var("DHRT_SCHRIFT_ORDNER") {
+    if let Ok(o) = crate::umgebung::var("DHRT_FONT_DIR") {
         ordner.push(o.into());
     } else {
         #[cfg(windows)]
@@ -137,7 +193,7 @@ fn systemschriften() -> Vec<(String, String)> {
     gefunden.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()).then(a.1.cmp(&b.1)));
     gefunden.dedup_by(|a, b| a.0.eq_ignore_ascii_case(&b.0));
     let mut o: Vec<(String, String)> = Vec::new();
-    if std::env::var("DHRT_SCHRIFT_ORDNER").is_err() {
+    if crate::umgebung::var("DHRT_FONT_DIR").is_err() {
         for n in ["sans", "serif", "mono"] { o.push((n.to_string(), n.to_string())); }
     }
     o.extend(gefunden);
@@ -147,6 +203,59 @@ fn systemschriften() -> Vec<(String, String)> {
 const VORSCHAU_TEXT: &str = "Franz jagt im Taxi quer durch Bayern 0123";
 
 impl Gui {
+    /// Der Kasten JEDER Popup-Liste und jedes Tipps (Menue, Klappliste,
+    /// Vorschlaege, Leistenmenue, Palette, Rechtschreibung, Tooltip,
+    /// Inspektor): Schlagschatten, Grund, Rand -- mit denselben Ecken und
+    /// demselben Schatten. Bis 2026.53 neun Bauarten mit Schatten von 0x40
+    /// bis 0x60, versetzt um 1..3 Punkte, mal rund, mal eckig (Bericht A18).
+    /// `t` (0..1) blendet ein, waehrend das Popup aufgeht.
+    pub(super) fn popup_kasten(&self, g: &mut Graphics, r: (i32, i32, i32, i32), t: f64, grund: i64, rand: i64) {
+        let (x, y, w, h) = r;
+        let rad = self.m("corner_radius").min(6);
+        let schatten = ((0x50 as f64) * t.clamp(0.0, 1.0)).round().max(1.0) as i64;
+        g.round_rect(x + 2, y + 3, x + w + 1, y + h + 2, rad.max(2), schatten << 24, true);
+        g.round_rect(x, y, x + w - 1, y + h - 1, rad, grund, true);
+        g.round_rect(x, y, x + w - 1, y + h - 1, rad, rand, false);
+    }
+
+    /// Ein Radschritt in Bildpunkten fuer Inhalt, der in Punkten rollt.
+    pub(super) fn rad_schritt_px(&self) -> i32 { self.sk(super::RAD_PUNKTE) }
+
+    /// Breite eines Rollbalkens in Bildpunkten (`ROLLBALKEN_W`, skaliert).
+    pub(super) fn rollbalken_w(&self) -> i32 { self.sk(super::ROLLBALKEN_W) }
+
+    /// Die Lage eines senkrechten Rollbalkens: Rinne (x, y, Breite, Hoehe)
+    /// und Griff (y, Hoehe), am rechten Rand von `(x, y, w, h)` -- gespiegelt
+    /// (`rtl`) am linken. `sicht` von `inhalt` sichtbar, `oben` gerollt.
+    /// Der Griff ist mindestens 16 Punkte hoch (oder die ganze Rinne).
+    pub(super) fn rollbalken_lage(&self, rect: (i32, i32, i32, i32), rtl: bool, sicht: i32, inhalt: i32, oben: f64)
+        -> (i32, i32, i32, i32, i32, i32) {
+        let (x, y, w, h) = rect;
+        let bw = self.rollbalken_w();
+        let tx = if rtl { x + 1 } else { x + w - 1 - bw };
+        let (ty, th) = (y + 1, (h - 2).max(1));
+        let thh = ((th as i64 * sicht as i64 / inhalt.max(1) as i64) as i32).clamp(self.sk(16).min(th), th);
+        let max = (inhalt - sicht).max(1) as f64;
+        let thy = ty + ((th - thh) as f64 * (oben / max).clamp(0.0, 1.0)) as i32;
+        (tx, ty, bw, th, thy, thh)
+    }
+
+    /// Einen senkrechten Rollbalken zeichnen: Rinne etwas dunkler als der
+    /// Grund, Griff in der Randfarbe; `aktiv` (unter der Maus oder gezogen)
+    /// mischt die Akzentfarbe hinein -- er ist ein Bedienelement.
+    pub(super) fn rollbalken_zeichnen(&self, g: &mut Graphics, lage: (i32, i32, i32, i32, i32, i32), grund: i64, rand: i64, aktiv: bool) {
+        let (tx, ty, bw, th, thy, thh) = lage;
+        g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(grund, -10));
+        let gc = if aktiv { mischen(rand, self.th("accent"), 0.5) } else { rand };
+        g.round_rect(tx + 1, thy, tx + bw - 2, thy + thh - 1, 3, gc, true);
+    }
+
+    /// Steht die Maus auf dem Griff?
+    pub(super) fn rollbalken_unter(lage: (i32, i32, i32, i32, i32, i32), mx: i32, my: i32) -> bool {
+        let (tx, _, bw, _, thy, thh) = lage;
+        mx >= tx && mx < tx + bw && my >= thy && my < thy + thh
+    }
+
     fn bau(w: &Widget) -> Option<&Bauzusatz> { w.bau.as_deref() }
     fn bau_mut<'a>(&'a mut self, h: i64, f: &str) -> Result<&'a mut Bauzusatz, String> {
         let w = self.wdg_mut(h, f)?;
@@ -344,13 +453,12 @@ impl Gui {
         let f = "GUI_LABEL_SET";
         if self.wdg(h, f)?.kind != Kind::Label { return Err(format!("{}: das Widget ist kein GUI_LABEL", f)); }
         let z = self.bau_mut(h, f)?;
-        match key.to_lowercase().as_str() {
-            "kuerzen" | "ellipsize" => z.kuerzen = match wert.to_lowercase().as_str() {
-                "" | "0" | "aus" | "none" => 0, "1" | "ende" | "end" => 1, "mitte" | "middle" => 2, "anfang" | "start" => 3,
-                _ => return Err(format!("{}: kuerzen ist aus, ende, mitte oder anfang -- nicht '{}'", f, wert)),
+        match super::einstellungen::schluessel(f, key, super::einstellungen::LABEL)? {
+            "kuerzen" => z.kuerzen = match wert.trim().to_lowercase().as_str() {
+                "" | "0" | "aus" | "none" | "false" => 0, "1" | "ende" | "end" => 1, "2" | "mitte" | "middle" => 2, "3" | "anfang" | "start" => 3,
+                _ => return Err(format!("{}: kuerzen ist aus, ende, mitte oder anfang (0..3) -- nicht '{}'", f, wert)),
             },
-            "auswaehlbar" | "selectable" => z.auswaehlbar = !matches!(wert.trim(), "" | "0" | "false" | "FALSE"),
-            _ => return Err(format!("{}: unbekannter Schluessel '{}' -- kuerzen, auswaehlbar", f, key)),
+            _ => z.auswaehlbar = !matches!(wert.trim(), "" | "0" | "false" | "FALSE"),
         }
         Ok(())
     }
@@ -454,7 +562,7 @@ impl Gui {
                         let k = self.label_stelle(g, wi, i, mx, my);
                         let jetzt = g.uhr_jetzt();
                         let w = &mut self.windows[wi].widgets[i];
-                        let doppelt = jetzt - w.klick_zeit < 0.4 && (k - w.klick_idx).abs() <= 2;
+                        let doppelt = klick_zaehlen(jetzt, w.klick_zeit, w.klick_idx, k, 1, 2) == 2;
                         w.klick_zeit = jetzt; w.klick_idx = k;
                         if doppelt {
                             let t: Vec<char> = ohne_marke_wenn(self.mnemonics, &w.text).chars().collect();
@@ -499,18 +607,18 @@ impl Gui {
         let f = "GUI_SLIDER_SET";
         if self.wdg(h, f)?.kind != Kind::Slider { return Err(format!("{}: das Widget ist kein GUI_SLIDER", f)); }
         let z = self.bau_mut(h, f)?;
-        match key.to_lowercase().as_str() {
-            "marken" | "ticks" => {
+        match super::einstellungen::schluessel("GUI_SLIDER_SET", key, super::einstellungen::SLIDER)? {
+            "marken" => {
                 if !(wert == 0.0 || (2.0..=101.0).contains(&wert)) { return Err(format!("{}: marken ist 0 oder 2..101", f)); }
                 z.marken_n = wert as i32;
             }
-            "wert_zeigen" | "draw_value" => z.wert_zeigen = wert != 0.0,
-            "einrasten" | "snap" => z.einrasten = wert != 0.0,
-            "stellen" | "digits" => {
+            "wert_zeigen" => z.wert_zeigen = wert != 0.0,
+            "einrasten" => z.einrasten = wert != 0.0,
+            "stellen" => {
                 if !(0.0..=6.0).contains(&wert) { return Err(format!("{}: stellen ist 0..6", f)); }
                 z.stellen = wert as i32;
             }
-            _ => return Err(format!("{}: unbekannter Schluessel '{}' -- marken, wert_zeigen, einrasten, stellen", f, key)),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -596,6 +704,31 @@ impl Gui {
     pub(super) fn progress_kreis_setzen(&mut self, h: i64, an: bool) -> Result<(), String> {
         self.bau_mut(h, "GUI_PROGRESS_SET")?.kreis = an;
         Ok(())
+    }
+    /// `GUI_SLIDER_GET`, `GUI_LABEL_GET`, `GUI_PROGRESS_GET`
+    /// (`einstellungen::einstellung_get`).
+    pub(super) fn bau_einstellung(&self, art: &str, h: i64, key: &str) -> Result<f64, String> {
+        use super::einstellungen as e;
+        let b = |x: bool| if x { 1.0 } else { 0.0 };
+        let (f, tafel, kind) = match art {
+            "slider" => ("GUI_SLIDER_GET", e::SLIDER, Kind::Slider),
+            "label" => ("GUI_LABEL_GET", e::LABEL, Kind::Label),
+            _ => ("GUI_PROGRESS_GET", e::PROGRESS, Kind::Progress),
+        };
+        let k = e::schluessel(f, key, tafel)?;
+        let w = self.wdg(h, f)?;
+        if w.kind != kind { return Err(format!("{}: das Widget ist kein GUI_{}", f, art.to_uppercase())); }
+        let z = Self::bau(w);
+        Ok(match k {
+            "marken" => z.map(|z| z.marken_n).unwrap_or(0) as f64,
+            "wert_zeigen" => b(z.map(|z| z.wert_zeigen).unwrap_or(false)),
+            "einrasten" => b(z.map(|z| z.einrasten).unwrap_or(false)),
+            "stellen" => z.map(|z| z.stellen).unwrap_or(0) as f64,
+            "kuerzen" => z.map(|z| z.kuerzen).unwrap_or(0) as f64,
+            "auswaehlbar" => b(z.map(|z| z.auswaehlbar).unwrap_or(false)),
+            "unbestimmt" => b(w.unbestimmt),
+            _ => b(Self::ist_kreisel(w)),
+        })
     }
     pub(super) fn ist_kreisel(w: &Widget) -> bool { Self::bau(w).map(|z| z.kreis).unwrap_or(false) }
     /// Zwoelf Punkte im Kreis, der hellste laeuft herum (die Zeit treibt ihn).
@@ -880,5 +1013,14 @@ mod tests {
         assert_eq!(kuerzen_mit("abcdefghij", 2, 7, &m), "ab...ij");
         assert_eq!(kuerzen_mit("abc", 1, 7, &m), "abc");
         assert_eq!(kuerzen_mit("abcdefghij", 0, 3, &m), "abcdefghij");
+        // Nicht einmal "..." passt: leer. Ein Riesentext kostet nur die Breite.
+        assert_eq!(kuerzen_mit("abcdefghij", 1, 2, &m), "");
+        let gross = "x".repeat(1_000_000);
+        let zaehler = std::cell::Cell::new(0usize);
+        let mm = |s: &str| { zaehler.set(zaehler.get() + s.len()); s.chars().count() as i32 };
+        assert_eq!(kuerzen_mit(&gross, 1, 7, &mm), "xxxx...");
+        assert!(zaehler.get() < 1000, "gemessen: {}", zaehler.get());
+        // Leerraum vor dem "..." faellt weg.
+        assert_eq!(kuerzen_mit("ab   cdefgh", 1, 7, &m), "ab...");
     }
 }

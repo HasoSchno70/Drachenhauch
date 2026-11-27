@@ -18,14 +18,13 @@ Programm einstellen koennte.
 | Funktion | Wirkung |
 |---|---|
 | `AUDIO_INIT([frequency[, channels[, buffer]]])` | stellt sicher, dass das Audio-System laeuft. **Nimmt Argumente entgegen und ignoriert sie** -- sie stammen aus der Mixer-Zeit und sind nur der Vertraeglichkeit halber geduldet |
-| `AUDIO_SET_NUM_CHANNELS(n)` | Anzahl gleichzeitiger Kanaele (Vorgabe **16**, hoch fuer Bullet-Hell) |
-| `AUDIO_NUM_CHANNELS()` → INTEGER | aktuelle Channel-Anzahl |
+| `AUDIO_SET_NUM_CHANNELS(n)` | merkt sich die Zahl für `AUDIO_NUM_CHANNELS` -- **begrenzt nichts**: Kira spielt so viele Klänge gleichzeitig, wie gestartet werden (ein Rest aus der Mixer-Zeit) |
+| `AUDIO_NUM_CHANNELS()` → INTEGER | die gemerkte Zahl (Vorgabe 16) |
 | `AUDIO_BUSY_CHANNELS()` → INTEGER | wie viele Channels gerade spielen |
 
-```basic
-AUDIO_INIT(48000, 2, 256)         ' niedrige Latenz fuer Action
-AUDIO_SET_NUM_CHANNELS(32)        ' 32 Sounds gleichzeitig moeglich
-```
+Latenz und Stimmenzahl stellt ein Programm also nicht ein; `AUDIO_INIT()`
+ohne Argumente startet den Ton vorab (sonst startet ihn der erste
+Ton-Befehl).
 
 ## Sound-Playback
 
@@ -481,7 +480,7 @@ unabhaengig von den Einzel-Lautstaerken (sie multiplizieren sich im Mixer).
 | Funktion | Wirkung |
 |---|---|
 | `AUDIO_BUS_VOLUME(bus$, vol)` | Master-Lautstaerke eines Busses (0..1) |
-| `AUDIO_IS_SILENT()` | läuft der Ton stumm? Mit `DHRT_OHNE_AUDIO=1` (alter Name `DH_OHNE_AUDIO`) wird der Mix in Echtzeit gerechnet, aber nicht ausgegeben -- Positionen, Pegel und `AUDIO_SAVE_WAV` laufen wie mit Soundkarte |
+| `AUDIO_IS_SILENT()` | läuft der Ton stumm? Mit `DHRT_NO_AUDIO=1` (alte Namen `DHRT_OHNE_AUDIO`, `DH_OHNE_AUDIO`) wird der Mix in Echtzeit gerechnet, aber nicht ausgegeben -- Positionen, Pegel und `AUDIO_SAVE_WAV` laufen wie mit Soundkarte |
 | `AUDIO_BUS_GET_VOLUME(bus$)` → FLOAT | aktuelle Bus-Lautstaerke |
 
 `bus$` ist `"sfx"`, `"music"`, `"master"` oder `"speech"` (case-insensitive;

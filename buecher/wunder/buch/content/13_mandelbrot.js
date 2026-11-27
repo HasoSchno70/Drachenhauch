@@ -81,7 +81,7 @@ module.exports = (H) => [
 
   H.code(stueck("kap13/3_messen.dh", "FUNCTION mitVec2", "END FUNCTION")),
 
-  H.p("Sie ist hübscher zu lesen und liefert genau dieselben elf Millionen Schritte — aber sie braucht 3,5 Sekunden, mit Maschinencode wie ohne, mehr als hundertmal so lange wie die Rechnung mit Zahlen. Die VEC2-Rechnung läuft in der VM. Als dieses Kapitel entstand, war es noch schlimmer: Mit Maschinencode dauerte sie 7,7 Sekunden, doppelt so lange wie ohne. Der Maschinencode übersetzte die Schleife, konnte die VEC2-Rechnung darin aber nicht selbst ausführen, gab bei jedem Schritt an die VM ab und stieg danach wieder ein — das Hin und Her kostete mehr, als es sparte. Seitdem merkt dhrt nach wenigen Runden, dass eine Schleife jedes Mal aussteigt, und lässt sie in der VM. Mit DHRT_JIT_BILANZ=1 sagt es auch, welche: „Schleife an Stelle 6 in mitvec2 bleibt in der VM“. Die Regel bleibt: In die innerste Schleife eines Programms, das Millionen Schritte rechnet, gehören nur Zahlen."),
+  H.p("Sie ist hübscher zu lesen und liefert genau dieselben elf Millionen Schritte — aber sie braucht 3,5 Sekunden, mit Maschinencode wie ohne, mehr als hundertmal so lange wie die Rechnung mit Zahlen. Die VEC2-Rechnung läuft in der VM. Als dieses Kapitel entstand, war es noch schlimmer: Mit Maschinencode dauerte sie 7,7 Sekunden, doppelt so lange wie ohne. Der Maschinencode übersetzte die Schleife, konnte die VEC2-Rechnung darin aber nicht selbst ausführen, gab bei jedem Schritt an die VM ab und stieg danach wieder ein — das Hin und Her kostete mehr, als es sparte. Seitdem merkt dhrt nach wenigen Runden, dass eine Schleife jedes Mal aussteigt, und lässt sie in der VM. Mit DHRT_JIT_STATS=1 sagt es auch, welche: „Schleife an Stelle 6 in mitvec2 bleibt in der VM“. Die Regel bleibt: In die innerste Schleife eines Programms, das Millionen Schritte rechnet, gehören nur Zahlen."),
 
   H.p("Ob die Rechnung in einer eigenen Funktion steht oder mitten im Hauptprogramm, ist für den Maschinencode übrigens gleich — beides gemessen 0,03 Sekunden. Die Funktion steht da, weil sie einen Namen hat und an einer Stelle steht: Die Zoom-Fassung ändert die Rechnung nur in flucht."),
 
@@ -126,6 +126,6 @@ module.exports = (H) => [
 
   H.h2("Zum Weiterlesen"),
 
-  H.bulletRich("Handbuch, Werkzeuge → Maschinencode: ", "dhrt --jit, DHRT_JIT=aus und DHRT_JIT_BILANZ, die zeigen, was übersetzt wird und wo die VM rechnet."),
+  H.bulletRich("Handbuch, Werkzeuge → Maschinencode: ", "dhrt --jit, DHRT_JIT=aus und DHRT_JIT_STATS, die zeigen, was übersetzt wird und wo die VM rechnet."),
   H.bulletRich("Handbuch, Sprache → Schleifen: ", "DO … LOOP in allen Formen, BREAK und CONTINUE."),
 ];

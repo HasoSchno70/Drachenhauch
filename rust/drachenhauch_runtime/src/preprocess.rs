@@ -275,7 +275,7 @@ pub fn hardware_missing_msg(module: &str) -> String {
 ///    Datei danebenlegt, will genau die, und keine, die irgendwo auf dem
 ///    Rechner liegt und sich unbemerkt aendert.
 /// 1b. `pakete/` von dort nach oben (`paketpfade`, die Pakete des Projekts).
-/// 2. `DH_PATH` -- wie `PYTHONPATH`, mehrere Ordner mit dem Trenner des
+/// 2. `DHRT_PATH` -- wie `PYTHONPATH`, mehrere Ordner mit dem Trenner des
 ///    Betriebssystems (`;` unter Windows, sonst `:`). Getrennt wird mit
 ///    `std::env::split_paths`, nicht von Hand: unter Windows ist der
 ///    Doppelpunkt in `C:\lib` sonst ein Trenner.
@@ -289,7 +289,7 @@ pub fn hardware_missing_msg(module: &str) -> String {
 /// Antworten auf "wo liegt die Bibliothek" waeren schlimmer als eine, die
 /// einen Ort weniger kennt.
 /// Die `pakete/`-Ordner von der importierenden Datei aus nach oben -- der
-/// Schritt zwischen "neben der Datei" und `DH_PATH` (`dhrt paket`, siehe
+/// Schritt zwischen "neben der Datei" und `DHRT_PATH` (`dhrt paket`, siehe
 /// docs/intern/entwurf-pakete.md). Von innen nach aussen wie bei `node_modules`:
 /// braucht ein Paket selbst ein Paket, liegt es in seinem eigenen `pakete/`
 /// und wird dort zuerst gefunden, auch wenn das Projekt eine andere Fassung
@@ -300,7 +300,7 @@ pub fn paketpfade(base: &std::path::Path) -> Vec<std::path::PathBuf> {
 
 pub fn bibliothekspfade() -> Vec<std::path::PathBuf> {
     let mut raus: Vec<std::path::PathBuf> = Vec::new();
-    if let Some(p) = std::env::var_os("DH_PATH") {
+    if let Some(p) = crate::umgebung::var_os("DHRT_PATH") {
         raus.extend(std::env::split_paths(&p).filter(|p| !p.as_os_str().is_empty()));
     }
     let heim = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"));

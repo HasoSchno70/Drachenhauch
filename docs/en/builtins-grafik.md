@@ -59,7 +59,7 @@ When the `camera` module is active and `CAMERA_SET` has been called, all drawing
 | `FILE_DROPPED(i)` → STRING | path of the `i`-th of them |
 | `CLIPBOARD_GET()` → STRING | read text from the clipboard; empty if another program is holding it right now |
 | `CLIPBOARD_SET(text$)` | put text into the clipboard — an **error** if that does not succeed |
-| `CLIPBOARD_SET_IMAGE(image)` → BOOLEAN | put an `IMAGE` into the clipboard (other programs paste it as a picture) — an **error** if that does not succeed |
+| `CLIPBOARD_SET_IMAGE(image)` | put an `IMAGE` into the clipboard (other programs paste it as a picture) — an **error** if that does not succeed |
 | `CLIPBOARD_GET_IMAGE()` → INTEGER | the picture from the clipboard as a new `IMAGE`; `-1` if there is none |
 | `CLIPBOARD_HAS_IMAGE()` → BOOLEAN | is there a picture in it right now? |
 | `CLIPBOARD_SET_FILES(paths)` | put files (`ARRAY OF STRING`, relative or absolute) into the clipboard — “Paste” in Explorer/Finder copies them |
@@ -143,7 +143,7 @@ END IF
 
 Dragging out exists **only on Windows** so far (through the shell, like
 Explorer itself); on macOS and Linux it returns `""`. With
-`DHRT_ZWISCHENABLAGE=privat` (every program under `dhrt test`) pictures and
+`DHRT_CLIPBOARD=privat` (every program under `dhrt test`) pictures and
 file lists stay in the process as well.
 
 Classic game loop:
@@ -922,7 +922,7 @@ sampler would stay black.
 
 | Function | Purpose |
 |---|---|
-| `KEYPRESSED(key)` → BOOLEAN | TRUE **as long as** the key with SDL code `code` is held — every frame again. For moving/steering. |
+| `KEYPRESSED(key)` → BOOLEAN | TRUE **as long as** the key `key` (a `KEY_*` constant or a letter) is held — every frame again. For moving/steering. |
 | `KEYHIT(key)` → BOOLEAN | TRUE only in **the one frame** in which the key goes down. For shooting, jumping, toggling. |
 | | *Letters:* `KEY_A`…`KEY_Z` are the clear spelling. `ASC("s")` and `ASC("S")` both mean the same key — until 2026-08-31 the **upper-case** spelling silently hit nothing at all, which looked like a forgotten call. |
 | | *Position or label:* a key code means the **position** of the key on the US keyboard — `KEY_Z` is the key labelled Y on a German keyboard, the one labelled W on a French one. That is right for WASD. For shortcuts like Ctrl+Z write the **letter as text**: `KEYHIT("z")` means the key the Z is printed on (also for `KEYPRESSED`, `KEYRELEASED`, `KEYREPEAT`; letters, digits and the space). |
@@ -982,9 +982,9 @@ Available constants:
 | Arrows | `KEY_LEFT`, `KEY_RIGHT`, `KEY_UP`, `KEY_DOWN` |
 | Letters/digits | `KEY_A` to `KEY_Z`, `KEY_0` to `KEY_9` |
 | Function keys | `KEY_F1` to `KEY_F12` |
-| Modifiers | `KEY_LSHIFT`, `KEY_RSHIFT`, `KEY_LCTRL`, `KEY_RCTRL`, `KEY_LALT`, `KEY_RALT`, `KEY_LSUPER`, `KEY_RSUPER`, `KEY_CAPSLOCK` |
-| Navigation | `KEY_INSERT`, `KEY_DELETE`, `KEY_HOME`, `KEY_END`, `KEY_PAGEUP`, `KEY_PAGEDOWN` |
-| Numeric keypad | `KEY_KP0` to `KEY_KP9`, `KEY_KP_ENTER`, `KEY_KP_PLUS`, `KEY_KP_MINUS`, `KEY_KP_MULTIPLY`, `KEY_KP_DIVIDE`, `KEY_KP_PERIOD` |
+| Modifiers | `KEY_LSHIFT`, `KEY_RSHIFT`, `KEY_LCTRL`, `KEY_RCTRL`, `KEY_LALT`, `KEY_RALT`, `KEY_LSUPER`, `KEY_RSUPER`, `KEY_CAPSLOCK` — also `KEY_LEFT_SHIFT`, `KEY_RIGHT_SHIFT`, `KEY_LEFT_CTRL`, `KEY_RIGHT_CTRL`, `KEY_LEFT_ALT`, `KEY_RIGHT_ALT`, `KEY_LEFT_SUPER`, `KEY_RIGHT_SUPER`, `KEY_CAPS_LOCK` |
+| Navigation | `KEY_INSERT`, `KEY_DELETE`, `KEY_HOME`, `KEY_END`, `KEY_PAGEUP`/`KEY_PAGE_UP`, `KEY_PAGEDOWN`/`KEY_PAGE_DOWN`, `KEY_NUM_LOCK`, `KEY_SCROLL_LOCK`, `KEY_PRINT_SCREEN`, `KEY_PAUSE` |
+| Numeric keypad | `KEY_KP0` to `KEY_KP9` (also `KEY_KP_0` to `KEY_KP_9`), `KEY_KP_ENTER`, `KEY_KP_PLUS`, `KEY_KP_MINUS`, `KEY_KP_MULTIPLY`, `KEY_KP_DIVIDE`, `KEY_KP_PERIOD` |
 
 The numeric keypad has codes of its own — a game control may bind it
 separately from the top row of digits. Gamepad codes (`JOY_BUTTON_A`,

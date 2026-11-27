@@ -30,6 +30,7 @@ pub const EINGEBAUT: [(&str, fn() -> &'static [u8]); 13] = [
 /// Die Bytes einer eingebauten Schrift ("sans", "serif-fett", "mono", auch
 /// die alten Namen helvetica/times/courier) -- auch fuer LOADFONT: so hat ein
 /// Programm auf jedem System eine richtige Schrift, ohne einen Pfad zu raten.
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub fn eingebaute_schrift(name: &str) -> Option<&'static [u8]> {
     let n = normalisieren(name);
     EINGEBAUT.iter().find(|(k, _)| *k == n).map(|(_, f)| f())

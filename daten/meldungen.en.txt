@@ -34,7 +34,7 @@ Unbekanntes Zeichen: {}	Unknown character: {}
 '&' verbindet hier keine Texte -- das macht +: "a" + "b" (&H/&B leiten Hex-/Binaerzahlen ein)	'&' does not join strings here -- + does that: "a" + "b" (&H/&B start hex/binary numbers)
 Typ-Zeichen wie {} hinter einem Namen gibt es nicht -- den Typ sagt DIM: DIM x AS INTEGER (oder FLOAT, STRING)	There are no type characters like {} after a name -- DIM gives the type: DIM x AS INTEGER (or FLOAT, STRING)
 Den Rest einer Division liefert MOD: 7 MOD 3 (ein %-Zeichen gibt es nicht)	MOD gives the remainder of a division: 7 MOD 3 (there is no % sign)
-'#' kommt in Drachenhauch nicht vor -- Kommentare beginnen mit ' (Hochkomma), und Dateien haben keine Nummern (f = OPENFILE("name.txt", "w"))	'#' does not occur in Drachenhauch -- comments start with ' (apostrophe), and files have no numbers (f = OPENFILE("name.txt", "w"))
+'#' kommt in Drachenhauch nicht vor -- Kommentare beginnen mit ' (Hochkomma), und Dateien haben keine Nummern (f = FILE_OPEN("name.txt", "w"))	'#' does not occur in Drachenhauch -- comments start with ' (apostrophe), and files have no numbers (f = FILE_OPEN("name.txt", "w"))
 Ungleich schreibt man in Drachenhauch <> -- IF a <> b THEN	Not-equal is written <> in Drachenhauch -- IF a <> b THEN
 Verglichen wird mit EINEM =: IF a = b THEN (== gibt es nicht)	Comparison uses ONE =: IF a = b THEN (there is no ==)
 Kommentare beginnen in Drachenhauch mit ' (Hochkomma) oder REM, nicht mit //	Comments in Drachenhauch start with ' (apostrophe) or REM, not with //
@@ -57,7 +57,7 @@ TYPE ... END TYPE heisst in Drachenhauch STRUCT ... END STRUCT, die Felder mit D
 DEF FN gibt es nicht -- FUNCTION name(x AS INTEGER) AS INTEGER ... RETURN wert ... END FUNCTION	There is no DEF FN -- FUNCTION name(x AS INTEGER) AS INTEGER ... RETURN value ... END FUNCTION
 ON ERROR / ON ... GOTO gibt es nicht. Fehler faengt TRY ... CATCH meldung ... END TRY, Verzweigen nach einer Zahl SELECT CASE	There is no ON ERROR / ON ... GOTO. Errors are caught by TRY ... CATCH message ... END TRY, branching on a number is SELECT CASE
 LINE INPUT gibt es nicht -- INPUT liest schon die ganze Zeile, wenn die Variable ein STRING ist	There is no LINE INPUT -- INPUT already reads the whole line when the variable is a STRING
-OPEN ... AS #1 gibt es nicht. Dateien: f = OPENFILE("name.txt", "w") (r/w/a), WRITELINE(f, text), READLINE(f), CLOSEFILE(f) -- oder alles auf einmal mit WRITEALL/READLINES	There is no OPEN ... AS #1. Files: f = OPENFILE("name.txt", "w") (r/w/a), WRITELINE(f, text), READLINE(f), CLOSEFILE(f) -- or all at once with WRITEALL/READLINES
+OPEN ... AS #1 gibt es nicht. Dateien: f = FILE_OPEN("name.txt", "w") (r/w/a), FILE_WRITE_LINE(f, text), FILE_READ_LINE$(f), FILE_CLOSE(f) -- oder alles auf einmal mit FILE_WRITE/FILE_READ_LINES	There is no OPEN ... AS #1. Files: f = FILE_OPEN("name.txt", "w") (r/w/a), FILE_WRITE_LINE(f, text), FILE_READ_LINE$(f), FILE_CLOSE(f) -- or all at once with FILE_WRITE/FILE_READ_LINES
 END IF schreibt man in zwei Woertern	END IF is written as two words
 END WHILE (oder WEND) schreibt man in zwei Woertern	END WHILE (or WEND) is written as two words
 END SUB schreibt man in zwei Woertern	END SUB is written as two words
@@ -225,7 +225,7 @@ Modul '{}' gibt es in dieser Laufzeit nicht	Module '{}' does not exist in this r
 RETURN nur in SUB/FUNCTION	RETURN only inside SUB/FUNCTION
 SUB darf RETURN nicht mit Wert verwenden	A SUB must not use RETURN with a value
 FUNCTION braucht einen Wert bei RETURN	A FUNCTION needs a value with RETURN
-{} darf nicht innerhalb eines Unterprogramms oder Blocks stehen -- SUB, FUNCTION, CLASS, STRUCT und ENUM gehoeren auf die oberste Ebene des Programms	{} must not be inside a subroutine or block -- SUB, FUNCTION, CLASS, STRUCT and ENUM belong at the top level of the program
+{} darf nicht innerhalb eines Unterprogramms oder Blocks stehen -- SUB, FUNCTION, CLASS und STRUCT gehoeren auf die oberste Ebene des Programms	{} must not be inside a subroutine or block -- SUB, FUNCTION, CLASS and STRUCT belong at the top level of the program
 Lokale Variable '{}' verdeckt die gleichnamige Konstante -- Drachenhauch ignoriert Gross-/Kleinschreibung. Innerhalb dieser Funktion meint der Name ab hier die Variable, nicht die Konstante.	Local variable '{}' hides the constant of the same name -- Drachenhauch ignores upper/lower case. Inside this function the name means the variable from here on, not the constant.
 {} '{}' verdeckt die gleichnamige Konstante -- Drachenhauch ignoriert Gross-/Kleinschreibung. {}	{} '{}' hides the constant of the same name -- Drachenhauch ignores upper/lower case. {}
 '{}' ist als '{}' angelegt -- Gross-/Kleinschreibung zaehlt nicht, es ist derselbe Name. Bitte so schreiben wie dort.	'{}' was declared as '{}' -- upper/lower case does not matter, it is the same name. Please write it the same way as there.
@@ -293,7 +293,7 @@ Namens-Kollision: '{}' ist zugleich eine Variable und eine SUB/FUNCTION -- beim 
 {}: keine Named-Args bei variadic	{}: no named arguments with variadic parameters
 {}: BYREF-Parameter '{}' braucht ein zuweisbares Argument	{}: BYREF parameter '{}' needs an assignable argument
 {}: Named-Args nur bei SUB/FUNCTION	{}: named arguments only for SUB/FUNCTION
-Unbekanntes Builtin '{}' -- dhrt kennt es nicht (Tippfehler? oder veraltet/entfernt). Der Aufruf schlaegt sonst erst zur Laufzeit fehl.{}	Unknown builtin '{}' -- dhrt does not know it (typo? or outdated/removed). Otherwise the call only fails at run time.{}
+Unbekannter Befehl '{}' -- dhrt kennt ihn nicht (Tippfehler? oder veraltet/entfernt). Der Aufruf schlaegt sonst erst zur Laufzeit fehl.{}	Unknown command '{}' -- dhrt does not know it (typo? or outdated/removed). Otherwise the call only fails at run time.{}
 {} gehoert zum Modul '{}', aber IMPORT "{}" fehlt. Das Programm laeuft trotzdem -- dhrt kennt die Module nativ, der Preprocessor macht aus der Zeile einen Kommentar. Ohne sie ist aber `DIM x AS <Modultyp>` ein Fehler, und man sieht dem Quelltext nicht an, worauf er aufbaut.	{} belongs to the module '{}', but IMPORT "{}" is missing. The program runs anyway -- dhrt knows the modules natively, the preprocessor turns the line into a comment. Without it, however, `DIM x AS <module type>` is an error, and the source does not show what it builds on.
 BYREF-Parameter braucht eine zuweisbare Variable (Identifier, Member oder Index-Access)	A BYREF parameter needs an assignable variable (identifier, member or index access)
 CASE IS: unbekannter Operator '{}'	CASE IS: unknown operator '{}'
@@ -362,9 +362,9 @@ ist in Drachenhauch der Operator BXOR: a BXOR b	is the operator BXOR in Drachenh
 ist in Drachenhauch der Operator BNOT: BNOT a	is the operator BNOT in Drachenhauch: BNOT a
 gibt es als Befehl nicht -- Tabulator: CHR$(9), feste Breite: PADR$(text, n)	does not exist as a command -- tab: CHR$(9), fixed width: PADR$(text, n)
 eine Farbe ist ein Argument jedes Zeichenbefehls: BOX(x1, y1, x2, y2, RED), TEXT(x, y, text$, YELLOW)	a color is an argument of every drawing command: BOX(x1, y1, x2, y2, RED), TEXT(x, y, text$, YELLOW)
-gehalten: KEYPRESSED(KEY_A), gerade gedrueckt: KEYHIT(KEY_A)	held: KEYPRESSED(KEY_A), just pressed: KEYHIT(KEY_A)
+gehalten: KEY_DOWN(KEY_A), gerade gedrueckt: KEY_HIT(KEY_A)	held: KEY_DOWN(KEY_A), just pressed: KEY_HIT(KEY_A)
 Text an eine Stelle: TEXT(x, y, text$) im Fenster	text at a position: TEXT(x, y, text$) in the window
-ein Teil einer Zeit kommt aus ZEIT_TEIL(zeit, "jahr") -- oder ZEIT_FORMAT$(zeit, muster$)	a part of a time comes from ZEIT_TEIL(time, "jahr") -- or ZEIT_FORMAT$(time, pattern$)
+ein Teil einer Zeit kommt aus TIME_PART(zeit, "year") -- oder TIME_FORMAT$(zeit, muster$)	a part of a time comes from TIME_PART(time, "year") -- or TIME_FORMAT$(time, pattern$)
 das Programm beenden: END (allein auf der Zeile) oder EXIT(0)	end the program: END (alone on the line) or EXIT(0)
 Kommazahlen heissen in Drachenhauch FLOAT (immer 64 Bit)	decimal numbers are called FLOAT in Drachenhauch (always 64 bits)
 ganze Zahlen heissen in Drachenhauch INTEGER (immer 64 Bit)	whole numbers are called INTEGER in Drachenhauch (always 64 bits)
@@ -401,6 +401,7 @@ Default-Parameter	default parameter
 Ganzzahl-Ueberlauf bei '{}' (INTEGER ist 64-bit; Wertebereich ueberschritten)	Integer overflow in '{}' (INTEGER is 64-bit; range exceeded)
 Division durch 0	Division by zero
 Integer-Division durch 0	Integer division by zero
+MOD durch 0	MOD by zero
 Operator '{}' erwartet Zahlen, erhalten {} / {}	Operator '{}' expects numbers, got {} / {}
 Operator '{}': '{}' ist eine FUNCTION ohne Klammern, also nur ihr Name -- aufrufen mit {}()	Operator '{}': '{}' is a FUNCTION without parentheses, so only its name -- call it with {}()
 \ erwartet INTEGER, erhalten {} / {}	\ expects INTEGER, got {} / {}
@@ -450,7 +451,7 @@ Zuweisung an '.{}' bei nicht-Objekt ({})	Assignment to '.{}' on a non-object ({}
 {}: einen Auftrag {} gibt es nicht -- nie gestartet, schon abgeholt oder abgebrochen	{}: there is no task {} -- never started, already collected or cancelled
 GFX_PUSH: mehr als 64 Ebenen -- fehlt ein GFX_POP?	GFX_PUSH: more than 64 levels -- is a GFX_POP missing?
 AUDIO_PUSH: mehr als 64 Ebenen -- fehlt ein AUDIO_POP?	AUDIO_PUSH: more than 64 levels -- is an AUDIO_POP missing?
-{}: Klang wurde freigegeben (UNLOADSOUND)	{}: the sound has been freed (UNLOADSOUND)
+{}: Klang wurde freigegeben (SOUND_FREE)	{}: the sound has been freed (SOUND_FREE)
 {}: einen Koerper {} gibt es nicht -- nie angelegt oder mit PHYS2D_REMOVE entfernt (PHYS2D_BODY_EXISTS fragt danach)	{}: there is no body {} -- never created or removed with PHYS2D_REMOVE (PHYS2D_BODY_EXISTS asks)
 {}: ein Koerper kann nicht mit sich selbst verbunden werden ({})	{}: a body cannot be joined to itself ({})
 {}: die Laenge muss 0 oder mehr sein, nicht {}	{}: the length must be 0 or more, not {}
@@ -589,7 +590,6 @@ TASK_START: dieses Lambda traegt Werte aus seiner Umgebung mit, und ein Auftrag 
 {} erwartet SAVE_HANDLE (aus SAVE_NEW/SAVE_LOAD)	{} expects a SAVE_HANDLE (from SAVE_NEW/SAVE_LOAD)
 {} erwartet ein XML_HANDLE (aus XML_PARSE/XML_LOAD/XML_FIND)	{} expects an XML_HANDLE (from XML_PARSE/XML_LOAD/XML_FIND)
 {} erwartet eine MAP (INI ist eine MAP OF STRING mit Punkt-Schluesseln)	{} expects a MAP (INI is a MAP OF STRING with dotted keys)
-{} erwartet Lese-FILE	{} expects a FILE opened for reading
 {} erwartet Zahl	{} expects a number
 {} erwartet Zahlen	{} expects numbers
 {} erwartet zwei ARRAYs	{} expects two ARRAYs
@@ -604,7 +604,7 @@ TASK_START: dieses Lambda traegt Werte aus seiner Umgebung mit, und ein Auftrag 
 {}: erwartet ein ARRAY OF STRING	{}: expected an ARRAY OF STRING
 {}: erwartet STRING oder BUFFER, erhalten {}	{}: expected STRING or BUFFER, got {}
 {}: erwartet BOOLEAN als 3. Argument	{}: expected BOOLEAN as the 3rd argument
-{}: erwartet eine Datei aus OPENFILE, erhalten {}	{}: expected a file from OPENFILE, got {}
+{}: erwartet eine Datei aus FILE_OPEN, erhalten {}	{}: expected a file from FILE_OPEN, got {}
 {}: erwartet eine MAP OF INTEGER als Menge	{}: expected a MAP OF INTEGER as a set
 {}: Arg {} muss Zahl sein	{}: argument {} must be a number
 {}: Argument muss INTEGER sein	{}: the argument must be INTEGER
@@ -632,8 +632,6 @@ TASK_START: dieses Lambda traegt Werte aus seiner Umgebung mit, und ein Auftrag 
 {}: erwartet {} oder {} Argumente	{}: expected {} or {} arguments
 {}: erwartet {} Argumente, bekam {}	{}: expected {} arguments, got {}
 {}: erwartet {} bis {} Argumente	{}: expected {} to {} arguments
-{}: erwartet (text$, links$, rechts$[, ab])	{}: expected (text$, left$, right$[, from])
-{}: erwartet (text, pattern [, ab])	{}: expected (text, pattern [, from])
 {}: erwartet 3 Zahlen (r, g, b){}	{}: expected 3 numbers (r, g, b){}
 # ---------------------------------------------------------------- Felder, Maps, Mengen
 {}: nur 1D-Arrays	{}: only 1D arrays
@@ -700,7 +698,7 @@ Ungueltige Regex '{}': {}	Invalid regex '{}': {}
 {}: Datei ist geschlossen	{}: the file is closed
 {}: Datei wurde nicht im Lese-Modus geoeffnet	{}: the file was not opened for reading
 {}: Datei wurde nicht im Schreib-Modus geoeffnet	{}: the file was not opened for writing
-{}: die Datei ist nicht geoeffnet -- f = OPENFILE("name.txt", "w")	{}: the file is not open -- f = OPENFILE("name.txt", "w")
+{}: die Datei ist nicht geoeffnet -- f = FILE_OPEN("name.txt", "w")	{}: the file is not open -- f = FILE_OPEN("name.txt", "w")
 {}: ungueltiger Modus '{}' (erlaubt: r, w, a)	{}: invalid mode '{}' (allowed: r, w, a)
 {}: die Standardeingabe kennt keine Position	{}: standard input has no position
 {}: die Standardeingabe laesst sich nicht zurueckspulen -- was gelesen ist, ist gelesen	{}: standard input cannot be rewound -- what has been read is read
@@ -735,7 +733,7 @@ Ungueltige Regex '{}': {}	Invalid regex '{}': {}
 {}: leerer Pfad -- das Dokument selbst laesst sich nicht ersetzen	{}: empty path -- the document itself cannot be replaced
 {}: '{}' gibt es unter <{}> nicht -- mit XML_HAS vorher fragen	{}: '{}' does not exist under <{}> -- ask first with XML_HAS
 {}: '{}' gibt es {}-mal, gefragt war Nummer {}	{}: '{}' exists {} time(s), number {} was asked for
-{}: Key '{}' nicht im Save	{}: key '{}' is not in the save
+{}: Schluessel '{}' nicht im Save	{}: key '{}' is not in the save
 {}: Save-Datei muss ein JSON-Objekt sein	{}: the save file must be a JSON object
 {}: '{}' ist {}	{}: '{}' is {}
 # ---------------------------------------------------------------- Spiele-Module (Tiled, Sprites, Raster, Physik)
@@ -781,9 +779,6 @@ Ungueltige Regex '{}': {}	Invalid regex '{}': {}
 {}: dauer_ms muss > 0 sein	{}: dauer_ms must be > 0
 # ---------------------------------------------------------------- Laufzeit: allgemeine Formen
 # Die Parameterliste in der Klammer bleibt, wie sie in der Signatur steht.
-{}: erwartet ({}), erhalten {} Argumente	{}: expected ({}), got {} arguments
-{}: erwartet ({})	{}: expected ({})
-{}: erwartet ({}), optional dahinter ({}) und eine Faerbung	{}: expected ({}), optionally followed by ({}) and a tint
 {}: erwartet {} Argumente ({}), erhalten {}	{}: expected {} arguments ({}), got {}
 {}: erwartet {} Argumente ({})	{}: expected {} arguments ({})
 {}: erwartet 0 Argumente	{}: expected 0 arguments
@@ -814,7 +809,7 @@ das Widget oder Fenster gibt es noch nicht (ein Fenster aus dem Studio legt sein
 {}: erwartet Text oder Zahl, erhalten {}	{}: expected text or a number, got {}
 {}: erwartet eine MAP mit den Werten	{}: expected a MAP with the values
 {}: erwartet genau ein Zeichen, nicht "{}"	{}: expected exactly one character, not "{}"
-{}: erwartet GELD, erhalten {} -- mit GELD_NEU() einen Betrag daraus machen	{}: expected GELD, got {} -- turn it into an amount with GELD_NEU()
+{}: erwartet GELD, erhalten {} -- mit MONEY_NEW() einen Betrag daraus machen	{}: expected GELD, got {} -- turn it into an amount with MONEY_NEW()
 {}: erwartet die Programmdatei, z.B. WINDOW_OPEN("palette.dh")	{}: expected the program file, e.g. WINDOW_OPEN("palette.dh")
 {}: erwartet eine Funktion als erstes Argument, bekommen {}. Schreib den Namen ohne Klammern: TASK_START(Rechne, 42)	{}: expected a function as the first argument, got {}. Write the name without parentheses: TASK_START(Calc, 42)
 {}: erwartet eine Funktion, z.B. TASK_START(Rechne, 42)	{}: expected a function, e.g. TASK_START(Calc, 42)
@@ -954,7 +949,7 @@ GUI_FORM_VERSION: '{}' ist an ein Widget gebunden -- die Versionsspalte fuehrt d
 {}: Seite {} gibt es nicht (1..{})	{}: page {} does not exist (1..{})
 {}: 0 bis 4 Nachkommastellen (mehr haelt ein Betrag nicht)	{}: 0 to 4 decimal places (an amount holds no more)
 {}: Betrag zu gross	{}: amount too large
-{} : GELD und eine gewoehnliche Zahl mischen sich nicht -- genau dafuer gibt es den Typ. Entweder GELD_NEU(zahl) daraus machen oder mit GELD_ZAHL(betrag) bewusst herausgehen.	{} : GELD and an ordinary number do not mix -- that is exactly what the type is for. Either make one with GELD_NEU(number) or deliberately leave with GELD_ZAHL(amount).
+{} : GELD und eine gewoehnliche Zahl mischen sich nicht -- genau dafuer gibt es den Typ. Entweder MONEY_NEW(zahl) daraus machen oder mit GELD_ZAHL(betrag) bewusst herausgehen.	{} : GELD and an ordinary number do not mix -- that is exactly what the type is for. Either make one with MONEY_NEW(number) or deliberately leave with GELD_ZAHL(amount).
 * : GELD mal GELD ergibt keinen Betrag (Euro mal Euro waeren Quadrat-Euro). Mit einer Zahl multiplizieren.	* : GELD times GELD is not an amount (euro times euro would be square euros). Multiply by a number.
 / : Zahl durch GELD ergibt keinen Betrag	/ : a number divided by GELD is not an amount
 + : inkompatible Vektor-Operanden (gleicher Vektor-Typ erwartet)	+ : incompatible vector operands (same vector type expected)
@@ -992,9 +987,9 @@ Unbekannte Funktion: {}	unknown function: {}
 Unbekannter Typ: {}	unknown type: {}
 {}: kein COMP_MARKER	{}: not a COMP_MARKER
 {}: interner Fehler -- Typname fehlt	{}: internal error -- type name missing
-Opcode {} im Rust-VM noch nicht implementiert (ip={})	opcode {} is not implemented in the VM (ip={})
+interner Fehler der Laufzeit: Befehl {} an Stelle {} unbekannt -- bitte als Fehler in dhrt melden (passt die .dhc zur Laufzeit?)	internal runtime error: instruction {} at position {} unknown -- please report it as a bug in dhrt (does the .dhc match the runtime?)
 dhrt: Maschinencode nicht moeglich -- {}	dhrt: machine code not possible -- {}
-Typpruefung (DHRT_TYPEN_PRUEFEN): der Compiler sagt {}, der Wert ist {} ({}) -- ein Fehler in compiler.rs typ_von	type check (DHRT_TYPEN_PRUEFEN): the compiler says {}, the value is {} ({}) -- a bug in compiler.rs typ_von
+Typpruefung (DHRT_CHECK_TYPES): der Compiler sagt {}, der Wert ist {} ({}) -- ein Fehler in compiler.rs typ_von	type check (DHRT_CHECK_TYPES): the compiler says {}, the value is {} ({}) -- a bug in compiler.rs typ_von
 # ---------------------------------------------------------------- Debugger
 eval: '{}' nicht gefunden	eval: '{}' not found
 eval: Ausdruck nicht unterstuetzt (nur Namen, Literale, Operatoren, Felder und Indizes -- keine Aufrufe)	eval: expression not supported (only names, literals, operators, fields and indexes -- no calls)
@@ -1050,7 +1045,7 @@ CHART_SET: {} erwartet {}, nicht '{}'	CHART_SET: {} expects {}, not '{}'
 # ---------------------------------------------------------------- Dateien, Kodierung, ZIP, XML, Excel, CSV
 {}: Kodierung '{}' kenne ich nicht -- moeglich sind: {}	{}: unknown encoding '{}' -- possible are: {}
 {}: {}Zeile {} ist kein UTF-8 (Byte 0x{}, Zeichen {} der Zeile). Kommt die Datei aus Excel oder einem alten Windows-Programm, ist sie meist cp1252 -- dann als letztes Argument "cp1252" mitgeben. Moeglich sind: {}	{}: {}line {} is not UTF-8 (byte 0x{}, character {} of the line). If the file comes from Excel or an old Windows program, it is usually cp1252 -- then pass "cp1252" as the last argument. Possible are: {}
-READALL$: die Kodierung einer offenen Datei steht schon bei OPENFILE(pfad, modus, kodierung)	READALL$: the encoding of an open file is already given at OPENFILE(pfad, modus, kodierung)
+READALL$: die Kodierung einer offenen Datei steht schon bei FILE_OPEN(pfad, modus, kodierung)	READALL$: the encoding of an open file is already given at FILE_OPEN(path, mode, encoding)
 {}: das Zeichen '{}' (U+{}) gibt es in {} nicht -- die Datei in utf8 schreiben oder das Zeichen ersetzen	{}: the character '{}' (U+{}) does not exist in {} -- write the file in utf8 or replace the character
 {}: das Trennzeichen muss genau ein Zeichen sein (bekommen: {})	{}: the separator must be exactly one character (got: {})
 {}: kein lesbares ZIP: {}	{}: not a readable ZIP: {}
@@ -1198,8 +1193,8 @@ OpenAL: kein Kontext	OpenAL: no context
 # ---------------------------------------------------------------- Nachtraege aus der Messung
 Unbekannter Typ '{}' -- {}	Unknown type '{}' -- {}
 (oder FLOAT, STRING, BOOLEAN)	(or FLOAT, STRING, BOOLEAN)
-mit GELD_NEU({}) einen Betrag daraus machen	turn it into an amount with GELD_NEU({})
-{}: die Datei ist nicht geoeffnet -- f = OPENFILE("name.txt", "w") [[]]("r" zum Lesen, "a" zum Anhaengen) muss davor stehen	{}: the file is not open -- f = OPENFILE("name.txt", "w") ("r" to read, "a" to append) must come first
+mit MONEY_NEW({}) einen Betrag daraus machen	turn it into an amount with MONEY_NEW({})
+{}: die Datei ist nicht geoeffnet -- f = FILE_OPEN("name.txt", "w") [[]]("r" zum Lesen, "a" zum Anhaengen) muss davor stehen	{}: the file is not open -- f = FILE_OPEN("name.txt", "w") ("r" to read, "a" to append) must come first
 Zeile {}: {}	line {}: {}
 </{}> schliesst <{}> -- die Namen muessen zusammenpassen	</{}> closes <{}> -- the names must match
 {}: Groesse {} ueberschreitet die Obergrenze von {} Bytes	{}: size {} exceeds the limit of {} bytes
@@ -1358,9 +1353,7 @@ GUI_ANSWER: das Fenster ist kein Dialog (GUI_DIALOG/GUI_PROMPT)	GUI_ANSWER: the 
 GUI_PICKED_COLOR: das Widget ist kein GUI_COLORPICKER	GUI_PICKED_COLOR: the widget is not a GUI_COLORPICKER
 GUI_SET_PICKED_COLOR: das Widget ist kein GUI_COLORPICKER	GUI_SET_PICKED_COLOR: the widget is not a GUI_COLORPICKER
 GUI_COLORPICKER_SET: das Widget ist kein GUI_COLORPICKER	GUI_COLORPICKER_SET: the widget is not a GUI_COLORPICKER
-GUI_COLORPICKER_SET: '{}' unbekannt -- moeglich ist alpha	GUI_COLORPICKER_SET: '{}' unknown -- possible is alpha
 GUI_DATEPICKER_SET: das Widget ist kein GUI_DATEPICKER	GUI_DATEPICKER_SET: the widget is not a GUI_DATEPICKER
-GUI_DATEPICKER_SET: '{}' unbekannt -- moeglich ist wochenbeginn	GUI_DATEPICKER_SET: '{}' unknown -- possible is wochenbeginn
 GUI_DATE_RANGE: {} '{}' ist kein Datum -- erwartet JJJJ-MM-TT	GUI_DATE_RANGE: {} '{}' is not a date -- expected YYYY-MM-DD
 GUI_DATE_RANGE: das Widget ist kein GUI_DATEPICKER	GUI_DATE_RANGE: the widget is not a GUI_DATEPICKER
 GUI_DATE: das Widget ist kein GUI_DATEPICKER	GUI_DATE: the widget is not a GUI_DATEPICKER
@@ -1399,7 +1392,6 @@ GUI_SPLITTER: orientation muss "v"/"vertical" oder "h"/"horizontal" sein	GUI_SPL
 {}: Eintrag {} gibt es nicht ({} Eintraege)	{}: there is no entry {} ({} entries)
 GUI_TOOLBAR_CHECKABLE: Eintrag {} ist kein Knopf	GUI_TOOLBAR_CHECKABLE: entry {} is not a button
 GUI_TOOLBAR_SET_CHECKED: Eintrag {} ist nicht kippbar (erst GUI_TOOLBAR_CHECKABLE)	GUI_TOOLBAR_SET_CHECKED: entry {} cannot be toggled (call GUI_TOOLBAR_CHECKABLE first)
-GUI_TOOLBAR_SET: unbekannte Einstellung '{}' -- bekannt sind: beschriftung, symbolgroesse	GUI_TOOLBAR_SET: unknown setting '{}' -- known are: beschriftung, symbolgroesse
 GUI_TOOLBAR_ITEM_X: Eintrag {} gibt es nicht	GUI_TOOLBAR_ITEM_X: there is no entry {}
 GUI_TOOLBAR_ITEM_X: Eintrag {} steht im Ueberlauf (>>), die Leiste ist zu schmal fuer ihn -- GUI_TOOLBAR_OVERFLOW sagt, wie viele dort stehen	GUI_TOOLBAR_ITEM_X: entry {} is in the overflow (>>), the toolbar is too narrow for it -- GUI_TOOLBAR_OVERFLOW tells how many are there
 {}: Feld {} gibt es nicht ({} Felder)	{}: there is no field {} ({} fields)
@@ -1422,22 +1414,18 @@ GUI_TABLE_CELL_KIND: '{}' unbekannt -- text, bild, haken, balken, knopf	GUI_TABL
 GUI_TABLE_COL_ALIGN: '{}' unbekannt -- links, mitte oder rechts	GUI_TABLE_COL_ALIGN: '{}' unknown -- links, mitte or rechts
 GUI_TABLE_COL_ALIGN: Spalte darf nicht negativ sein	GUI_TABLE_COL_ALIGN: column must not be negative
 GUI_TABLE_REMOVE_ROW: Zeile {} gibt es nicht (0..{})	GUI_TABLE_REMOVE_ROW: there is no row {} (0..{})
-GUI_TABLE_SET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, zellmodus, zeilen_anhaengen	GUI_TABLE_SET: '{}' unknown -- zeilenhoehe, kopfhoehe, zebra, gitter, filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, zellmodus, zeilen_anhaengen
 {}: Zelle ({}, {}) gibt es nicht -- {} Zeilen, {} Spalten	{}: there is no cell ({}, {}) -- {} rows, {} columns
 GUI_TABLE_COL_TYPE: '{}' unbekannt -- text, ganz, zahl, auswahl	GUI_TABLE_COL_TYPE: '{}' unknown -- text, ganz, zahl, auswahl
-GUI_TABLE_GET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, zellmodus, zeilen_anhaengen, spalten	GUI_TABLE_GET: '{}' unknown -- zeilenhoehe, kopfhoehe, zebra, gitter, filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, zellmodus, zeilen_anhaengen, spalten
 GUI_TABLE_MOVE_COL: Position ausserhalb 0..{}	GUI_TABLE_MOVE_COL: position outside 0..{}
 GUI_TABLE_SELECT: Zeile {} gibt es nicht (0..{})	GUI_TABLE_SELECT: there is no row {} (0..{})
 GUI_TABLE_COL_EDIT: Spalte darf nicht negativ sein	GUI_TABLE_COL_EDIT: column must not be negative
 GUI_TABLE_FILTER: Spalte darf nicht negativ sein	GUI_TABLE_FILTER: column must not be negative
 GUI_TREE_ADD: ungueltiger parent {}	GUI_TREE_ADD: invalid parent {}
-GUI_TREE_SET: unbekannte Einstellung '{}' (gueltig: mehrfachauswahl, kaestchen, bearbeitbar)	GUI_TREE_SET: unknown setting '{}' (valid: mehrfachauswahl, kaestchen, bearbeitbar)
 GUI_TREE_SELECT: ungueltige Knoten-id {}	GUI_TREE_SELECT: invalid node id {}
 GUI_TREE_LABEL: ungueltige Knoten-id {}	GUI_TREE_LABEL: invalid node id {}
 GUI_TREE_EXPAND: ungueltige Knoten-id {}	GUI_TREE_EXPAND: invalid node id {}
 GUI_TREE_CHECKED: ungueltige Knoten-id {}	GUI_TREE_CHECKED: invalid node id {}
 GUI_TREE_SET_CHECKED: ungueltige Knoten-id {}	GUI_TREE_SET_CHECKED: invalid node id {}
-GUI_FILETREE_SET: unbekannte Einstellung '{}' (gueltig: ordner_zuerst, verborgene, nur_ordner, nach_art, klick_klappt, mehrfachauswahl, kaestchen, auffrischen)	GUI_FILETREE_SET: unknown setting '{}' (valid: ordner_zuerst, verborgene, nur_ordner, nach_art, klick_klappt, mehrfachauswahl, kaestchen, auffrischen)
 GUI_TABCONTROL_SET_PAGE: Seite {} gibt es nicht	GUI_TABCONTROL_SET_PAGE: there is no page {}
 GUI_TABCONTROL_SET_TITLE: Seite {} gibt es nicht	GUI_TABCONTROL_SET_TITLE: there is no page {}
 GUI_TABCONTROL_ADD_WIDGET: das Reiterwerk kann nicht sein eigenes Kind sein	GUI_TABCONTROL_ADD_WIDGET: the tab control cannot be its own child
@@ -1446,18 +1434,14 @@ GUI_TABCONTROL_REMOVE: Seite {} gibt es nicht	GUI_TABCONTROL_REMOVE: there is no
 {}: Abschnitt {} gibt es nicht (erst GUI_ACCORDION_ADD)	{}: there is no section {} (call GUI_ACCORDION_ADD first)
 {}: das Akkordeon kann nicht sein eigenes Kind sein	{}: the accordion cannot be its own child
 {}: das Kind muss NACH dem Akkordeon angelegt sein, sonst zeichnet es darunter	{}: the child must be created AFTER the accordion, otherwise it is drawn underneath
-GUI_ACCORDION_SET: unbekannter Schluessel '{}' (erlaubt: mehrere)	GUI_ACCORDION_SET: unknown key '{}' (allowed: mehrere)
 GUI_WIZARD_SET_STEP: Schritt {} gibt es nicht	GUI_WIZARD_SET_STEP: there is no step {}
 {}: der Assistent kann nicht sein eigenes Kind sein	{}: the wizard cannot be its own child
 {}: Schritt {} gibt es nicht (erst GUI_WIZARD_ADD)	{}: there is no step {} (call GUI_WIZARD_ADD first)
-GUI_WIZARD_SET: unbekannter Schluessel '{}' (erlaubt: pruefen)	GUI_WIZARD_SET: unknown key '{}' (allowed: pruefen)
 {}: Tabelle ist kein Baum (GUI_TREETABLE oder GUI_TABLE_SET(t, "baum", 1))	{}: the table is not a tree (GUI_TREETABLE or GUI_TABLE_SET(t, "baum", 1))
 {}: Zeile {} gibt es nicht	{}: there is no row {}
 {}: Zeile {} kann nicht unter sich selbst oder ihren Nachkommen haengen	{}: row {} cannot hang under itself or its descendants
 GUI_SET_TIME: '{}' ist keine Uhrzeit (HH:MM oder HH:MM:SS)	GUI_SET_TIME: '{}' is not a time of day (HH:MM or HH:MM:SS)
 GUI_SET_TIME: '{}' liegt ausserhalb von 00:00:00 bis 23:59:59	GUI_SET_TIME: '{}' is outside 00:00:00 to 23:59:59
-GUI_TIMEPICKER_SET: unbekannte Einstellung '{}' (gueltig: sekunden, schritt)	GUI_TIMEPICKER_SET: unknown setting '{}' (valid: sekunden, schritt)
-GUI_RICHTEXT_SET: unbekannte Einstellung '{}' (gueltig: groesse, codeschrift, {})	GUI_RICHTEXT_SET: unknown setting '{}' (valid: groesse, codeschrift, {})
 {}: erwartet GUI_MENU/GUI_CONTEXT	{}: expects GUI_MENU/GUI_CONTEXT
 {}: ungueltiges Menue-Handle	{}: invalid menu handle
 {}: erwartet einen Menue-Eintrag (von GUI_MENU_ITEM)	{}: expects a menu item (from GUI_MENU_ITEM)
@@ -1506,7 +1490,6 @@ GUI_CONTEXT_WIDGET: erwartet ein Menue aus GUI_CONTEXT	GUI_CONTEXT_WIDGET: expec
 GUI_TEXTAREA_PAIRS: erwartet je zwei Zeichen, oeffnend und schliessend (z. B. "()[]")	GUI_TEXTAREA_PAIRS: expects two characters each, opening and closing (e.g. "()[]")
 GUI_TEXTAREA_SHARE: ein Textbereich kann keine Ansicht auf sich selbst sein	GUI_TEXTAREA_SHARE: a text area cannot be a view of itself
 GUI_TEXTAREA_SHARE: `von` ist selbst eine Ansicht -- nimm dessen Besitzer	GUI_TEXTAREA_SHARE: `von` is itself a view -- take its owner
-GUI_DROPDOWN_SET: unbekannter Schluessel '{}' (bekannt: bearbeitbar)	GUI_DROPDOWN_SET: unknown key '{}' (known: bearbeitbar)
 GUI_BIND: der Schluessel darf nur Buchstaben, Ziffern und _ enthalten -- er wird ein Spaltenname	GUI_BIND: the key may only contain letters, digits and _ -- it becomes a column name
 GUI_BIND: dieses Widget traegt keinen Wert (Textfeld, Kaestchen, Klappliste, Regler, Datum, Farbe)	GUI_BIND: this widget carries no value (text field, check box, dropdown, slider, date, color)
 GUI_FORM_GET: erwartet GUI_WINDOW	GUI_FORM_GET: expects a GUI_WINDOW
@@ -1523,7 +1506,6 @@ GUI_RULE: an Klappliste und Kaestchen geht nur 'pflicht'	GUI_RULE: dropdowns and
 GUI_RULE: Regeln gehen an Textfeld, Textbereich, Klappliste und Kaestchen	GUI_RULE: rules apply to text fields, text areas, dropdowns and check boxes
 GUI_ERROR_LABEL: das zweite Widget muss eine Beschriftung sein	GUI_ERROR_LABEL: the second widget must be a label
 GUI_ERROR_LABEL: Feld und Beschriftung liegen in verschiedenen Fenstern	GUI_ERROR_LABEL: field and label are in different windows
-GUI_PROGRESS_SET: unbekannter Schluessel '{}' -- erwartet unbestimmt	GUI_PROGRESS_SET: unknown key '{}' -- expected unbestimmt
 GUI_IMAGE_MODE: '{}' ist kein Modus -- strecken, einpassen, fuellen, mitte oder kacheln	GUI_IMAGE_MODE: '{}' is not a mode -- strecken, einpassen, fuellen, mitte or kacheln
 GUI_SET_CURSOR: unbekannte Form '{}' -- erwartet {} oder auto	GUI_SET_CURSOR: unknown shape '{}' -- expected {} or auto
 GUI_TREE_ICON: ungueltige Knoten-id {}	GUI_TREE_ICON: invalid node id {}
@@ -1728,9 +1710,7 @@ GENTEX_RADIAL: dichte {} liegt nicht in 0..1 -- sie ist der Anteil des Radius in
 {}: eine Coroutine kann keine BYREF-Parameter zurueckschreiben	{}: a coroutine cannot write back BYREF parameters
 JOIN$: Feld aus Texten, Zahlen oder Wahrheitswerten noetig	JOIN$: needs an array of strings, numbers or booleans
 JOIN$: erwartet ein Feld	JOIN$: expects an array
-IMAGE_SCALE: erwartet (bild, breite, hoehe [, filter$])	IMAGE_SCALE: expects (image, width, height [, filter$])
 IMAGE_SCALE: unbekannter Filter '{}' -- moeglich sind lanczos, bikubisch, box, hamming, linear	IMAGE_SCALE: unknown filter '{}' -- possible are lanczos, bicubic, box, hamming, linear
-IMAGE_ENHANCE: erwartet (bild, art$, faktor)	IMAGE_ENHANCE: expects (image, kind$, factor)
 IMAGE_ENHANCE: unbekannte Art '{}' -- moeglich sind helligkeit, kontrast, saettigung	IMAGE_ENHANCE: unknown kind '{}' -- possible are brightness, contrast, saturation
 IMAGE_ENHANCE: der Faktor muss eine Zahl ab 0 sein	IMAGE_ENHANCE: the factor must be a number from 0 up
 {} liefert nie "{}" -- der Vergleich trifft nie. Moeglich sind: {}.	{} never returns "{}" -- the comparison never matches. Possible are: {}.
@@ -1743,7 +1723,6 @@ FILE_SAVE_DIALOG: das zweite Argument ist der vorgeschlagene Dateiname, nicht di
 verfuegbar sind: {}	available are: {}
 SPELL_SUGGEST: hoechstens {} Vorschlaege -- erwartet 1 oder mehr	SPELL_SUGGEST: at most {} suggestions -- expects 1 or more
 {}: nur fuer Textfeld und Textbereich, nicht fuer {}	{}: only for text field and text area, not for {}
-GUI_SPELL: erwartet (feld, woerterbuch) -- woerterbuch -1 schaltet ab	GUI_SPELL: expects (field, dictionary) -- dictionary -1 turns it off
 TEXT_VISUAL$: unbekannte Richtung '{}' -- erlaubt: auto, ltr, rtl	TEXT_VISUAL$: unknown direction '{}' -- allowed: auto, ltr, rtl
 # ---------------------------------------------------------------- firmata (2026-11-05)
 {}: die Verbindung zum Board ist beendet	{}: the connection to the board has ended
@@ -1809,7 +1788,7 @@ MIC_START: das Mikrofon antwortet nicht (10 s)	MIC_START: the microphone does no
 MIC_START: das Mikrofon liefert das Format {}, das dhrt nicht liest	MIC_START: the microphone delivers the format {}, which dhrt cannot read
 MIC_START: das Mikrofon laesst sich nicht oeffnen -- {}	MIC_START: the microphone cannot be opened -- {}
 MIC_START: im Browser gibt es noch kein Mikrofon	MIC_START: there is no microphone in the browser yet
-MIC_START: DHRT_MIKROFON '{}' ist leer	MIC_START: DHRT_MIKROFON '{}' is empty
+MIC_START: DHRT_MICROPHONE '{}' ist leer	MIC_START: DHRT_MICROPHONE '{}' is empty
 {}: es laeuft keine Aufnahme -- erst MIC_RECORD_START	{}: no recording is running -- call MIC_RECORD_START first
 MIC_RECORD_START: max_sekunden muss 0 < x <= 3600 sein	MIC_RECORD_START: max_sekunden must be 0 < x <= 3600
 MIC_WAVE: hoechstens {} Werte, das Feld hat {}	MIC_WAVE: at most {} values, the array has {}
@@ -1844,7 +1823,6 @@ WS_LISTEN: Port {} ausserhalb 0..65535	WS_LISTEN: port {} outside 0..65535
 ungueltiger/geschlossener WS_SERVER	invalid/closed WS_SERVER
 ungueltiger/geschlossener OSC	invalid/closed OSC
 OSC_OPEN: Port {} ausserhalb 0..65535	OSC_OPEN: port {} outside 0..65535
-{}: erwartet (osc, host$, port, adresse$, werte...)	{}: expects (osc, host$, port, adresse$, values...)
 {}: Port {} ausserhalb 1..65535	{}: port {} outside 1..65535
 {}: eine OSC-Adresse beginnt mit /, nicht {}	{}: an OSC address starts with /, not {}
 {}: Wert {} ist {} -- OSC kennt Zahlen, Texte, Wahrheitswerte und BUFFER	{}: value {} is {} -- OSC knows numbers, texts, truth values and BUFFER
@@ -2064,7 +2042,7 @@ mit Werten: Mitglieder in der inneren Schleife {}..{}	with values: members in th
 schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt	writes into an array (or calculates with values) and calls a function that writes global variables
 # ---------------------------------------------------------------- Nachtrag aus Kleine Wunder (2026-11-24)
 MODEL_LIT: zuerst LIGHT_ENABLE() / ein Licht hinzufuegen	MODEL_LIT: first LIGHT_ENABLE() / add a light
-# ---------------------------------------------------------------- DHRT_JIT_BILANZ (2026-11-24)
+# ---------------------------------------------------------------- DHRT_JIT_STATS (2026-11-24)
 jit: Schleife an {} bleibt in der VM: {}	jit: loop at {} stays in the VM: {}
 jit: Schleife an Stelle {} in {} bleibt in der VM: {} Ausstiege mitten drin bei {} eigenen Runden	jit: loop at position {} in {} stays in the VM: {} exits midway in {} rounds of its own
 Stelle {} in {}	position {} in {}
@@ -2117,6 +2095,309 @@ GUI_SOUND: Lautstaerke {} muss 0..100 sein	GUI_SOUND: volume {} must be 0..100
 {}: die Bytes fehlen	{}: the bytes are missing
 {}: unbekannte Wellenform '{}' (erlaubt: sine, square/pulse, saw, triangle, noise -- auch sinus, rechteck, saege, dreieck, rauschen)	{}: unknown waveform '{}' (allowed: sine, square/pulse, saw, triangle, noise -- also sinus, rechteck, saege, dreieck, rauschen)
 AUDIO_LFO_NEW: ein LFO rauscht nicht -- sine, square/pulse, saw oder triangle	AUDIO_LFO_NEW: an LFO does not make noise -- sine, square/pulse, saw or triangle
-GUI_TEXTAREA_SET: '{}' unbekannt -- moeglich sind line_numbers/zeilennummern, active_line/aktive_zeile, tab_inserts/tab_fuegt_ein, tab_width/tabbreite, wrap/umbruch, formatted/formatiert, auto_indent/auto_einzug, indent_guides/einzugslinien, tab_reports/tab_meldet, sticky_headers/kopfzeilen, hints_clickable/hinweise_klickbar	GUI_TEXTAREA_SET: '{}' unknown -- possible are line_numbers, active_line, tab_inserts, tab_width, wrap, formatted, auto_indent, indent_guides, tab_reports, sticky_headers, hints_clickable
 INPUT_BIND: ein Text meint den Buchstaben oder die Ziffer auf der Taste -- "{}" ist keins (Sondertasten als Konstante: KEY_ENTER, KEY_LEFT, ...)	INPUT_BIND: a text means the letter or digit on the key -- "{}" is not one (special keys as a constant: KEY_ENTER, KEY_LEFT, ...)
 {}: Argument {} erwartet ein {}-Handle, erhalten ein {}-Handle	{}: argument {} expects a {} handle, got a {} handle
+{}: falsche Zahl von Argumenten, erhalten {}	{}: wrong number of arguments, got {}
+
+{}: unbekannter Schluessel '{}' -- moeglich sind {}	{}: unknown key '{}' -- possible are {}
+{}: unbekannter Modus '{}' -- free/frei, orbital/umkreisend, first_person/ego, third_person/verfolger, custom/eigen	{}: unknown mode '{}' -- free/frei, orbital/umkreisend, first_person/ego, third_person/verfolger, custom/eigen
+interner Fehler des Uebersetzers: die Anweisung {} kennt er nicht -- bitte als Fehler in dhrt melden	internal compiler error: it does not know the statement {} -- please report it as a bug in dhrt
+interner Fehler des Uebersetzers: den Ausdruck {} kennt er nicht -- bitte als Fehler in dhrt melden	internal compiler error: it does not know the expression {} -- please report it as a bug in dhrt
+SCROLL: verschiebt in Drachenhauch nichts -- jedes Bild wird neu gezeichnet; zum Verschieben CAMERA_SET(x, y) oder ein Render-Ziel (RENDERTARGET_DRAW) nehmen	SCROLL: does not shift anything in Drachenhauch -- every frame is drawn anew; to shift, use CAMERA_SET(x, y) or a render target (RENDERTARGET_DRAW)
+dhrt {}: es fehlt, was der Befehl braucht	dhrt {}: the command is missing what it needs
+# ---------------------------------------------------------------- Nachtrag 2026-11-27
+# Die Meldungen, die `dhrt pruef meldungen --offen` noch deutsch fand.
+{a} und {b} teilen sich {x}	{} and {} share {}
+Bilder in der Zwischenablage gibt es in diesem Bau nicht	images in the clipboard are not available in this build
+Dateien in der Zwischenablage gibt es in diesem Bau nicht	files in the clipboard are not available in this build
+zu viele gleichzeitige Klaenge oder Objekte (Grenze erreicht)	too many simultaneous sounds or objects (limit reached)
+diese Kanalanordnung wird nicht unterstuetzt	this channel layout is not supported
+das Format wird nicht unterstuetzt oder die Datei ist beschaedigt	the format is not supported or the file is damaged
+die Datei liess sich nicht lesen	the file could not be read
+AUDIO_RECORD_START: max_sekunden muss 0 < x <= 3600 sein	AUDIO_RECORD_START: max_sekunden must be 0 < x <= 3600
+AUDIO_RECORD_STOP: es laeuft kein Mitschnitt -- erst AUDIO_RECORD_START	AUDIO_RECORD_STOP: no recording is running -- first AUDIO_RECORD_START
+SAMPLE_FROM_SOUND: der Klang ist leer	SAMPLE_FROM_SOUND: the sound is empty
+aufnehmen --bilder: erwartet eine Zahl	aufnehmen --bilder: expected a number
+aufnehmen: keine Aufnahme -- oeffnet das Programm ein Fenster mit SCREEN?	aufnehmen: no recording -- does the program open a window with SCREEN?
+aufnehmen: kein Zustand der gui -- benutzt das Programm IMPORT "gui" und SCREEN?	aufnehmen: no gui state -- does the program use IMPORT "gui" and SCREEN?
+gibt es in dieser Laufzeit nicht	does not exist in this runtime
+Unbekannter Befehl	Unknown command
+{}: dt {} ist in Sekunden gemeint (DELTA() liefert Sekunden) -- fuer Millisekunden durch 1000 teilen	{}: dt {} is meant in seconds (DELTA() returns seconds) -- divide by 1000 for milliseconds
+erwartet eine Zahl, erhalten {}	expected a number, got {}
+FORMAT$: die Maske {:?} hat keinen Platzhalter -- der Wert kaeme nicht vor. FORMAT$ arbeitet im printf-Stil ("%.2f", "%05d"); Tausenderpunkte und Dezimalkomma schreibt ZAHL$(wert, stellen)	FORMAT$: the mask {} has no placeholder -- the value would not appear. FORMAT$ works printf-style ("%.2f", "%05d"); thousands separators and a decimal comma are written by ZAHL$(wert, stellen)
+ZIP_WRITE: Inhalt {} ist {} -- erwartet wird ein Text oder ein BUFFER	ZIP_WRITE: content {} is {} -- expected a text or a BUFFER
+ZIP_WRITE: erwartet ein ARRAY OF STRING oder ARRAY OF BUFFER	ZIP_WRITE: expected an ARRAY OF STRING or ARRAY OF BUFFER
+("r" zum Lesen, "a" zum Anhaengen) muss davor stehen	("r" for reading, "a" for appending) must come before it
+ Umgebaut wird nur ein frisches Feld; sonst ARRAY_MAP(feld, FUNCTION(x) FLT(x)) oder gleich ein ARRAY OF FLOAT.	 Only a fresh array is converted; otherwise ARRAY_MAP(feld, FUNCTION(x) FLT(x)) or an ARRAY OF FLOAT right away.
+ Umgebaut wird nur eine frische MAP; sonst gleich eine MAP OF FLOAT anlegen.	 Only a fresh MAP is converted; otherwise create a MAP OF FLOAT right away.
+ Eine MAP nimmt nur MAPs ihres Werttyps oder einer Unterklasse davon.	 A MAP only takes MAPs of its value type or of a subclass of it.
+ Ein Feld nimmt nur Felder seines Elementtyps oder einer Unterklasse davon; ARRAY_OF_TYPE holt die passenden Elemente heraus.	 An array only takes arrays of its element type or of a subclass of it; ARRAY_OF_TYPE picks out the matching elements.
+{} hat kein Mitglied '{}' -- weder {} selbst noch eine ihrer Eltern- oder Kindklassen. {} gibt es nicht, der Zugriff bricht beim Laufen ab.{}	{} has no member '{}' -- neither {} itself nor one of its parent or child classes. {} does not exist, the access stops the program when it runs.{}
+'{}' wurde in {} schon als {} angelegt, hier als {}. {} nur EINE Variable dieses Namens (Gross-/Kleinschreibung zaehlt nicht) -- einer der beiden Verwendungszwecke bekommt den falschen Typ. Zweiten Namen vergeben.	'{}' was already declared in {} as {}, here as {}. {} only ONE variable of this name (upper/lower case does not count) -- one of the two uses gets the wrong type. Choose a second name.
+'{}' wurde in {} schon angelegt, hier noch einmal (gleicher Typ {}). Beide DIM meinen {} DIESELBE Variable (Gross-/Kleinschreibung zaehlt nicht) -- was die erste Stelle darin ablegt, ueberschreibt die zweite still. Zweiten Namen vergeben oder das zweite DIM streichen.	'{}' was already declared in {}, here once more (same type {}). Both DIMs mean {} THE SAME variable (upper/lower case does not count) -- the second place silently overwrites what the first stores there. Choose a second name or remove the second DIM.
+DIM {}: ein Feld von Structs liegt wie in C und zaehlt ab 0 -- [von TO bis] geht hier nicht, nur die Groesse: DIM {}[10]	DIM {}: an array of structs is laid out as in C and counts from 0 -- [lower TO upper] does not work here, only the size: DIM {}[10]
+Entweder eine Unterklasse nehmen, die sie ausschreibt, oder 	Either use a subclass that writes it out, or 
+'{}' wird hier {}, ist an dieser Stelle aber nicht sichtbar -- den Namen gibt es nur als lokale Variable einer anderen SUB/FUNCTION. Beim Laufen bricht diese Zeile ab ("Variable '{}' nicht deklariert"). Wer ihn an beiden Stellen braucht, legt ihn mit DIM auf oberster Ebene an.	'{}' is {} here, but is not visible at this place -- the name only exists as a local variable of another SUB/FUNCTION. When the program runs this line stops it ("Variable '{}' is not declared"). If you need it in both places, declare it with DIM at the top level.
+'{}' wird hier {}, aber nirgends im Programm mit DIM oder CONST angelegt. Beim Laufen bricht diese Zeile ab ("Variable '{}' nicht deklariert").{}	'{}' is {} here, but is not declared anywhere in the program with DIM or CONST. When the program runs this line stops it ("Variable '{}' is not declared").{}
+TO steht nur in den eckigen Klammern eines DIM: DIM tage[1 TO 31] AS INTEGER	TO only goes inside the square brackets of a DIM: DIM tage[1 TO 31] AS INTEGER
+VAL(text) oder STR$(zahl) macht beide gleich	VAL(text) or STR$(zahl) makes both the same
+ein Wahrheitswert ist keine Zahl -- direkt fragen: IF fertig THEN	a truth value is not a number -- ask directly: IF fertig THEN
+'{}' vergleicht {} mit {} -- das ist immer {}, weil nichts umgewandelt wird: {}.	'{}' compares {} with {} -- that is always {}, because nothing is converted: {}.
+6 AND 3 ergibt 3, nicht 2	6 AND 3 gives 3, not 2
+6 OR 1 ergibt 6, nicht 7	6 OR 1 gives 6, not 7
+{} verknuepft hier zwei Ganzzahlen. In Drachenhauch ist {} logisch und liefert einen der beiden Werte ({}) -- fuer Bits {} nehmen, fuer Wahrheitswerte vergleichen (x <> 0).	{} combines two integers here. In Drachenhauch {} is logical and gives one of the two values ({}) -- for bits use {}, for truth values compare (x <> 0).
+{}: benannte Argumente gehen hier nicht -- die Signatur dieses Befehls nennt keine Parameternamen	{}: named arguments do not work here -- the signature of this built-in command names no parameters
+{}: {} Werte nach Stelle, die Signatur hat nur {} benennbare Parameter ({}){}	{}: {} positional values, but the signature has only {} nameable parameters ({}){}
+ -- die weiteren nach `...` gehen nur ohne Namen	 -- the further ones after `...` only work without names
+{}: Parameter '{}' ist doppelt belegt	{}: parameter '{}' is given twice
+{}: die Vorgabe von '{}' ({}) laesst sich nicht lesen: {}	{}: the default of '{}' ({}) cannot be read: {}
+{}: '{}' hat keine Vorgabe -- wer {} benennt, gibt '{}' mit an	{}: '{}' has no default -- if you name {}, also give '{}'
+CASE IS: Operator-String erwartet	CASE IS: expected an operator string
+CASE: unerwarteter Operator-Wert	CASE: unexpected operator value
+Default '-' nur auf Zahlen	Default '-' only on numbers
+Methode '{}' in {} ueberschreibt '{}' aus {} -- dort mit {} Parameter(n), hier mit {} (Gross-/Kleinschreibung zaehlt nicht). Jeder Aufruf der geerbten Methode landet jetzt hier. Ist eine eigene Methode gemeint, einen anderen Namen vergeben.	Method '{}' in {} overrides '{}' from {} -- there with {} parameter(s), here with {} (upper/lower case does not count). Every call of the inherited method now lands here. If a separate method is meant, choose a different name.
+DB_GET_BUFFER: Spalte {} ist eine Zahl, keine Bytes	DB_GET_BUFFER: column {} is a number, not bytes
+erwartet {} Bytes, erhalten {}	expected {} bytes, got {}
+jsonb in unbekannter Fassung	jsonb in an unknown version
+TEXT (UTF-8, const char*) oder WTEXT (wchar_t*)	TEXT (UTF-8, const char*) or WTEXT (wchar_t*)
+{} ist zu gross	{} is too large
+{}: {} muss {} sein	{}: {} must be {}
+ -- das System stellt kein passendes OpenGL (3.3) bereit (Einzelheiten in den GLFW-Warnungen davor, falls es welche gibt).	 -- the system does not provide a suitable OpenGL (3.3) (details in the GLFW warnings before, if there are any).
+ -- es gibt keinen Bildschirm (weder DISPLAY noch WAYLAND_DISPLAY ist gesetzt). Auf einem Rechner ohne Bildschirm etwa ueber `xvfb-run` starten.	 -- there is no display (neither DISPLAY nor WAYLAND_DISPLAY is set). On a computer without a display, start through `xvfb-run`, for example.
+ Ein Fenster brauchen SCREEN und alle Zeichen-, Bild- und gui-Befehle; PRINT, Dateien, Netz und Datenbank gehen ohne.	 SCREEN and all drawing, image and gui commands need a window; PRINT, files, network and database work without one.
+{}: Font {} hat keine Schriftdatei (Masse haben nur Fonts, die LOADFONT aus einer TrueType-/OpenType-Datei geladen hat)	{}: font {} has no font file (only fonts that LOADFONT loaded from a TrueType/OpenType file have metrics)
+FONT_BASELINE: Schrift nicht lesbar: {}	FONT_BASELINE: font not readable: {}
+FONT_GLYPH_BOX: Schrift nicht lesbar: {}	FONT_GLYPH_BOX: font not readable: {}
+FONT_GLYPH_BOX: die Schrift hat kein Zeichen '{}' (U+{:04X})	FONT_GLYPH_BOX: the font has no character '{}' (U+{})
+AUTOMATION_STOP: '{}' nicht schreibbar: {}	AUTOMATION_STOP: '{}' not writable: {}
+POSTFX: der Massstab muss zwischen 0.25 und 1 liegen, nicht {}	POSTFX: the scale must be between 0.25 and 1, not {}
+Tafel und Arme laufen auseinander	table and match arms are out of sync
+GUI_WINDOW_CLIP: nur fuer ein Fenster im Entwurfsmodus (GUI_WINDOW_DESIGN)	GUI_WINDOW_CLIP: only for a window in design mode (GUI_WINDOW_DESIGN)
+Zeile {}: '{}' -- erwartet z.B. 50%: y -8, drehen 10	line {}: '{}' -- expected e.g. 50%: y -8, drehen 10
+Zeile {}: '{}' -- erwartet farbe #RGB oder #RRGGBB	line {}: '{}' -- expected farbe #RGB or #RRGGBB
+Zeile {}: '{}' -- erwartet name zahl (x, y, drehen, groesse, deckkraft)	line {}: '{}' -- expected name number (x, y, drehen, groesse, deckkraft)
+Zeile {}: '{}' gibt es in einem Ablauf nicht -- x, y, drehen, groesse, deckkraft, farbe	line {}: '{}' does not exist in an animation sequence -- x, y, drehen, groesse, deckkraft, farbe
+Zeile {}: animation: '{}' ist keine Dauer	line {}: animation: '{}' is not a duration
+Zeile {}: animation: '{}' unbekannt -- puls, wackeln, schweben, huepfen, drehen, ein @ablauf der Stildatei, Dauer in ms, einmal oder eine Anzahl	line {}: animation: '{}' unknown -- puls, wackeln, schweben, huepfen, drehen, an @ablauf of the stylesheet, a duration in ms, einmal or a count
+GUI_SET_SHAPE: Form '{}' unbekannt -- rechteck, pille, kreis, raute, bild oder ""	GUI_SET_SHAPE: shape '{}' unknown -- rechteck, pille, kreis, raute, bild or ""
+GUI_SET_SHAPE: nur fuer Knoepfe (GUI_BUTTON)	GUI_SET_SHAPE: only for buttons (GUI_BUTTON)
+GUI_ANIMATE: '{}' unbekannt -- puls, wackeln, schweben, huepfen, drehen, ein @ablauf der Stildatei oder ""	GUI_ANIMATE: '{}' unknown -- puls, wackeln, schweben, huepfen, drehen, an @ablauf of the stylesheet or ""
+GUI_TREE_SET_LABEL: ungueltige Knoten-id {}	GUI_TREE_SET_LABEL: invalid node id {}
+GUI_TREE_EXPANDED: ungueltige Knoten-id {}	GUI_TREE_EXPANDED: invalid node id {}
+GUI_TREE_REMOVE: ungueltige Knoten-id {}	GUI_TREE_REMOVE: invalid node id {}
+GUI_LAYOUT_SELECT: das Widget gehoert nicht zu diesem Layout	GUI_LAYOUT_SELECT: the widget does not belong to this layout
+{}: kuerzen ist aus, ende, mitte oder anfang (0..3) -- nicht '{}'	{}: kuerzen is aus, ende, mitte or anfang (0..3) -- not '{}'
+{}: marken ist 0 oder 2..101	{}: marken is 0 or 2..101
+{}: stellen ist 0..6	{}: stellen is 0..6
+GUI_BUSY: der Durchmesser muss mindestens 8 sein	GUI_BUSY: the diameter must be at least 8
+{}: '{}' ist kein Datum JJJJ-MM-TT	{}: '{}' is not a date YYYY-MM-DD
+{}: '{}' -- breite, hoehe oder beide	{}: '{}' -- breite, hoehe or beide
+{}: dieses Fenster ist keine Schriftwahl (GUI_FONT_DIALOG)	{}: this window is not a font chooser (GUI_FONT_DIALOG)
+(laesst sich nicht laden)	(cannot be loaded)
+GUI_IMAGE_MODE: das Widget ist kein GUI_IMAGE oder GUI_CARD	GUI_IMAGE_MODE: the widget is not a GUI_IMAGE or GUI_CARD
+GUI_DOCK_SET_STATE: erwartet ein JSON-Objekt	GUI_DOCK_SET_STATE: expected a JSON object
+{}: das Fenster hat kein Dock -- erst GUI_DOCK(win, x, y, w, h)	{}: the window has no dock -- first GUI_DOCK(win, x, y, w, h)
+{}: keine Leiste '{}' im Dock (da sind: {})	{}: no panel '{}' in the dock (there are: {})
+GUI_DOCK_SET: unbekannter Schluessel '{}' (kopf, rand, abstand, fuge)	GUI_DOCK_SET: unknown key '{}' (kopf, rand, abstand, fuge)
+{}: eine Leiste '{}' gibt es schon	{}: a panel '{}' already exists
+{}: unbekannter Bereich '{}' (links, rechts, unten, schwebend)	{}: unknown area '{}' (links, rechts, unten, schwebend)
+{}: ein Fenster kann nicht in sein eigenes Dock	{}: a window cannot go into its own dock
+{}: ein Fenster mit eigenem Dock kann nicht angedockt werden	{}: a window with its own dock cannot be docked
+GUI_DOCK_SHARE: der Anteil muss groesser als 0 sein	GUI_DOCK_SHARE: the share must be greater than 0
+{}: unbekannter Bereich '{}' (links, rechts, unten)	{}: unknown area '{}' (links, rechts, unten)
+GUI_DOCK_SET_STATE: ungueltiges JSON: {}	GUI_DOCK_SET_STATE: invalid JSON: {}
+Zeile {}: klang '{}' -- erwartet name [lautstaerke%]	line {}: klang '{}' -- expected name [volume%]
+Zeile {}: klang '{}' unbekannt -- {} oder eine Datei (.wav, .ogg)	line {}: klang '{}' unknown -- {} or a file (.wav, .ogg)
+Zeile {}: effekt '{}' unbekannt -- funken, konfetti, sterne	line {}: effekt '{}' unknown -- funken, konfetti, sterne
+{}: anzahl {} muss 1..500 sein (0 = Vorgabe)	{}: anzahl {} must be 1..500 (0 = default)
+{}: unbekannte Art	{}: unknown kind
+GUI_SET_MOTION: '{}' -- erwartet "system", "an" oder "aus"	GUI_SET_MOTION: '{}' -- expected "system", "an" or "aus"
+stildatei: keine	stylesheet: none
+ -- keine Regel passt	 -- no rule matches
+GUI_CHECKED: das Widget ist kein GUI_CHECKBOX, GUI_RADIO oder GUI_TOGGLE	GUI_CHECKED: the widget is not a GUI_CHECKBOX, GUI_RADIO or GUI_TOGGLE
+GUI_VALUE: das Widget ist kein GUI_SLIDER, GUI_PROGRESS, GUI_SPINNER, GUI_SPLITTER oder GUI_KNOB	GUI_VALUE: the widget is not a GUI_SLIDER, GUI_PROGRESS, GUI_SPINNER, GUI_SPLITTER or GUI_KNOB
+GUI_SET_CHECKED: das Widget ist kein GUI_CHECKBOX, GUI_RADIO oder GUI_TOGGLE	GUI_SET_CHECKED: the widget is not a GUI_CHECKBOX, GUI_RADIO or GUI_TOGGLE
+GUI_SET_VALUE: das Widget ist kein GUI_SLIDER, GUI_PROGRESS, GUI_SPINNER oder GUI_SPLITTER	GUI_SET_VALUE: the widget is not a GUI_SLIDER, GUI_PROGRESS, GUI_SPINNER or GUI_SPLITTER
+GUI_STYLE_GET: unbekannter Style '{}'	GUI_STYLE_GET: unknown style '{}'
+{}: nur ein Textfeld oder Textbereich hat einen Verlauf	{}: only a text field or text area has a history
+GUI_PALETTE_FILTER: die Palette ist nicht offen -- erst GUI_PALETTE(TRUE)	GUI_PALETTE_FILTER: the palette is not open -- first GUI_PALETTE(TRUE)
+Tab springt hierher zurueck (von {}) -- die Reihenfolge folgt nicht der Lage: Widgets in Lesereihenfolge anlegen oder GUI_SET_TAB_INDEX	Tab jumps back here (from {}) -- the order does not follow the layout: create the widgets in reading order or use GUI_SET_TAB_INDEX
+kein Name fuer den Bildschirmleser -- Text, eine Beschriftung davor (GUI_LABEL) oder GUI_TOOLTIP	no name for the screen reader -- a text, a label in front of it (GUI_LABEL) or GUI_TOOLTIP
+Ziel {} x {} Punkte, zu dicht an einem anderen -- mindestens {} x {} oder mehr Abstand	target {} x {} points, too close to another one -- at least {} x {} or more spacing
+Zeile {}: uebergang fuer '{}' -- eine eigene Dauer haben bg, fg, border und accent	line {}: uebergang for '{}' -- only bg, fg, border and accent have their own duration
+Zeile {}: uebergang erwartet eine Zahl oder eine Liste wie '120, bg 400, border 0', erhalten '{}'	line {}: uebergang expects a number or a list like '120, bg 400, border 0', got '{}'
+Zeile {}: {} erwartet einen Vergleich wie < 600 oder >= 900, erhalten '{}'	line {}: {} expects a comparison like < 600 or >= 900, got '{}'
+Zeile {}: @zeit erwartet von-bis wie 20:00-06:00, erhalten '{}'	line {}: @zeit expects from-to like 20:00-06:00, got '{}'
+Zeile {}: @datum erwartet Monat-Tag wie 12-24 oder 12-01..12-26, erhalten '{}'	line {}: @datum expects month-day like 12-24 or 12-01..12-26, got '{}'
+Zeile {}: '{}' unbekannt -- vor einer Regel stehen @zeit, @datum, @breite, @hoehe, @dunkel, @hell, @hochkontrast, @rtl oder @ltr	line {}: '{}' unknown -- before a rule can stand @zeit, @datum, @breite, @hoehe, @dunkel, @hell, @hochkontrast, @rtl or @ltr
+Zeile {}: '{}' -- vor '>' fehlt ein Teil	line {}: '{}' -- a part is missing before '>'
+Zeile {}: '{}' -- hinter '>' fehlt ein Teil	line {}: '{}' -- a part is missing after '>'
+Zeile {}: '{}' -- einen Zustand traegt nur der letzte Teil des Selektors, nicht ein Behaelter darueber	line {}: '{}' -- only the last part of the selector carries a state, not a container above it
+Zeile {}: 'window' gibt es nur als Vorfahre (window#name button) -- das Fenster selbst ist kein Widget	line {}: 'window' only exists as an ancestor (window#name button) -- the window itself is not a widget
+Zeile {}: Klasse '{}' -- erlaubt sind Buchstaben, Ziffern, _ und -	line {}: class '{}' -- allowed are letters, digits, _ and -
+Zeile {}: Name '{}' -- erlaubt sind Buchstaben, Ziffern, _ und -	line {}: name '{}' -- allowed are letters, digits, _ and -
+Zeile {}: '{}' ist keine Farbe -- erwartet #RGB, #RRGGBB, #AARRGGBB oder ein Name des Themas	line {}: '{}' is not a color -- expected #RGB, #RRGGBB, #AARRGGBB or a name from the theme
+Zeile {}: '{}' ist keine Farbe -- erwartet #RGB, #RRGGBB, #AARRGGBB oder ein Name des Themas (accent, text_fg, widget_bg, ...)	line {}: '{}' is not a color -- expected #RGB, #RRGGBB, #AARRGGBB or a name from the theme (accent, text_fg, widget_bg, ...)
+Zeile {}: {} erwartet eine ganze Zahl {}..{}, erhalten '{}'	line {}: {} expects a whole number {}..{}, got '{}'
+Zeile {}: farbverlauf erwartet 2 bis 6 Farben, dann wahlweise einen Winkel und 'wandert [dauer]' -- etwa '#FF6B6B #845EC2 45 wandert 6s', erhalten '{}'	line {}: farbverlauf expects 2 to 6 colors, then optionally an angle and 'wandert [duration]' -- e.g. '#FF6B6B #845EC2 45 wandert 6s', got '{}'
+Zeile {}: farbverlauf: eine Runde dauert 500 ms bis 60 s, erhalten '{}'	line {}: farbverlauf: one cycle lasts 500 ms to 60 s, got '{}'
+Zeile {}: nebel erwartet eine Staerke 0..40 % und wahlweise eine Farbe -- etwa '12%' oder '12% #73F2D9', oder 'aus'; erhalten '{}'	line {}: nebel expects a strength of 0..40 % and optionally a color -- e.g. '12%' or '12% #73F2D9', or 'aus'; got '{}'
+Zeile {}: schatten erwartet 'weich' oder 'dx dy weich [farbe]', erhalten '{}'	line {}: schatten expects 'weich' or 'dx dy weich [farbe]', got '{}'
+Zeile {}: '{{' im Rumpf -- Regeln lassen sich nicht schachteln	line {}: '{{' inside the body -- rules cannot be nested
+Zeile {}: @ablauf braucht einen Namen (Buchstaben, Ziffern, _ und -)	line {}: @ablauf needs a name (letters, digits, _ and -)
+Zeile {}: '{}' -- erwartet eigenschaft: wert	line {}: '{}' -- expected property: value
+Zeile {}: '{}' gilt nur in Regeln ohne :hover, :focus, :active, :disabled -- eine Form, die mit dem Zustand springt, waere ein Wackeln	line {}: '{}' only applies in rules without :hover, :focus, :active, :disabled -- a shape that jumps with the state would wobble
+Zeile {}: abstand erwartet eine oder zwei Zahlen (senkrecht waagerecht), erhalten '{}'	line {}: abstand expects one or two numbers (vertical horizontal), got '{}'
+Zeile {}: form '{}' unbekannt -- rechteck, pille, kreis, raute, bild	line {}: form '{}' unknown -- rechteck, pille, kreis, raute, bild
+GUI_STYLESHEET_CLOCK: Uhrzeit '{}' -- erwartet HH:MM	GUI_STYLESHEET_CLOCK: time '{}' -- expected HH:MM
+GUI_STYLESHEET_CLOCK: Datum '{}' -- erwartet MM-TT oder JJJJ-MM-TT	GUI_STYLESHEET_CLOCK: date '{}' -- expected MM-DD or YYYY-MM-DD
+GUI_SET_NAME: Name '{}' -- erlaubt sind Buchstaben, Ziffern, _ und -	GUI_SET_NAME: name '{}' -- allowed are letters, digits, _ and -
+GUI_ADD_CLASS: Klasse '{}' -- erlaubt sind Buchstaben, Ziffern, _ und -	GUI_ADD_CLASS: class '{}' -- allowed are letters, digits, _ and -
+GUI_SET_CONTRAST: '{}' -- erwartet "system", "hoch" oder "normal"	GUI_SET_CONTRAST: '{}' -- expected "system", "hoch" or "normal"
+GUI_WINDOW_SET_NAME: Name '{}' -- erlaubt sind Buchstaben, Ziffern, _ und -	GUI_WINDOW_SET_NAME: name '{}' -- allowed are letters, digits, _ and -
+GUI_TABLE_ROW_COLOR: nicht in einer virtuellen Tabelle -- GUI_TABLE_CELL_COLOR je gelieferter Zelle	GUI_TABLE_ROW_COLOR: not in a virtual table -- use GUI_TABLE_CELL_COLOR for each supplied cell
+GUI_TABLE_ADD_ROW: die Tabelle ist virtuell -- Zeilenzahl mit GUI_TABLE_VIRTUAL, Inhalt mit GUI_TABLE_SUPPLY	GUI_TABLE_ADD_ROW: the table is virtual -- row count with GUI_TABLE_VIRTUAL, content with GUI_TABLE_SUPPLY
+GUI_TABLE_REMOVE_ROW: die Tabelle ist virtuell -- Zeilenzahl mit GUI_TABLE_VIRTUAL	GUI_TABLE_REMOVE_ROW: the table is virtual -- row count with GUI_TABLE_VIRTUAL
+GUI_TABLE_SET: spalten laesst sich nur abfragen -- Spalten setzt GUI_TABLE_SET_HEADERS	GUI_TABLE_SET: spalten can only be queried -- columns are set with GUI_TABLE_SET_HEADERS
+GUI_TABLE_COL_TYPE: '{}' unbekannt -- text, ganz, zahl, auswahl, datum	GUI_TABLE_COL_TYPE: '{}' unknown -- text, ganz, zahl, auswahl, datum
+GUI_TABLE_SUPPLY: die Tabelle ist nicht virtuell (GUI_TABLE_VIRTUAL)	GUI_TABLE_SUPPLY: the table is not virtual (GUI_TABLE_VIRTUAL)
+{}: Seite '{}' gibt es nicht -- unten, oben, rechts oder links	{}: side '{}' does not exist -- unten, oben, rechts or links
+{}: Breite und Hoehe muessen mindestens 8 sein	{}: width and height must be at least 8
+{}: dieses Fenster ist kein Popover (GUI_POPOVER)	{}: this window is not a popover (GUI_POPOVER)
+GUI_SET_IMAGE: das Widget ist kein GUI_IMAGE oder GUI_CARD	GUI_SET_IMAGE: the widget is not a GUI_IMAGE or GUI_CARD
+GUI_CUSTOM: Rolle '{}' -- button, checkbox oder slider	GUI_CUSTOM: role '{}' -- button, checkbox or slider
+{}: das Widget ist kein GUI_CANVAS oder GUI_CUSTOM	{}: the widget is not a GUI_CANVAS or GUI_CUSTOM
+GUI_CANVAS_BEGIN: eine Zeichenflaeche ist schon offen -- erst GUI_CANVAS_END	GUI_CANVAS_BEGIN: a canvas is already open -- first GUI_CANVAS_END
+GUI_CANVAS_END: keine Zeichenflaeche offen (GUI_CANVAS_BEGIN)	GUI_CANVAS_END: no canvas open (GUI_CANVAS_BEGIN)
+{}: das Widget ist kein GUI_DROPDOWN oder GUI_LISTBOX	{}: the widget is not a GUI_DROPDOWN or GUI_LISTBOX
+{}: das Widget ist kein GUI_LISTBOX oder GUI_DROPDOWN	{}: the widget is not a GUI_LISTBOX or GUI_DROPDOWN
+TASK_START: Auftrag nicht abzuwarten: {}	TASK_START: cannot wait for the task: {}
+{} hat kein Feld {}	{} has no field {}
+Konstante fehlt	constant missing
+Mitglied ausserhalb eines Bereichs	member outside a region
+Methode ausserhalb eines Bereichs	method outside a region
+globale Variable, die keine Zahl ist	global variable that is not a number
+DECLARE-Vorgabe ist keine Zahl	DECLARE default is not a number
+\ nur mit zwei INTEGER	\ only with two INTEGERs
+{}: {}sieht nach einer Binaerdatei aus (Nullbyte an Stelle {}) -- "auto" liest nur Text	{}: {}looks like a binary file (null byte at position {}) -- "auto" only reads text
+{}: "auto" gilt nur beim Lesen -- zum Schreiben eine Kodierung angeben (utf8, cp1252, latin1)	{}: "auto" only applies when reading -- give an encoding for writing (utf8, cp1252, latin1)
+{} fehlt im Lookup	{} missing from the lookup
+Unbekannte Escape-Folge '\q'	Unknown escape sequence '\q'
+NUMBER war kein Int	NUMBER was not an Int
+LSP-Nachricht mit ungueltigem Content-Length: {:?}	LSP message with invalid Content-Length: {}
+Methode '{}' in {} ueberschreibt '{}' aus {} -- Gross-/Kleinschreibung zaehlt nicht, es ist derselbe Name. Jeder Aufruf von '{}' landet jetzt hier. Ist eine eigene Methode gemeint, einen anderen Namen vergeben; soll sie ersetzen, genauso schreiben wie dort.	Method '{}' in {} overrides '{}' from {} -- upper/lower case does not count, it is the same name. Every call of '{}' now lands here. If a separate method is meant, choose a different name; if it is meant to replace the other one, write it the same way as there.
+Befehle und SUBs bekommen ihre Werte in Klammern	Commands and SUBs get their values in parentheses
+ erwartet, Programmende erreicht	 expected, reached the end of the program
+ fehlt -- hier steht END 	 is missing -- here it says END 
+WEND (oder END WHILE) erwartet	Expected WEND (or END WHILE)
+aber nirgends im Programm mit DIM oder CONST angelegt	but not declared anywhere in the program with DIM or CONST
+Der Namensraum {} hat nichts namens '{}'.	The namespace {} has nothing named '{}'.
+{} hat kein Mitglied '{}'.	{} has no member '{}'.
+UEBERSPRINGEN: dieser Bau hat kein Tray-Symbol (Feature tray)	UEBERSPRINGEN: this build has no tray icon (feature tray)
+Argumente nicht lesbar: {}	arguments not readable: {}
+Argumente sind kein JSON-Feld aus Texten: {}	the arguments are not a JSON array of strings: {}
+nicht geschrieben (kein Bildschirmfoto? IMAGE_SAVE nicht aufgerufen?)	not written (no screenshot? IMAGE_SAVE not called?)
+--- programm {}: nicht lesbar ({})	--- programm {}: not readable ({})
+Datei '{}' wurde nicht geschrieben	file '{}' was not written
+Ton '{}': nicht geschrieben (AUDIO_SAVE_WAV nicht aufgerufen?)	sound '{}': not written (AUDIO_SAVE_WAV not called?)
+dhrt test: eigenen Pfad nicht gefunden: {}	dhrt test: own path not found: {}
+dhrt test: --zeitgrenze braucht ganze Sekunden (0 = ohne), nicht '{}'	dhrt test: --zeitgrenze needs whole seconds (0 = none), not '{}'
+dhrt test: keine Pruefprogramme gefunden (gesucht wird nach *{} und *{})	dhrt test: no test programs found (looking for *{} and *{})
+Arg: erwartet Ints	Arg: expected Ints
+Arg: erwartet List	Arg: expected List
+Arg: erwartet Str	Arg: expected Str
+Zahl {} passt nicht	number {} does not fit
+ein f-Wert ist keine Zahl	an f value is not a number
+ein b-Wert ist kein Wahrheitswert	a b value is not a truth value
+ein funcref ist kein Name	a funcref is not a name
+ein ns ist kein Objekt	an ns is not an object
+unbekannter Wert {}	unknown value {}
+eine Funktion ist kein Objekt: {}	a function is not an object: {}
+Befehl {} ist kein [op, arg]: {}	instruction {} is not [op, arg]: {}
+eine Klasse ist kein Objekt: {}	a class is not an object: {}
+ein Feld ist kein Objekt: {}	a field is not an object: {}
+Top-Level ist kein Objekt	top level is not an object
+Unbekanntes Format: {:?}	Unknown format: {}
+Diese .dhc stammt aus dhrt {}, diese Laufzeit ist {} -- die Quelle mit dieser Fassung neu uebersetzen	This .dhc comes from dhrt {}, this runtime is {} -- compile the source again with this version
+sieht dessen Globals nicht -- reiche den Wert als Parameter 	does not see its globals -- pass the value 
+herein oder deklariere ihn in der Datei selbst.	in as a parameter or declare it in the file itself.
+keine OSC-Nachricht (beginnt nicht mit /)	not an OSC message (does not start with /)
+unbekannter Typ '{}'	unknown type '{}'
+'{}': hinter # steht ein Ordner der Quelle (ohne .. und ohne / vorn)	'{}': after # comes a folder of the source (without .. and without a leading /)
+'{}': der Stand fehlt -- github:nutzer/repo@stand (ein Tag, Zweig oder Commit). Ohne Stand holte jeder Rechner etwas anderes.	'{}': the ref is missing -- github:user/repo@ref (a tag, branch or commit). Without a ref every computer would fetch something different.
+'{}': erwartet github:nutzer/repo@stand	'{}': expected github:user/repo@ref
+'{}' taugt nicht als Paketname (Buchstaben, Ziffern, _ - .) -- mit --als name einen anderen waehlen	'{}' is not usable as a package name (letters, digits, _ - .) -- choose another one with --als name
+{}: die Quelle hat keinen Ordner '{}'	{}: the source has no folder '{}'
+Kreis in den Abhaengigkeiten: {} kommt auf dem Weg zu sich selbst noch einmal vor	cycle in the dependencies: {} occurs again on the way to itself
+{}: angekommen ist etwas anderes als beim letzten Mal (SHA-256 {} statt {}). Wurde der Stand verschoben? Wer den neuen Inhalt will: dhrt paket hole --erneuern	{}: what arrived differs from last time (SHA-256 {} instead of {}). Was the ref moved? If you want the new content: dhrt paket hole --erneuern
+'{}' ist weder ein ZIP noch eine .dh-Datei	'{}' is neither a ZIP nor a .dh file
+ein heruntergeladenes Paket kann nicht auf einen lokalen Pfad verweisen ('{}' in {})	a downloaded package cannot refer to a local path ('{}' in {})
+{}: kein gueltiges JSON ({})	{}: not valid JSON ({})
+{} gibt es schon	{} already exists
+hier gibt es keine paket.json -- dhrt paket hole <quelle> legt eine an, dhrt paket neu eine leere	there is no paket.json here -- dhrt paket hole <quelle> creates one, dhrt paket neu an empty one
+paket.json nennt keine Pakete	paket.json names no packages
+'{}' gibt es in diesem Projekt nicht	'{}' does not exist in this project
+hier gibt es keine paket.json	there is no paket.json here
+  -- fehlt, dhrt paket hole	  -- missing, dhrt paket hole
+die Schrift '{}' gibt es nicht mehr -- seit die Schriften eingebettet werden, hat 'sans' griechische Buchstaben und Zeichen wie u{2713} u{2717} u{2605} selbst	the font '{}' no longer exists -- since the fonts are embedded, 'sans' itself has Greek letters and characters like u{2713} u{2717} u{2605}
+die Deckkraft geht von 0 bis 1, nicht {}	the opacity goes from 0 to 1, not {}
+der Radius muss groesser als 0 sein, nicht {}	the radius must be greater than 0, not {}
+ein Vieleck braucht mindestens drei Punkte, nicht {}	a polygon needs at least three points, not {}
+' [IMPORT OPTIONAL nicht gefunden: {}]	' [IMPORT OPTIONAL not found: {}]
+es gibt keine. Unter Linux liefert das Paket hunspell-de-de (bzw. -en-us) die Woerterbuecher; sonst SPELL_LOAD mit einer .dic-Datei	there are none. On Linux the package hunspell-de-de (or -en-us) provides the dictionaries; otherwise SPELL_LOAD with a .dic file
+die Rechtschreibpruefung von Windows ist nicht da ({})	the Windows spell checker is not available ({})
+' angelegt -- Gross-/Kleinschreibung zaehlt nicht	' -- upper/lower case does not matter
+UEBERSPRINGEN: dbus-daemon fehlt	UEBERSPRINGEN: dbus-daemon is missing
+dbus-daemon nennt keine Adresse	dbus-daemon names no address
+die Argumente: ARGC() und ARG$(n) (ab 0) -- einen Pfad vom Ort des Aufrufs aus liefert ARGPATH$(n)	the arguments: ARGC() and ARG$(n) (from 0) -- ARGPATH$(n) gives a path as seen from where the program was called
+heisst in Drachenhauch DIR_CURRENT$() -- der Ordner, aus dem das Programm aufgerufen wurde, ist STARTDIR$()	is called DIR_CURRENT$() in Drachenhauch -- the folder the program was called from is STARTDIR$()
+ -- ein Dateiname ist noch kein {art}: erst `x = {lader}("{text}")`, dann `{}(x, ...)`	 -- a file name is not a {} yet: first `x = {}("{}")`, then `{}(x, ...)`
+Zugriff auf eine globale Variable, die noch nicht gesetzt ist. 	Access to a global variable that has not been set yet. 
+Laeuft das hier als Auftrag (`dhrt call` / TASK_START)? Dann ist das 	Is this running as a task (`dhrt call` / TASK_START)? Then that is 
+erwartet: das Hauptprogramm laeuft dabei NICHT, also ist kein Global 	expected: the main program does NOT run then, so no global is 
+gesetzt -- auch keine CONST, deren Wert erst beim Laufen feststeht (eine 	set -- not even a CONST whose value is only known at run time (one 
+Hinweis: Das Fenster ist leer geblieben -- es wurde gezeichnet, aber FLIP() fehlt. 	Note: the window stayed empty -- something was drawn, but FLIP() is missing. 
+dhrt sammelt die Zeichenbefehle und zeigt sie erst beim FLIP(); 	dhrt collects the drawing commands and only shows them at FLIP(); 
+Unbekannte Funktion	Unknown function
+DIM: die Grenzen eines Feldes muessen INTEGER sein, erhalten {} TO {}	DIM: the bounds of an array must be INTEGER, got {} TO {}
+DIM: in Dimension {} liegt die Obergrenze {} unter der Untergrenze {} -- [{} TO {}] ist schon leer	DIM: in dimension {} the upper bound {} is below the lower bound {} -- [{} TO {}] is already empty
+DEFAULT_KEYS: Taste fehlt	DEFAULT_KEYS: key missing
+laesst sich nicht lesen	cannot be read
+{}: Kopfzeile '{}' erwartet STRING, erhalten {}	{}: header '{}' expects STRING, got {}
+ungueltige/freigegebene MIDI_FILE	invalid/freed MIDI_FILE
+{}: das Feld fehlt	{}: the array is missing
+{}: erwartet ein Feld, nicht {}	{}: expected an array, not {}
+{}: an Stelle {} steht keine ganze Zahl ({})	{}: there is no whole number at position {} ({})
+MDNS_BROWSE: ein Diensttyp sieht aus wie "_http._tcp", nicht {:?}	MDNS_BROWSE: a service type looks like "_http._tcp", not {}
+{}: ein Diensttyp sieht aus wie "_http._tcp", nicht {:?}	{}: a service type looks like "_http._tcp", not {}
+WEBCAM: kein Bild ohne Grafik	WEBCAM: no image without graphics
+WEBCAM_OPEN: kein Bild ohne Grafik	WEBCAM_OPEN: no image without graphics
+ungueltiger/geschlossener GPIO_CHIP	invalid/closed GPIO_CHIP
+ungueltiger/geschlossener I2C_BUS	invalid/closed I2C_BUS
+{}: keine Dateien	{}: no files
+FONT_GLYPH_BOX: erwartet GENAU ein Zeichen (Arg 2)	FONT_GLYPH_BOX: expected EXACTLY one character (argument 2)
+{}: {} ist keine mit LOADFONT geladene Schrift	{}: {} is not a font loaded with LOADFONT
+GUI_FONT: erwartet ein Font-Handle (LOADFONT) oder -1 (Arg 1)	GUI_FONT: expected a font handle (LOADFONT) or -1 (argument 1)
+GUI_FONT: {} ist kein geladener Font	GUI_FONT: {} is not a loaded font
+GUI_FONT: erwartet eine Groesse 4..400 (Arg 2)	GUI_FONT: expected a size 4..400 (argument 2)
+der Ort fehlt: {}	the location is missing: {}
+ZEIT_AUS_UNIX: erwartet Unix-Sekunden (eine Zahl)	ZEIT_AUS_UNIX: expected Unix seconds (a number)
+ZEIT_NACH_UNIX: erwartet einen Zeitpunkt	ZEIT_NACH_UNIX: expected a point in time
+SLEEP: {} ist keine Dauer	SLEEP: {} is not a duration
+MJPEG-Bild nicht lesbar -- {}	MJPEG frame not readable -- {}
+WEBCAM_OPEN: keine Puffer -- {}	WEBCAM_OPEN: no buffers -- {}
+WEBCAM_OPEN: die Kamera gibt keine Puffer	WEBCAM_OPEN: the camera provides no buffers
+WEBCAM: Media Foundation startet nicht -- {}	WEBCAM: Media Foundation does not start -- {}
+WEBCAM: keine Attribute	WEBCAM: no attributes
+WEBCAM: die Kameras sind nicht lesbar -- {}	WEBCAM: the cameras cannot be read -- {}
+WEBCAM_OPEN: kein Leser fuer {} -- {}	WEBCAM_OPEN: no reader for {} -- {}
+WEBCAM_OPEN: {} liefert kein RGB -- {}	WEBCAM_OPEN: {} delivers no RGB -- {}
+WEBCAM_OPEN: {} ist belegt	WEBCAM_OPEN: {} is busy
+WEBCAM_OPEN: {} liefert kein Bild	WEBCAM_OPEN: {} delivers no image
+WEBCAM_OPEN: auf diesem System gibt es noch keine Kamera	WEBCAM_OPEN: there is no camera on this system yet
+Rahmen mit gesetzten RSV-Bits (Erweiterung, die nicht ausgehandelt wurde)	frame with RSV bits set (an extension that was not negotiated)
+Steuerrahmen zu lang oder zerteilt	control frame too long or fragmented
+die Verbindung ist zu	the connection is closed
+Nachricht zu gross	message too large
+unbekannter Rahmentyp {}	unknown frame type {}
+Eintrag {}: kein lesbarer Name: {}	entry {}: no readable name: {}

@@ -2,7 +2,7 @@
 //!
 //! Teil von `gui.rs`.
 //! - **Inspektor** wie die Entwicklerwerkzeuge eines Browsers: an
-//!   (`GUI_INSPECTOR(TRUE)`, oder Strg+Umschalt+I, wenn `DHRT_INSPEKTOR=1`
+//!   (`GUI_INSPECTOR(TRUE)`, oder Strg+Umschalt+I, wenn `DHRT_INSPECTOR=1`
 //!   gesetzt ist) umrandet er das Widget unter dem Zeiger; ein Klick waehlt
 //!   es -- und erreicht das Widget NICHT -- und eine Tafel zeigt Art, Name,
 //!   Klassen, Lage, Zustand, die passenden Regeln der Stildatei mit Zeile
@@ -54,6 +54,12 @@ impl Gui {
         Ok(())
     }
 
+    /// GUI_GET_MOTION_MODE$(): der Modus aus GUI_SET_MOTION -- das Gegenstueck
+    /// zum Setzen (GUI_GET_MOTION sagt, ob gerade bewegt WIRD; Bericht B4).
+    pub fn motion_mode(&self) -> &'static str {
+        match self.bewegung { 1 => "an", 2 => "aus", _ => "system" }
+    }
+
     // ================================================================ Inspektor
     /// GUI_INSPECTOR(an): den Inspektor zeigen oder schliessen.
     pub fn inspector(&mut self, an: bool) {
@@ -67,7 +73,7 @@ impl Gui {
         match self.wdg(self.insp_wahl, "") { Ok(w) if w.alive => self.insp_wahl, _ => -1 }
     }
 
-    /// Strg+Umschalt+I (mit DHRT_INSPEKTOR=1) schaltet um, ESC schliesst --
+    /// Strg+Umschalt+I (mit DHRT_INSPECTOR=1) schaltet um, ESC schliesst --
     /// beide gelten als verbraucht.
     pub(super) fn inspektor_tasten(&mut self, g: &Graphics) {
         if self.insp_taste && g.key_ctrl() && g.key_shift() && g.key_pressed(73) {
@@ -250,10 +256,7 @@ impl Gui {
         }
         if !tafel_hier { return; }
         // Die Tafel.
-        let rad = self.sk(6);
-        g.round_rect(tx + 2, ty + 3, tx + tb + 1, ty + th + 2, rad, 0x50i64 << 24, true);
-        g.round_rect(tx, ty, tx + tb - 1, ty + th - 1, rad, I_GRUND, true);
-        g.round_rect(tx, ty, tx + tb - 1, ty + th - 1, rad, I_WAHL, false);
+        self.popup_kasten(g, (tx, ty, tb, th), 1.0, I_GRUND, I_WAHL);
         let pad = self.sk(8);
         let lh = self.ctext_height(g) + self.sk(3);
         g.push_clip(tx, ty, tb, th);

@@ -1453,14 +1453,15 @@ END FUNCTION
 FUNCTION musikKugeln() AS INTEGER
     RETURN snNotenBis(musikSchritt())
 END FUNCTION
-' Gibt es Ton? Ohne Soundkarte muss nichts gebaut werden. DH_OHNE_AUDIO (wie
+' Gibt es Ton? Ohne Soundkarte muss nichts gebaut werden. DHRT_NO_AUDIO (wie
 ' in den Pruefungen) schaltet den Ton ab -- dann laufen Bild und Takt ueber
 ' die Uhr des Rechners.
 FUNCTION tonDa() AS BOOLEAN
-    IF GETENV$("DH_OHNE_AUDIO") <> "" THEN RETURN FALSE
     TRY
         AUDIO_BUS_VOLUME("sfx", 0.6)
-        RETURN TRUE
+        ' Stumm gerechnet (DHRT_NO_AUDIO, wie in den Pruefungen): die Laufzeit
+        ' sagt es selbst, statt dass das Programm die Variable liest.
+        RETURN NOT AUDIO_IS_SILENT()
     CATCH fehler
         RETURN FALSE
     END TRY

@@ -84,17 +84,17 @@ impl Gui {
     /// GUI_LAYOUT_SET(layout, key$, wert): abstand, rand, ausrichtung, dehnen, rahmen.
     pub fn layout_set(&mut self, layout: i64, key: &str, wert: f64) -> Result<(), String> {
         let l = self.layout_mut(layout, "GUI_LAYOUT_SET")?;
-        match key.to_lowercase().as_str() {
-            "abstand" | "gap" | "spacing" => { if wert < 0.0 { return Err("GUI_LAYOUT_SET: abstand muss >= 0 sein".into()); } l.abstand = wert as i32; }
-            "rand" | "padding" => { if wert < 0.0 { return Err("GUI_LAYOUT_SET: rand muss >= 0 sein".into()); } l.rand = wert as i32; }
-            "ausrichtung" | "align" => {
+        match super::einstellungen::schluessel("GUI_LAYOUT_SET", key, super::einstellungen::LAYOUT)? {
+            "abstand" => { if wert < 0.0 { return Err("GUI_LAYOUT_SET: abstand muss >= 0 sein".into()); } l.abstand = wert as i32; }
+            "rand" => { if wert < 0.0 { return Err("GUI_LAYOUT_SET: rand muss >= 0 sein".into()); } l.rand = wert as i32; }
+            "ausrichtung" => {
                 if !(0.0..=2.0).contains(&wert) { return Err("GUI_LAYOUT_SET: ausrichtung ist 0 (Anfang), 1 (Mitte) oder 2 (Ende)".into()); }
                 l.ausrichtung = wert as u8;
             }
-            "dehnen" | "stretch" => l.dehnen = wert != 0.0,
-            "rahmen" | "frame" => l.rahmen = wert != 0.0,
-            "auswahl" | "selection" => { l.auswahl = wert != 0.0; if !l.auswahl { l.gewaehlt = -1; } }
-            _ => return Err(format!("GUI_LAYOUT_SET: unbekannter Schluessel '{}' -- abstand, rand, ausrichtung, dehnen, rahmen, auswahl", key)),
+            "dehnen" => l.dehnen = wert != 0.0,
+            "rahmen" => l.rahmen = wert != 0.0,
+            "auswahl" => { l.auswahl = wert != 0.0; if !l.auswahl { l.gewaehlt = -1; } }
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }

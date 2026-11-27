@@ -74,12 +74,22 @@ DIM a1 AS INTEGER : a1 = HTTP_GET_START("https://api.openligadb.de/getavailablel
 DIM a2 AS INTEGER : a2 = HTTP_GET_START("https://api.openligadb.de/getcurrentgroup/bl1")
 PRINT "    offen: "; HTTP_PENDING()
 t0 = MILLIS()
+' Ein abgeholter Abruf ist weg -- nach ihm fragt man nicht mehr (seit 2026.54
+' ein Fehler wie bei jedem freigegebenen Handle). Die Merker halten fest,
+' welcher schon da war.
+DIM hat1 AS BOOLEAN, hat2 AS BOOLEAN
 WHILE HTTP_PENDING() > 0
-    IF HTTP_READY(a1) AND HTTP_URL$(a1) <> "" THEN
-        PRINT "    fertig: Ligenliste ("; LEN(HTTP_RESULT(a1)); " Zeichen)"
+    IF NOT hat1 THEN
+        IF HTTP_READY(a1) THEN
+            PRINT "    fertig: Ligenliste ("; LEN(HTTP_RESULT(a1)); " Zeichen)"
+            hat1 = TRUE
+        END IF
     END IF
-    IF HTTP_READY(a2) AND HTTP_URL$(a2) <> "" THEN
-        PRINT "    fertig: aktueller Spieltag ("; LEN(HTTP_RESULT(a2)); " Zeichen)"
+    IF NOT hat2 THEN
+        IF HTTP_READY(a2) THEN
+            PRINT "    fertig: aktueller Spieltag ("; LEN(HTTP_RESULT(a2)); " Zeichen)"
+            hat2 = TRUE
+        END IF
     END IF
     SLEEP(1)
 WEND

@@ -6,7 +6,7 @@
 ' Rust-Rueckverfolgung an, und abfangen liess es sich nicht. Jetzt ist es ein
 ' gewoehnlicher Laufzeitfehler: mit Zeile und Befehl, per TRY abfangbar.
 '
-' Auf einem Rechner mit Bildschirm taeuscht DHRT_KEIN_FENSTER den Fehler vor:
+' Auf einem Rechner mit Bildschirm taeuscht DHRT_NO_WINDOW den Fehler vor:
 ' es loest DENSELBEN Panic an derselben Stelle aus, geprueft wird also das
 ' echte Fangen. Der echte Fall laeuft im Paket-Lauf der CI (package.yml:
 ' Linux ohne Bildschirm, macOS ohne OpenGL).
@@ -32,7 +32,7 @@ PRINT "sagt kein fenster "; (INSTR(gefangen, "Kein Fenster moeglich") >= 0)
 PRINT "sagt was ohne geht "; (INSTR(gefangen, "PRINT, Dateien") >= 0)
 PRINT "danach geht es weiter"
 --- umgebung
-DHRT_KEIN_FENSTER=1
+DHRT_NO_WINDOW=1
 --- erwartet
 gefangen TRUE
 nennt SCREEN TRUE
@@ -65,7 +65,7 @@ CATCH e
 END TRY
 PRINT "zweiter versuch ebenso "; (INSTR(zweiter, "Kein Fenster moeglich") >= 0)
 --- umgebung
-DHRT_KEIN_FENSTER=1
+DHRT_NO_WINDOW=1
 --- erwartet
 nennt IMAGE_NEW TRUE
 sagt kein fenster TRUE
@@ -93,7 +93,7 @@ IF INSTR(vt, "fehlt: grafik") >= 0 OR INSTR(vt, "grafik") < 0 THEN
     PRINT "UEBERSPRINGEN: Laufzeit ohne Grafik"
     EXIT(0)
 END IF
-SETENV("DHRT_KEIN_FENSTER", "1")
+SETENV("DHRT_NO_WINDOW", "1")
 DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", CWD$() + "/spiel.dh")
 DIM aus AS STRING : aus = lauf$(p)
 PRINT "rueckgabe "; PROCESS_CODE(p)
@@ -115,6 +115,6 @@ nichts danach TRUE
 === ein programm ohne grafik merkt nichts davon
 PRINT "rechnet "; 6 * 7
 --- umgebung
-DHRT_KEIN_FENSTER=1
+DHRT_NO_WINDOW=1
 --- erwartet
 rechnet 42

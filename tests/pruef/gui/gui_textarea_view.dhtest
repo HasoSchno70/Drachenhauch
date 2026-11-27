@@ -157,3 +157,26 @@ DHRT_FRAMES=2
 --- erwartet
 12 12
 
+
+=== abschnitte nehmen ganze zahlen, ein bruch ist ein fehler
+' Die Zahlenfelder der gui (Abschnitte, Marken, Farben) lesen ueber denselben
+' Leser wie die Geraete (`argument::a_zahlenfeld`): 2.0 geht, 2.5 waere
+' vorher still zu 2 geworden (Bericht C8, vier Kopien in vm_gui.rs).
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 5, 5, 280, 150)
+GUI_SET_TEXT(ta, "eins zwei")
+DIM st AS ARRAY OF FLOAT : ARRAY_PUSH(st, 0.0) : ARRAY_PUSH(st, 5.0)
+DIM ln AS ARRAY OF INTEGER : ARRAY_PUSH(ln, 4) : ARRAY_PUSH(ln, 4)
+DIM fb AS ARRAY OF INTEGER : ARRAY_PUSH(fb, &HFF0000) : ARRAY_PUSH(fb, &H00FF00)
+GUI_TEXTAREA_SPANS(ta, st, ln, fb)
+PRINT "glatt ok"
+st[1] = 5.5
+TRY
+    GUI_TEXTAREA_SPANS(ta, st, ln, fb)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+glatt ok
+GUI_TEXTAREA_SPANS: im Feld steht an Stelle 1 keine ganze Zahl (FLOAT)
