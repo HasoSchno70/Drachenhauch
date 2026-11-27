@@ -19,7 +19,7 @@ IMPORT "net"
 | `NET_SEND(sock, text_or_buffer)` | INTEGER | bytes sent; instead of text a `BUFFER` (raw bytes) works too |
 | `NET_RECV(sock, max_bytes)` | STRING | empty if nothing is there (non-blocking) |
 | `NET_RECV_BYTES(sock, max_bytes)` | BUFFER | raw bytes without UTF-8 decoding, empty if nothing is there -- for binary protocols |
-| `NET_PEER_ADDR(sock)` | STRING | remote IP |
+| `NET_PEER_ADDR(sock)` | STRING | the other end: for an accepted client its IP, for `NET_CONNECT` the name as written there |
 | `NET_PEER_PORT(sock)` | INTEGER | remote port |
 | `NET_IS_CONNECTED(sock)` | BOOLEAN | FALSE as soon as the other side has closed, dropped hard or a recv/send has failed |
 | `NET_SET_TIMEOUT(sock, ms)` | — | `0` = non-blocking (default), `> 0` = timeout in ms, `< 0` = fully blocking |

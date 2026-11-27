@@ -257,7 +257,7 @@ jobs:
           codesign -d --entitlements - "$APP" 2>&1 | tee "$RUNNER_TEMP/rechte.txt"
           grep -q allow-unsigned-executable-memory "$RUNNER_TEMP/rechte.txt"
           printf 'DIM s AS INTEGER\nDIM i AS INTEGER\nFOR i = 1 TO 100000\n    s = s + i MOD 7\nNEXT\nPRINT s\n' > "$RUNNER_TEMP/schleife.dh"
-          DHRT_JIT_BILANZ=1 "$APP/Contents/MacOS/dhrt" run "$RUNNER_TEMP/schleife.dh" > "$RUNNER_TEMP/jit.txt" 2>&1
+          DHRT_JIT_STATS=1 "$APP/Contents/MacOS/dhrt" run "$RUNNER_TEMP/schleife.dh" > "$RUNNER_TEMP/jit.txt" 2>&1
           cat "$RUNNER_TEMP/jit.txt"
           grep -qx 300000 "$RUNNER_TEMP/jit.txt"
           grep -q "1 Schleifenlaeufe" "$RUNNER_TEMP/jit.txt"
@@ -285,19 +285,19 @@ jobs:
           # Doppelklick im Finder: macOS schickt die Datei als Apple-Event,
           # nicht als Argument (finder.rs). `open -a APP datei` geht denselben
           # Weg ueber LaunchServices. Ein Fenster geht hier nicht auf -- das
-          # Protokoll (DHRT_OEFFNEN_PROTOKOLL, ueber launchd an die App
+          # Protokoll (DHRT_OPEN_LOG, ueber launchd an die App
           # vererbt) belegt, dass die Datei in der Laufzeit ankommt.
           LSREG=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
           "$LSREG" -f "$APP"
           "$LSREG" -dump | grep -q "de.drachenhauch.quelltext"
           echo 'PRINT "aus dem Finder"' > "$RUNNER_TEMP/finderprobe.dh"
-          launchctl setenv DHRT_OEFFNEN_PROTOKOLL "$RUNNER_TEMP/geoeffnet.txt"
+          launchctl setenv DHRT_OPEN_LOG "$RUNNER_TEMP/geoeffnet.txt"
           open -a "$APP" "$RUNNER_TEMP/finderprobe.dh"
           for i in $(seq 1 30); do
             if grep -q "finderprobe.dh" "$RUNNER_TEMP/geoeffnet.txt" 2>/dev/null; then break; fi
             sleep 1
           done
-          launchctl unsetenv DHRT_OEFFNEN_PROTOKOLL
+          launchctl unsetenv DHRT_OPEN_LOG
           cat "$RUNNER_TEMP/geoeffnet.txt"
           grep -q "finderprobe.dh" "$RUNNER_TEMP/geoeffnet.txt"
           hdiutil detach -force "$RUNNER_TEMP/abbild"

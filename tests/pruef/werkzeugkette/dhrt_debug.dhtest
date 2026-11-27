@@ -992,3 +992,31 @@ PRINT "gehoert nicht dazu"
 --- erwartet
 anders.dh 1 FALSE FALSE
 d.dh 99 FALSE TRUE
+
+=== eval rechnet wie die vm
+' Bis 2026.53 rechnete der Debugger selbst ueber f64: "apfel" < "birne" war
+' FALSE, 2^53 + 1 verlor die letzte Stelle (Bericht A20.1). Jetzt dieselben
+' Regeln wie die Befehle (vm_helfer::cmp, wert_rechnen).
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[3]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + "s < \" + q + "birne\" + q + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + "n + 1" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "eval-result" THEN PRINT feld$(i, "value")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/../_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM s AS STRING : s = "apfel"
+DIM n AS INTEGER : n = 9007199254740992
+PRINT s
+PRINT n
+
+--- erwartet
+TRUE
+9007199254740993

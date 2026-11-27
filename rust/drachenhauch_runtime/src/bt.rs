@@ -41,21 +41,6 @@ fn seen() -> &'static Mutex<HashMap<String, Peripheral>> {
     S.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-pub fn latin1_encode(s: &str, fn_: &str) -> Result<Vec<u8>, String> {
-    let mut out = Vec::with_capacity(s.len());
-    for c in s.chars() {
-        let cp = c as u32;
-        if cp > 0xFF {
-            return Err(format!("{}: STRING enthaelt Zeichen > 0xFF. Nur Bytes 0..255 sind erlaubt (latin-1).", fn_));
-        }
-        out.push(cp as u8);
-    }
-    Ok(out)
-}
-pub fn latin1_decode(bytes: &[u8]) -> String {
-    bytes.iter().map(|&b| b as char).collect()
-}
-
 fn char_props(f: CharPropFlags) -> String {
     let mut v = Vec::new();
     if f.contains(CharPropFlags::BROADCAST) { v.push("broadcast"); }
@@ -218,21 +203,38 @@ pub fn read(p: &Peripheral, char_uuid: &str) -> Result<String, String> {
         let ch = find_char(p, char_uuid).await
             .ok_or_else(|| format!("BT_READ: Characteristic '{}' nicht gefunden", char_uuid))?;
         let data = with_timeout(p.read(&ch), "BT_READ").await?;
-        Ok(latin1_decode(&data))
+        Ok(crate::kodierung::latin1_lesen(&data))
     })
 }
 
-pub fn write(p: &Peripheral, char_uuid: &str, payload: &str) -> Result<(), String> {
-    let bytes = latin1_encode(payload, "BT_WRITE")?;
+/// Bytes, wie sie sind (BT_READ_BYTES / BT_WRITE_BYTES, BUFFER).
+pub fn read_bytes(p: &Peripheral, char_uuid: &str) -> Result<Vec<u8>, String> {
     let g = bt()?;
     g.rt.block_on(async {
         let ch = find_char(p, char_uuid).await
-            .ok_or_else(|| format!("BT_WRITE: Characteristic '{}' nicht gefunden", char_uuid))?;
+            .ok_or_else(|| format!("BT_READ_BYTES: Characteristic '{}' nicht gefunden", char_uuid))?;
+        with_timeout(p.read(&ch), "BT_READ_BYTES").await
+    })
+}
+pub fn write_bytes(p: &Peripheral, char_uuid: &str, bytes: &[u8]) -> Result<(), String> {
+    schreiben(p, char_uuid, bytes, "BT_WRITE_BYTES")
+}
+
+pub fn write(p: &Peripheral, char_uuid: &str, payload: &str) -> Result<(), String> {
+    let bytes = crate::kodierung::latin1_schreiben(payload, "BT_WRITE")?;
+    schreiben(p, char_uuid, &bytes, "BT_WRITE")
+}
+
+fn schreiben(p: &Peripheral, char_uuid: &str, bytes: &[u8], fn_: &str) -> Result<(), String> {
+    let g = bt()?;
+    g.rt.block_on(async {
+        let ch = find_char(p, char_uuid).await
+            .ok_or_else(|| format!("{}: Characteristic '{}' nicht gefunden", fn_, char_uuid))?;
         let wt = if ch.properties.contains(CharPropFlags::WRITE) {
             WriteType::WithResponse
         } else {
             WriteType::WithoutResponse
         };
-        with_timeout(p.write(&ch, &bytes, wt), "BT_WRITE").await
+        with_timeout(p.write(&ch, bytes, wt), fn_).await
     })
 }

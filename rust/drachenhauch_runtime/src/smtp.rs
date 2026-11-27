@@ -24,7 +24,6 @@
 //! Umbruch ist ein Fehler und wird nicht etwa still entfernt.
 
 use std::io::{Read, Write};
-use std::net::TcpStream;
 use std::time::Duration;
 
 use crate::builtins::b64_encode;
@@ -343,68 +342,7 @@ pub fn punkte_verdoppeln(s: &str) -> String {
 // Die Verbindung
 // ===================================================================
 
-/// Klartext oder TLS -- der Rest des Codes soll den Unterschied nicht sehen.
-enum Strom {
-    Klar(TcpStream),
-    Tls(Box<rustls::StreamOwned<rustls::ClientConnection, TcpStream>>),
-}
-
-impl Read for Strom {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        match self {
-            Strom::Klar(s) => s.read(buf),
-            Strom::Tls(s) => s.read(buf),
-        }
-    }
-}
-
-impl Write for Strom {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        match self {
-            Strom::Klar(s) => s.write(buf),
-            Strom::Tls(s) => s.write(buf),
-        }
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        match self {
-            Strom::Klar(s) => s.flush(),
-            Strom::Tls(s) => s.flush(),
-        }
-    }
-}
-
-impl Strom {
-    fn tcp(&self) -> &TcpStream {
-        match self {
-            Strom::Klar(s) => s,
-            Strom::Tls(s) => s.get_ref(),
-        }
-    }
-
-    /// Auf TLS hochschalten.
-    fn verschluesseln(self, host: &str) -> Result<Strom, String> {
-        let tcp = match self {
-            Strom::Klar(s) => s,
-            Strom::Tls(_) => return Err("die Verbindung ist bereits verschluesselt".into()),
-        };
-        let mut wurzeln = rustls::RootCertStore::empty();
-        wurzeln.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-        // Der Anbieter wird ausdruecklich genannt statt ueber
-        // `ClientConfig::builder()` geraten: waeren einmal zwei
-        // Krypto-Anbieter im Baum, liefe der Ratepfad in einen Absturz.
-        let anbieter = std::sync::Arc::new(rustls::crypto::ring::default_provider());
-        let konfig = rustls::ClientConfig::builder_with_provider(anbieter)
-            .with_safe_default_protocol_versions()
-            .map_err(|e| format!("TLS liess sich nicht einrichten: {}", e))?
-            .with_root_certificates(wurzeln)
-            .with_no_client_auth();
-        let name = rustls::pki_types::ServerName::try_from(host.to_string())
-            .map_err(|_| format!("{:?} ist kein gueltiger Servername fuer TLS", host))?;
-        let verbindung = rustls::ClientConnection::new(std::sync::Arc::new(konfig), name)
-            .map_err(|e| format!("TLS-Verbindung fehlgeschlagen: {}", e))?;
-        Ok(Strom::Tls(Box::new(rustls::StreamOwned::new(verbindung, tcp))))
-    }
-}
+use crate::tls::Strom;
 
 /// Eine Antwort lesen: `250 OK` oder mehrzeilig `250-...` bis `250 ...`.
 ///
@@ -415,7 +353,7 @@ impl Strom {
 /// bekannte Luecke.
 fn lies_antwort(s: &mut Strom) -> Result<(u16, String), String> {
     let mut text = String::new();
-    let mut code = 0u16;
+    let mut code: u16;
     loop {
         let mut zeile = Vec::new();
         loop {
@@ -481,22 +419,14 @@ pub fn senden(m: &Mail, nachricht: &str) -> Result<(), String> {
     }
 
     let frist = Duration::from_millis(m.frist_ms.max(1));
-    let adressen: Vec<std::net::SocketAddr> = {
-        use std::net::ToSocketAddrs;
-        (m.host.as_str(), m.port).to_socket_addrs()
-            .map_err(|e| format!("SMTP_SEND: {} ist nicht auffindbar ({})", m.host, e))?
-            .collect()
-    };
-    let ziel = adressen.first()
-        .ok_or_else(|| format!("SMTP_SEND: {} liefert keine Adresse", m.host))?;
-    let tcp = TcpStream::connect_timeout(ziel, frist)
-        .map_err(|e| format!("SMTP_SEND: keine Verbindung zu {}:{} ({})", m.host, m.port, e))?;
+    // Alle Adressen des Namens (verbinden.rs), nicht nur die erste.
+    let tcp = crate::verbinden::tcp(&m.host, m.port, frist, "SMTP_SEND")?;
     tcp.set_read_timeout(Some(frist)).ok();
     tcp.set_write_timeout(Some(frist)).ok();
 
     let mut s = Strom::Klar(tcp);
     if m.sicherheit == Sicherheit::Tls {
-        s = s.verschluesseln(&m.host).map_err(|e| format!("SMTP_SEND: {}", e))?;
+        s = s.verschluesseln(&m.host, "").map_err(|e| format!("SMTP_SEND: {}", e))?;
     }
 
     let (code, text) = lies_antwort(&mut s)?;
@@ -521,7 +451,7 @@ pub fn senden(m: &Mail, nachricht: &str) -> Result<(), String> {
                  zwar bewusst", m.host, m.port));
         }
         befehl(&mut s, "STARTTLS", &[220], "STARTTLS")?;
-        s = s.verschluesseln(&m.host).map_err(|e| format!("SMTP_SEND: {}", e))?;
+        s = s.verschluesseln(&m.host, "").map_err(|e| format!("SMTP_SEND: {}", e))?;
         // Nach dem Hochschalten gilt die alte Faehigkeitsliste nicht mehr:
         // viele Server bieten AUTH erst an, wenn verschluesselt wird.
         faehig = befehl(&mut s, &format!("EHLO {}", ich), &[250], "EHLO (nach STARTTLS)")?;

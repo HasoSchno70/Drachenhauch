@@ -10,12 +10,13 @@
 //! DH-Funktionen macht die VM (`try_timer` in vm.rs, gleiches Muster wie
 //! die GUI-Callbacks). Kein Grafik-Bezug -- laeuft auch konsolen-only.
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+/// Zeitpunkte in ms der Spieluhr (spieluhr.rs): im Testlauf mit den Bildern.
+fn jetzt() -> f64 { crate::spieluhr::jetzt_ms() }
 
 use crate::value::Rueckruf;
 
 struct Entry {
-    due: Instant,
+    due: f64,
     interval_ms: Option<i64>,   // Some(_) = TIMER_EVERY, None = TIMER_AFTER
     // Der Rueckruf traegt neben dem Namen ggf. die Instanz, an die er
     // gebunden ist (`TIMER_EVERY(500, gegner.zucken)`).
@@ -25,7 +26,7 @@ struct Entry {
 #[derive(Default)]
 pub struct Timers {
     entries: Vec<Option<Entry>>,          // Tombstones -> IDs bleiben stabil
-    cooldowns: HashMap<String, Instant>,  // Cooldown-ID -> wieder frei ab
+    cooldowns: HashMap<String, f64>,      // Cooldown-ID -> wieder frei ab (ms)
 }
 
 impl Timers {
@@ -39,7 +40,7 @@ impl Timers {
 
     fn add(&mut self, ms: i64, interval_ms: Option<i64>, func: Rueckruf) -> i64 {
         self.entries.push(Some(Entry {
-            due: Instant::now() + Duration::from_millis(clamp_ms(ms)),
+            due: jetzt() + clamp_ms(ms) as f64,
             interval_ms, func,
         }));
         (self.entries.len() - 1) as i64
@@ -80,14 +81,14 @@ impl Timers {
     /// werden auf jetzt+Intervall gestellt -- ein EVERY feuert pro Update
     /// hoechstens EINMAL (kein Aufhol-Burst nach einem Lag/SLEEP).
     pub fn take_due(&mut self) -> Vec<Rueckruf> {
-        let now = Instant::now();
+        let now = jetzt();
         let mut due = Vec::new();
         for slot in &mut self.entries {
             if let Some(e) = slot {
                 if e.due <= now {
                     due.push(e.func.clone());
                     match e.interval_ms {
-                        Some(iv) => e.due = now + Duration::from_millis(clamp_ms(iv)),
+                        Some(iv) => e.due = now + clamp_ms(iv) as f64,
                         None => *slot = None,
                     }
                 }
@@ -99,11 +100,11 @@ impl Timers {
     /// COOLDOWN(id, ms): TRUE wenn die ID frei ist -- und startet dann
     /// sofort die Sperre. FALSE solange die Sperre laeuft.
     pub fn cooldown(&mut self, id: &str, ms: i64) -> bool {
-        let now = Instant::now();
+        let now = jetzt();
         if matches!(self.cooldowns.get(id), Some(frei_ab) if *frei_ab > now) {
             return false;
         }
-        self.cooldowns.insert(id.to_string(), now + Duration::from_millis(clamp_ms(ms)));
+        self.cooldowns.insert(id.to_string(), now + clamp_ms(ms) as f64);
         true
     }
 }

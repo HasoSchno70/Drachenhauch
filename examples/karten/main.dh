@@ -189,10 +189,10 @@ SUB zoomUm(neuZ AS INTEGER, dx AS FLOAT, dy AS FLOAT)
 END SUB
 
 FUNCTION karteB() AS INTEGER
-    RETURN GUI_CANVAS_W(cvKarte)
+    RETURN GUI_CANVAS_SCREEN_W(cvKarte)
 END FUNCTION
 FUNCTION karteH() AS INTEGER
-    RETURN GUI_CANVAS_H(cvKarte)
+    RETURN GUI_CANVAS_SCREEN_H(cvKarte)
 END FUNCTION
 
 ' --- Zeichnen ---------------------------------------------------------------
@@ -578,8 +578,8 @@ IF gpxStart <> "" THEN spurLaden(gpxStart)
 SUB karteBedienen()
     DIM mx AS INTEGER : mx = MOUSEX()
     DIM my AS INTEGER : my = MOUSEY()
-    DIM ox AS INTEGER : ox = GUI_CANVAS_X(cvKarte)
-    DIM oy AS INTEGER : oy = GUI_CANVAS_Y(cvKarte)
+    DIM ox AS INTEGER : ox = GUI_CANVAS_SCREEN_X(cvKarte)
+    DIM oy AS INTEGER : oy = GUI_CANVAS_SCREEN_Y(cvKarte)
     DIM ueber AS BOOLEAN : ueber = GUI_HIT_TEST(mx, my) = cvKarte AND NOT GUI_MODAL()
     DIM dx AS FLOAT : dx = mx - ox - karteB() / 2
     DIM dy AS FLOAT : dy = my - oy - karteH() / 2
@@ -725,7 +725,7 @@ WHILE NOT beenden
     GUI_STATUSBAR_SET(sb, 2, "Zoom " + STR$(zoom))
     DIM laeuft AS INTEGER : laeuft = kachelnLaufend()
     GUI_STATUSBAR_SET(sb, 3, IIF(laeuft > 0, "lädt " + STR$(laeuft) + " Kacheln", ""))
-    CHART_BOUNDS(profil, GUI_CANVAS_X(cvProfil), GUI_CANVAS_Y(cvProfil), GUI_CANVAS_W(cvProfil), GUI_CANVAS_H(cvProfil))
+    CHART_BOUNDS(profil, GUI_CANVAS_SCREEN_X(cvProfil), GUI_CANVAS_SCREEN_Y(cvProfil), GUI_CANVAS_SCREEN_W(cvProfil), GUI_CANVAS_SCREEN_H(cvProfil))
 
     CLS(RGB(240, 240, 240))
     GUI_DRAW(FALSE)
@@ -734,11 +734,11 @@ WHILE NOT beenden
         CHART_DRAW(profil)
         hervor = CHART_HOVER(profil)
     ELSE
-        TEXT(GUI_CANVAS_X(cvProfil) + 12, GUI_CANVAS_Y(cvProfil) + 12, "Das Höhenprofil erscheint mit", RGB(150, 160, 175))
-        TEXT(GUI_CANVAS_X(cvProfil) + 12, GUI_CANVAS_Y(cvProfil) + 32, "einer GPX-Spur, die Höhen hat.", RGB(150, 160, 175))
+        TEXT(GUI_CANVAS_SCREEN_X(cvProfil) + 12, GUI_CANVAS_SCREEN_Y(cvProfil) + 12, "Das Höhenprofil erscheint mit", RGB(150, 160, 175))
+        TEXT(GUI_CANVAS_SCREEN_X(cvProfil) + 12, GUI_CANVAS_SCREEN_Y(cvProfil) + 32, "einer GPX-Spur, die Höhen hat.", RGB(150, 160, 175))
     END IF
-    SCISSOR(GUI_CANVAS_X(cvKarte), GUI_CANVAS_Y(cvKarte), karteB(), karteH())
-    karteZeichnen(GUI_CANVAS_X(cvKarte), GUI_CANVAS_Y(cvKarte), karteB(), karteH(), hervor)
+    SCISSOR(GUI_CANVAS_SCREEN_X(cvKarte), GUI_CANVAS_SCREEN_Y(cvKarte), karteB(), karteH())
+    karteZeichnen(GUI_CANVAS_SCREEN_X(cvKarte), GUI_CANVAS_SCREEN_Y(cvKarte), karteB(), karteH(), hervor)
     SCISSOR_END()
     IF dlgMarker <> 0 THEN GUI_DRAW_WINDOW(dlgMarker)
     IF dlgDruck <> 0 THEN GUI_DRAW_WINDOW(dlgDruck)

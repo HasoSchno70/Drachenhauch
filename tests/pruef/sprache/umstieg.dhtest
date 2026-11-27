@@ -376,7 +376,7 @@ PRINT USING gibt es nicht
 === open mit dateinummer
 OPEN "t.txt" FOR OUTPUT AS #1
 --- fehler
-OPENFILE
+FILE_OPEN
 
 === else if in zwei woertern
 DIM x AS INTEGER
@@ -523,7 +523,7 @@ Unbekannter Befehl 'UCASE$' -- dhrt kennt ihn nicht (Tippfehler?) -- heisst in D
 ' MKDIR vor -- DIREXISTS stand nicht darunter.
 PRINT ISDIR(".")
 --- fehler
-heisst in Drachenhauch DIREXISTS(pfad)
+heisst in Drachenhauch DIR_EXISTS(pfad)
 
 === command$ aus qbasic
 PRINT COMMAND$
@@ -726,7 +726,7 @@ CIRCLE(x, y, radius, farbe)
 === pset color und keydown
 PRINT KEYDOWN(1)
 --- fehler
-gehalten: KEYPRESSED(KEY_A)
+gehalten: KEY_DOWN(KEY_A)
 
 === import ohne anfuehrungszeichen
 IMPORT json
@@ -811,7 +811,7 @@ Aufruf: JSON_GET_INT(h: ?, path: STRING)
 IMPORT "zeit"
 PRINT ZEIT_JAHR(ZEIT_JETZT())
 --- fehler
-ZEIT_TEIL(zeit, "jahr")
+TIME_PART(zeit, "year")
 
 === eine sub mit yield ist eine coroutine und liefert ein handle
 SUB ticker()
@@ -983,7 +983,7 @@ PRINT p.x
 DIM f AS FILE
 WRITELINE(f, "x")
 --- fehler
-WRITELINE: die Datei ist nicht geoeffnet -- f = OPENFILE("name.txt", "w")
+WRITELINE: die Datei ist nicht geoeffnet -- f = FILE_OPEN("name.txt", "w")
 
 === ein feld zaehlt ab null
 DIM a[3] AS INTEGER

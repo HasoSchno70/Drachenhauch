@@ -72,11 +72,11 @@ CHART_LABEL(c, 0, "Mo")                ' label a category
 | `CHART_LABEL(chart, point, text$)` | label a category |
 | `CHART_X(chart, x_values)` | line chart: real x values per point (e.g. timestamps), ascending; `[]` = equal spacing again |
 | `CHART_GET(chart, series, point)` | read a value |
-| `CHART_COUNT(chart)` / `CHART_SERIES_COUNT(c)` | number of points / series |
+| `CHART_COUNT(chart)` / `CHART_SERIES_COUNT(chart)` | number of points / series |
 | `CHART_CLEAR(chart)` | discard the data |
 | `CHART_STAT(chart, series, stat$)` | `anzahl`/`summe`/`mittel`/`min`/`max` (count/sum/mean/min/max) |
 | `CHART_BOUNDS(chart, x, y, width, height)` | move/resize the area |
-| `CHART_ZONE(chart, from, to, color [, name$])` / `CHART_ZONE_CLEAR(c)` | colour zones of the gauge scale, optionally labelled |
+| `CHART_ZONE(chart, from, to, color [, name$])` / `CHART_ZONE_CLEAR(chart)` | colour zones of the gauge scale, optionally labelled |
 | `CHART_UPDATE(chart, seconds)` | keep the animation running (see below) |
 | `CHART_DRAW(chart)` | draw (needs `SCREEN`) |
 
@@ -92,6 +92,9 @@ CHART_SET_NUM(c,   "innenradius", 0.55)    ' number
 CHART_SET_COLOR(c, "gitter", DARKGRAY)     ' colour
 CHART_SET_FLAG(c,  "prozent", TRUE)        ' on/off
 ```
+
+Every name and every word has an English alias -- `"title"`, `"inner_radius"`,
+`"grid"`, `"percent"`, `"legend"` with `"bottom"` --; the German one is stored.
 
 The price: a typo only shows up at run time. The message, however, always names
 what would have been valid:

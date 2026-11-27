@@ -67,7 +67,7 @@ module.exports = (H) => [
 
   H.h2("Samples: einen Klang in Tonhöhen spielen"),
   H.p("Ein Sample ist eine kurze Aufnahme (z. B. ein einzelner Klavieranschlag), die du in beliebigen Tonhöhen abspielst – das Prinzip eines Samplers. SAMPLE_PLAY transponiert die Aufnahme um eine Anzahl Halbtöne. Kurze One-Shots eignen sich für Drums und Treffer, mit einer Loop-Region (SAMPLE_SET_LOOP) lassen sich gehaltene Töne erzeugen."),
-  H.cmd("SAMPLE_LOAD · SAMPLE_PLAY · SAMPLE_SET_LOOP · SAMPLE_LEN", 'SAMPLE_LOAD(pfad$)   SAMPLE_PLAY(sample, halbtoene, vol [, dur_ms])   SAMPLE_SET_LOOP(sample, start, ende [, art$])   SAMPLE_LEN(sample)',
+  H.cmd("SAMPLE_LOAD · SAMPLE_PLAY · SAMPLE_SET_LOOP · SAMPLE_LEN", 'SAMPLE_LOAD(pfad$)   SAMPLE_PLAY(sample, halbtoene [, vol [, dur_ms]])   SAMPLE_SET_LOOP(sample, start, ende [, art$])   SAMPLE_LEN(sample)',
     "LOAD lädt eine Audiodatei als SAMPLE. PLAY spielt sie um halbtoene transponiert (0 = Originaltonhöhe, 12 = eine Oktave höher) und gibt eine Kanal-Nummer zurück. SET_LOOP markiert eine Schleifenregion in Frames; mit \"pingpong\" läuft sie am Ende rückwärts wieder hinunter, statt an ihren Anfang zu springen. LEN liefert die Länge in Sekunden.",
     [
       'IMPORT "audio"',
@@ -293,7 +293,7 @@ module.exports = (H) => [
       'SLEEP(3000)',
       'PRINT MIC_RECORD_SAVE("stimme.wav"); " Werte"',
     ]),
-  H.note("Ohne Mikrofon zum Ausprobieren: Die Umgebungsvariable DHRT_MIKROFON=datei.wav macht aus einer WAV-Datei ein Mikrofon, das sie in Schleife abspielt. Unter Windows muss in den Datenschutz-Einstellungen der Mikrofon-Zugriff für Desktop-Apps erlaubt sein; macOS fragt beim ersten MIC_START."),
+  H.note("Ohne Mikrofon zum Ausprobieren: Die Umgebungsvariable DHRT_MICROPHONE=datei.wav macht aus einer WAV-Datei ein Mikrofon, das sie in Schleife abspielt. Unter Windows muss in den Datenschutz-Einstellungen der Mikrofon-Zugriff für Desktop-Apps erlaubt sein; macOS fragt beim ersten MIC_START."),
 
   H.h2("Räumliches Audio: Listener & Emitter"),
   H.p("Für 2D-/3D-Spiele mit Ortsgefühl: Ein Listener ist das „Ohr“ der Szene (meist an Kamera oder Spielfigur gebunden), ein Emitter eine Klangquelle irgendwo in der Welt. Kira übernimmt selbst die Berechnung von Panning und Lautstärke-Abnahme mit der Entfernung – du musst nichts selbst rechnen."),

@@ -1,7 +1,6 @@
 //! Abfragen und Setzer, Menues, Stil je Widget, Geometrie und Lebenslauf zur Laufzeit, Text- und Formularbefehle.
 //!
-//! Teil von `gui.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `gui.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
@@ -255,15 +254,17 @@ impl Gui {
     pub fn hovered(&self, h: i64) -> Result<bool, String> { Ok(self.wdg(h, "GUI_HOVERED")?.hovered) }
     pub fn checked(&self, h: i64) -> Result<bool, String> {
         let w = self.wdg(h, "GUI_CHECKED")?;
-        if !matches!(w.kind, Kind::Checkbox | Kind::Radio | Kind::Toggle | Kind::Eigen) { return Err("GUI_CHECKED: Widget ist keine checkbox/radio/toggle".into()); }
+        if !matches!(w.kind, Kind::Checkbox | Kind::Radio | Kind::Toggle | Kind::Eigen) { return Err("GUI_CHECKED: das Widget ist kein GUI_CHECKBOX, GUI_RADIO oder GUI_TOGGLE".into()); }
         Ok(w.checked)
     }
     pub fn value(&self, h: i64) -> Result<f64, String> {
         let w = self.wdg(h, "GUI_VALUE")?;
         match w.kind {
             Kind::Slider | Kind::Progress | Kind::Spinner | Kind::Knob | Kind::Eigen => Ok(w.value),
-            Kind::Splitter => Ok(if w.group == "v" { w.x as f64 } else { w.y as f64 }),
-            _ => Err("GUI_VALUE: Widget ist kein slider/progress/spinner/splitter/knob".into()),
+            // Logisch wie GUI_GET_X (bis 2026.53 Bildschirmpixel: bei
+            // GUI_SCALE(2) sagte GUI_GET_X 100 und GUI_GET_VALUE 200).
+            Kind::Splitter => Ok(self.unsk(if w.group == "v" { w.x } else { w.y }) as f64),
+            _ => Err("GUI_VALUE: das Widget ist kein GUI_SLIDER, GUI_PROGRESS, GUI_SPINNER, GUI_SPLITTER oder GUI_KNOB".into()),
         }
     }
     pub fn text(&self, h: i64) -> Result<String, String> {
@@ -330,7 +331,7 @@ impl Gui {
     }
     pub fn set_checked(&mut self, h: i64, f: bool) -> Result<(), String> {
         let kind = self.wdg(h, "GUI_SET_CHECKED")?.kind;
-        if !matches!(kind, Kind::Checkbox | Kind::Radio | Kind::Toggle | Kind::Eigen) { return Err("GUI_SET_CHECKED: Widget ist keine checkbox/radio/toggle".into()); }
+        if !matches!(kind, Kind::Checkbox | Kind::Radio | Kind::Toggle | Kind::Eigen) { return Err("GUI_SET_CHECKED: das Widget ist kein GUI_CHECKBOX, GUI_RADIO oder GUI_TOGGLE".into()); }
         {
             let w = self.wdg_mut(h, "GUI_SET_CHECKED")?;
             w.checked = f;
@@ -343,16 +344,18 @@ impl Gui {
         Ok(())
     }
     pub fn set_value(&mut self, h: i64, v: f64) -> Result<(), String> {
+        // Ein Splitter nimmt die Lage logisch (wie GUI_SET_BOUNDS).
+        let px = self.sk(v.round().clamp(-1e6, 1e6) as i32);
         let w = self.wdg_mut(h, "GUI_SET_VALUE")?;
         match w.kind {
             Kind::Slider | Kind::Progress | Kind::Spinner | Kind::Knob => { w.value = v.clamp(w.min, w.max); }
             // Selbst gezeichnet: der Wert gehoert dem Programm (Rolle "slider").
             Kind::Eigen => { w.value = v; }
             Kind::Splitter => {
-                let c = (v.round() as i32).clamp(w.min as i32, w.max as i32);
+                let c = px.clamp(w.min as i32, w.max as i32);
                 if w.group == "v" { w.x = c; } else { w.y = c; }
             }
-            _ => return Err("GUI_SET_VALUE: Widget ist kein slider/progress/spinner/splitter".into()),
+            _ => return Err("GUI_SET_VALUE: das Widget ist kein GUI_SLIDER, GUI_PROGRESS, GUI_SPINNER oder GUI_SPLITTER".into()),
         }
         Ok(())
     }
@@ -416,6 +419,8 @@ impl Gui {
     }
 
     pub fn set_color(&mut self, h: i64, role: String, color: i64) -> Result<(), String> {
+        // Gross/klein wie bei GUI_GET_COLOR egal (bis 2026.53 nur klein).
+        let role = role.to_lowercase();
         if !matches!(role.as_str(), "bg" | "fg" | "border" | "accent" | "hover" | "pressed") {
             return Err("GUI_SET_COLOR: role muss bg/fg/border/accent/hover/pressed sein".into());
         }
@@ -485,11 +490,14 @@ impl Gui {
     /// GUI_STYLE_GET(name$, prop$): ein Wert eines benannten Styles, -1 wenn
     /// er ihn nicht setzt. Ein unbekannter Style ist ein Fehler.
     pub fn style_get(&self, name: &str, prop: &str) -> Result<i64, String> {
+        let prop = prop.to_lowercase();
+        let prop = prop.as_str();
         let s = self.styles.get(name)
             .ok_or_else(|| format!("GUI_STYLE_GET: unbekannter Style '{}'", name))?;
         Ok(s.get(prop).copied().unwrap_or(-1))
     }
     pub fn style_set(&mut self, name: String, prop: String, value: i64) -> Result<(), String> {
+        let prop = prop.to_lowercase();
         if !matches!(prop.as_str(), "bg" | "fg" | "border" | "accent" | "hover" | "pressed" | "font" | "font_size") {
             return Err("GUI_STYLE_SET: prop muss bg/fg/border/accent/hover/pressed/font/font_size sein".into());
         }
@@ -531,6 +539,13 @@ impl Gui {
     }
     pub fn destroy(&mut self, h: i64) -> Result<(), String> {
         let (wi, i) = Self::dec_widget(h);
+        // Freigeben ist still, auch doppelt (Handle-Regel); nur eine Nummer,
+        // die es nie gab, ist ein Fehler.
+        match self.windows.get(wi).and_then(|w| w.widgets.get(i)) {
+            None => return Err(format!("GUI_WIDGET_FREE: ungueltiges GUI_WIDGET-Handle {}", h)),
+            Some(w) if !w.alive || !self.windows[wi].alive => return Ok(()),
+            _ => {}
+        }
         let wd = self.wdg_mut(h, "GUI_DESTROY")?;
         wd.alive = false;
         // Haengende Interaktions-Referenzen auf dieses Widget loesen.
@@ -675,9 +690,9 @@ impl Gui {
         }
         Ok(())
     }
-    pub fn window_bounds(&self, h: i64) -> Result<(i32, i32, i32, i32), String> {
+    pub fn window_bounds(&self, h: i64, fn_: &str) -> Result<(i32, i32, i32, i32), String> {
         let w = self.windows.get(h as usize)
-            .ok_or("GUI_WINDOW_GET_*: ungueltiges GUI_WINDOW-Handle")?;
+            .ok_or_else(|| format!("{}: ungueltiges GUI_WINDOW-Handle {}", fn_, h))?;
         Ok((self.unsk(w.x), self.unsk(w.y), self.unsk(w.w), self.unsk(w.h)))
     }
     /// Breite und Hoehe des INHALTSbereichs -- unter Titel-, Menue- und
@@ -685,10 +700,10 @@ impl Gui {
     /// Programm mit Menue die Hoehe der Leiste raten, und die haengt an Thema
     /// und Massstab (gefunden beim Dogfooding 2026-10-09: die Statusleiste
     /// eines Notizzettels sass zu hoch).
-    pub fn window_inhalt(&self, h: i64) -> Result<(i32, i32), String> {
+    pub fn window_inhalt(&self, h: i64, fn_: &str) -> Result<(i32, i32), String> {
         let wi = h as usize;
         let w = self.windows.get(wi)
-            .ok_or("GUI_WINDOW_CONTENT_*: ungueltiges GUI_WINDOW-Handle")?;
+            .ok_or_else(|| format!("{}: ungueltiges GUI_WINDOW-Handle {}", fn_, h))?;
         Ok((self.unsk(w.w), self.unsk((w.h - self.content_top(wi)).max(0))))
     }
     /// Loest JEDE Interaktions-Referenz auf Fenster `wi` (oder ein Widget
@@ -725,6 +740,11 @@ impl Gui {
         if self.context_open.map(|(w, _, _, _)| w) == Some(wi) { self.context_open = None; }
     }
     pub fn window_destroy(&mut self, h: i64) -> Result<(), String> {
+        match self.windows.get(h as usize) {
+            None => return Err(format!("GUI_WINDOW_FREE: ungueltiges GUI_WINDOW-Handle {}", h)),
+            Some(w) if !w.alive => return Ok(()),
+            _ => {}
+        }
         let win = self.win_mut(h, "GUI_WINDOW_DESTROY")?;
         win.alive = false; win.visible = false;
         let wi = h as usize;
@@ -818,22 +838,21 @@ impl Gui {
         if w.kind != Kind::TextInput {
             return Err("GUI_TEXTINPUT_SET: das Widget ist kein GUI_TEXTINPUT".into());
         }
-        match key.to_lowercase().as_str() {
-            "passwort" | "password" => w.passwort = wert != 0.0,
-            "nur_lesen" | "readonly" => w.nur_lesen = wert != 0.0,
-            "maxlaenge" | "maxlen" => {
+        match super::einstellungen::schluessel("GUI_TEXTINPUT_SET", key, super::einstellungen::TEXTINPUT)? {
+            "passwort" => w.passwort = wert != 0.0,
+            "nur_lesen" => w.nur_lesen = wert != 0.0,
+            "maxlaenge" => {
                 if wert < 0.0 { return Err("GUI_TEXTINPUT_SET: maxlaenge muss >= 0 sein (0 = frei)".into()); }
                 w.maxlaenge = wert as i32;
             }
-            "zahlen" | "numeric" => {
+            "zahlen" => {
                 if !(0.0..=3.0).contains(&wert) || wert.fract() != 0.0 {
                     return Err("GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl), 2 (Kommazahl) oder 3 (Geldbetrag in Cent)".into());
                 }
                 w.zahlen = wert as u8;
             }
-            "suche" | "search" => return self.feld_suche_setzen(h, wert != 0.0),
-            _ => return Err(format!(
-                "GUI_TEXTINPUT_SET: unbekannter Schluessel '{}' -- passwort, nur_lesen, maxlaenge, zahlen, suche", key)),
+            "suche" => return self.feld_suche_setzen(h, wert != 0.0),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -847,23 +866,14 @@ impl Gui {
             return Err("GUI_TEXTINPUT_GET: das Widget ist kein GUI_TEXTINPUT".into());
         }
         let b = |x: bool| if x { 1.0 } else { 0.0 };
-        Ok(match key.to_lowercase().as_str() {
-            "passwort" | "password" => b(w.passwort),
-            "nur_lesen" | "readonly" => b(w.nur_lesen),
-            "maxlaenge" | "maxlen" => w.maxlaenge as f64,
-            "zahlen" | "numeric" => w.zahlen as f64,
-            "suche" | "search" => b(Self::feld_ist_suche(w)),
-            _ => return Err(format!(
-                "GUI_TEXTINPUT_GET: unbekannter Schluessel '{}' -- passwort, nur_lesen, maxlaenge, zahlen, suche", key)),
+        Ok(match super::einstellungen::schluessel("GUI_TEXTINPUT_GET", key, super::einstellungen::TEXTINPUT)? {
+            "passwort" => b(w.passwort),
+            "nur_lesen" => b(w.nur_lesen),
+            "maxlaenge" => w.maxlaenge as f64,
+            "zahlen" => w.zahlen as f64,
+            "suche" => b(Self::feld_ist_suche(w)),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         })
-    }
-    /// GUI_TEXTINPUT_PLACEHOLDER$(tf): der graue Text im leeren Feld.
-    pub fn textinput_placeholder(&self, h: i64) -> Result<String, String> {
-        let w = self.wdg(h, "GUI_TEXTINPUT_PLACEHOLDER$")?;
-        if !matches!(w.kind, Kind::TextInput | Kind::TextArea) {
-            return Err("GUI_TEXTINPUT_PLACEHOLDER$: das Widget ist kein GUI_TEXTINPUT oder GUI_TEXTAREA".into());
-        }
-        Ok(w.placeholder.clone())
     }
 
     /// GUI_ENTERED(tf) -- wurde in DIESEM Bild Enter im Textfeld gedrueckt?
@@ -961,15 +971,7 @@ impl Gui {
     /// Text auf `breite` Pixel kuerzen: passt er, unveraendert, sonst so viele
     /// Zeichen, wie mit "..." dahinter passen.
     pub(super) fn text_kuerzen(&self, g: &Graphics, wdg: &Widget, text: &str, breite: i32) -> String {
-        if self.wtext_width(g, wdg, text) <= breite { return text.to_string(); }
-        let zeichen: Vec<char> = text.chars().collect();
-        let mut n = zeichen.len();
-        while n > 0 {
-            n -= 1;
-            let probe: String = zeichen[..n].iter().collect::<String>() + "...";
-            if self.wtext_width(g, wdg, &probe) <= breite { return probe; }
-        }
-        String::new()
+        super::bausteine::kuerzen_mit(text, 1, breite, &|s| self.wtext_width(g, wdg, s))
     }
 
     /// Text an Wortgrenzen auf `breite` Pixel umbrechen. Ein Wort, das allein

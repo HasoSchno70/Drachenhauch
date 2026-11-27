@@ -21,9 +21,10 @@ IMPORT "save"
 | `SAVE_GET_INT/FLOAT/STRING/BOOL(s, key$)` | strict — a missing key is an error |
 | `SAVE_GET_INT_OR/FLOAT_OR/STRING_OR/BOOL_OR(s, key$, default)` | with fallback — returns `default` if the key is missing or has the wrong type |
 | `SAVE_HAS(s, key$)` | BOOLEAN — is the key set? |
-| `SAVE_DELETE(s, key$)` | idempotent |
+| `SAVE_DELETE(s, key$)` | BOOLEAN — TRUE if the key existed; idempotent |
 | `SAVE_CLEAR(s)` | all keys gone, version stays |
 | `SAVE_KEYS(s)` | STRING — sorted list |
+| `SAVE_GET_KEYS(s)` | ARRAY OF STRING — the keys, sorted, like `MAP_KEYS` |
 
 ## Concept
 

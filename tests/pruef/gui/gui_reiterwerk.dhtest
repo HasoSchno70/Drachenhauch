@@ -257,7 +257,7 @@ END TRY
 DHRT_FRAMES=1
 --- enthaelt
 Seite 3 gibt es nicht
-kein Reiterwerk
+kein GUI_TABCONTROL
 
 === pfeile blaettern, wenn das reiterwerk den fokus hat
 ' Ohne Tastatur waere es das einzige Bedienelement, das man nur mit der Maus
@@ -413,14 +413,14 @@ GUI_TABCONTROL_SET(tc, "farbe", 1)
 --- umgebung
 DHRT_FRAMES=1
 --- fehler
-bekannt: schliessbar
+moeglich sind schliessbar/closable
 
 === ein breiter titel bekommt einen kopf, der ihn fasst
 ' Die Koepfe richten sich nach der gemessenen Beschriftung, nicht nach der
 ' Zeichenzahl (8 je Zeichen): acht W sind breiter als 64 Punkte. Ein Klick
 ' ans Ende ihres Textes bleibt auf der ersten Seite -- frueher lag dort
 ' schon der zweite Kopf (gefunden mit der Kuehlschrank-App, "Lagerorte").
-' GUI_TABCONTROL_ITEM_RECT liefert die Lage aus derselben Rechnung.
+' GUI_TABCONTROL_ITEM_SCREEN_RECT liefert die Lage aus derselben Rechnung.
 IMPORT "gui"
 SCREEN(500, 300, "T", 1)
 SET_WINDOW_POS(-3000, -3000)
@@ -439,12 +439,12 @@ FOR f = 1 TO 20
         DIM y0 AS INTEGER
         DIM b0 AS INTEGER
         DIM h0 AS INTEGER
-        (x0, y0, b0, h0) = GUI_TABCONTROL_ITEM_RECT(tc, 0)
+        (x0, y0, b0, h0) = GUI_TABCONTROL_ITEM_SCREEN_RECT(tc, 0)
         DIM x1 AS INTEGER
         DIM y1 AS INTEGER
         DIM b1 AS INTEGER
         DIM h1 AS INTEGER
-        (x1, y1, b1, h1) = GUI_TABCONTROL_ITEM_RECT(tc, 1)
+        (x1, y1, b1, h1) = GUI_TABCONTROL_ITEM_SCREEN_RECT(tc, 1)
         PRINT "breiter als geschaetzt "; b0 > 8 * 8 + 20; " anschluss "; x1 = x0 + b0 + 2; " hoehe "; h0
     END IF
     IF f = 12 THEN PRINT "seite "; GUI_TABCONTROL_PAGE(tc)
@@ -452,7 +452,7 @@ FOR f = 1 TO 20
     FLIP()
 NEXT
 TRY
-    GUI_TABCONTROL_ITEM_RECT(tc, 2)
+    GUI_TABCONTROL_ITEM_SCREEN_RECT(tc, 2)
 CATCH fehler
     PRINT fehler
 END TRY
@@ -468,7 +468,7 @@ DHRT_FRAMES=22
 --- erwartet
 breiter als geschaetzt TRUE anschluss TRUE hoehe 24
 seite 0
-GUI_TABCONTROL_ITEM_RECT: Seite 2 ausserhalb [0..1]
+GUI_TABCONTROL_ITEM_SCREEN_RECT: Seite 2 ausserhalb [0..1]
 
 === zu viele koepfe werden schmaler statt ueber den rand
 ' Sechs Koepfe in 300 Punkten: frueher lagen die letzten jenseits des Rands
@@ -496,7 +496,7 @@ DIM links AS INTEGER, rechts AS INTEGER
 DIM breiten AS ARRAY OF INTEGER : breiten = []
 DIM k AS INTEGER
 FOR k = 0 TO 5
-    (x, y, b, h) = GUI_TABCONTROL_ITEM_RECT(tc, k)
+    (x, y, b, h) = GUI_TABCONTROL_ITEM_SCREEN_RECT(tc, k)
     IF k = 0 THEN links = x
     rechts = x + b
     ARRAY_PUSH(breiten, b)
@@ -514,7 +514,7 @@ FOR f = 1 TO 2
 NEXT
 SAVESCREENSHOT("koepfe.png")
 DIM bild AS IMAGE : bild = LOADIMAGE("koepfe.png")
-(x, y, b, h) = GUI_TABCONTROL_ITEM_RECT(tc, 1)
+(x, y, b, h) = GUI_TABCONTROL_ITEM_SCREEN_RECT(tc, 1)
 DIM hellPunkte AS INTEGER : hellPunkte = 0
 DIM px AS INTEGER, py AS INTEGER
 FOR py = y + 4 TO y + h - 5
@@ -532,8 +532,8 @@ GUI_UPDATE()
 GUI_DRAW()
 FLIP()
 DIM b0 AS INTEGER, b1 AS INTEGER
-(x, y, b0, h) = GUI_TABCONTROL_ITEM_RECT(tc2, 0)
-(x, y, b1, h) = GUI_TABCONTROL_ITEM_RECT(tc2, 1)
+(x, y, b0, h) = GUI_TABCONTROL_ITEM_SCREEN_RECT(tc2, 0)
+(x, y, b1, h) = GUI_TABCONTROL_ITEM_SCREEN_RECT(tc2, 1)
 PRINT "ungekuerzt "; b1 > b0 * 2
 --- umgebung
 DHRT_FRAMES=12

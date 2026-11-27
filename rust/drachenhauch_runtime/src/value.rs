@@ -107,6 +107,10 @@ pub enum Value {
     AnimFsm(Rc<RefCell<crate::animfsm::AnimFsmObj>>),
     /// Modul `chart`: Diagramm (CHART_*, Referenz-Typ -- Daten + Stil).
     Chart(Rc<RefCell<crate::chart::ChartObj>>),
+    /// Ein getaggtes Handle: die Nummer eines Dings, das ein Modul verwaltet
+    /// (PDF, Datenbank, Bild, Widget ...), mit seiner Art (`handle::ARTEN`).
+    /// Rechnet und vergleicht wie seine Nummer; siehe `handle.rs`.
+    Handle(u16, i64),
 }
 
 /// Suspendierter Zustand einer Coroutine. Der Frame (ip/locals/stack/
@@ -138,6 +142,7 @@ pub struct CoroState {
     pub try_handlers: Vec<(usize, usize)>,
 }
 
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub struct Particle {
     pub x: f64, pub y: f64, pub vx: f64, pub vy: f64,
     pub lifetime: i32, pub age: i32, pub size: i32, pub color: i64,
@@ -199,7 +204,11 @@ impl SaveHandle {
     pub fn set(&mut self, k: String, v: Value) {
         if let Some(e) = self.data.iter_mut().find(|(key, _)| key == &k) { e.1 = v; } else { self.data.push((k, v)); }
     }
-    pub fn remove(&mut self, k: &str) { self.data.retain(|(key, _)| key != k); }
+    pub fn remove(&mut self, k: &str) -> bool {
+        let vorher = self.data.len();
+        self.data.retain(|(key, _)| key != k);
+        self.data.len() != vorher
+    }
 }
 
 /// FILE-Handle. `r`-Modus nutzt BufReader (READLINE/ENDOFFILE), `w`/`a` File.
@@ -256,6 +265,7 @@ pub struct TweenObj {
 }
 
 /// Zustand eines `sprite`-Objekts (entspricht `_Sprite`).
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub struct SpriteObj {
     pub tex_idx: i64,
     pub frame_w: i32,
@@ -467,7 +477,9 @@ impl Cells {
 
     // Typisierte Direkt-Zugriffe fuer Bulk-Fast-Paths (weitere Varianten
     // bei Bedarf ergaenzen -- Konsumenten matchen sonst direkt auf Cells).
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     pub fn as_ints(&self) -> Option<&[i64]> { if let Cells::Int(v) = self { Some(v) } else { None } }
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     pub fn as_vals(&self) -> Option<&[Value]> { if let Cells::Val(v) = self { Some(v) } else { None } }
 }
 
@@ -620,7 +632,6 @@ impl DhMap {
     pub fn entries(&self) -> &indexmap::map::Slice<String, Value> { self.eintraege.as_slice() }
 
     pub fn len(&self) -> usize { self.eintraege.len() }
-    pub fn is_empty(&self) -> bool { self.eintraege.is_empty() }
 
     pub fn get(&self, k: &str) -> Option<&Value> { self.eintraege.get(k) }
 
@@ -723,6 +734,13 @@ pub(crate) fn klasse_erbt(kind: &str, basis: &str) -> bool {
 /// `AS Tier` nahm ein `Auto` und eine Parameter `AS Datei` die Zahl 5, und
 /// der Fehler kam erst beim ersten Methodenaufruf, weit weg von der Stelle
 /// (docs/intern/entwurf-schnittstellen.md, Weg B).
+/// Ist `target` (klein, wie im Typ-String) ein Typ, dessen Werte echte
+/// Werte sind (keine Handle-Nummer)? Dann sein Name, so wie
+/// `Value::type_name` ihn nennt. Aus der Typtafel (`typtafel::TYPEN`).
+pub(crate) fn wert_typ(target: &str) -> Option<&'static str> {
+    crate::typtafel::typ(target).filter(|t| t.art == crate::typtafel::Art::Wert).map(|t| t.name)
+}
+
 pub(crate) fn klasse_pruefen(value: &Value, target: &str, ctx: &str) -> Result<(), String> {
     let ist = match value {
         Value::Nil => return Ok(()),
@@ -739,6 +757,14 @@ pub(crate) fn klasse_pruefen(value: &Value, target: &str, ctx: &str) -> Result<(
         }
         v => v.type_name().to_string(),
     };
+    // Ein Modultyp, der ein echter Wert ist (VEC2, JSON_HANDLE, SPRITE ...),
+    // nimmt nur seinesgleichen. Bis 2026.53 ging `DIM j AS JSON_HANDLE = 5`
+    // durch, und der Fehler kam erst beim naechsten JSON-Befehl. Typen mit
+    // Handle-Nummer (IMAGE, PDF, GUI_WIDGET ...) bleiben bei INTEGER.
+    if let Some(soll) = wert_typ(target) {
+        if value.type_name() == soll { return Ok(()); }
+        return Err(format!("{}: Erwartet {}, erhalten {}", ctx, soll, ist));
+    }
     if !ist_klasse(target) { return Ok(()); }
     Err(format!("{}: Erwartet {} (oder eine Unterklasse), erhalten {}",
         ctx, crate::namensraum::lesbar_text(&target.to_uppercase()), ist))
@@ -777,6 +803,7 @@ impl Rueckruf {
     }
 
     /// Nur fuer das Wiederherstellen aus einer Datei (dort steht bloss ein Name).
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     pub fn benannt(name: &str) -> Rueckruf {
         Rueckruf { name: Rc::from(name), empfaenger: None, vorab: Vec::new() }
     }
@@ -787,6 +814,7 @@ impl Rueckruf {
     /// Ebenso ein Lambda: sein Name (`__lambda_3`) haengt an der Stelle im
     /// Quelltext und verschiebt sich mit jeder Aenderung davor -- in einer
     /// Datei zeigte er bald auf ein anderes Lambda.
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     pub fn ist_gebunden(&self) -> bool {
         self.empfaenger.is_some() || !self.vorab.is_empty() || self.name.starts_with("__lambda_")
     }
@@ -797,7 +825,7 @@ impl Value {
         match self {
             Value::Nil => "NIL".to_string(),
             Value::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_string(),
-            Value::Int(i) => i.to_string(),
+            Value::Int(i) | Value::Handle(_, i) => i.to_string(),
             Value::Float(f) => fmt_float(*f),
             Value::Str(s) => s.to_string(),
             Value::Tuple(items) => {
@@ -897,7 +925,7 @@ impl Value {
     pub fn truthy(&self) -> bool {
         match self {
             Value::Bool(b) => *b,
-            Value::Int(i) => *i != 0,
+            Value::Int(i) | Value::Handle(_, i) => *i != 0,
             Value::Float(f) => *f != 0.0,
             Value::Str(s) => !s.is_empty(),
             Value::Nil => false,
@@ -949,7 +977,14 @@ impl Value {
             Value::Phys2d(_) => "PHYS2D_WORLD",
             Value::AnimFsm(_) => "ANIM_FSM",
             Value::Chart(_) => "CHART",
+            Value::Handle(a, _) => crate::handle::name(*a),
         }
+    }
+
+    /// Ein Handle als seine Nummer, alles andere unveraendert (fuer die
+    /// Stellen, die rechnen oder vergleichen).
+    pub fn ohne_handle(&self) -> Value {
+        match self { Value::Handle(_, n) => Value::Int(*n), v => v.clone() }
     }
 
     /// Ein Text-Wert. Nimmt `&str` (dann eine Kopie) oder einen fertigen
@@ -1056,6 +1091,10 @@ pub fn value_eq(a: &Value, b: &Value) -> bool {
         // derselben Stelle tragen womoeglich verschiedene Werte.
         (Value::Closure(x), Value::Closure(y)) => Rc::ptr_eq(x, y),
         (Value::CompMarker, Value::CompMarker) => true,
+        // Ein Handle ist seiner Art und Nummer gleich; einer nackten Zahl
+        // gleich, wenn sie seine Nummer ist (`IF bild = 0`).
+        (Value::Handle(x, n), Value::Handle(y, m)) => x == y && n == m,
+        (Value::Handle(_, n), v) | (v, Value::Handle(_, n)) => value_eq(&Value::Int(*n), v),
         _ if is_num(a) && is_num(b) => as_f64(a) == as_f64(b),
         _ => false,
     }

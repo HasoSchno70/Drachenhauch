@@ -24,7 +24,7 @@ module [`m3d`](module-m3d.md), for an orbit camera `CAMERA_ORBIT` from
 | Function | Returns | Meaning |
 |---|---|---|
 | `CAMERA3D(px, py, pz, tx, ty, tz, fovy)` | — | set the camera: position, look-at target, field of view in degrees (usually 45). Up is +Y |
-| `CAMERA3D_UPDATE(mode)` | — | let raylib move the camera: `1` free, `2` orbital, `3` first person, `4` third person — reads mouse and WASD itself |
+| `CAMERA3D_UPDATE(mode)` | — | let raylib move the camera: `1`/`"free"`, `2`/`"orbital"`, `3`/`"first_person"`, `4`/`"third_person"` (German names too: `"frei"`, `"ego"` …) — reads mouse and WASD itself |
 | `CAMERA3D_MOVE(forward, right, up, yaw, pitch[, zoom])` | — | move the camera from the program (in units, forward/right on the ground plane) and turn it (degrees: yaw to the right, pitch upwards, at most 89 degrees); `zoom` changes the distance to the target (positive = farther away). For your own key bindings, gamepad or camera flights; works from the position that `CAMERA3D` last set — so do not call `CAMERA3D` again in every frame |
 | `CAMERA3D_X()` / `CAMERA3D_Y()` / `CAMERA3D_Z()` | FLOAT | where is the camera right now? |
 | `CAMERA3D_TARGET_X()` / `CAMERA3D_TARGET_Y()` / `CAMERA3D_TARGET_Z()` | FLOAT | what is it looking at? |

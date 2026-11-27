@@ -1,11 +1,28 @@
-//! Befehle fuer System und Ablauf: zeit, Betriebssystem, Prozesse und Hintergrundaufgaben, Pruefungen (ASSERT, LOG), timer, scene.
+//! Befehle fuer System und Ablauf: zeit, Betriebssystem, Prozesse und Hintergrundaufgaben, Pruefungen (ASSERT, LOG).
 //!
-//! Teil von `vm.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `vm.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
 impl<'p> Vm<'p> {
+    /// Argumente ab `ab` als Texte; ein FELD von Texten wird ausgebreitet
+    /// (SHELL, SHELL_OUT$, SHELL_START wie PROCESS_START).
+    fn argumente_ausbreiten(a: &[Value], ab: usize, fn_: &str) -> R<Vec<String>> {
+        let mut rest = Vec::new();
+        for i in ab..a.len() {
+            match &a[i] {
+                Value::Array(arr) => for x in arr.borrow().cells.iter() {
+                    match x {
+                        Value::Str(s) => rest.push(s.to_string()),
+                        _ => return Err(format!("{}: ein Feld von Argumenten muss aus Texten bestehen", fn_)),
+                    }
+                },
+                _ => rest.push(bi_str(a, i, fn_)?.to_string()),
+            }
+        }
+        Ok(rest)
+    }
+
     /// Modul `zeit` (zeit.rs): mit Datum und Uhrzeit rechnen.
     ///
     /// Der Zeitwert ist eine ganze Zahl: Sekunden seit 1970 in ORTSZEIT --
@@ -68,10 +85,10 @@ impl<'p> Vm<'p> {
             // ZEIT_TEXT$ gibt Text, ZEIT_LESBAR fragt nach. Getrennte Namen,
             // weil "lesbar" sich als beides lesen laesst -- ich habe die
             // zwei beim Schreiben der ersten Pruefung selbst verwechselt.
-            "zeit_text$" | "zeit_text" =>
+            "zeit_text$" =>
                 Value::str_rc(zeit::format(z_int(a, 0, "ZEIT_TEXT$")?, "")),
             "zeit_lesbar" => Value::Bool(zeit::parse(z_str(a, 0, "ZEIT_LESBAR")?).is_some()),
-            "zeit_format$" | "zeit_format" => {
+            "zeit_format$" => {
                 let t = z_int(a, 0, "ZEIT_FORMAT$")?;
                 let muster = if a.len() > 1 { z_str(a, 1, "ZEIT_FORMAT$")? } else { "" };
                 Value::str_rc(zeit::format_pruefen(t, muster)?)
@@ -98,7 +115,7 @@ impl<'p> Vm<'p> {
                 z_int(a, 0, "ZEIT_PLUS")?.saturating_add(z_int(a, 1, "ZEIT_PLUS")?)),
             "zeit_diff" => Value::Int(
                 z_int(a, 0, "ZEIT_DIFF")?.saturating_sub(z_int(a, 1, "ZEIT_DIFF")?)),
-            "zeit_dauer$" | "zeit_dauer" => Value::str_rc(zeit::dauer(z_int(a, 0, "ZEIT_DAUER$")?)),
+            "zeit_dauer$" => Value::str_rc(zeit::dauer(z_int(a, 0, "ZEIT_DAUER$")?)),
             "zeit_wochentag" => Value::Int(zeit::wochentag(z_int(a, 0, "ZEIT_WOCHENTAG")?)),
             _ => return Ok(None),
         };
@@ -124,10 +141,27 @@ impl<'p> Vm<'p> {
         // braucht genau das, um sich zu bremsen -- ohne SLEEP dreht die
         // Warteschleife auf 100% eines Kerns.
         if name == "sleep" {
-            let ms = bi_int(a, 0, "SLEEP")?.max(0) as u64;
+            // Millisekunden, auch mit Komma (SLEEP(1.5)) -- bis 2026.53 nur
+            // INTEGER, obwohl der Index "SLEEP(ms: Zahl)" versprach.
+            if a.len() != 1 { return Err(format!("SLEEP: erwartet 1 Argument, erhalten {}", a.len())); }
+            let ms = crate::argument::num(&a[0], "SLEEP", Some(1))?;
+            if !ms.is_finite() { return Err(format!("SLEEP: {} ist keine Dauer", ms)); }
             // Was vor der Pause ausgegeben wurde, steht waehrend der Pause da.
             self.flush_out();
-            std::thread::sleep(std::time::Duration::from_millis(ms));
+            let ende = std::time::Instant::now() + std::time::Duration::from_secs_f64(ms.clamp(0.0, 1e9) / 1000.0);
+            loop {
+                let jetzt = std::time::Instant::now();
+                if jetzt >= ende { break; }
+                // Hoechstens 20 ms am Stueck, wenn Ton laeuft: endliche Loops,
+                // AUTOPAN und die Musik-Warteschlange brauchen ihren Takt.
+                #[cfg(feature = "graphics")]
+                let stueck = if self.audio.is_some() { std::time::Duration::from_millis(20) } else { ende - jetzt };
+                #[cfg(not(feature = "graphics"))]
+                let stueck = ende - jetzt;
+                std::thread::sleep(stueck.min(ende - jetzt));
+                #[cfg(feature = "graphics")]
+                if let Some(a) = self.audio.as_mut() { a.update(); }
+            }
             return Ok(Some(Value::Nil));
         }
         // STDIN() -- die Standardeingabe als FILE-Handle. Steht hier und nicht
@@ -138,7 +172,7 @@ impl<'p> Vm<'p> {
         // einen Strom, der sofort zu Ende ist (wie INPUT dort "" liefert).
         if name == "stdin" {
             if a.len() > 1 {
-                return Err(format!("STDIN: erwartet 0..1 Argument(e), erhalten {}", a.len()));
+                return Err(format!("STDIN: erwartet 0 bis 1 Argumente, erhalten {}", a.len()));
             }
             let kod = match a.first() {
                 None => crate::kodierung::Kodierung::Utf8,
@@ -153,7 +187,7 @@ impl<'p> Vm<'p> {
         }
         let v = match name {
             "exit" => {
-                if a.len() > 1 { return Err(format!("EXIT: erwartet 0..1 Argument(e), erhalten {}", a.len())); }
+                if a.len() > 1 { return Err(format!("EXIT: erwartet 0 bis 1 Argumente, erhalten {}", a.len())); }
                 let code = match a.first() {
                     None => 0,
                     Some(Value::Int(n)) => *n,
@@ -182,17 +216,18 @@ impl<'p> Vm<'p> {
             }
             "shell" | "shell_out$" | "shell_out" => {
                 let anzeige = if name == "shell" { "SHELL" } else { "SHELL_OUT$" };
-                if a.is_empty() { return Err(format!("{}: erwartet mind. 1 Argument (Programm)", anzeige)); }
+                if a.is_empty() { return Err(format!("{}: erwartet mindestens 1 Argument(e), erhalten 0", anzeige)); }
                 let prog = o_str(a, 0, anzeige)?.to_string();
                 // Argumente EINZELN statt als eine Kommandozeile -- damit gibt
                 // es keine Quoting-Regeln zu lernen und keine Shell, die aus
                 // einem Dateinamen mit Leerzeichen zwei Argumente macht. Wer
                 // wirklich eine Shell will, ruft sie ausdruecklich auf
                 // (SHELL("cmd", "/c", "dir | more")).
-                let mut rest: Vec<String> = Vec::new();
-                for i in 1..a.len() { rest.push(o_str(a, i, anzeige)?.to_string()); }
-                let mut cmd = std::process::Command::new(&prog);
-                cmd.args(&rest);
+                // Ein FELD von Texten wird ausgebreitet wie bei PROCESS_START;
+                // der Befehl kommt aus prozess::befehl ("dhrt" = eigene
+                // Laufzeit, keine Testvariablen) -- bis 2026.53 eigene Wege.
+                let rest = Self::argumente_ausbreiten(a, 1, anzeige)?;
+                let mut cmd = crate::prozess::befehl(&prog, &rest, anzeige)?;
                 self.flush_out();
                 if name == "shell" {
                     // Erbt stdout/stderr -- das Kind schreibt direkt aufs
@@ -218,13 +253,6 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
-    /// Hintergrund-Auftraege (WP H): SHELL_START, DB_QUERY_START und TASK_START.
-    ///
-    /// Dasselbe Muster ueberall -- starten, pro Bild nachsehen, abholen.
-    /// `shell_`/`db_query_` laufen als reine Rust-Arbeit ohne VM. `task_`
-    /// fuehrt dagegen DH-Code aus, und zwar in einem EIGENEN dhrt-Prozess:
-    /// im Thread ginge es nicht, weil `Value` ueberall `Rc` haelt und
-    /// `Program` damit weder Send noch Sync ist.
     /// Der Kindprozess zu Argument 0 (PROCESS_*), mit Meldung fuer eine
     /// unbekannte oder schon geschlossene Nummer.
     pub(super) fn prozess(&mut self, a: &[Value], fn_: &str) -> R<&mut crate::prozess::Prozess> {
@@ -235,6 +263,13 @@ impl<'p> Vm<'p> {
         Err(format!("{}: Prozess {} gibt es nicht (nie gestartet oder schon PROCESS_CLOSE)", fn_, id))
     }
 
+    /// Hintergrund-Auftraege (WP H): SHELL_START, DB_QUERY_START und TASK_START.
+    ///
+    /// Dasselbe Muster ueberall -- starten, pro Bild nachsehen, abholen.
+    /// `shell_`/`db_query_` laufen als reine Rust-Arbeit ohne VM. `task_`
+    /// fuehrt dagegen DH-Code aus, und zwar in einem EIGENEN dhrt-Prozess:
+    /// im Thread ginge es nicht, weil `Value` ueberall `Rc` haelt und
+    /// `Program` damit weder Send noch Sync ist.
     pub(super) fn try_hintergrund(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("shell_") || name.starts_with("db_query_")
              || name.starts_with("task_") || name.starts_with("window_") || name.starts_with("parent_")
@@ -247,7 +282,7 @@ impl<'p> Vm<'p> {
                 // Griff, das Kind ueberlebt das Ende dieses Programms; die
                 // Argumente nehmen beide gleich.
                 let fn_ = if name == "process_start" { "PROCESS_START" } else { "PROCESS_START_DETACHED" };
-                if a.is_empty() { return Err(format!("{}: erwartet mind. 1 Argument (Programm)", fn_)); }
+                if a.is_empty() { return Err(format!("{}: erwartet mindestens 1 Argument(e), erhalten 0", fn_)); }
                 let prog = bi_str(a, 0, fn_)?.to_string();
                 // Ein FELD von Texten wird ausgebreitet (eine variable Zahl von
                 // Argumenten liess sich vorher gar nicht uebergeben), eine MAP
@@ -284,8 +319,8 @@ impl<'p> Vm<'p> {
                 self.prozesse.push(Some(p));
                 Value::Int((self.prozesse.len() - 1) as i64)
             }
-            "process_read$" | "process_read" => Value::str_rc(&self.prozess(a, "PROCESS_READ$")?.lesen()),
-            "process_err$" | "process_err" => Value::str_rc(&self.prozess(a, "PROCESS_ERR$")?.fehler_lesen()),
+            "process_read$" => Value::str_rc(&self.prozess(a, "PROCESS_READ$")?.lesen()),
+            "process_err$" => Value::str_rc(&self.prozess(a, "PROCESS_ERR$")?.fehler_lesen()),
             "process_write" => {
                 let text = bi_str(a, 1, "PROCESS_WRITE")?.to_string();
                 self.prozess(a, "PROCESS_WRITE")?.schreiben(&text)?;
@@ -305,7 +340,7 @@ impl<'p> Vm<'p> {
             // Dieselben Funktionen, die `dhrt lsp` VS Code anbietet -- eine IDE
             // in Drachenhauch braucht dafuer keinen zweiten Prozess und keine
             // JSON-RPC-Rahmung in BASIC. Zeilen und Spalten zaehlen ab 1.
-            "code_check$" | "code_check" => {
+            "code_check$" => {
                 let text = bi_str(a, 0, "CODE_CHECK$")?.to_string();
                 let basis = if a.len() > 1 { std::path::PathBuf::from(bi_str(a, 1, "CODE_CHECK$")?) }
                             else { std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")) };
@@ -338,7 +373,7 @@ impl<'p> Vm<'p> {
                 }).collect();
                 Value::str_rc(&serde_json::Value::Array(liste).to_string())
             }
-            "code_hover$" | "code_hover" => {
+            "code_hover$" => {
                 let text = bi_str(a, 0, "CODE_HOVER$")?;
                 let z = bi_int(a, 1, "CODE_HOVER$")?.max(1) as usize - 1;
                 let s = bi_int(a, 2, "CODE_HOVER$")?.max(1) as usize - 1;
@@ -386,23 +421,23 @@ impl<'p> Vm<'p> {
             // mit `einruecken` (Vorgabe TRUE) die Bloecke neu eingerueckt. Leer,
             // wenn sich die Quelle nicht lexen laesst: an kaputtem Code
             // herumzuruecken hilft niemandem, und die IDE sagt es dann.
-            "code_format$" | "code_format" => {
+            "code_format$" => {
                 let text = bi_str(a, 0, "CODE_FORMAT$")?;
-                let einruecken = if a.len() > 1 { a[1].truthy() } else { true };
+                let einruecken = crate::argument::a_schalter_oder(a, 1, true, "CODE_FORMAT$")?;
                 Value::str_rc(crate::formatiere(text, einruecken, "    ").unwrap_or_default())
             }
             // CODE_RENAME$: ein Symbol im ganzen Text umbenennen. Liefert den
             // neuen Quelltext, oder LEER, wenn an der Stelle kein Name steht
             // oder der neue keiner ist -- ein Aufrufer, der das nicht prueft,
             // schreibt dann nichts, statt die Datei zu leeren.
-            "code_rename$" | "code_rename" => {
+            "code_rename$" => {
                 let text = bi_str(a, 0, "CODE_RENAME$")?;
                 let z = bi_int(a, 1, "CODE_RENAME$")?.max(1) as usize - 1;
                 let s = bi_int(a, 2, "CODE_RENAME$")?.max(1) as usize - 1;
                 let neu = bi_str(a, 3, "CODE_RENAME$")?;
                 Value::str_rc(crate::lsp::umbenennen(text, z, s, neu).unwrap_or_default())
             }
-            "code_method_calls$" | "code_method_calls" => {
+            "code_method_calls$" => {
                 let text = bi_str(a, 0, "CODE_METHOD_CALLS$")?.to_string();
                 let basis = code_basis(a, 1, "CODE_METHOD_CALLS$")?
                     .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
@@ -412,11 +447,11 @@ impl<'p> Vm<'p> {
             }
             // CODE_CLASSES$: Klassen und Structs des Textes mit ihren
             // Mitgliedern als JSON, ohne zu uebersetzen (lsp::klassen_struktur).
-            "code_classes$" | "code_classes" => {
+            "code_classes$" => {
                 let text = bi_str(a, 0, "CODE_CLASSES$")?;
                 Value::str_rc(crate::lsp::klassen_struktur(text).to_string())
             }
-            "code_types$" | "code_types" => {
+            "code_types$" => {
                 let text = bi_str(a, 0, "CODE_TYPES$")?.to_string();
                 let basis = if a.len() > 1 { std::path::PathBuf::from(bi_str(a, 1, "CODE_TYPES$")?) }
                             else { std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")) };
@@ -439,7 +474,7 @@ impl<'p> Vm<'p> {
                 Value::Tuple(std::rc::Rc::new(vec![
                     crate::builtins::new_int_array(starts),
                     crate::builtins::new_int_array(laengen),
-                    crate::builtins::new_string_array(arten),
+                    crate::builtins::new_str_array(arten),
                 ]))
             }
             "code_names" => {
@@ -448,7 +483,7 @@ impl<'p> Vm<'p> {
                 for (k, n) in crate::syntax::namen_zaehlen(text) { m.put(k, Value::Int(n)); }
                 Value::Map(std::rc::Rc::new(std::cell::RefCell::new(m)))
             }
-            "code_symbols$" | "code_symbols" => {
+            "code_symbols$" => {
                 fn um(v: &serde_json::Value) -> serde_json::Value {
                     serde_json::json!({
                         "name": v["name"], "art": match (v["kind"].as_i64(), v["detail"].as_str()) {
@@ -473,7 +508,7 @@ impl<'p> Vm<'p> {
                 for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(&s)); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
-            "printer_default$" | "printer_default" => Value::str_rc(crate::drucken::standard_drucker()?),
+            "printer_default$" => Value::str_rc(crate::drucken::standard_drucker()?),
             // ===== Fenster als Prozess (docs/intern/entwurf-native-fenster.md, Weg B) =====
             // Ein zweites OS-Fenster ist ein zweiter dhrt mit eigenem SCREEN;
             // die Seiten reden ueber Textzeilen. Kein geteilter Zustand --
@@ -499,7 +534,7 @@ impl<'p> Vm<'p> {
                 Value::Int(self.fenster.oeffnen(exe, &datei, &args)?)
             }
             "window_send" => { self.fenster.senden(bi_int(a, 0, "WINDOW_SEND")?, bi_str(a, 1, "WINDOW_SEND")?)?; Value::Nil }
-            "window_recv$" | "window_recv" => Value::str_rc(&self.fenster.empfangen(bi_int(a, 0, "WINDOW_RECV$")?)?),
+            "window_recv$" => Value::str_rc(&self.fenster.empfangen(bi_int(a, 0, "WINDOW_RECV$")?)?),
             "window_alive" => Value::Bool(self.fenster.lebt(bi_int(a, 0, "WINDOW_ALIVE")?)?),
             "window_close" => { self.fenster.schliessen(bi_int(a, 0, "WINDOW_CLOSE")?)?; Value::Nil }
             "parent_send" | "parent_recv$" | "parent_recv" | "parent_alive" => {
@@ -518,10 +553,9 @@ impl<'p> Vm<'p> {
                 }
             }
             "shell_start" => {
-                if a.is_empty() { return Err("SHELL_START: erwartet mind. 1 Argument (Programm)".into()); }
+                if a.is_empty() { return Err("SHELL_START: erwartet mindestens 1 Argument(e), erhalten 0".into()); }
                 let prog = bi_str(a, 0, "SHELL_START")?.to_string();
-                let mut rest: Vec<String> = Vec::new();
-                for i in 1..a.len() { rest.push(bi_str(a, i, "SHELL_START")?.to_string()); }
+                let rest = Self::argumente_ausbreiten(a, 1, "SHELL_START")?;
                 Value::Int(self.shell_auftraege.start(&prog.clone(),
                     move || crate::hintergrund::shell_arbeit(prog, rest)))
             }
@@ -591,10 +625,10 @@ impl<'p> Vm<'p> {
             // das Ergebnis wegnehmen, je nachdem wer zuerst fragt. Was der
             // Auftrag gedruckt hat, geht damit verloren: ein Auftrag rechnet,
             // er redet nicht.
-            "task_result$" | "task_result" => {
+            "task_result$" => {
                 let id = bi_int(a, 0, "TASK_RESULT$")?;
                 match self.task_auftraege.abholen(id, "TASK_RESULT$")? {
-                    Some(Ok(e)) => Value::str_rc(&e.ergebnis),
+                    Some(Ok(e)) => Value::str_rc(&e),
                     Some(Err(e)) => return Err(e),
                     None => return Err(format!(
                         "TASK_RESULT$: Auftrag {} ist noch nicht fertig -- erst \
@@ -605,7 +639,7 @@ impl<'p> Vm<'p> {
             "task_pending" => Value::Int(self.task_auftraege.offen()),
 
             "shell_ready" => Value::Bool(self.shell_auftraege.fertig(bi_int(a, 0, "SHELL_READY")?, "SHELL_READY")?),
-            "shell_result$" | "shell_result" => {
+            "shell_result$" => {
                 let id = bi_int(a, 0, "SHELL_RESULT$")?;
                 match self.shell_auftraege.abholen(id, "SHELL_RESULT$")? {
                     Some(Ok(e)) => {
@@ -621,66 +655,20 @@ impl<'p> Vm<'p> {
                     // Abholen ohne vorheriges SHELL_READY ist der haeufigste
                     // Anfaengerfehler -- die Meldung sagt, was fehlt.
                     None => return Err(format!(
-                        "SHELL_RESULT$: Auftrag {} ist nicht fertig (oder schon abgeholt) -- erst SHELL_READY({}) abfragen", id, id)),
+                        "SHELL_RESULT$: Auftrag {} ist noch nicht fertig -- erst SHELL_READY({}) abfragen", id, id)),
                 }
             }
             "shell_code" => {
-                if !a.is_empty() { return Err("SHELL_CODE: erwartet 0 Argumente (gilt fuer den zuletzt abgeholten Auftrag)".into()); }
+                if !a.is_empty() { return Err(format!("SHELL_CODE: erwartet 0 Argumente, erhalten {}", a.len())); }
                 Value::Int(self.shell_letzter_code)
             }
-            "shell_err$" | "shell_err" => {
-                if !a.is_empty() { return Err("SHELL_ERR$: erwartet 0 Argumente (gilt fuer den zuletzt abgeholten Auftrag)".into()); }
+            "shell_err$" => {
+                if !a.is_empty() { return Err(format!("SHELL_ERR$: erwartet 0 Argumente, erhalten {}", a.len())); }
                 Value::str_rc(&self.shell_letzter_fehler)
             }
             "shell_cancel" => { self.shell_auftraege.abbrechen(bi_int(a, 0, "SHELL_CANCEL")?); Value::Nil }
             "shell_pending" => Value::Int(self.shell_auftraege.offen()),
             _ => return self.try_hintergrund_db(name, a),
-        };
-        Ok(Some(v))
-    }
-
-    #[cfg(not(feature = "db"))]
-    pub(super) fn try_hintergrund_db(&mut self, _name: &str, _a: &[Value]) -> R<Option<Value>> { Ok(None) }
-
-    /// Abfragen im Hintergrund (WP H).
-    ///
-    /// Der Auftrag oeffnet eine EIGENE Verbindung zur Datei, statt die des
-    /// Programms mitzunehmen: eine `rusqlite::Connection` ist `Send`, aber
-    /// nicht `Sync` -- sie mitzugeben hiesse, sie dem Hauptthread wegzunehmen,
-    /// und der soll ja weiterarbeiten koennen. Preis dafuer: der Auftrag sieht
-    /// nur, was schon festgeschrieben ist, nicht die offene Transaktion des
-    /// Programms. Steht so in der Doku.
-    #[cfg(feature = "db")]
-    pub(super) fn try_hintergrund_db(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        let v = match name {
-            "db_query_start" => {
-                let datei = bi_str(a, 0, "DB_QUERY_START")?.to_string();
-                let sql = bi_str(a, 1, "DB_QUERY_START")?.to_string();
-                let params = db_params(a.get(2..).unwrap_or(&[]), "DB_QUERY_START")?;
-                let kurz = sql.chars().take(40).collect::<String>();
-                Value::Int(self.db_auftraege.start(&kurz, move || {
-                    // Eine eigene Verbindung -- zur Datei oder zum Server.
-                    let mut conn = crate::db::open(&datei)
-                        .map_err(|e| e.replacen("DB_OPEN", "DB_QUERY_START", 1))?;
-                    conn.query(&sql, &params, "DB_QUERY_START")
-                }))
-            }
-            "db_query_ready" => Value::Bool(self.db_auftraege.fertig(bi_int(a, 0, "DB_QUERY_READY")?, "DB_QUERY_READY")?),
-            "db_query_result" => {
-                let id = bi_int(a, 0, "DB_QUERY_RESULT")?;
-                match self.db_auftraege.abholen(id, "DB_QUERY_RESULT")? {
-                    Some(Ok(res)) => {
-                        self.db_results.push(res);
-                        Value::Int((self.db_results.len() - 1) as i64)
-                    }
-                    Some(Err(msg)) => return Err(msg),
-                    None => return Err(format!(
-                        "DB_QUERY_RESULT: Auftrag {} ist nicht fertig (oder schon abgeholt) -- erst DB_QUERY_READY({}) abfragen", id, id)),
-                }
-            }
-            "db_query_cancel" => { self.db_auftraege.abbrechen(bi_int(a, 0, "DB_QUERY_CANCEL")?); Value::Nil }
-            "db_query_pending" => Value::Int(self.db_auftraege.offen()),
-            _ => return Ok(None),
         };
         Ok(Some(v))
     }
@@ -700,13 +688,13 @@ impl<'p> Vm<'p> {
                 if !a.is_empty() { return Err("ERROR_LINE: erwartet 0 Argumente".into()); }
                 Value::Int(self.error_line as i64)
             }
-            "error_code$" | "error_code" => {
+            "error_code$" => {
                 if !a.is_empty() { return Err("ERROR_CODE$: erwartet 0 Argumente".into()); }
                 Value::str_rc(&self.error_code)
             }
             "assert" => {
                 if a.is_empty() || a.len() > 2 {
-                    return Err(format!("ASSERT: erwartet 1..2 Argumente (bedingung [, meldung]), erhalten {}", a.len()));
+                    return Err(format!("ASSERT: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
                 }
                 // Absichtlich streng auf BOOLEAN: `ASSERT(anzahl)` waere sonst
                 // still "wahr, weil nicht null" -- und eine Pruefung, die aus
@@ -725,7 +713,7 @@ impl<'p> Vm<'p> {
             }
             "assert_eq" => {
                 if a.len() < 2 || a.len() > 3 {
-                    return Err(format!("ASSERT_EQ: erwartet 2..3 Argumente (ist, soll [, was]), erhalten {}", a.len()));
+                    return Err(format!("ASSERT_EQ: erwartet 2 bis 3 Argumente, erhalten {}", a.len()));
                 }
                 // Dieselbe Gleichheit wie der `=`-Operator der Sprache --
                 // eine zweite Vorstellung davon, wann zwei Werte gleich sind,
@@ -814,12 +802,12 @@ impl<'p> Vm<'p> {
         Ok(Value::Nil)
     }
 
-    /// Ab welcher Stufe LOG_* etwas ausgibt. Aus `DH_LOG` (debug/info/warn/
+    /// Ab welcher Stufe LOG_* etwas ausgibt. Aus `DHRT_LOG` (debug/info/warn/
     /// error/aus), einmal nachgesehen und dann gemerkt. Vorgabe: `info` --
     /// LOG_DEBUG schweigt also, bis jemand es einschaltet.
     pub(super) fn log_schwelle(&mut self) -> u8 {
         if let Some(p) = self.log_pegel { return p; }
-        let p = match std::env::var("DH_LOG").unwrap_or_default().to_ascii_lowercase().as_str() {
+        let p = match crate::umgebung::var("DHRT_LOG").unwrap_or_default().to_ascii_lowercase().as_str() {
             "debug" => 0,
             "warn" => 2,
             "error" => 3,
@@ -848,99 +836,4 @@ impl<'p> Vm<'p> {
         self.out_zeit = std::time::Instant::now();
     }
 
-    /// Modul `timer` (timer.rs): AFTER/EVERY/CANCEL/UPDATE + COOLDOWN.
-    /// Kein Grafik-Bezug -- laeuft auch konsolen-only. TIMER_UPDATE feuert
-    /// faellige FUNCREF-Callbacks nach dem gleichen Muster wie GUI_UPDATE.
-    pub(super) fn try_timer(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        if !(name.starts_with("timer_") || name == "cooldown") { return Ok(None); }
-        fn t_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
-            crate::argument::a_int(a, i, fn_)
-        }
-        fn t_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-            crate::argument::a_text(a, i, fn_)
-        }
-        fn t_func(a: &[Value], i: usize, fn_: &str) -> R<crate::value::Rueckruf> {
-            match a.get(i).and_then(crate::value::Rueckruf::aus_wert) {
-                Some(cb) => Ok(cb),
-                None => Err(format!("{}: erwartet FUNCREF (Arg {})", fn_, i + 1)),
-            }
-        }
-        let r = match name {
-            "timer_after" => {
-                let ms = t_int(a, 0, "TIMER_AFTER")?;
-                if ms < 0 { return Err("TIMER_AFTER: ms muss >= 0 sein".into()); }
-                Value::Int(self.timers.after(ms, t_func(a, 1, "TIMER_AFTER")?))
-            }
-            "timer_every" => {
-                let ms = t_int(a, 0, "TIMER_EVERY")?;
-                if ms <= 0 { return Err("TIMER_EVERY: ms muss > 0 sein".into()); }
-                Value::Int(self.timers.every(ms, t_func(a, 1, "TIMER_EVERY")?))
-            }
-            "timer_cancel" => { self.timers.cancel(t_int(a, 0, "TIMER_CANCEL")?); Value::Nil }
-            "timer_active" => Value::Bool(self.timers.active(t_int(a, 0, "TIMER_ACTIVE")?)),
-            "timer_count" => Value::Int(self.timers.count()),
-            "timer_clear" => { self.timers.clear(); Value::Nil }
-            "timer_update" => {
-                // Faellige Callbacks NACH dem Einsammeln feuern -- ein Callback
-                // darf selbst Timer registrieren/canceln; neue Eintraege werden
-                // erst beim naechsten Update faellig geprueft.
-                for cb in self.timers.take_due() {
-                    self.rueckruf_rufen(&cb, "TIMER-Callback")?;
-                }
-                Value::Nil
-            }
-            "cooldown" => {
-                let id = t_str(a, 0, "COOLDOWN")?.to_string();
-                let ms = t_int(a, 1, "COOLDOWN")?;
-                if ms < 0 { return Err("COOLDOWN: ms muss >= 0 sein".into()); }
-                Value::Bool(self.timers.cooldown(&id, ms))
-            }
-            _ => return Ok(None),
-        };
-        Ok(Some(r))
-    }
-
-    pub(super) fn try_scene(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        if !(name.starts_with("scene_")) { return Ok(None); }
-        fn sa<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-            crate::argument::a_text(a, i, fn_)
-        }
-        let r = match name {
-            "scene_push" => { self.scene_stack.push((sa(a, 0, "SCENE_PUSH")?.to_string(), HashMap::new())); Value::Nil }
-            "scene_pop" => { if self.scene_stack.is_empty() { return Err("SCENE_POP: Stack ist bereits leer".into()); } self.scene_stack.pop(); Value::Nil }
-            "scene_switch" => { let n = sa(a, 0, "SCENE_SWITCH")?.to_string(); self.scene_stack.clear(); self.scene_stack.push((n, HashMap::new())); Value::Nil }
-            "scene_current" => Value::str_rc(self.scene_stack.last().map(|(n, _)| n.as_str()).unwrap_or("")),
-            "scene_depth" => Value::Int(self.scene_stack.len() as i64),
-            "scene_has" => { let n = sa(a, 0, "SCENE_HAS")?; Value::Bool(self.scene_stack.iter().any(|(x, _)| x == n)) }
-            "scene_reset" => { self.scene_stack.clear(); Value::Nil }
-            "scene_set_int" | "scene_set_float" | "scene_set_string" | "scene_set_bool" => {
-                let key = sa(a, 0, "SCENE_SET")?.to_string();
-                let v = match name {
-                    "scene_set_int" => match a.get(1) { Some(Value::Int(i)) => Value::Int(*i), _ => return Err("SCENE_SET_INT: value muss INTEGER sein".into()) },
-                    "scene_set_float" => match a.get(1) { Some(Value::Int(i)) => Value::Float(*i as f64), Some(Value::Float(f)) => Value::Float(*f), _ => return Err("SCENE_SET_FLOAT: value muss Zahl sein".into()) },
-                    "scene_set_string" => match a.get(1) { Some(Value::Str(s)) => Value::Str(s.clone()), _ => return Err("SCENE_SET_STRING: value muss STRING sein".into()) },
-                    _ => match a.get(1) { Some(Value::Bool(b)) => Value::Bool(*b), _ => return Err("SCENE_SET_BOOL: value muss BOOLEAN sein".into()) },
-                };
-                self.scene_top_mut()?.1.insert(key, v); Value::Nil
-            }
-            "scene_get_int" | "scene_get_float" | "scene_get_string" | "scene_get_bool" => {
-                let key = sa(a, 0, "SCENE_GET")?;
-                let data = &self.scene_top()?.1;
-                let val = data.get(key).ok_or_else(|| format!("{}: Key '{}' nicht in Scene", name.to_uppercase(), key))?;
-                let ok = scene_type_ok(val, name);
-                if !ok { return Err(format!("{}: Key '{}' hat falschen Typ", name.to_uppercase(), key)); }
-                val.clone()
-            }
-            "scene_get_int_or" | "scene_get_float_or" | "scene_get_string_or" | "scene_get_bool_or" => {
-                let key = sa(a, 0, "SCENE_GET_OR")?;
-                let def = a.get(1).cloned().unwrap_or(Value::Nil);
-                let data = &self.scene_top()?.1;
-                match data.get(key) { Some(v) if scene_type_ok(v, name) => v.clone(), _ => def }
-            }
-            "scene_has_key" => { let key = sa(a, 0, "SCENE_HAS_KEY")?; Value::Bool(self.scene_top()?.1.contains_key(key)) }
-            "scene_delete" => { let key = sa(a, 0, "SCENE_DELETE")?.to_string(); self.scene_top_mut()?.1.remove(&key); Value::Nil }
-            _ => return Ok(None),
-        };
-        Ok(Some(r))
-    }
 }

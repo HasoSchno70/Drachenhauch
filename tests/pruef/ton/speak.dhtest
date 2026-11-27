@@ -90,7 +90,7 @@ mitte laut, rand leiser TRUE
 ' Der Vorrat spart das Neurechnen gleicher Saetze, aber das Programm bekommt
 ' je Aufruf einen EIGENEN Klang. Bis 2026.53 lieferte derselbe Text dasselbe
 ' Handle aus dem Vorrat -- und nach 64 weiteren Saetzen gab SPEAK es still
-' frei ("wurde bereits mit UNLOADSOUND freigegeben").
+' frei ("wurde bereits mit SOUND_FREE freigegeben").
 IMPORT "helfer.dh"
 TRY
     DIM a AS SOUND : a = SPEAK_SOUND("Treffer")

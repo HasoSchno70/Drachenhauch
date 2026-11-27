@@ -9,6 +9,7 @@
 //!
 //! Das Textformat ist `YYYY-MM-DD` -- dasselbe, das `DATE$()` liefert. Zwei
 //! Datumsformate im selben System waeren eine Stolperfalle.
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
 
 /// Schaltjahr nach dem gregorianischen Kalender.
 pub fn schaltjahr(jahr: i32) -> bool {
@@ -108,6 +109,8 @@ pub const MONATSNAMEN: [&str; 12] = [
 ];
 
 pub const WOCHENTAGE: [&str; 7] = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+/// Dieselben Kuerzel englisch (der Datumswaehler folgt der Sprache).
+pub const WOCHENTAGE_EN: [&str; 7] = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 
 #[cfg(test)]
 mod tests {

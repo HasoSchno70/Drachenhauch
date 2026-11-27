@@ -256,15 +256,12 @@ impl Gui {
     pub(super) fn palette_zeichnen(&self, g: &mut Graphics) {
         let Some(((x, y, b, h), kopf, zh)) = self.pal_lage(g) else { return };
         let p = self.palette.as_ref().unwrap();
-        let rad = self.m("corner_radius").min(8).max(2);
         let grund = self.th("widget_bg");
         let rand = self.th("win_border");
         let text = self.th("text_fg");
         let leise = self.th("muted_fg");
         let akzent = self.th("accent");
-        g.round_rect(x + 3, y + 5, x + b + 2, y + h + 4, rad, 0x60i64 << 24, true);
-        g.round_rect(x, y, x + b - 1, y + h - 1, rad, grund, true);
-        g.round_rect(x, y, x + b - 1, y + h - 1, rad, rand, false);
+        self.popup_kasten(g, (x, y, b, h), 1.0, grund, rand);
         // Suchzeile mit Lupe, Text und Schreibmarke.
         let pad = self.sk(10);
         let th = self.ctext_height(g);
@@ -298,8 +295,7 @@ impl Gui {
             let ky = ry + (zh - th) / 2;
             let kw = if e.kuerzel.is_empty() { 0 } else { self.ctext_width(g, &e.kuerzel) + self.sk(12) };
             let platz = (b - pad * 2 - kw).max(self.sk(40));
-            let mut t = e.text.clone();
-            while t.chars().count() > 3 && self.ctext_width(g, &t) > platz { t.pop(); t = format!("{}\u{2026}", t.trim_end_matches('\u{2026}')); }
+            let t = super::bausteine::kuerzen_mit(&e.text, 1, platz, &|s| self.ctext_width(g, s));
             self.ctext(g, x + pad, ky, t, text);
             if !e.kuerzel.is_empty() {
                 let kx = x + b - pad - self.ctext_width(g, &e.kuerzel);

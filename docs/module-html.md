@@ -7,32 +7,36 @@ HTTP-Client + URL-Helpers + HTML-Parser. Alles nativ in `dhrt` (Rust, HTTP über
 IMPORT "html"
 ```
 
+`IMPORT "http"` meint dasselbe Modul — der Name `html` stammt aus der Zeit,
+als es nur Seiten las.
+
 ## Übersicht
 
 | Bereich | Funktion | Rückgabe | Bedeutung |
 |---|---|---|---|
-| HTTP | `HTTP_REQUEST(methode$, url$ [, rumpf [, kopfzeilen]])` | STRING (Antwort-Rumpf) | beliebige HTTP-Methode mit eigenem Rumpf und Kopfzeilen |
+| HTTP | `HTTP_REQUEST(method$, url$ [, body [, headers]])` | STRING (Antwort-Rumpf) | beliebige HTTP-Methode mit eigenem Rumpf und Kopfzeilen |
 | HTTP | `HTTP_GET(url$)` | STRING (Response-Body) | Seite oder Datei abrufen |
 | HTTP | `HTTP_POST(url$, body$)` | STRING | Daten senden und die Antwort lesen |
-| HTTP | `HTTP_DOWNLOAD(url$, pfad$)` | INTEGER (Bytes) | Datei herunterladen und speichern |
+| HTTP | `HTTP_DOWNLOAD(url$, path$)` | INTEGER (Bytes) | Datei herunterladen und speichern |
 | HTTP | `HTTP_STATUS()` | INTEGER (z.B. 200, 404) | Status des letzten Abrufs (200 = gut, 404 = nicht da) |
 | HTTP | `HTTP_HEADER(name$)` | STRING (Kopfzeile der Antwort) | eine Kopfzeile der letzten Antwort lesen |
 | HTTP | `HTTP_BYTES()` | BUFFER (roher Rumpf der letzten Antwort) |  |
-| HTTP | `HTTP_SET_HEADER(name$, wert$)` | — (gilt für alle folgenden Aufrufe) |  |
+| HTTP | `HTTP_SET_HEADER(name$, value$)` | — (gilt für alle folgenden Aufrufe) |  |
 | HTTP | `HTTP_CLEAR_HEADERS()` | — |  |
-| HTTP | `HTTP_TIMEOUT(sekunden)` | — |  |
-| HTTP (Hintergrund) | `HTTP_REQUEST_START(methode$, url$ [, rumpf [, kopfzeilen]])` | INTEGER (Abruf-Nummer) |  |
+| HTTP | `HTTP_TIMEOUT(seconds)` | — |  |
+| HTTP | `HTTP_SET_TIMEOUT(ms)` | — | dieselbe Frist in Millisekunden (1..600000) — wie jede Frist; `HTTP_TIMEOUT` zählt Sekunden |
+| HTTP (Hintergrund) | `HTTP_REQUEST_START(method$, url$ [, body [, headers]])` | INTEGER (Abruf-Nummer) |  |
 | HTTP (Hintergrund) | `HTTP_GET_START(url$)` | INTEGER (Abruf-Nummer) |  |
-| HTTP (Hintergrund) | `HTTP_READY(abruf)` | BOOLEAN |  |
-| HTTP (Hintergrund) | `HTTP_RESULT(abruf)` | STRING (Response-Body) |  |
-| HTTP (Hintergrund) | `HTTP_CANCEL(abruf)` | — |  |
+| HTTP (Hintergrund) | `HTTP_READY(request)` | BOOLEAN |  |
+| HTTP (Hintergrund) | `HTTP_RESULT(request)` | STRING (Response-Body) |  |
+| HTTP (Hintergrund) | `HTTP_CANCEL(request)` | — |  |
 | HTTP (Hintergrund) | `HTTP_PENDING()` | INTEGER (offene Abrufe) |  |
-| HTTP (Hintergrund) | `HTTP_URL$(abruf)` | STRING |  |
+| HTTP (Hintergrund) | `HTTP_URL$(request)` | STRING |  |
 | URL | `URL_ENCODE(s$)` | STRING | Text für eine URL sicher machen (Leerzeichen, Umlaute, `&`) |
 | URL | `URL_DECODE(s$)` | STRING | das Gegenstück — kodierten Text zurückwandeln |
-| HTML | `HTML_TEXT(html$)` | STRING (Tags raus, Entities decodiert) |  |
-| HTML | `HTML_FIND_ALL(html$, tag$)` | ARRAY OF STRING |  |
-| HTML | `HTML_GET_ATTR(tag_html$, attr$)` | STRING |  |
+| HTML | `HTML_TEXT(s$)` | STRING (Tags raus, Entities decodiert) |  |
+| HTML | `HTML_FIND_ALL(s$, tag$)` | ARRAY OF STRING |  |
+| HTML | `HTML_GET_ATTR(s$, attr$)` | STRING |  |
 
 ## HTTP_REQUEST — für alles, was über GET und POST hinausgeht
 
@@ -166,7 +170,7 @@ Für alles, was in einer Schleife läuft, gibt es darum denselben Abruf zum Nach
 |---|---|
 | `HTTP_REQUEST_START(method$, url$ [, body [, headers]])` → INTEGER | startet **jede** Anfrage im Hintergrund |
 | `HTTP_GET_START(url$)` → INTEGER | Kurzform davon für GET |
-| `HTTP_READY(request)` → BOOLEAN | ist die Antwort da? (fragt nach, wartet nicht) |
+| `HTTP_READY(request)` → BOOLEAN | ist die Antwort da? (fragt nach, wartet nicht; unbekannte Nummer = Fehler) |
 | `HTTP_RESULT(request)` → STRING | holt den Body ab und gibt den Platz frei |
 | `HTTP_CANCEL(request)` | Abruf verwerfen (unbekannte Nummer = No-Op) |
 | `HTTP_PENDING()` → INTEGER | wie viele Abrufe noch offen sind |
@@ -211,6 +215,7 @@ Nach `HTTP_RESULT` stehen `HTTP_STATUS()` und `HTTP_HEADER()` genau wie nach `HT
 - **`HTTP_RESULT` vor `HTTP_READY`** bricht mit Klartext ab statt zu blockieren — sonst wäre der Vorteil wieder verspielt.
 - **Mehrere Abrufe laufen wirklich gleichzeitig.** Zwei Anfragen zu je 300 ms sind nach ~300 ms fertig, nicht nach 600.
 - **Nummern bleiben stabil** (Tombstones wie bei `timer`): eine abgeholte oder abgebrochene Nummer wird nicht neu vergeben. Ein Programm kann eine alte Nummer also nicht versehentlich auf einen fremden Abruf beziehen.
+- **Eine Nummer, die es nicht (mehr) gibt** — nie gestartet, schon abgeholt oder abgebrochen —, ist bei `HTTP_READY` und `HTTP_RESULT` ein Fehler (bis 2026.53 lieferte `HTTP_READY` dann FALSE, und `WHILE NOT HTTP_READY(n)` lief ewig). `HTTP_CANCEL` nimmt sie still hin, `HTTP_URL$` liefert "".
 - **Die erste Nummer ist 0** (wie bei `timer`). Wer sich "kein Abruf unterwegs" merken will, nimmt -1 -- ein frisches `DIM abruf AS INTEGER` ist 0 und damit schon die Nummer des ersten Abrufs.
 - **Abbrechen stoppt den Abruf nicht mitten im Netz** — er läuft zu Ende, sein Ergebnis wird verworfen. Das Programm wartet dabei auf nichts.
 - **Jede Methode.** `HTTP_GET_START` ist die Kurzform für GET; `HTTP_REQUEST_START` nimmt jede Methode samt Rumpf und Kopfzeilen (siehe Tabelle). Ein `HTTP_DOWNLOAD` im Hintergrund gibt es nicht -- dafür `HTTP_GET_START` und nach `HTTP_RESULT` den rohen Rumpf aus `HTTP_BYTES()` mit `WRITEALL_BYTES` sichern.

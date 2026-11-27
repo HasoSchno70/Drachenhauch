@@ -449,3 +449,61 @@ HTTPD_STOP(h)
 TRUE TRUE
 TRUE a+b c
 der server lebt
+
+=== rumpf als buffer hin und zurueck
+' HTTPD_BODY_BYTES liefert den Rumpf, wie er kam; HTTPD_SEND nimmt einen
+' BUFFER (Bericht A13; bis 2026.53 nur Text).
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+DIM a AS STRING : a = holen$(port, "POST", "/", "", "abc")
+PRINT rumpf$(a)
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+DIM b AS BUFFER : b = HTTPD_BODY_BYTES(s)
+DIM antwort AS BUFFER : antwort = BUFFER_FROM_STRING("Bytes " + STR$(BUFFER_LEN(b)))
+HTTPD_SEND(s, 200, "text/plain", antwort)
+HTTPD_STOP(s)
+
+--- erwartet
+Bytes 3
+
+
+=== der user-agent nennt drachenhauch und seine fassung
+' Bis 2026.53 meldete sich dhrt als "Drachenhauch/0.1" mit einer fremden
+' Adresse (Bericht C6). Der eigene Server liest, was der Client schickt.
+IMPORT "klient.dh"
+IMPORT "html"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+DIM ua AS STRING : ua = HTTP_GET("http://127.0.0.1:" + STR$(port) + "/")
+PRINT "name "; LEFT$(ua, 13) = "Drachenhauch/"
+PRINT "keine 0.1 "; INSTR(ua, "/0.1 ") < 0
+PRINT "heimat "; INSTR(ua, "github.com/HasoSchno70/Drachenhauch") >= 0
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/../_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+HTTPD_SEND(s, 200, "text/plain", HTTPD_HEADER$(s, "User-Agent"))
+HTTPD_STOP(s)
+
+--- erwartet
+name TRUE
+keine 0.1 TRUE
+heimat TRUE

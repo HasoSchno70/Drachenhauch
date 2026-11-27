@@ -319,7 +319,7 @@ WHILE NOT TASK_READY(a)
 WEND
 PRINT TASK_RESULT$(a)
 --- fehler
-TASK: SUMME: erwartet 3..3 Argument(e), erhalten 1
+TASK: SUMME: erwartet 3 Argument(e), erhalten 1
 
 === untragbares argument nennt die stelle
 FUNCTION Summe(a AS INTEGER, b AS INTEGER, c AS INTEGER) AS INTEGER
@@ -395,3 +395,27 @@ END TRY
 --- erwartet
 TASK_READY: einen Auftrag 7 gibt es nicht -- nie gestartet, schon abgeholt oder abgebrochen
 SHELL_READY: einen Auftrag 7 gibt es nicht -- nie gestartet, schon abgeholt oder abgebrochen
+
+=== shell und shell_out$ geben die testvariablen nicht weiter
+' Alle Kindprozesse laufen ueber prozess::befehl: "dhrt" ist die eigene
+' Laufzeit, ein GEERBTES DHRT_FRAMES & Co. geht nicht mit (bis 2026.53
+' vererbten SHELL* und TASK_START sie), ein Feld von Texten wird
+' ausgebreitet (Bericht A16).
+WRITEALL("kind.dh", "PRINT " + CHR$(34) + "[" + CHR$(34) + " + GETENV$(" + CHR$(34) + "DHRT_FRAMES" + CHR$(34) + ") + " + CHR$(34) + "]" + CHR$(34) + CHR$(10))
+DIM args AS ARRAY OF STRING = ["run", "kind.dh"]
+PRINT TRIM$(SHELL_OUT$("dhrt", args))
+--- umgebung
+DHRT_FRAMES=7
+--- erwartet
+[]
+
+=== was das programm selbst setzt, geht an das kind
+' SETENV("DHRT_FRAMES", ...) vor einem Kind ist Absicht: so endet ein
+' gebautes Fenster-Programm nach N Bildern (Studio, werkzeug_studio3).
+SETENV("DHRT_FRAMES", "7")
+WRITEALL("kind.dh", "PRINT " + CHR$(34) + "[" + CHR$(34) + " + GETENV$(" + CHR$(34) + "DHRT_FRAMES" + CHR$(34) + ") + " + CHR$(34) + "]" + CHR$(34) + CHR$(10))
+DIM args AS ARRAY OF STRING = ["run", "kind.dh"]
+PRINT TRIM$(SHELL_OUT$("dhrt", args))
+--- erwartet
+[7]
+

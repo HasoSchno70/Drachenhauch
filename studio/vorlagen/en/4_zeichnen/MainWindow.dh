@@ -1,6 +1,6 @@
 ' A canvas and a timer: the timer moves the ball, the event Zeichnen paints
 ' it (every frame), dragging on the canvas puts it there. Drawing happens in
-' screen coordinates -- GUI_CANVAS_X/Y say where the canvas is, and it grows
+' screen coordinates -- GUI_CANVAS_SCREEN_X/Y say where the canvas is, and it grows
 ' with the window.
 CONST RADIUS = 12
 
@@ -19,8 +19,8 @@ CLASS MainWindow EXTENDS MainWindow_Basis
     END SUB
 
     SUB ticker_Aktion()
-        DIM b AS INTEGER : b = GUI_CANVAS_W(Self.canvas)
-        DIM h AS INTEGER : h = GUI_CANVAS_H(Self.canvas)
+        DIM b AS INTEGER : b = GUI_CANVAS_SCREEN_W(Self.canvas)
+        DIM h AS INTEGER : h = GUI_CANVAS_SCREEN_H(Self.canvas)
         Self.x = Self.x + Self.vx
         Self.y = Self.y + Self.vy
         IF Self.x < RADIUS OR Self.x > b - RADIUS THEN
@@ -37,9 +37,9 @@ CLASS MainWindow EXTENDS MainWindow_Basis
     END SUB
 
     SUB canvas_Zeichnen()
-        DIM ox AS INTEGER : ox = GUI_CANVAS_X(Self.canvas)
-        DIM oy AS INTEGER : oy = GUI_CANVAS_Y(Self.canvas)
-        BOX(ox, oy, ox + GUI_CANVAS_W(Self.canvas) - 1, oy + GUI_CANVAS_H(Self.canvas) - 1, RGB(22, 28, 42))
+        DIM ox AS INTEGER : ox = GUI_CANVAS_SCREEN_X(Self.canvas)
+        DIM oy AS INTEGER : oy = GUI_CANVAS_SCREEN_Y(Self.canvas)
+        BOX(ox, oy, ox + GUI_CANVAS_SCREEN_W(Self.canvas) - 1, oy + GUI_CANVAS_SCREEN_H(Self.canvas) - 1, RGB(22, 28, 42))
         CIRCLE(ox + INT(Self.x), oy + INT(Self.y), RADIUS, RGB(255, 170, 40))
     END SUB
 

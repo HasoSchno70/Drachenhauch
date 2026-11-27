@@ -360,3 +360,74 @@ PRINT CHAR_X("not a controller")
 --- fehler
 CHAR_X: erwartet CHAR_CONTROLLER
 
+=== mit dt laeuft die figur bei 30 und 60 bildern gleich schnell
+' CHAR_UPDATE(c, map, layer, dt): dt in Sekunden wie DELTA, Geschwindigkeiten
+' bleiben Pixel je 1/60 s. Ohne dt rechnet es wie bisher je Bild.
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM a AS CHAR_CONTROLLER : a = CHAR_NEW(10.0, 10.0, 8.0, 8.0)
+DIM b AS CHAR_CONTROLLER : b = CHAR_NEW(10.0, 10.0, 8.0, 8.0)
+DIM c AS CHAR_CONTROLLER : c = CHAR_NEW(10.0, 10.0, 8.0, 8.0)
+CHAR_SET_INPUT(a, 1, FALSE, FALSE)
+CHAR_SET_INPUT(b, 1, FALSE, FALSE)
+CHAR_SET_INPUT(c, 1, FALSE, FALSE)
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    CHAR_UPDATE(a, m, 0, 1.0 / 60.0)
+    CHAR_UPDATE(c, m, 0)
+NEXT
+FOR i = 1 TO 5
+    CHAR_UPDATE(b, m, 0, 1.0 / 30.0)
+NEXT
+PRINT "60 "; ROUND(CHAR_X(a), 3); " 30 "; ROUND(CHAR_X(b), 3)
+PRINT "ohne dt gleich "; ABS(CHAR_X(a) - CHAR_X(c)) < 0.000001 AND ABS(CHAR_Y(a) - CHAR_Y(c)) < 0.000001
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}]}
+--- erwartet
+60 30.0 30 30.0
+ohne dt gleich TRUE
+
+=== die coyote-zeit in ms
+' 50 ms sind drei Bilder zu 1/60 s: nach zwei Bildern in der Luft geht der
+' Sprung noch, nach vier nicht mehr.
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM i AS INTEGER, n AS INTEGER
+FOR n = 2 TO 4 STEP 2
+    DIM c AS CHAR_CONTROLLER : c = CHAR_NEW(50.0, 104.0, 8.0, 8.0)
+    CHAR_SET_COYOTE_MS(c, 50)
+    CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+    CHAR_UPDATE(c, m, 0, 1.0 / 60.0)
+    CHAR_SET_POS(c, 50.0, 50.0)
+    FOR i = 1 TO n
+        CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+        CHAR_UPDATE(c, m, 0, 1.0 / 60.0)
+    NEXT
+    CHAR_SET_INPUT(c, 0, TRUE, TRUE)
+    CHAR_UPDATE(c, m, 0, 1.0 / 60.0)
+    PRINT n; " bilder: "; IIF(CHAR_VY(c) < 0.0, "springt", "faellt")
+NEXT
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}]}
+--- erwartet
+2 bilder: springt
+4 bilder: faellt
+
+=== dt in millisekunden ist ein fehler
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER : c = CHAR_NEW(10.0, 10.0, 8.0, 8.0)
+CHAR_UPDATE(c, m, 0, 16)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}]}
+--- fehler
+CHAR_UPDATE: dt ist in Sekunden (wie DELTA) -- 16 sieht nach Millisekunden aus

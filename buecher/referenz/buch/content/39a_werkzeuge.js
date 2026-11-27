@@ -43,8 +43,8 @@ module.exports = (H) => [
       'drin = ZIP_LIST("sicherung.zip")',
       'PRINT JOIN$(drin, ", ")',
     ]),
-  H.cmd("ZIP_READ$ · ZIP_READ", "ZIP_READ$(archiv$, name$)   ZIP_READ(archiv$, name$)",
-    "Einen einzelnen Eintrag herausholen – als Text oder als BUFFER, ohne das ganze Archiv auszupacken. Für ein Bild oder eine Datenbank aus dem Archiv nimmst du die Byte-Fassung.",
+  H.cmd("ZIP_READ$ · ZIP_READ", "ZIP_READ$(archiv$, name$[, kodierung$])   ZIP_READ(archiv$, name$)",
+    "Einen einzelnen Eintrag herausholen – als Text oder als BUFFER, ohne das ganze Archiv auszupacken. Für ein Bild oder eine Datenbank aus dem Archiv nimmst du die Byte-Fassung. ZIP_READ$ liest wie READALL$: eine BOM fällt weg, und eine andere Kodierung als UTF-8 steht hinten (etwa cp1252).",
     [
       'PRINT ZIP_READ$("sicherung.zip", "brief.txt")',
     ]),

@@ -255,7 +255,7 @@ DHRT_FRAMES=2
 GUI_CAN_UNDO: nur ein Textfeld oder Textbereich hat einen Verlauf
 
 === das thema system folgt einem hellen system mit eigenem akzent
-' DHRT_SYSTEM_DUNKEL/DHRT_SYSTEM_AKZENT legen die Antwort des Systems fest.
+' DHRT_SYSTEM_DARK/DHRT_SYSTEM_ACCENT legen die Antwort des Systems fest.
 IMPORT "gui"
 SCREEN(400, 300, "T", 1)
 SET_WINDOW_POS(-3000, -3000)
@@ -265,8 +265,8 @@ GUI_THEME_PRESET("system")
 PRINT "grund "; HEX$(GUI_THEME_GET("widget_bg")); " akzent "; HEX$(GUI_THEME_GET("accent")); " rund "; GUI_METRIC_GET("corner_radius") > 0
 --- umgebung
 DHRT_FRAMES=2
-DHRT_SYSTEM_DUNKEL=0
-DHRT_SYSTEM_AKZENT=#FF8800
+DHRT_SYSTEM_DARK=0
+DHRT_SYSTEM_ACCENT=#FF8800
 --- erwartet
 dunkel FALSE akzent FF8800
 grund FFFFFF akzent FF8800 rund TRUE
@@ -281,8 +281,8 @@ GUI_THEME_PRESET("system")
 PRINT "grund "; HEX$(GUI_THEME_GET("widget_bg")); " akzent "; HEX$(GUI_THEME_GET("accent"))
 --- umgebung
 DHRT_FRAMES=2
-DHRT_SYSTEM_DUNKEL=1
-DHRT_SYSTEM_AKZENT=-
+DHRT_SYSTEM_DARK=1
+DHRT_SYSTEM_ACCENT=-
 --- erwartet
 dunkel TRUE akzent -1
 grund 2A3542 akzent 2BC4E8
@@ -350,3 +350,117 @@ PRINT "breite "; GUI_TEXT_WIDTH(k, "Umbenennen")
 DHRT_FRAMES=2
 --- erwartet
 breite 113
+
+=== der splitter spricht logisch wie gui_get_x
+' Nach aussen ist alles logisch (CLAUDE.md, gui). Der Splitter lieferte und
+' nahm in GUI_VALUE/GUI_SET_VALUE bis 2026.53 Bildschirmpixel: bei
+' GUI_SCALE(2) sagte GUI_GET_X 100 und GUI_VALUE 200, und nach
+' GUI_SET_VALUE(120) stand er bei GUI_GET_X 60.
+IMPORT "gui"
+SCREEN(800, 600, "T", 1)
+GUI_SCALE(2)
+DIM a AS GUI_WINDOW : a = GUI_WINDOW("A", 0, 0, 380, 280)
+DIM s AS GUI_WIDGET : s = GUI_SPLITTER(a, 100, 0, 200, "v", 20, 300)
+PRINT "splitter "; GUI_GET_X(s); " "; GUI_VALUE(s)
+GUI_SET_VALUE(s, 120)
+PRINT "gesetzt "; GUI_GET_X(s); " "; GUI_VALUE(s)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+splitter 100 100.0
+gesetzt 120 120.0
+
+=== lagen-abfragen sind logisch, die _screen_-fassung spricht pixel
+' Bis 2026.53 lieferten GUI_LISTBOX_ITEM_RECT & Co., GUI_CANVAS_X/Y/W/H und
+' der Blickversatz des Richtexts Bildschirmpixel, GUI_GET_X logische
+' Punkte -- bei GUI_SCALE(2) das Doppelte. Jetzt sind die alten Namen
+' logisch; wer Pixel braucht (Zeichenbefehle, echte Klicks), nimmt _SCREEN_.
+IMPORT "gui"
+SCREEN(800, 600, "T", 1)
+GUI_SCALE(2)
+DIM a AS GUI_WINDOW : a = GUI_WINDOW("A", 0, 0, 380, 280)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(a, 10, 40, 200, 100, ["eins", "zwei"])
+DIM cv AS GUI_WIDGET : cv = GUI_CANVAS(a, 220, 40, 100, 50)
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(a, 10, 150, 200, 60)
+DIM t AS STRING, i AS INTEGER
+FOR i = 1 TO 40 : t = t + "Zeile " + STR$(i) + CHR$(10) + CHR$(10) : NEXT
+GUI_RICHTEXT_SET_TEXT(rt, t)
+FOR i = 1 TO 2
+    CLS(0) : GUI_UPDATE() : GUI_DRAW() : FLIP()
+NEXT
+PRINT "liste "; GUI_LISTBOX_ITEM_RECT(lb, 1); " "; GUI_LISTBOX_ITEM_SCREEN_RECT(lb, 1)
+PRINT "flaeche "; GUI_CANVAS_X(cv); " "; GUI_CANVAS_W(cv); " "; GUI_CANVAS_SCREEN_X(cv); " "; GUI_CANVAS_SCREEN_W(cv)
+GUI_RICHTEXT_SCROLL(rt, 100000)
+PRINT "richtext unten "; GUI_RICHTEXT_SCROLL_GET(rt) + GUI_GET_H(rt) - GUI_RICHTEXT_HEIGHT(rt)
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+liste (10, 84, 200, 22) (20, 168, 400, 44)
+flaeche 221 99 441 198
+richtext unten 0
+
+=== der innenabstand des textbereichs waechst mit dem massstab
+' Bis 2026.53 stand der Rand 5 roh an rund 15 Stellen: bei GUI_SCALE(2)
+' lag die Schreibmarke 2,5 logische Punkte vom Rand statt 5. Jetzt eine
+' Quelle (ta_pad) fuer Textbereich und Textfeld.
+IMPORT "gui"
+SCREEN(800, 600, "T", 1)
+GUI_SCALE(2)
+DIM a AS GUI_WINDOW : a = GUI_WINDOW("A", 0, 0, 380, 280)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(a, 10, 40, 200, 100, "abc")
+GUI_FOCUS(ta)
+DIM i AS INTEGER
+FOR i = 1 TO 2
+    CLS(0) : GUI_UPDATE() : GUI_DRAW() : FLIP()
+NEXT
+DIM m AS TUPLE : m = GUI_TEXTAREA_CARET_XY(ta)
+PRINT "marke "; m[0] - GUI_GET_X(ta); " "; m[1] - GUI_GET_Y(ta)
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+marke 5 27
+
+=== gui_get_color kennt hover und pressed wie gui_set_color
+' Bis 2026.53 nahm GUI_SET_COLOR "hover"/"pressed" (nur klein), GUI_GET_COLOR
+' kannte sie nicht (Fehler) und schrieb Gross/klein anders.
+IMPORT "gui"
+DIM a AS GUI_WINDOW : a = GUI_WINDOW("A", 0, 0, 300, 200)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(a, "B", 10, 10, 80, 24)
+DIM c AS GUI_WIDGET : c = GUI_BUTTON(a, "C", 10, 40, 80, 24)
+GUI_SET_COLOR(b, "Hover", &HFF0000)
+GUI_SET_COLOR(b, "pressed", &H00FF00)
+PRINT HEX$(GUI_GET_COLOR(b, "hover")); " "; HEX$(GUI_GET_COLOR(b, "PRESSED"))
+PRINT GUI_GET_COLOR(c, "hover"); " "; GUI_GET_COLOR(c, "pressed")
+--- erwartet
+FF0000 FF00
+-1 -1
+
+=== reiterleiste und panel-kopf wachsen mit dem massstab
+' Feste Pixel ohne Massstab: die Reiterleiste eines Fensters (30) und der
+' Titelstreifen eines Panels (18) blieben bei GUI_SCALE(2) so hoch wie bei 1,
+' die Schrift darin aber doppelt -- sie lief ueber ihren Streifen. Gemessen an
+' der Lage einer Liste unter der Reiterleiste (Bildschirmpixel) und an der
+' Rollweite eines Panels mit Titel (logisch).
+IMPORT "gui"
+SCREEN(800, 600, "T", 1)
+GUI_SCALE(2)
+DIM a AS GUI_WINDOW : a = GUI_WINDOW("A", 0, 0, 380, 280)
+DIM b AS GUI_WINDOW : b = GUI_WINDOW("B", 0, 0, 380, 280)
+GUI_TABS(b, ["eins", "zwei"])
+DIM la AS GUI_WIDGET : la = GUI_LISTBOX(a, 10, 10, 100, 80, ["x"])
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(b, 10, 10, 100, 80, ["x"])
+DIM p AS GUI_WIDGET : p = GUI_PANEL(a, 10, 100, 200, 100, "Titel")
+DIM l AS GUI_WIDGET : l = GUI_LISTBOX(a, 10, 100, 150, 200, ["x"])
+GUI_PANEL_ADD(p, l)
+GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+DIM ra AS TUPLE : ra = GUI_LISTBOX_ITEM_SCREEN_RECT(la, 0)
+DIM rb AS TUPLE : rb = GUI_LISTBOX_ITEM_SCREEN_RECT(lb, 0)
+PRINT "reiterleiste "; rb[1] - ra[1]
+GUI_PANEL_SCROLL(p, 10000)
+GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+PRINT "rollen bis "; GUI_PANEL_SCROLL_GET(p)
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+reiterleiste 60
+rollen bis 124

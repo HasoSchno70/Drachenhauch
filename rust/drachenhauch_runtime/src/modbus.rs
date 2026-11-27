@@ -17,7 +17,7 @@
 //! Beispiele der Spezifikation.
 
 use std::io::{Read, Write};
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::TcpStream;
 use std::time::{Duration, Instant};
 
 // ------------------------------------------------------------ reine Rechnerei
@@ -252,17 +252,7 @@ pub struct Geraet {
 }
 
 fn verbinden(host: &str, port: u16, fn_: &str) -> Result<TcpStream, String> {
-    let adressen: Vec<_> = (host, port).to_socket_addrs()
-        .map_err(|e| format!("{}: {} nicht gefunden: {}", fn_, host, e))?
-        .collect();
-    let mut letzter = format!("{}: {} hat keine Adresse", fn_, host);
-    for a in adressen {
-        match TcpStream::connect_timeout(&a, Duration::from_secs(3)) {
-            Ok(s) => { let _ = s.set_nodelay(true); return Ok(s); }
-            Err(e) => letzter = format!("{}: {}:{} -- {}", fn_, host, port, e),
-        }
-    }
-    Err(letzter)
+    crate::verbinden::tcp(host, port, Duration::from_secs(3), fn_)
 }
 
 pub fn tcp(host: &str, port: i64, einheit: i64) -> Result<Geraet, String> {

@@ -9,7 +9,7 @@
 //! "e"), und eine Maus ueber dem Fenster nahm dem Fall seinen Tooltip.
 //! Gesehen in schnellen Laeufen, einzeln war jeder Fall gruen.
 //!
-//! Darum setzt `dhrt test` jedem Programm `DHRT_OHNE_EINGABE`, und ein
+//! Darum setzt `dhrt test` jedem Programm `DHRT_NO_INPUT`, und ein
 //! Fenster unter dem Schalter
 //! * geht ohne Fokus auf (GLFW_FOCUS_ON_SHOW),
 //! * laesst die Maus durch auf das Fenster darunter (GLFW_MOUSE_PASSTHROUGH;
@@ -37,7 +37,7 @@ pub fn an() -> bool {
     if !GEPRUEFT.swap(true, Ordering::SeqCst) {
         // "0" oder leer schaltet ab -- so laesst sich die Gegenprobe in einer
         // Sammlung schreiben, deren Laeufer den Schalter setzt.
-        let wert = std::env::var("DHRT_OHNE_EINGABE").unwrap_or_default();
+        let wert = crate::umgebung::var("DHRT_NO_INPUT").unwrap_or_default();
         AN.store(!wert.is_empty() && wert != "0", Ordering::SeqCst);
     }
     AN.load(Ordering::SeqCst)

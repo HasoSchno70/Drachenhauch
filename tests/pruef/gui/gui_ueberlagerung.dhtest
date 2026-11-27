@@ -714,5 +714,33 @@ GUI_TOAST: Art 'rot' gibt es nicht -- bekannt sind: info, erfolg, warnung, fehle
 GUI_POPOVER: Seite 'mitte' gibt es nicht -- unten, oben, rechts oder links
 GUI_POPOVER_SHOW: dieses Fenster ist kein Popover (GUI_POPOVER)
 GUI_TEXTINPUT_ICON: ein Sinnbild 'lupe' gibt es nicht -- bekannt
-GUI_TEXTINPUT_ICON: Widget ist kein Textfeld (GUI_TEXTINPUT)
+GUI_TEXTINPUT_ICON: das Widget ist kein GUI_TEXTINPUT
 GUI_INFOBAR: hoechstens vier Knoepfe
+
+=== ein toast zaehlt zeit nicht bilder auch bei zwei gui_update
+' Die Fristen der gui laufen nach `takt` (der Uhr, die auch die Wartezeit
+' von WINDOW_WAIT_EVENTS mitzaehlt). Bis 2026.53 zogen sie die Dauer des
+' vorigen Bildes ab -- im Leerlauf stand ein Toast von 1000 ms nach 12 s noch
+' da, und wer GUI_UPDATE zweimal je Bild rief, liess ihn doppelt so schnell
+' laufen. 12 Bilder sind 200 ms: der Toast von 300 ms ist noch da.
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_TOAST(w, "kurz", "erfolg", 300)
+DIM n AS INTEGER
+FOR n = 1 TO 12
+    GUI_UPDATE()
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "nach 200 ms: " + STR$(GUI_TOAST_COUNT(w))
+FOR n = 1 TO 20
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT "nach 533 ms: " + STR$(GUI_TOAST_COUNT(w))
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+nach 200 ms: 1
+nach 533 ms: 0

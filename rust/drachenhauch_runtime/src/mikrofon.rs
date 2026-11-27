@@ -8,7 +8,7 @@
 //! EINEN Puffer (`PUFFER`): Ring fuer Spektrum, Tonhoehe und Wellenform, die
 //! Spitze seit der letzten Frage und, wenn eine laeuft, die Aufnahme.
 //!
-//! **Pruefen ohne Mikrofon:** `DHRT_MIKROFON=datei.wav` macht aus einer
+//! **Pruefen ohne Mikrofon:** `DHRT_MICROPHONE=datei.wav` macht aus einer
 //! WAV-Datei ein Mikrofon -- sie wird in Echtzeit eingespeist, in Schleife,
 //! ueber denselben Puffer. Die Laeufer der CI haben keinen Eingang; so
 //! laesst sich alles ausser dem cpal-Weg selbst pruefen.
@@ -168,25 +168,7 @@ pub fn tonhoehe(w: &[f32], rate: u32) -> f64 {
 /// Werte (ein Kanal) als WAV, 16 Bit -- fuer MIC_RECORD_SAVE, das ohne
 /// Ausgabegeraet gehen soll (ein SOUND braucht die Audio-Ausgabe).
 pub fn wav_bytes(werte: &[f32], rate: u32) -> Vec<u8> {
-    let daten = werte.len() * 2;
-    let mut b = Vec::with_capacity(44 + daten);
-    b.extend_from_slice(b"RIFF");
-    b.extend_from_slice(&((36 + daten) as u32).to_le_bytes());
-    b.extend_from_slice(b"WAVEfmt ");
-    b.extend_from_slice(&16u32.to_le_bytes());
-    b.extend_from_slice(&1u16.to_le_bytes());
-    b.extend_from_slice(&1u16.to_le_bytes());
-    b.extend_from_slice(&rate.to_le_bytes());
-    b.extend_from_slice(&(rate * 2).to_le_bytes());
-    b.extend_from_slice(&2u16.to_le_bytes());
-    b.extend_from_slice(&16u16.to_le_bytes());
-    b.extend_from_slice(b"data");
-    b.extend_from_slice(&(daten as u32).to_le_bytes());
-    for &w in werte {
-        let v = (w.clamp(-1.0, 1.0) * 32767.0).round() as i16;
-        b.extend_from_slice(&v.to_le_bytes());
-    }
-    b
+    crate::wav::bytes(1, rate, 16, werte)
 }
 
 // --- Geraete --------------------------------------------------------------
@@ -209,7 +191,7 @@ impl Drop for Lauf {
 
 /// Die WAV-Datei, die ein Mikrofon spielt (Pruefungen), oder keine.
 fn datei_statt_geraet() -> Option<String> {
-    std::env::var("DHRT_MIKROFON").ok().filter(|s| !s.is_empty())
+    crate::umgebung::var("DHRT_MICROPHONE").ok().filter(|s| !s.is_empty())
 }
 
 fn datei_name(pfad: &str) -> String {
@@ -259,12 +241,12 @@ fn datei_starten(pfad: &str, name: &str) -> Result<Lauf, String> {
     if !name.is_empty() && !anzeige.to_lowercase().contains(&name.to_lowercase()) {
         return Err(format!("MIC_START: kein Eingang '{}' -- es gibt: {}", name, anzeige));
     }
-    let bytes = std::fs::read(pfad).map_err(|e| format!("MIC_START: DHRT_MIKROFON '{}' -- {}", pfad, e))?;
+    let bytes = std::fs::read(pfad).map_err(|e| format!("MIC_START: DHRT_MICROPHONE '{}' -- {}", pfad, e))?;
     let (werte, rate) = crate::sprache::wav_lesen(&bytes)
         .map_err(|e| e.replace("SPEAK: die Sprachausgabe lieferte kein WAV", "keine WAV-Datei")
                        .replace("SPEAK: ", ""))
-        .map_err(|e| format!("MIC_START: DHRT_MIKROFON '{}' -- {}", pfad, e))?;
-    if werte.is_empty() { return Err(format!("MIC_START: DHRT_MIKROFON '{}' ist leer", pfad)); }
+        .map_err(|e| format!("MIC_START: DHRT_MICROPHONE '{}' -- {}", pfad, e))?;
+    if werte.is_empty() { return Err(format!("MIC_START: DHRT_MICROPHONE '{}' ist leer", pfad)); }
     let werte: Vec<f32> = werte.iter().map(|&w| w as f32).collect();
     let (tx, rx) = mpsc::channel::<()>();
     let block = (rate as usize / 100).max(1);

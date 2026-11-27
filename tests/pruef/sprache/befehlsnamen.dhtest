@@ -126,3 +126,181 @@ zwei TRUE
 Hilfe Hilfe
 FALSE FALSE
 3
+
+=== freigeben heisst _FREE: koerper der physik
+' Seit 2026.54 heisst Freigeben ueberall _FREE (docs/builtins-namen.md); die
+' alten Namen _REMOVE/_DESTROY/_DISCONNECT bleiben gueltig.
+IMPORT "physics2d"
+IMPORT "physics3d"
+DIM w AS PHYS2D_WORLD : w = PHYS2D_NEW()
+DIM a AS INTEGER : a = PHYS2D_ADD_CIRCLE(w, 10.0, 10.0, 4.0, TRUE, 0.0)
+DIM b AS INTEGER : b = PHYS2D_ADD_CIRCLE(w, 20.0, 20.0, 4.0, TRUE, 0.0)
+PHYS2D_BODY_FREE(w, a)
+PRINT "2d "; PHYS2D_COUNT(w)
+DIM r AS PHYS_WORLD : r = PHYS3D_NEW()
+DIM k AS INTEGER : k = PHYS3D_ADD_SPHERE(r, 0.0, 0.0, 0.0, 1.0, TRUE, 0.0)
+DIM l AS INTEGER : l = PHYS3D_ADD_SPHERE(r, 5.0, 0.0, 0.0, 1.0, TRUE, 0.0)
+PHYS3D_BODY_FREE(r, k)
+PRINT "3d "; PHYS3D_COUNT(r)
+--- erwartet
+2d 1
+3d 1
+
+=== freigeben heisst _FREE: widgets und fenster
+IMPORT "gui"
+DIM gw AS GUI_WINDOW : gw = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(gw, "A", 10, 10, 60, 24)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(gw, "B", 10, 50, 60, 24)
+GUI_WIDGET_FREE(a)
+PRINT "widget "; GUI_WINDOW_WIDGET_COUNT(gw)
+GUI_WINDOW_FREE(gw)
+PRINT "fenster "; GUI_WINDOW_WIDGET_COUNT(gw)
+--- erwartet
+widget 1
+fenster 0
+
+=== freigeben heisst _FREE: die audio-uhr
+IMPORT "audio"
+DIM uhr AS AUDIO_CLOCK : uhr = AUDIO_CLOCK_NEW(100)
+AUDIO_CLOCK_FREE(uhr)
+TRY
+    PRINT AUDIO_CLOCK_TICKS(uhr)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DH_OHNE_AUDIO=1
+--- erwartet
+AUDIO_CLOCK_TICKS: ungueltiges oder entferntes Uhr-Handle 0
+
+=== eine verbindung schliessen heisst _CLOSE
+' BT und MQTT brauchen ein Geraet bzw. einen Broker; der Hover der alten
+' Namen nennt die neuen, und --check kennt sie.
+PRINT "bt "; INSTR(CODE_HOVER$("BT_DISCONNECT(b)", 1, 3), "Neuer Name: BT_CLOSE") >= 0
+PRINT "mqtt "; INSTR(CODE_HOVER$("MQTT_DISCONNECT(b)", 1, 3), "Neuer Name: MQTT_CLOSE") >= 0
+DIM q AS STRING
+q = "IMPORT " + CHR$(34) + "mqtt" + CHR$(34) + CHR$(10) + "MQTT_CLOSE(0)" + CHR$(10)
+PRINT "check "; CODE_CHECK$(q)
+--- erwartet
+bt TRUE
+mqtt TRUE
+check []
+
+
+=== der bereich steht vorn: text, typen, dateien, zeichnen
+' Bericht B3/B7: neue Namen fuer Befehle ohne Bereich oder mit deutschem
+' Namen; IMPORT "http" meint das Modul html.
+IMPORT "http"
+PRINT TEXT_STARTS_WITH("Drachen", "Dra"); " "; TEXT_ENDS_WITH("Drachen", "en"); " "; TEXT_CONTAINS("Drachen", "ach"); " "; TEXT_COUNT("banana", "an")
+PRINT TEXT_REMOVE_SPACES$("DE89 3704"); " "; IS_NUM(1.5); " "; IS_INT(2); " "; IS_STR("x"); " "; IS_BOOL(TRUE); " "; IS_NUMERIC("3,5")
+PRINT NUMBER_TEXT$(1234567.891, 2); " "; DIR_CURRENT$() = CWD$(); " "; DIR_TEMP$() = TEMPDIR$(); " "; SYSTEM_EXE_PATH$() = EXEPATH$()
+DIR_CREATE("unter/tiefer")
+PRINT DIR_EXISTS("unter/tiefer")
+FILE_WRITE("unter/a.txt", "abc")
+FILE_RENAME("unter/a.txt", "unter/b.txt")
+DIM f AS FILE = FILE_OPEN("unter/b.txt", "r")
+FILE_SEEK(f, 1)
+PRINT FILE_TELL(f); " "; BUFFER_TO_HEX$(FILE_READ_BLOCK(f, 2))
+FILE_CLOSE(f)
+DIR_DELETE("unter", TRUE)
+PRINT DIR_EXISTS("unter"); " "; URL_ENCODE("a b")
+--- erwartet
+TRUE TRUE TRUE 2
+DE893704 TRUE TRUE TRUE TRUE FALSE
+1.234.567,89 TRUE TRUE TRUE
+TRUE
+1 6263
+FALSE a%20b
+
+=== zaehlen heisst count, laenge len, zweitnamen sind derselbe befehl
+' Bericht B2/B5: JSON_COUNT, ARRAY_DIM_LEN, XML_NAME_COUNT; SAVE_GET_KEYS
+' als Feld, SAVE_DELETE sagt, ob es den Schluessel gab, LEN nimmt einen
+' BUFFER; EOF ist ENDOFFILE (dieselbe Meldung, mit dem geschriebenen Namen).
+IMPORT "json"
+IMPORT "xml"
+IMPORT "save"
+DIM j AS JSON_HANDLE = JSON_PARSE("[1, 2, 3]")
+DIM f[2, 5] AS INTEGER
+DIM x AS XML_HANDLE = XML_PARSE("<a><b/><b/><c/></a>")
+PRINT JSON_COUNT(j, ""); " "; ARRAY_DIM_LEN(f, 1); " "; XML_NAME_COUNT(x, "b")
+DIM s AS SAVE_HANDLE = SAVE_NEW()
+SAVE_SET_INT(s, "zwei", 2)
+SAVE_SET_INT(s, "eins", 1)
+DIM k AS ARRAY OF STRING = SAVE_GET_KEYS(s)
+PRINT LEN(k); " "; k[0]; " "; SAVE_DELETE(s, "eins"); " "; SAVE_DELETE(s, "eins")
+PRINT LEN(BUFFER_FROM_HEX("0A0B0C"))
+WRITEALL("t.txt", "x")
+DIM d AS FILE = OPENFILE("t.txt", "w")
+TRY
+    PRINT EOF(d)
+CATCH e
+    PRINT e
+END TRY
+CLOSEFILE(d)
+--- erwartet
+3 5 2
+2 eins TRUE FALSE
+3
+EOF: Datei wurde nicht im Lese-Modus geoeffnet
+
+=== zweitnamen fuer parameter: x fuer x_mm, line1 fuer z1
+' Bericht B6.3: PDF_TEXT heisst (p, x_mm, y_mm, text$) -- `x:` meint x_mm;
+' GUI_TEXTAREA_SELECT hiess (z1, s1, z2, s2), heute (line1, column1, ...),
+' die alten Namen gehen weiter. Uebersetzt der Compiler, ist es bewiesen.
+IMPORT "pdf"
+DIM p AS PDF = PDF_NEW()
+PDF_TEXT(p, x: 20, y: 30, text: "Hallo")
+PRINT FILE_EXISTS(path: "gibtsnicht.txt")
+--- erwartet
+FALSE
+
+=== image sound und file sind namen, keine schluesselwoerter
+' Bericht C4.4: ein Parameter `file` oder eine Variable `sound` ging bis
+' 2026.53 nicht ("Erwartet Parametername"); als Typ gelten sie weiter.
+FUNCTION laenge(file AS STRING) AS INTEGER
+    RETURN LEN(file)
+END FUNCTION
+DIM sound AS INTEGER = 3
+WRITEALL("x.txt", "abc")
+DIM f AS FILE = OPENFILE("x.txt", "r")
+PRINT laenge("abcd"); " "; sound; " "; f IS FILE
+CLOSEFILE(f)
+--- erwartet
+4 3 TRUE
+
+=== ein zweitname darf in mehreren gruppen stehen
+' `v` hiess bei AUDIO_SET_VOLUME die Lautstaerke, bei anderen Befehlen die
+' Zahl; FONT_SET hiess sein Argument `handle`, SETFONT schon immer `font`.
+' Beide alten Namen gelten weiter (Bericht B6, E1).
+' Uebersetzt wird alles; die Laufzeit nennt danach den Kanal, an der Stelle,
+' an die der Name gehoert.
+PRINT "uebersetzt"
+AUDIO_MUSIC_SET_VOLUME(v: 0.25)
+PRINT "musik ok"
+TRY
+    AUDIO_SET_VOLUME(v: 0.5, ch: 7)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_NO_AUDIO=1
+--- erwartet
+uebersetzt
+musik ok
+AUDIO_SET_VOLUME: ungueltiges Handle 7
+
+=== font_set nimmt font wie setfont, handle bleibt gueltig
+TRY
+    SCREEN(100, 60, "t", 1)
+CATCH e
+    PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+    EXIT(0)
+END TRY
+FONT_SET(font: -1)
+FONT_SET(handle: -1, size: 14)
+SETFONT(font: -1)
+PRINT "ok"
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+ok

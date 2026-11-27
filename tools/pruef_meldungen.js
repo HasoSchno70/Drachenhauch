@@ -56,7 +56,7 @@ const DHRT = (() => {
 // eine, die ohne Internet nicht geht.
 const PROVOKATIONEN = [
   { name: "Variable nicht deklariert", zeilen: ["PRINT mmx"] },
-  { name: "Unbekanntes Builtin", zeilen: ["CIRLCE(1, 2, 3)"] },
+  { name: "Unbekannter Befehl", zeilen: ["CIRLCE(1, 2, 3)"] },
   { name: "Parse-Fehler", zeilen: ["PRINT (1 + 2"] },
   { name: "Zu tiefe Rekursion",
     zeilen: ["FUNCTION tief(n AS INTEGER) AS INTEGER",

@@ -45,7 +45,7 @@ PDF_SAVE(p, "rechnung.pdf")
 | `PDF_IMAGE(pdf, image, x, y, width[, height])` | ein Bild (`IMAGE`) in das Rechteck setzen, Maße in mm; ohne `h` nach dem Seitenverhältnis |
 | `PDF_SAVE(p, path$)` | schreiben |
 | `PDF_PRINT(p[, printer$[, copies[, target_file$]]])` | **drucken** — Windows über GDI, macOS/Linux über CUPS; siehe [Drucken](#drucken-und-vorschau) |
-| `PDF_PREVIEW(p, page[, width_px])` → IMAGE | die Seite als Bild, für eine Vorschau im Fenster |
+| `PDF_PREVIEW(p, page[, width_px])` → IMAGE | die Seite als Bild, für eine Vorschau im Fenster; Seiten zählen ab 1 wie im Druck |
 | `PDF_CLOSE(p)` | Speicher freigeben |
 
 Schrift, Größe, Farbe, Strichstärke und Deckkraft sind Einstellungen des

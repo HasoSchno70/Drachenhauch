@@ -247,6 +247,32 @@ niemandem auf.
 `SELECT CASE`-Vergleiche (`CASE IS > 5`) sind davon unberührt — dort gehört
 das `IS` zum `CASE`.
 
+### Handles
+
+Was ein Modul verwaltet — ein PDF, eine Datenbankverbindung, ein Bild, ein
+Widget —, gibt es als **Handle** heraus: eine Nummer, die ihre Art kennt.
+
+```basic
+IMPORT "pdf"
+IMPORT "xlsx"
+DIM p AS PDF = PDF_NEW()
+PRINT TYPEOF(p)          ' "PDF"
+PRINT p IS PDF           ' TRUE
+PRINT p = 0              ' TRUE -- rechnet und vergleicht wie seine Nummer
+DIM x AS XLSX = XLSX_NEW("Blatt")
+' XLSX_SHEET_COUNT(p)    ' Fehler: erwartet ein XLSX-Handle, erhalten ein PDF-Handle
+```
+
+- Ein Handle **einer anderen Art** an einem Befehl ist ein Fehler, der beide
+  nennt; `dhrt --check` meldet ihn schon vorher, wenn die Art der Variablen
+  feststeht. Welcher Parameter welche Art nimmt, steht in der Signatur
+  (`PDF_TEXT(p: PDF, …)`).
+- In einer **INTEGER**-Variablen (oder einem `ARRAY OF INTEGER`) liegt nur
+  die Nummer — so halten ältere Programme ihre Handles, und das geht weiter.
+  Eine Zahl an eine Variable des Handle-Typs wird umgekehrt zum Handle.
+- An einen Handle-Typ geht nur seinesgleichen, eine Zahl oder `NIL`:
+  `DIM d AS DB_CONN = TRUE` ist ein Fehler.
+
 ## Was der Übersetzer prüft
 
 Die Typen gelten nicht erst beim Laufen. `dhrt --check` (im Editor die gelbe
@@ -1650,15 +1676,15 @@ PRINT Distance(0.0, 0.0, 3.0, 4.0)    ' 5.0 - aus mathlib.dh
    `dhrt paket hole` ablegt (siehe [Pakete](pakete.md)). Braucht ein Paket
    selbst ein Paket, liegt das in seinem eigenen `pakete/` und wird zuerst
    gefunden.
-3. **Jeder Ordner aus `DH_PATH`**, in der angegebenen Reihenfolge (wie
+3. **Jeder Ordner aus `DHRT_PATH`**, in der angegebenen Reihenfolge (wie
    `PATH` und `PYTHONPATH`; Trenner ist `;` unter Windows, sonst `:`).
 4. **`<Benutzerordner>/.drachenhauch/bibliothek`** — der Ort für Dinge, die
    auf diesem Rechner allen Projekten zur Verfügung stehen sollen. Er
    entsteht nicht von selbst; wer ihn anlegt, hat ihn gemeint.
 
 ```bash
-set DH_PATH=D:\dh-bibliothek          &:: Windows
-export DH_PATH=~/dh-bibliothek         # macOS/Linux
+set DHRT_PATH=D:\dh-bibliothek          &:: Windows
+export DHRT_PATH=~/dh-bibliothek         # macOS/Linux
 ```
 
 Wird die Datei nirgends gefunden, nennt die Meldung **alle** durchsuchten

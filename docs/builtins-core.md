@@ -91,8 +91,8 @@ PRINT HEX$(RGB(255, 0, 0))  ' "FF0000"
 | `POW(base, exponent)` | b hoch e |
 | `EXP(x)` | e^x |
 | `LOG(x[, base])` | Logarithmus, default natürlich |
-| `DEG(rad)`, `RAD(grad)` | Radiant ↔ Grad |
-| `FLOOR(x)`, `CEIL(x)`, `ROUND(x)` | INT-Konvertierung |
+| `DEG(rad)`, `RAD(deg)` | Radiant ↔ Grad |
+| `FLOOR(x)`, `CEIL(x)`, `ROUND(x[, digits])` | INT-Konvertierung |
 | `ROUND(x, digits)` → FLOAT | auf N Nachkommastellen runden, **zur geraden Zahl** (siehe unten) |
 | `ROUND_HALF_UP(x[, decimals])` | kaufmännisch runden: von der Null weg |
 | `MIN(a, ...)`, `MAX(a, b, ...)` | variadic |
@@ -461,8 +461,8 @@ PRINT LEN(stack)                 ' 1
 
 > Die `ARRAY_*`-Aggregate und die dynamischen Array-Ops
 > (`ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`) sind in `dhrt` implementiert
-> (`builtins.rs`/`vm.rs`) und laufen über alle Wege — `dhrt run` (auch aus der IDE),
-> `--runsrc` und den `dhrt --export`-Standalone-Build.
+> (`builtins.rs`/`vm.rs`) und laufen über alle Wege — `dhrt run` (auch aus der IDE)
+> und den `dhrt --export`-Standalone-Build.
 
 ## Maps
 
@@ -522,7 +522,7 @@ eine weiterzugeben.
 | Funktion | Zweck |
 |---|---|
 | `ZIP_LIST(archive$)` → ARRAY OF STRING | Namen aller Einträge |
-| `ZIP_READ$(archive$, name$)` → STRING | einen Eintrag als Text |
+| `ZIP_READ$(archive$, name$ [, encoding$])` → STRING | einen Eintrag als Text -- liest wie `READALL$`: eine BOM fällt weg, eine andere Kodierung als UTF-8 steht hinten (`"cp1252"`, `"latin1"`, `"auto"`); ungültiges UTF-8 ist ein Fehler |
 | `ZIP_READ(archive$, name$)` → BUFFER | einen Eintrag als Bytes |
 | `ZIP_EXTRACT(archive$, folder$)` → INTEGER | alles entpacken, liefert die Zahl der Dateien |
 | `ZIP_CREATE(archive$, files)` → INTEGER | Archiv aus einer Liste von Dateipfaden |
@@ -981,7 +981,7 @@ Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
 | `READALL$(f$[, encoding$])` → STRING | Datei komplett als Text lesen |
 | `FILESIZE(path$)` → INTEGER | Größe in Bytes |
 | `FILE_ENCODING$(path$)` → STRING | was `"auto"` wählen würde: `utf8`, `utf8bom`, `cp1252` oder `binaer` (siehe Kodierungen) |
-| `DELETEFILE(path$)`, `RENAME(alt$, neu$)` | löschen / umbenennen·verschieben |
+| `DELETEFILE(path$)`, `RENAME(old$, new$)` | löschen / umbenennen·verschieben |
 | `DIREXISTS(path$)` → BOOLEAN | Verzeichnis vorhanden? |
 | `DIRLIST(path$, pattern$ = "", recursive = FALSE)` → ARRAY OF STRING | Eintragsnamen (sortiert), optional gefiltert; mit `recursive: TRUE` wie `DIRLIST_REC` |
 | `DIRLIST_REC(path$[, pattern$])` → ARRAY OF STRING | wie oben, aber rekursiv — nur Dateien, Pfade relativ mit `/` |
@@ -1069,8 +1069,8 @@ beschnitten — das fiele sonst erst in der fertigen Ausgabedatei auf.
 |---|---|
 | `BUFFER_FROM_STRING(text$)` → BUFFER | Text als UTF-8-Bytes |
 | `BUFFER_TO_STRING$(buffer)` → STRING | Bytes als UTF-8-Text |
-| `BUFFER_TO_HEX$(buffer)` / `BUFFER_FROM_HEX(s$)` | Hex-Text (`"deadbeef"`) |
-| `BUFFER_TO_BASE64$(buffer)` / `BUFFER_FROM_BASE64(s$)` | Base64 |
+| `BUFFER_TO_HEX$(buffer)` / `BUFFER_FROM_HEX(hex$)` | Hex-Text (`"deadbeef"`) |
+| `BUFFER_TO_BASE64$(buffer)` / `BUFFER_FROM_BASE64(text$)` | Base64 |
 
 `BUFFER_TO_STRING$` ist **streng**: sind die Bytes kein gültiges UTF-8, gibt es
 einen Fehler statt stillschweigend ersetzter Zeichen — ein `?` an der falschen
@@ -1505,9 +1505,9 @@ LOG_ERROR("Datenbank nicht lesbar")
 Ausgabe: `20:45:43 INFO  Saison 2026 geladen` — nach **stderr**, damit `PRINT`
 als Nutzdaten durchgereicht werden kann.
 
-Wie viel davon erscheint, steuert die Umgebungsvariable **`DH_LOG`**:
+Wie viel davon erscheint, steuert die Umgebungsvariable **`DHRT_LOG`** (bisher `DHRT_LOG`, gilt weiter):
 
-| `DH_LOG` | was erscheint |
+| `DHRT_LOG` | was erscheint |
 |---|---|
 | `debug` | alles |
 | *(nicht gesetzt)* / `info` | INFO, WARN, ERROR — **Vorgabe** |
@@ -1519,7 +1519,7 @@ Wie viel davon erscheint, steuert die Umgebungsvariable **`DH_LOG`**:
 im Code stehen bleiben, ohne den Normalbetrieb zuzumüllen:
 
 ```bash
-DH_LOG=debug dhrt run werkzeug.dh
+DHRT_LOG=debug dhrt run werkzeug.dh
 ```
 
 ## Zeit & Random
@@ -1693,8 +1693,9 @@ Container-Methode `arr.join(trenner)` ≡ `JOIN$(arr, trenner)`.
 - **Suffix `2` ist mehrdeutig** und kontextabhängig: `PHYSICS_DISTANCE2` =
   *quadrierte* Distanz (schneller), `LINE3D`/Vec2-Funktionen meinen *2D*, und
   `VEC2_*` ist der Typname. Kein einheitliches Schema — am Funktionsnamen ablesen.
-- **`SPRITE_COLLIDE` vs `SPRITE_COLLIDES`.** Das `sprite`-Modul nutzt
-  `SPRITE_COLLIDES` (mit `S`). Auf den Core-`COLLIDES` (AABB von Rohwerten)
+- **`SPRITE_COLLIDE` und `SPRITE_COLLIDES`** sind derselbe Befehl mit
+  denselben Parametern (`sp1, sp2`), ebenso `BATCH_DRAW` und `ATLAS_DRAW`,
+  `EOF` und `ENDOFFILE`. Auf den Core-`COLLIDES` (AABB von Rohwerten)
   achten — anderer Anwendungsfall.
 - **`CAMERA_X` (2D) vs `CAMERA3D_X`.** Das 2D-`camera`-Modul und die native
   3D-Kamera (`g3d`) haben getrennte Getter — nicht verwechseln.

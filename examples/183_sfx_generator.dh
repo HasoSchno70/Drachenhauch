@@ -749,11 +749,11 @@ END FUNCTION
 
 ' x-Lage eines Zeitpunkts in der Zeichenflaeche.
 FUNCTION zx(ms AS FLOAT) AS INTEGER
-    RETURN GUI_CANVAS_X(flaeche) + 12 + INT(ms / skalaMs * (GUI_CANVAS_W(flaeche) - 40))
+    RETURN GUI_CANVAS_SCREEN_X(flaeche) + 12 + INT(ms / skalaMs * (GUI_CANVAS_SCREEN_W(flaeche) - 40))
 END FUNCTION
 
 FUNCTION msBei(x AS INTEGER) AS FLOAT
-    RETURN (x - GUI_CANVAS_X(flaeche) - 12) * skalaMs / (GUI_CANVAS_W(flaeche) - 40)
+    RETURN (x - GUI_CANVAS_SCREEN_X(flaeche) - 12) * skalaMs / (GUI_CANVAS_SCREEN_W(flaeche) - 40)
 END FUNCTION
 
 ' Lage der drei Punkte: Ende Attack (oben), Ende Sustain (oben), Ende Decay
@@ -765,11 +765,11 @@ FUNCTION punktX(i AS INTEGER) AS INTEGER
 END FUNCTION
 
 FUNCTION obenY() AS INTEGER
-    RETURN GUI_CANVAS_Y(flaeche) + 22
+    RETURN GUI_CANVAS_SCREEN_Y(flaeche) + 22
 END FUNCTION
 
 FUNCTION untenY() AS INTEGER
-    RETURN GUI_CANVAS_Y(flaeche) + GUI_CANVAS_H(flaeche) - 30
+    RETURN GUI_CANVAS_SCREEN_Y(flaeche) + GUI_CANVAS_SCREEN_H(flaeche) - 30
 END FUNCTION
 
 FUNCTION mitteY() AS INTEGER
@@ -788,8 +788,8 @@ FUNCTION punktY(i AS INTEGER) AS INTEGER
 END FUNCTION
 
 FUNCTION inFlaeche(mx AS INTEGER, my AS INTEGER) AS BOOLEAN
-    RETURN mx >= GUI_CANVAS_X(flaeche) AND my >= GUI_CANVAS_Y(flaeche) AND _
-           mx < GUI_CANVAS_X(flaeche) + GUI_CANVAS_W(flaeche) AND my < GUI_CANVAS_Y(flaeche) + GUI_CANVAS_H(flaeche)
+    RETURN mx >= GUI_CANVAS_SCREEN_X(flaeche) AND my >= GUI_CANVAS_SCREEN_Y(flaeche) AND _
+           mx < GUI_CANVAS_SCREEN_X(flaeche) + GUI_CANVAS_SCREEN_W(flaeche) AND my < GUI_CANVAS_SCREEN_Y(flaeche) + GUI_CANVAS_SCREEN_H(flaeche)
 END FUNCTION
 
 FUNCTION punktUnter(mx AS INTEGER, my AS INTEGER) AS INTEGER
@@ -848,10 +848,10 @@ SUB flaecheMaus()
 END SUB
 
 SUB zeichneFlaeche()
-    DIM cx AS INTEGER : cx = GUI_CANVAS_X(flaeche)
-    DIM cy AS INTEGER : cy = GUI_CANVAS_Y(flaeche)
-    DIM cw AS INTEGER : cw = GUI_CANVAS_W(flaeche)
-    DIM chh AS INTEGER : chh = GUI_CANVAS_H(flaeche)
+    DIM cx AS INTEGER : cx = GUI_CANVAS_SCREEN_X(flaeche)
+    DIM cy AS INTEGER : cy = GUI_CANVAS_SCREEN_Y(flaeche)
+    DIM cw AS INTEGER : cw = GUI_CANVAS_SCREEN_W(flaeche)
+    DIM chh AS INTEGER : chh = GUI_CANVAS_SCREEN_H(flaeche)
     IF ziehPunkt < 0 THEN skalaMs = runde(dauerMs())
     GRADIENTV(cx, cy, cx + cw - 1, cy + chh - 1, &H121C2A, &H0A0F17)
 

@@ -263,7 +263,7 @@ FOR EACH th IN ["dark", "light", "modern_dark", "modern_light", "contrast"]
     DIM y AS INTEGER
     DIM b AS INTEGER
     DIM h AS INTEGER
-    (x, y, b, h) = GUI_TABLE_ROW_RECT(tb, 0)
+    (x, y, b, h) = GUI_TABLE_ROW_SCREEN_RECT(tb, 0)
     DIM farben AS ARRAY OF INTEGER : farben = []
     DIM zahl AS ARRAY OF INTEGER : zahl = []
     DIM px AS INTEGER

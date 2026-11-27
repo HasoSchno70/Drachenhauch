@@ -1,5 +1,5 @@
 ' WAV-Dateien (16 Bit, ein Kanal) fuer die Mikrofon-Pruefungen: damit spielt
-' DHRT_MIKROFON ein Mikrofon, das einen bekannten Ton hoert -- die Laeufer der
+' DHRT_MICROPHONE ein Mikrofon, das einen bekannten Ton hoert -- die Laeufer der
 ' CI haben keinen Eingang. Eingebunden ueber eine Beilage mit
 ' IMPORT "{sammlung}/_hilfen/tonwav.dh".
 '

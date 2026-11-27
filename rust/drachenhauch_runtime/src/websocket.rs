@@ -14,38 +14,14 @@
 
 use std::collections::VecDeque;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::net::{TcpListener, TcpStream};
 use std::time::{Duration, Instant};
 
 const GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 /// Groesste Nachricht (auch zusammengesetzt aus Fragmenten).
 pub const MAX_NACHRICHT: usize = 16 * 1024 * 1024;
 
-enum Strom {
-    Klar(TcpStream),
-    Tls(Box<rustls::StreamOwned<rustls::ClientConnection, TcpStream>>),
-}
-
-impl Strom {
-    fn tcp(&self) -> &TcpStream {
-        match self { Strom::Klar(s) => s, Strom::Tls(s) => s.get_ref() }
-    }
-}
-
-impl Read for Strom {
-    fn read(&mut self, b: &mut [u8]) -> std::io::Result<usize> {
-        match self { Strom::Klar(s) => s.read(b), Strom::Tls(s) => s.read(b) }
-    }
-}
-
-impl Write for Strom {
-    fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
-        match self { Strom::Klar(s) => s.write(b), Strom::Tls(s) => s.write(b) }
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        match self { Strom::Klar(s) => s.flush(), Strom::Tls(s) => s.flush() }
-    }
-}
+use crate::tls::Strom;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Nachricht { pub binaer: bool, pub daten: Vec<u8> }
@@ -209,38 +185,16 @@ fn http_kopf(strom: &mut Strom, frist: Instant) -> Result<(String, Vec<u8>), Str
 }
 
 fn tls_strom(tcp: TcpStream, name: &str) -> Result<Strom, String> {
-    let mut wurzeln = rustls::RootCertStore::empty();
-    wurzeln.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    let anbieter = std::sync::Arc::new(rustls::crypto::ring::default_provider());
-    let konfig = rustls::ClientConfig::builder_with_provider(anbieter)
-        .with_safe_default_protocol_versions()
-        .map_err(|e| format!("WS_CONNECT: TLS liess sich nicht einrichten: {}", e))?
-        .with_root_certificates(wurzeln)
-        .with_no_client_auth();
-    let sn = rustls::pki_types::ServerName::try_from(name.to_string())
-        .map_err(|_| format!("WS_CONNECT: {:?} ist kein gueltiger Servername fuer TLS", name))?;
-    let v = rustls::ClientConnection::new(std::sync::Arc::new(konfig), sn)
-        .map_err(|e| format!("WS_CONNECT: TLS-Verbindung fehlgeschlagen: {}", e))?;
-    Ok(Strom::Tls(Box::new(rustls::StreamOwned::new(v, tcp))))
+    crate::tls::strom(tcp, name, None, "WS_CONNECT")
 }
 
 /// Mit einem WebSocket-Server verbinden (wartet hoechstens 5 s).
 pub fn verbinden(url: &str) -> Result<Verbindung, String> {
     let (tls, host, port, pfad) = adresse_lesen(url)?;
     let ziel = format!("{}:{}", host, port);
-    let adr = match (host.as_str(), port).to_socket_addrs().ok().and_then(|mut a| a.next()) {
-        Some(a) => a,
-        // Ein Name auf .local, den das System nicht kennt (Linux ohne
-        // nss-mdns): selbst ueber mDNS fragen.
-        None if host.to_ascii_lowercase().ends_with(".local") => {
-            let ip = crate::mdns::aufloesen(&host, 1500).unwrap_or_default();
-            format!("{}:{}", ip, port).parse::<std::net::SocketAddr>()
-                .map_err(|_| format!("WS_CONNECT: {} nicht aufloesbar (auch nicht ueber mDNS)", ziel))?
-        }
-        None => return Err(format!("WS_CONNECT: {} nicht aufloesbar", ziel)),
-    };
-    let tcp = TcpStream::connect_timeout(&adr, Duration::from_secs(5))
-        .map_err(|e| format!("WS_CONNECT: {} -- {}", ziel, e))?;
+    // Alle Adressen des Namens, `.local` notfalls ueber mDNS (verbinden.rs).
+    let _ = &ziel;
+    let tcp = crate::verbinden::tcp(&host, port, Duration::from_secs(5), "WS_CONNECT")?;
     tcp.set_nodelay(true).ok();
     tcp.set_read_timeout(Some(Duration::from_millis(50))).ok();
     let mut strom = if tls { tls_strom(tcp, &host)? } else { Strom::Klar(tcp) };

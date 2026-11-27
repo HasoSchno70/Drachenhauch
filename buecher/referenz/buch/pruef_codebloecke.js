@@ -91,7 +91,7 @@ for (const b of bloecke) {
   try { diag = JSON.parse(roh); } catch { continue; }
   // NUR Lexer/Parser. Ein Buchbeispiel ist meist ein Ausschnitt: es ruft
   // eine Funktion aus einem frueheren Block auf und laesst dessen IMPORT
-  // weg. Die `compile`-Befunde ("Unbekanntes Builtin", "fehlt IMPORT")
+  // weg. Die `compile`-Befunde ("Unbekannter Befehl", "fehlt IMPORT")
   // treffen damit fast immer das Fragment, nicht den Fehler -- 86 Befunde,
   // von denen keiner echt war. Was ein Leser wirklich abtippt und was
   // deshalb stimmen MUSS, ist die Syntax.

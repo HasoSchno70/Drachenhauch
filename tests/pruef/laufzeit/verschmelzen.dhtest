@@ -4,7 +4,7 @@
 ' Alles andere (Ueberlauf, Division durch 0, eine Umwandlung beim Speichern,
 ' ein konstanter oder leerer Platz, Kommazahl-Vergleiche) laeuft Befehl fuer
 ' Befehl. Jeder Fall steht zweimal: einmal mit, einmal ohne
-' (`DHRT_OHNE_VERSCHMELZEN`) -- die Erwartung ist dieselbe.
+' (`DHRT_NO_FUSION`) -- die Erwartung ist dieselbe.
 ' Format: docs/werkzeuge.md.
 
 === rechnen und vergleichen wie ohne
@@ -70,7 +70,7 @@ SUB lauf()
 END SUB
 lauf()
 --- umgebung
-DHRT_OHNE_VERSCHMELZEN=1
+DHRT_NO_FUSION=1
 --- erwartet
 10 4 21 1 2 2.3333333333333335 17.5 10.0
 ge
@@ -117,7 +117,7 @@ SUB lauf()
 END SUB
 lauf()
 --- umgebung
-DHRT_OHNE_VERSCHMELZEN=1
+DHRT_NO_FUSION=1
 --- erwartet
 gefangen: Ganzzahl-Ueberlauf bei '+' (INTEGER ist 64-bit; Wertebereich ueberschritten)
 9223372036854775807
@@ -174,7 +174,7 @@ CATCH e
     PRINT "null: "; e
 END TRY
 --- umgebung
-DHRT_OHNE_VERSCHMELZEN=1
+DHRT_NO_FUSION=1
 --- erwartet
 10.0 FLOAT
 3 INTEGER
@@ -186,11 +186,11 @@ null: Division durch 0
 ' (die flackert auf einer belasteten Maschine): `dhrt --verschmolzen` listet
 ' die markierten Stellen. Die Folge im Rumpf der Schleife ist ein Sprung
 ' (IF i MOD 3 = 0), die Zuweisung `c = a * b` speichert lokal; `a + b` als
-' Argument bleibt ein Wert. Mit DHRT_OHNE_VERSCHMELZEN steht nichts da.
+' Argument bleibt ein Wert. Mit DHRT_NO_FUSION steht nichts da.
 IMPORT "helfer.dh"
 dlStarten(["--verschmolzen", "prog.dh"])
 PRINT dlAus
-SETENV("DHRT_OHNE_VERSCHMELZEN", "1")
+SETENV("DHRT_NO_FUSION", "1")
 dlStarten(["--verschmolzen", "prog.dh"])
 PRINT "ohne: ["; TRIM$(dlAus); "]"
 --- datei helfer.dh

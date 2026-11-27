@@ -1,6 +1,7 @@
 //! Streaming-UTF-8-Dekodierung fuer byteweise Reads (TCP/Serial/...).
 //! Kein Feature-Gate -- wird von mehreren, unabhaengig zuschaltbaren I/O-
 //! Modulen (net, serial) genutzt und muss deshalb immer verfuegbar sein.
+#![cfg_attr(not(any(feature = "net", feature = "serial")), allow(dead_code))]
 
 /// Dekodiert `data` moeglichst als UTF-8: echte Fehlsequenzen werden (wie bei
 /// `from_utf8_lossy`) durch U+FFFD ersetzt, aber Byte am ENDE, die noch der

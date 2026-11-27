@@ -93,9 +93,14 @@ if ($Nachricht.StartsWith("roh:")) {
     # "anf" = ein Anfuehrungszeichen (auf der Befehlszeile schwer zu
     # uebergeben), "rueck"/"links"/"rechts"/"auf"/"ab"/"enter"/"escape"/"f12" = die
     # Taste gedrueckt und los ("esc" allein ist die Nachricht oben),
-    # "buchstabe:z" = die Taste, auf der das Z steht.
+    # "buchstabe:z" = die Taste, auf der das Z steht, "pause:MS" = warten.
     foreach ($teil in $Nachricht.Split("|")) {
-        if ($teil.StartsWith("tippe:")) {
+        if ($teil.StartsWith("pause:")) {
+            # "pause:MS" = warten, bevor es weitergeht (etwa bis das Kind in
+            # WAITKEY steht -- raylib leert seine Tastenwarteschlange bei
+            # jedem Abfragen, eine zu fruehe Taste ginge verloren).
+            Start-Sleep -Milliseconds ([int]$teil.Substring(6))
+        } elseif ($teil.StartsWith("tippe:")) {
             foreach ($z in $teil.Substring(6).ToCharArray()) {
                 [FensterSender]::PostMessage($h, 0x102, [IntPtr][int]$z, [IntPtr]1) | Out-Null
                 Start-Sleep -Milliseconds 60

@@ -1,7 +1,6 @@
 //! Formular-Widgets: Radio, Dropdown, Fortschritt, Statusleiste, Pfadleiste, Listen samt Ausbau, Knopfarten.
 //!
-//! Teil von `gui.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `gui.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
@@ -38,7 +37,7 @@ impl Gui {
     /// Gruppe von `h`, oder -1. `h` darf ein beliebiges Radio der Gruppe sein.
     pub fn radio_selected(&self, h: i64) -> Result<i64, String> {
         let w = self.wdg(h, "GUI_RADIO_SELECTED")?;
-        if w.kind != Kind::Radio { return Err("GUI_RADIO_SELECTED: Widget ist kein radio".into()); }
+        if w.kind != Kind::Radio { return Err("GUI_RADIO_SELECTED: das Widget ist kein GUI_RADIO".into()); }
         let (wi, _) = Self::dec_widget(h);
         let group = &w.group;
         let mut idx = 0i64;
@@ -64,7 +63,7 @@ impl Gui {
     }
     pub fn set_image(&mut self, h: i64, tex: i64) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_SET_IMAGE")?;
-        if !matches!(w.kind, Kind::Image | Kind::Card) { return Err("GUI_SET_IMAGE: Widget ist kein image und keine Kachel".into()); }
+        if !matches!(w.kind, Kind::Image | Kind::Card) { return Err("GUI_SET_IMAGE: das Widget ist kein GUI_IMAGE oder GUI_CARD".into()); }
         w.sel = tex as i32; Ok(())
     }
     /// Kachel (GUI_CARD): Bild oben, Titel, Beschreibung darunter -- und das
@@ -83,12 +82,12 @@ impl Gui {
     }
     pub fn card_set_text(&mut self, h: i64, text: String) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_CARD_SET_TEXT")?;
-        if w.kind != Kind::Card { return Err("GUI_CARD_SET_TEXT: Widget ist keine Kachel (GUI_CARD)".into()); }
+        if w.kind != Kind::Card { return Err("GUI_CARD_SET_TEXT: das Widget ist kein GUI_CARD".into()); }
         w.placeholder = text; Ok(())
     }
     pub fn card_text(&self, h: i64) -> Result<String, String> {
         let w = self.wdg(h, "GUI_CARD_TEXT$")?;
-        if w.kind != Kind::Card { return Err("GUI_CARD_TEXT$: Widget ist keine Kachel (GUI_CARD)".into()); }
+        if w.kind != Kind::Card { return Err("GUI_CARD_TEXT$: das Widget ist kein GUI_CARD".into()); }
         Ok(w.placeholder.clone())
     }
     /// Button mit Icon (Textur-Handle aus LOADIMAGE/GENTEX im sel-Feld). Mit Text
@@ -103,26 +102,26 @@ impl Gui {
     /// Icon eines Buttons setzen/ersetzen (-1 entfernt es).
     pub fn set_icon(&mut self, h: i64, tex: i64) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_SET_ICON")?;
-        if w.kind != Kind::Button { return Err("GUI_SET_ICON: Widget ist kein button".into()); }
+        if w.kind != Kind::Button { return Err("GUI_SET_ICON: das Widget ist kein GUI_BUTTON".into()); }
         w.sel = tex as i32; w.sinnbild.clear(); Ok(())
     }
     /// GUI_GET_ICON$(knopf): das eingebaute Sinnbild ("" ohne);
     /// GUI_GET_ICON(knopf): die Textur (-1 ohne).
     pub fn get_icon_symbol(&self, h: i64) -> Result<String, String> {
         let w = self.wdg(h, "GUI_GET_ICON$")?;
-        if w.kind != Kind::Button { return Err("GUI_GET_ICON$: Widget ist kein button".into()); }
+        if w.kind != Kind::Button { return Err("GUI_GET_ICON$: das Widget ist kein GUI_BUTTON".into()); }
         Ok(w.sinnbild.clone())
     }
     pub fn get_icon(&self, h: i64) -> Result<i64, String> {
         let w = self.wdg(h, "GUI_GET_ICON")?;
-        if w.kind != Kind::Button { return Err("GUI_GET_ICON: Widget ist kein button".into()); }
+        if w.kind != Kind::Button { return Err("GUI_GET_ICON: das Widget ist kein GUI_BUTTON".into()); }
         Ok(if w.sinnbild.is_empty() { w.sel as i64 } else { -1 })
     }
     /// Eingebautes Sinnbild auf einen Knopf -- `""` nimmt es wieder weg.
     pub fn set_icon_symbol(&mut self, h: i64, name: &str) -> Result<(), String> {
         let n = if name.is_empty() { String::new() } else { sinnbild_pruefen(name, "GUI_SET_ICON")? };
         let w = self.wdg_mut(h, "GUI_SET_ICON")?;
-        if w.kind != Kind::Button { return Err("GUI_SET_ICON: Widget ist kein button".into()); }
+        if w.kind != Kind::Button { return Err("GUI_SET_ICON: das Widget ist kein GUI_BUTTON".into()); }
         w.sinnbild = n; Ok(())
     }
     /// Werkzeugleiste: ohne Eintraege ein flacher Streifen (so war sie immer),
@@ -135,12 +134,12 @@ impl Gui {
     }
     pub(super) fn tb_mut(&mut self, h: i64, fn_: &str) -> Result<&mut LeisteState, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::Toolbar { return Err(format!("{}: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)", fn_)); }
+        if w.kind != Kind::Toolbar { return Err(format!("{}: das Widget ist kein GUI_TOOLBAR", fn_)); }
         Ok(w.leiste.get_or_insert_with(|| Box::new(LeisteState::default())))
     }
     pub(super) fn tb_ref(&self, h: i64, fn_: &str) -> Result<Option<&LeisteState>, String> {
         let w = self.wdg(h, fn_)?;
-        if w.kind != Kind::Toolbar { return Err(format!("{}: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)", fn_)); }
+        if w.kind != Kind::Toolbar { return Err(format!("{}: das Widget ist kein GUI_TOOLBAR", fn_)); }
         Ok(w.leiste.as_deref())
     }
     pub(super) fn tb_eintrag(&mut self, h: i64, i: i64, fn_: &str) -> Result<&mut LeistenEintrag, String> {
@@ -226,10 +225,10 @@ impl Gui {
     /// `symbolgroesse` (Punkte, 0 = aus der Hoehe).
     pub fn toolbar_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let l = self.tb_mut(h, "GUI_TOOLBAR_SET")?;
-        match key.to_lowercase().as_str() {
-            "beschriftung" | "text" => l.mit_text = wert != 0.0,
-            "symbolgroesse" | "symbol" => l.symbol = (wert as i32).clamp(0, 64),
-            _ => return Err(format!("GUI_TOOLBAR_SET: unbekannte Einstellung '{}' -- bekannt sind: beschriftung, symbolgroesse", key)),
+        match super::einstellungen::schluessel("GUI_TOOLBAR_SET", key, super::einstellungen::TOOLBAR)? {
+            "beschriftung" => l.mit_text = wert != 0.0,
+            "symbolgroesse" => l.symbol = (wert as i32).clamp(0, 64),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -237,16 +236,16 @@ impl Gui {
     pub fn toolbar_get(&self, h: i64, key: &str) -> Result<f64, String> {
         let l = self.tb_ref(h, "GUI_TOOLBAR_GET")?;
         let (mit_text, symbol) = l.map(|l| (l.mit_text, l.symbol)).unwrap_or((false, 0));
-        Ok(match key.to_lowercase().as_str() {
-            "beschriftung" | "text" => if mit_text { 1.0 } else { 0.0 },
-            "symbolgroesse" | "symbol" => symbol as f64,
-            _ => return Err(format!("GUI_TOOLBAR_GET: unbekannte Einstellung '{}' -- bekannt sind: beschriftung, symbolgroesse", key)),
+        Ok(match super::einstellungen::schluessel("GUI_TOOLBAR_GET", key, super::einstellungen::TOOLBAR)? {
+            "beschriftung" => if mit_text { 1.0 } else { 0.0 },
+            "symbolgroesse" => symbol as f64,
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         })
     }
     /// Lage eines Eintrags (x, Breite) in logischen Koordinaten, wie GUI_GET_X.
     pub fn toolbar_item_rect(&self, h: i64, i: i64) -> Result<(i64, i64), String> {
         let w = self.wdg(h, "GUI_TOOLBAR_ITEM_X")?;
-        if w.kind != Kind::Toolbar { return Err("GUI_TOOLBAR_ITEM_X: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)".into()); }
+        if w.kind != Kind::Toolbar { return Err("GUI_TOOLBAR_ITEM_X: das Widget ist kein GUI_TOOLBAR".into()); }
         let geo = self.tb_geom(w.x, w.y, w.w, w.h, w);
         match geo.iter().find(|&&(k, _, _)| k as i64 == i) {
             Some(&(_, x0, x1)) => Ok((self.unsk(x0) as i64, self.unsk(x1 - x0) as i64)),
@@ -267,7 +266,7 @@ impl Gui {
     /// Wie viele Eintraege gerade im Ueberlauf-Menue stehen (0 = alles passt).
     pub fn toolbar_overflow(&self, h: i64) -> Result<i64, String> {
         let w = self.wdg(h, "GUI_TOOLBAR_OVERFLOW")?;
-        if w.kind != Kind::Toolbar { return Err("GUI_TOOLBAR_OVERFLOW: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)".into()); }
+        if w.kind != Kind::Toolbar { return Err("GUI_TOOLBAR_OVERFLOW: das Widget ist kein GUI_TOOLBAR".into()); }
         let (wi, i) = Self::dec_widget(h);
         let (ax, ay, bw, bh) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
         Ok(self.tb_layout(ax, ay, bw, bh, w).1.iter().filter(|&&k| w.leiste.as_ref().map(|l| l.eintraege[k].art == 0).unwrap_or(false)).count() as i64)
@@ -413,7 +412,7 @@ impl Gui {
     }
     pub(super) fn sb_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::StatusBar { return Err(format!("{}: Widget ist keine Statusleiste (GUI_STATUSBAR)", fn_)); }
+        if w.kind != Kind::StatusBar { return Err(format!("{}: das Widget ist kein GUI_STATUSBAR", fn_)); }
         if w.status.is_none() { w.status = Some(Box::new(StatusState::default())); }
         Ok(w)
     }
@@ -466,7 +465,7 @@ impl Gui {
     }
     pub fn statusbar_field_rect(&self, h: i64, i: i64) -> Result<(i64, i64), String> {
         let w = self.wdg(h, "GUI_STATUSBAR_FIELD_X")?;
-        if w.kind != Kind::StatusBar { return Err("GUI_STATUSBAR_FIELD_X: Widget ist keine Statusleiste (GUI_STATUSBAR)".into()); }
+        if w.kind != Kind::StatusBar { return Err("GUI_STATUSBAR_FIELD_X: das Widget ist kein GUI_STATUSBAR".into()); }
         match self.sb_geom(w.x, w.w, w).iter().find(|&&(k, _, _)| k as i64 == i) {
             Some(&(_, x0, x1)) => Ok((self.unsk(x0) as i64, self.unsk(x1 - x0) as i64)),
             None => Err(format!("GUI_STATUSBAR_FIELD_X: Feld {} gibt es nicht", i)),
@@ -508,7 +507,7 @@ impl Gui {
     }
     pub(super) fn pf_mut(&mut self, h: i64, fn_: &str) -> Result<&mut PfadState, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::Breadcrumb { return Err(format!("{}: Widget ist keine Pfadleiste (GUI_BREADCRUMB)", fn_)); }
+        if w.kind != Kind::Breadcrumb { return Err(format!("{}: das Widget ist kein GUI_BREADCRUMB", fn_)); }
         Ok(w.pfad.get_or_insert_with(|| Box::new(PfadState::default())))
     }
     pub(super) fn pf_idx(p: &PfadState, i: i64, fn_: &str) -> Result<usize, String> {
@@ -550,7 +549,7 @@ impl Gui {
     /// Der erste Teil, der zu sehen ist -- davor steht das "...".
     pub fn breadcrumb_first_visible(&self, h: i64) -> Result<i64, String> {
         let w = self.wdg(h, "GUI_BREADCRUMB_FIRST_VISIBLE")?;
-        if w.kind != Kind::Breadcrumb { return Err("GUI_BREADCRUMB_FIRST_VISIBLE: Widget ist keine Pfadleiste (GUI_BREADCRUMB)".into()); }
+        if w.kind != Kind::Breadcrumb { return Err("GUI_BREADCRUMB_FIRST_VISIBLE: das Widget ist kein GUI_BREADCRUMB".into()); }
         let (geo, _) = self.pf_geom(w.x, w.w, w);
         Ok(geo.first().map(|&(k, _, _)| k as i64).unwrap_or(0))
     }
@@ -658,13 +657,13 @@ impl Gui {
     /// (Codes wie KEYHIT: KEY_LEFT, KEY_ENTER ...), 0 = keine.
     pub fn custom_key(&self, h: i64) -> Result<i64, String> {
         let w = self.wdg(h, "GUI_CUSTOM_KEY")?;
-        if w.kind != Kind::Eigen { return Err("GUI_CUSTOM_KEY: Widget ist kein GUI_CUSTOM".into()); }
+        if w.kind != Kind::Eigen { return Err("GUI_CUSTOM_KEY: das Widget ist kein GUI_CUSTOM".into()); }
         Ok(w.eigen_taste)
     }
     /// GUI_CUSTOM_TEXT$(wdg): die Zeichen, die es in diesem Bild bekam.
     pub fn custom_text(&self, h: i64) -> Result<String, String> {
         let w = self.wdg(h, "GUI_CUSTOM_TEXT$")?;
-        if w.kind != Kind::Eigen { return Err("GUI_CUSTOM_TEXT$: Widget ist kein GUI_CUSTOM".into()); }
+        if w.kind != Kind::Eigen { return Err("GUI_CUSTOM_TEXT$: das Widget ist kein GUI_CUSTOM".into()); }
         Ok(w.eigen_text.clone())
     }
 
@@ -674,10 +673,10 @@ impl Gui {
     }
     /// Absoluter Bildschirm-Bereich (Inhaltsflaeche) eines Canvas, in den der User
     /// nach GUI_DRAW mit normalen Zeichenbefehlen malen kann (selbst clippen).
-    pub fn canvas_rect(&self, h: i64) -> Result<(i32, i32, i32, i32), String> {
+    pub fn canvas_rect(&self, h: i64, fn_: &str) -> Result<(i32, i32, i32, i32), String> {
         let (wi, _) = Self::dec_widget(h);
-        let w = self.wdg(h, "GUI_CANVAS_*")?;
-        if w.kind != Kind::Canvas && w.kind != Kind::Eigen { return Err("GUI_CANVAS_*: Widget ist kein canvas (GUI_CANVAS oder GUI_CUSTOM)".into()); }
+        let w = self.wdg(h, fn_)?;
+        if w.kind != Kind::Canvas && w.kind != Kind::Eigen { return Err(format!("{}: das Widget ist kein GUI_CANVAS oder GUI_CUSTOM", fn_)); }
         let (ax, ay, ww, wh) = self.abs_rect(wi, w);
         Ok((ax + 1, ay + 1, (ww - 2).max(0), (wh - 2).max(0)))   // Inhalt ohne Rahmen
     }
@@ -690,7 +689,7 @@ impl Gui {
         if self.canvas_offen.is_some() {
             return Err("GUI_CANVAS_BEGIN: eine Zeichenflaeche ist schon offen -- erst GUI_CANVAS_END".into());
         }
-        self.canvas_rect(h)?;
+        self.canvas_rect(h, "GUI_CANVAS_BEGIN")?;
         let (wi, i) = Self::dec_widget(h);
         // In einer abgerissenen Leiste aus Widgets des Gastfensters (Stufe
         // 3b): das Gastfenster bis GUI_CANVAS_END verschoben ausleihen, wie
@@ -706,7 +705,7 @@ impl Gui {
             if teil { self.zurueckgeben(); teil = false; }
             id = 0;
         }
-        let (cx, cy, cw, ch) = self.canvas_rect(h)?;
+        let (cx, cy, cw, ch) = self.canvas_rect(h, "GUI_CANVAS_BEGIN")?;
         g.push_clip(cx, cy, cw, ch);
         self.canvas_offen = Some((id, teil));
         Ok(())
@@ -753,7 +752,7 @@ impl Gui {
     /// sie steht (auch ein echtes). Steht der Zeiger ueber einem anderen
     /// Fenster, liegt (x, y) weit draussen.
     pub fn canvas_mouse(&mut self, g: &mut Graphics, h: i64) -> Result<(i64, i64, bool), String> {
-        self.canvas_rect(h)?;
+        self.canvas_rect(h, "GUI_CANVAS_MOUSE")?;
         let (wi, i) = Self::dec_widget(h);
         let mut id = self.windows.get(wi).map(|w| w.nativ).unwrap_or(0);
         // Schon ausgeliehen (zwischen GUI_CANVAS_BEGIN und _END)? Dann nicht
@@ -761,7 +760,7 @@ impl Gui {
         let teil = if self.leihe.is_none() { self.canvas_teil(wi, i) } else { None };
         if let Some((k, f)) = teil { self.leihen(wi, k, f); id = f; }
         else if let Some(l) = self.leihe.as_ref().filter(|l| l.wi == wi) { id = l.id; }
-        let r = self.canvas_rect(h);
+        let r = self.canvas_rect(h, "GUI_CANVAS_MOUSE");
         g.sicht_setzen(Some(id));
         let (mx, my, unten) = (g.mouse_x(), g.mouse_y(), g.mouse_button(0));
         g.sicht_setzen(None);
@@ -773,20 +772,23 @@ impl Gui {
     // Item-Auswahl: Dropdown UND ListBox (beide nutzen items/sel).
     pub(super) fn item_widget(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
         let w = self.wdg(h, fn_)?;
-        if !matches!(w.kind, Kind::Dropdown | Kind::ListBox) { return Err(format!("{}: Widget ist kein dropdown/listbox", fn_)); }
+        if !matches!(w.kind, Kind::Dropdown | Kind::ListBox) { return Err(format!("{}: das Widget ist kein GUI_DROPDOWN oder GUI_LISTBOX", fn_)); }
         Ok(w)
     }
-    pub fn dropdown_selected(&self, h: i64) -> Result<i64, String> {
-        Ok(self.item_widget(h, "GUI_DROPDOWN_SELECTED")?.sel as i64)
+    /// Liste und Dropdown teilen sich diese drei; `fn_` ist der gerufene
+    /// Befehl (bis 2026.53 meldete GUI_LISTBOX_SELECTED sich als
+    /// GUI_DROPDOWN_SELECTED).
+    pub fn dropdown_selected(&self, h: i64, fn_: &str) -> Result<i64, String> {
+        Ok(self.item_widget(h, fn_)?.sel as i64)
     }
-    pub fn dropdown_text(&self, h: i64) -> Result<String, String> {
-        let w = self.item_widget(h, "GUI_DROPDOWN_TEXT")?;
+    pub fn dropdown_text(&self, h: i64, fn_: &str) -> Result<String, String> {
+        let w = self.item_widget(h, fn_)?;
         if w.kind == Kind::Dropdown && w.frei { return Ok(w.text.clone()); }
         Ok(if w.sel >= 0 && (w.sel as usize) < w.items.len() { w.items[w.sel as usize].clone() } else { String::new() })
     }
-    pub fn dropdown_set_selected(&mut self, h: i64, idx: i64) -> Result<(), String> {
-        self.item_widget(h, "GUI_DROPDOWN_SET_SELECTED")?;
-        let w = self.wdg_mut(h, "GUI_DROPDOWN_SET_SELECTED")?;
+    pub fn dropdown_set_selected(&mut self, h: i64, idx: i64, fn_: &str) -> Result<(), String> {
+        self.item_widget(h, fn_)?;
+        let w = self.wdg_mut(h, fn_)?;
         w.sel = if idx >= 0 && (idx as usize) < w.items.len() { idx as i32 } else { -1 };
         dd_frei_text_setzen(w);
         Ok(())
@@ -815,7 +817,7 @@ impl Gui {
     /// Den Zusatzzustand einer ListBox holen (bei Bedarf anlegen).
     pub(super) fn list_mut(&mut self, h: i64, fn_: &str) -> Result<&mut ListState, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::ListBox { return Err(format!("{}: das Widget ist keine Liste (GUI_LISTBOX)", fn_)); }
+        if w.kind != Kind::ListBox { return Err(format!("{}: das Widget ist kein GUI_LISTBOX", fn_)); }
         let n = w.items.len();
         let l = w.list.get_or_insert_with(|| Box::new(ListState { anker: -1, ..Default::default() }));
         l.sync(n);
@@ -861,12 +863,12 @@ impl Gui {
     /// Kuehlschrank-App: welche Vorschlaege stehen gerade darin?).
     pub fn dropdown_count(&self, h: i64) -> Result<i64, String> {
         let w = self.wdg(h, "GUI_DROPDOWN_COUNT")?;
-        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_COUNT: Widget ist keine Klappliste".into()); }
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_COUNT: das Widget ist kein GUI_DROPDOWN".into()); }
         Ok(w.items.len() as i64)
     }
     pub fn dropdown_item(&self, h: i64, i: i64) -> Result<String, String> {
         let w = self.wdg(h, "GUI_DROPDOWN_ITEM")?;
-        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_ITEM: Widget ist keine Klappliste".into()); }
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_ITEM: das Widget ist kein GUI_DROPDOWN".into()); }
         Ok(w.items[Self::list_idx(w, i, "GUI_DROPDOWN_ITEM")?].clone())
     }
     /// GUI_LISTBOX_COUNT(lb)
@@ -907,11 +909,11 @@ impl Gui {
     /// GUI_LISTBOX_SET(lb, key$, wert): `mehrfachauswahl`, `kaestchen`.
     pub fn list_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let l = self.list_mut(h, "GUI_LISTBOX_SET")?;
-        match key.to_lowercase().as_str() {
-            "mehrfachauswahl" | "multi_select" | "multi" => { l.multi = wert != 0.0; if !l.multi { for x in l.sel.iter_mut() { *x = false; } } }
-            "kaestchen" | "checkboxes" => l.kaestchen = wert != 0.0,
-            "bearbeitbar" | "editable" => { l.bearbeitbar = wert != 0.0; if !l.bearbeitbar { l.edit = None; } }
-            _ => return Err(format!("GUI_LISTBOX_SET: unbekannter Schluessel '{}' -- mehrfachauswahl, kaestchen, bearbeitbar", key)),
+        match super::einstellungen::schluessel("GUI_LISTBOX_SET", key, super::einstellungen::LISTBOX)? {
+            "mehrfachauswahl" => { l.multi = wert != 0.0; if !l.multi { for x in l.sel.iter_mut() { *x = false; } } }
+            "kaestchen" => l.kaestchen = wert != 0.0,
+            "bearbeitbar" => { l.bearbeitbar = wert != 0.0; if !l.bearbeitbar { l.edit = None; } }
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -1010,14 +1012,14 @@ impl Gui {
 
     pub(super) fn list_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
         let w = self.wdg(h, fn_)?;
-        if w.kind != Kind::ListBox { return Err(format!("{}: das Widget ist keine Liste (GUI_LISTBOX)", fn_)); }
+        if w.kind != Kind::ListBox { return Err(format!("{}: das Widget ist kein GUI_LISTBOX", fn_)); }
         Ok(w)
     }
     /// Liste ODER Klappliste -- die Werte je Eintrag gelten fuer beide.
     pub(super) fn werte_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
         let w = self.wdg(h, fn_)?;
         if !matches!(w.kind, Kind::ListBox | Kind::Dropdown) {
-            return Err(format!("{}: das Widget ist keine Liste und keine Klappliste", fn_));
+            return Err(format!("{}: das Widget ist kein GUI_LISTBOX oder GUI_DROPDOWN", fn_));
         }
         Ok(w)
     }
@@ -1073,13 +1075,13 @@ impl Gui {
     /// weggefilterter Eintrag liefert (0, 0, 0, 0); ein herausgerollter eine
     /// Lage ausserhalb der Liste. Gebraucht fuer Pruefungen mit echten Klicks
     /// -- die Zeilenhoehe haengt an Schrift und Stildatei.
-    pub fn list_item_rect(&self, h: i64, k: i64) -> Result<(i32, i32, i32, i32), String> {
-        let w = self.wdg(h, "GUI_LISTBOX_ITEM_RECT")?;
+    pub fn list_item_rect(&self, h: i64, k: i64, fn_: &str) -> Result<(i32, i32, i32, i32), String> {
+        let w = self.wdg(h, fn_)?;
         if !matches!(w.kind, Kind::ListBox) {
-            return Err("GUI_LISTBOX_ITEM_RECT: Widget ist keine Liste".into());
+            return Err(format!("{}: das Widget ist kein GUI_LISTBOX", fn_));
         }
         if k < 0 || k as usize >= w.items.len() {
-            return Err(format!("GUI_LISTBOX_ITEM_RECT: Eintrag {} ausserhalb [0..{}]", k, w.items.len() as i64 - 1));
+            return Err(format!("{}: Eintrag {} ausserhalb [0..{}]", fn_, k, w.items.len() as i64 - 1));
         }
         let (wi, _) = Self::dec_widget(h);
         let pos = match liste_ansicht(&w.items, w.list.as_deref()).iter().position(|&x| x == k as usize) {
@@ -1144,14 +1146,6 @@ impl Gui {
     pub fn list_view_row(&self, h: i64, k: i64) -> Result<i64, String> {
         let w = self.list_ref(h, "GUI_LISTBOX_VIEW_ROW")?;
         Ok(liste_ansicht(&w.items, w.list.as_deref()).get(k.max(0) as usize).filter(|_| k >= 0).map(|&x| x as i64).unwrap_or(-1))
-    }
-    pub fn list_placeholder(&mut self, h: i64, text: String) -> Result<(), String> {
-        self.list_mut(h, "GUI_LISTBOX_PLACEHOLDER")?.leer_text = text; Ok(())
-    }
-    /// GUI_LISTBOX_PLACEHOLDER$(lb): der Hinweis der leeren Liste ("" = keiner).
-    pub fn list_placeholder_get(&self, h: i64) -> Result<String, String> {
-        let w = self.list_ref(h, "GUI_LISTBOX_PLACEHOLDER$")?;
-        Ok(w.list.as_ref().map(|l| l.leer_text.clone()).unwrap_or_default())
     }
     /// Sortieren -- natuerlich ("Datei 9" vor "Datei 10"), und INNERHALB der
     /// Gruppen, wenn es Gruppenkoepfe gibt: sonst risse Sortieren die Koepfe
@@ -1234,16 +1228,8 @@ impl Gui {
         if !matches!(w.kind, Kind::ListBox | Kind::Tree) || !self.widget_shown(wi, w) { return None; }
         let max = self.list_max_scroll(wi, i);
         if max <= 0 { return None; }
-        let (ax, ay, aw, ah) = self.abs_rect(wi, w);
-        let bw = self.sk(8);
         // Gespiegelt stehen Baum und Liste mit dem Balken links.
-        let links = self.windows[wi].rtl;
-        let tx = if links { ax + 1 } else { ax + aw - 1 - bw };
-        let (ty, th) = (ay + 1, (ah - 2).max(1));
-        let inhalt = max + w.h;
-        let thh = ((th as i64 * w.h as i64 / inhalt.max(1) as i64) as i32).clamp(self.sk(16).min(th), th);
-        let thy = ty + ((th - thh) as f64 * (Self::roll_ist(w) / max as f64).clamp(0.0, 1.0)) as i32;
-        Some((tx, ty, bw, th, thy, thh))
+        Some(self.rollbalken_lage(self.abs_rect(wi, w), self.windows[wi].rtl, w.h, max + w.h, Self::roll_ist(w)))
     }
     pub(super) fn list_bar_at(&self, wi: usize, i: usize, mx: i32, my: i32) -> bool {
         self.list_bar_geom(wi, i).map(|(tx, ty, bw, th, _, _)| Self::in_rect(mx, my, (tx, ty, bw, th))).unwrap_or(false)
@@ -1341,12 +1327,28 @@ impl Gui {
     }
     /// Wo der Text einer Listenzeile beginnt: hinter Kaestchen und Sinnbild.
     pub(super) fn list_text_x(&self, w: &Widget, ax: i32) -> i32 {
-        let box_w = self.list_box_w(w);
-        let ih = self.list_zeile_h(w);
         let hat_icon = w.list.as_ref().map(|l| l.icons.iter().any(|&i| i >= 0)).unwrap_or(false);
-        let mut tx = if box_w > 0 { ax + box_w } else { ax + self.w_pad(w) };
-        if hat_icon { tx += ih + 2; }
-        tx
+        self.list_icon_x(w, ax) + if hat_icon { self.list_zeile_h(w) + 2 } else { 0 }
+    }
+    /// Wo das Sinnbild einer Listenzeile beginnt: hinter dem Kaestchen,
+    /// sonst nach dem Innenabstand des Widgets.
+    pub(super) fn list_icon_x(&self, w: &Widget, ax: i32) -> i32 {
+        let box_w = self.list_box_w(w);
+        if box_w > 0 { ax + box_w } else { ax + self.w_pad(w) }
+    }
+    /// Wo der Text einer Listenzeile enden muss und wo ihr Zusatztext
+    /// beginnt (relativ zum linken Rand; `wz` = Breite ohne Rollbalken).
+    /// Zusammen mit `list_text_x` EINE Rechnung fuer Zeichnen und Tooltip --
+    /// bis 2026.53 rechnete der Tooltip mit dem Vorgabe-Innenabstand statt
+    /// dem der Stildatei.
+    pub(super) fn liste_rechts(&self, g: &Graphics, w: &Widget, wz: i32, k: usize) -> (i32, Option<i32>) {
+        match w.list.as_deref().and_then(|l| l.details.get(k)).filter(|d| !d.is_empty()) {
+            Some(d) => {
+                let dx = wz - self.w_pad(w) - self.wtext_width(g, w, d);
+                (dx - self.sk(10), Some(dx))
+            }
+            None => (wz - 2, None),
+        }
     }
     /// Rechtsklick auf einen Knoten waehlt ihn -- wie bei Liste und Tabelle;
     /// eine Mehrfachauswahl bleibt, wenn der Knoten dazugehoert.
@@ -1426,27 +1428,14 @@ impl Gui {
     }
     /// Tippen springt (Baum): wie bei der Liste, ueber die SICHTBAREN Knoten.
     pub(super) fn baum_tippen(&mut self, wi: usize, i: usize, vis: &[usize], g: &mut Graphics) -> bool {
-        let mut s = g.pop_text_input();
-        s.retain(|c| !c.is_control() && c != ' ');
-        if s.is_empty() && !g.key_ctrl() {
-            for c in (b'a'..=b'z').chain(b'0'..=b'9') {
-                if g.key_pressed(c as i64) { s.push(c as char); }
-            }
-        }
+        let s = super::bausteine::getippt(g);
         if s.is_empty() || vis.is_empty() { return false; }
-        let jetzt = g.get_time();
+        let jetzt = g.uhr_jetzt();
         let ziel = {
             let t = self.windows[wi].widgets[i].tree.as_mut().unwrap();
-            if jetzt - t.tipp_zeit > 1.0 { t.tipp.clear(); }
-            t.tipp_zeit = jetzt;
-            t.tipp.push_str(&s.to_lowercase());
-            let tipp = t.tipp.clone();
-            let erster = tipp.chars().next().unwrap();
-            let wiederholt = tipp.chars().all(|c| c == erster);
-            let such: String = if wiederholt { erster.to_string() } else { tipp };
+            let (such, wiederholt) = super::bausteine::tipp_merken(&mut t.tipp, &mut t.tipp_zeit, jetzt, &s);
             let sel = t.selected;
-            let pos = vis.iter().position(|&k| k as i32 == sel);
-            let start = match pos { Some(p) if wiederholt => p + 1, Some(p) => p, None => 0 };
+            let start = super::bausteine::tipp_start(vis.iter().position(|&k| k as i32 == sel), wiederholt);
             (0..vis.len()).map(|d| vis[(start + d) % vis.len()])
                 .find(|&k| t.nodes[k].label.to_lowercase().starts_with(&such))
         };
@@ -1469,10 +1458,6 @@ impl Gui {
     }
     pub fn tree_editing(&self, h: i64) -> Result<i64, String> {
         Ok(self.tree_ref(h, "GUI_TREE_EDITING")?.edit.as_ref().map(|e| e.k as i64).unwrap_or(-1))
-    }
-    pub fn tree_placeholder(&mut self, h: i64, text: String) -> Result<(), String> {
-        self.tree_mut(h, "GUI_TREE_PLACEHOLDER")?.leer_text = text;
-        Ok(())
     }
     // --- GUI_LISTBOX_EDIT / EDITED / EDITING ---
     pub fn list_edit(&mut self, h: i64, i: i64) -> Result<(), String> {
@@ -1506,11 +1491,11 @@ impl Gui {
     /// Akzent) bzw. aus einer festen, lesbaren Reihe -- und die TEXTfarbe wird
     /// danach gewaehlt, wie hell der Grund ist.
     pub fn set_button_variant(&mut self, h: i64, art: &str) -> Result<(), String> {
-        let a = art.trim().to_lowercase();
+        let a = gui_wort(art);
         let k = KNOPF_ARTEN.iter().position(|x| *x == a).ok_or_else(|| format!(
             "GUI_BUTTON_VARIANT: Knopfart '{}' gibt es nicht -- bekannt sind: {}", art, KNOPF_ARTEN.join(", ")))?;
         let w = self.wdg_mut(h, "GUI_BUTTON_VARIANT")?;
-        if w.kind != Kind::Button { return Err("GUI_BUTTON_VARIANT: Widget ist kein Knopf".into()); }
+        if w.kind != Kind::Button { return Err("GUI_BUTTON_VARIANT: das Widget ist kein GUI_BUTTON".into()); }
         w.variante = k as u8; Ok(())
     }
     pub fn button_variant(&self, h: i64) -> Result<String, String> {
@@ -1542,10 +1527,7 @@ impl Gui {
         if !wdg.enabled && grund.is_some() && !self.stil_hat(wdg, "bg", stil::AUS) {
             bg = mischen(bg, self.th("widget_bg"), 0.65);
         }
-        let bg_h = wdg.ov.get("hover").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::HOVER))
-            .unwrap_or(shade(bg, if grund.is_some() { 18 } else { 30 }));
-        let bg_d = wdg.ov.get("pressed").copied().or_else(|| self.stil_farbe(wdg, "bg", stil::AKTIV))
-            .unwrap_or(shade(bg, -30));
+        let (bg_h, bg_d) = self.knopf_hover_druck(wdg, bg, grund.is_some());
         let (eh, ed) = if wdg.enabled { (Self::rolle_t(wdg, "bg", 0), Self::rolle_t(wdg, "bg", 2)) } else { (0.0, 0.0) };
         bg = mischen(mischen(bg, bg_h, eh), bg_d, ed);
         let rahmen = if self.windows[wi].default_btn == idx as i32 && wdg.variante != 1 {

@@ -1,7 +1,6 @@
-//! A*-Pathfinding fuer das `astar`-Modul. Portiert aus
-//! `rust/gb_native/src/astar.rs` (PyO3-Helper) -- selber Algorithmus, selber
-//! counter-FIFO-Tie-Break, damit bei mehreren optimalen Pfaden derselbe wie
-//! in der Python-Referenz (`astar.py::_AStarGrid`) herauskommt.
+//! A*-Pathfinding fuer das `astar`-Modul. Bei gleich guten Pfaden entscheidet
+//! ein Zaehler in Einfuege-Reihenfolge (FIFO) -- so kommt bei mehreren
+//! optimalen Wegen immer derselbe heraus (Pruefungen und Wiederholungen).
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;

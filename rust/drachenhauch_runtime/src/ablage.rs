@@ -4,7 +4,7 @@
 //! Text geht weiter ueber GLFW (`Graphics::clipboard_get/set`). Bilder und
 //! Dateilisten kann GLFW nicht -- hier uebernimmt `arboard` (Windows,
 //! macOS, Linux mit X11; unter Wayland ueber XWayland). Mit
-//! `DHRT_ZWISCHENABLAGE=privat` (jedes Kind von `dhrt test`) bleibt beides
+//! `DHRT_CLIPBOARD=privat` (jedes Kind von `dhrt test`) bleibt beides
 //! wie der Text im Prozess.
 //!
 //! Ziehen hinaus (`ziehen`): unter Windows ein echtes OLE-Ziehen ueber die
@@ -13,7 +13,7 @@
 //! NUR, solange die linke Maustaste wirklich gedrueckt ist: ohne Taste
 //! legte das System sofort dort ab, wo der Zeiger gerade steht.
 
-#![allow(dead_code)]
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
 
 use std::sync::Mutex;
 
@@ -28,7 +28,7 @@ static PRIVAT_BILD: Mutex<Option<(u32, u32, Vec<u8>)>> = Mutex::new(None);
 static PRIVAT_DATEIEN: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 fn privat() -> bool {
-    std::env::var("DHRT_ZWISCHENABLAGE").as_deref() == Ok("privat")
+    crate::umgebung::var("DHRT_CLIPBOARD").as_deref() == Ok("privat")
 }
 
 /// Ein Bild in die Zwischenablage legen. Err mit dem Grund.
@@ -100,6 +100,7 @@ pub fn dateien_holen() -> Vec<String> {
 /// Was beim Ziehen hinaus herauskam: "kopieren", "verschieben",
 /// "verknuepfen" -- oder "" (abgebrochen, nirgends abgelegt, keine Taste
 /// gedrueckt, auf diesem System nicht moeglich).
+#[cfg_attr(not(all(feature = "dialogs", windows)), allow(dead_code))]
 pub fn wirkung_name(w: u32) -> &'static str {
     if w & 2 != 0 { "verschieben" } else if w & 1 != 0 { "kopieren" } else if w & 4 != 0 { "verknuepfen" } else { "" }
 }
@@ -119,6 +120,7 @@ pub fn ziehen(hwnd: usize, dateien: &[String], text: &str) -> String {
 
 /// Ist die linke Maustaste gerade wirklich gedrueckt? (Nur dann darf ein
 /// Zug hinaus beginnen.)
+#[cfg_attr(not(all(feature = "dialogs", windows)), allow(dead_code))]
 pub fn taste_unten() -> bool {
     #[cfg(windows)]
     unsafe {

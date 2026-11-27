@@ -405,8 +405,8 @@ FUNCTION prozessStartenDatei(art AS STRING, datei AS STRING) AS BOOLEAN
     DIM su AS MAP OF STRING : su = startUmgebung(startWert$(datei, TRUE))
     DIM eigeneUmg AS INTEGER : eigeneUmg = LEN(MAPKEYS(su))
     ' Aus der IDE gestartet: Strg+Umschalt+I oeffnet den gui-Inspektor
-    ' (DHRT_INSPEKTOR); eine eigene Angabe in der Umgebung gewinnt.
-    IF NOT MAPHAS(su, "DHRT_INSPEKTOR") THEN MAPPUT(su, "DHRT_INSPEKTOR", "1")
+    ' (DHRT_INSPECTOR); eine eigene Angabe in der Umgebung gewinnt.
+    IF NOT MAPHAS(su, "DHRT_INSPECTOR") THEN MAPPUT(su, "DHRT_INSPECTOR", "1")
     IF LEN(sa) > 0 THEN
         prozess = PROCESS_START("dhrt", art, prozessDatei, "--", sa, su)
     ELSE

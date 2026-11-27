@@ -9,6 +9,44 @@
 //! verliert ihn genau dann -- der Zeiger im Farbfeld springt beim Herunterziehen
 //! auf Schwarz nach links, und beim Hochziehen kommt Rot statt der Farbe zurueck,
 //! die man gewaehlt hatte.
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
+
+/// Eine Farbe der Laufzeit in [r, g, b, a]: das oberste Byte ist die
+/// Deckkraft, **0 heisst deckend** -- so bleiben `&Hrrggbb` und RGB(r, g, b)
+/// voll deckend, `RGBA(..., a)` und `&Haarrggbb` mit a > 0 durchscheinend.
+/// EINE Stelle fuer die Regel (bis 2026.53 stand sie viermal im Code:
+/// `col`, `lw_farbe`, chart `alpha_of`, ALPHA).
+pub fn rgba(c: i64) -> [u8; 4] {
+    let v = c as u32;
+    let a = ((v >> 24) & 0xFF) as u8;
+    [((v >> 16) & 0xFF) as u8, ((v >> 8) & 0xFF) as u8, (v & 0xFF) as u8, if a == 0 { 255 } else { a }]
+}
+
+/// Gegenstueck zu `rgba`: [r, g, b, a] als Farbe der Laufzeit. Deckend wird
+/// 0 im obersten Byte; ganz durchsichtig (a = 0) laesst sich so nicht
+/// schreiben und wird 1.
+pub fn aus_rgba(r: u8, g: u8, b: u8, a: u8) -> i64 {
+    let a = if a == 255 { 0 } else { a.max(1) };
+    ((a as i64) << 24) | ((r as i64) << 16) | ((g as i64) << 8) | b as i64
+}
+
+/// Eine Farbe aus Hex-Text: `#RGB` (jede Ziffer doppelt, wie im Web),
+/// `#RRGGBB` oder `#AARRGGBB`; das `#` (oder `0x`, `&H`) darf fehlen. EIN
+/// Leser fuer COLOR_FROM_HEX, die Stildatei, `@ablauf` und die `.dhform`
+/// (bis 2026.53 vier: die `.dhform` las `#FFF` als 0x000FFF, `@ablauf`
+/// kannte nur sechs Stellen). None, wenn es keine ist.
+pub fn hex_lesen(text: &str) -> Option<i64> {
+    let t = text.trim();
+    let t = t.strip_prefix('#').or_else(|| t.strip_prefix("0x")).or_else(|| t.strip_prefix("0X"))
+        .or_else(|| t.strip_prefix("&H")).or_else(|| t.strip_prefix("&h")).unwrap_or(t);
+    if t.is_empty() || !t.chars().all(|c| c.is_ascii_hexdigit()) { return None; }
+    let voll: String = match t.len() {
+        3 => t.chars().flat_map(|c| [c, c]).collect(),
+        6 | 8 => t.to_string(),
+        _ => return None,
+    };
+    i64::from_str_radix(&voll, 16).ok()
+}
 
 /// `h` in Grad 0..360, `s` und `v` in 0..1 -> 0xRRGGBB.
 pub fn hsv_zu_rgb(h: f32, s: f32, v: f32) -> i64 {
@@ -55,6 +93,25 @@ mod tests {
     use super::*;
 
     fn nah(a: f32, b: f32) -> bool { (a - b).abs() < 0.01 }
+
+    #[test]
+    fn eine_regel_fuer_die_deckkraft() {
+        assert_eq!(rgba(0xFF0000), [255, 0, 0, 255]);
+        assert_eq!(rgba(0x80_00FF00), [0, 255, 0, 0x80]);
+        assert_eq!(aus_rgba(1, 2, 3, 255), 0x010203);
+        assert_eq!(aus_rgba(1, 2, 3, 0), 0x01_010203);
+        assert_eq!(rgba(aus_rgba(9, 8, 7, 0x40)), [9, 8, 7, 0x40]);
+    }
+
+    #[test]
+    fn hex_in_allen_formen() {
+        assert_eq!(hex_lesen("#FFF"), Some(0xFFFFFF));
+        assert_eq!(hex_lesen("F80"), Some(0xFF8800));
+        assert_eq!(hex_lesen("#102030"), Some(0x102030));
+        assert_eq!(hex_lesen("&H80FF0000"), Some(0x80FF0000));
+        assert_eq!(hex_lesen("#12345"), None);
+        assert_eq!(hex_lesen("#xyz"), None);
+    }
 
     #[test]
     fn die_reinen_farben() {

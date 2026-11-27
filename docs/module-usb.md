@@ -22,11 +22,14 @@ python rust/build_runtime.py --hardware
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
 | `USB_LIST()` | STRING (multi-line `vid:pid|product|manufacturer`) | angeschlossene HID-Geraete auflisten |
+| `USB_DEVICES()` | ARRAY OF STRING | je Gerät `VID:PID|Produkt|Hersteller|Pfad` -- der Pfad ist der für `USB_OPEN_PATH` |
 | `USB_OPEN(vid, pid)` | USB_HANDLE | Geraet ueber Hersteller- und Produkt-Kennung oeffnen |
 | `USB_OPEN_PATH(path$)` | USB_HANDLE | Geraet ueber seinen Systempfad oeffnen (eindeutig, wenn zwei gleiche stecken) |
 | `USB_CLOSE(handle)` | — | Geraet schliessen |
 | `USB_WRITE(handle, data$)` | INTEGER (geschriebene Bytes) | Bericht an das Geraet senden |
+| `USB_WRITE_BYTES(handle, data)` | INTEGER (geschriebene Bytes) | Bericht als BUFFER oder Feld aus Zahlen 0..255 senden |
 | `USB_READ(handle, n, timeout_ms)` | STRING (Bytes als latin-1) | bis zu n Bytes lesen; nach `timeout_ms` kommt zurueck, was da ist |
+| `USB_READ_BYTES(handle, n[, timeout_ms])` | BUFFER | bis zu n Bytes als BUFFER lesen |
 | `USB_PRODUCT(handle)` | STRING | Produktname laut Geraet |
 | `USB_MANUFACTURER(handle)` | STRING | Herstellername laut Geraet |
 | `USB_SERIAL(handle)` | STRING | Seriennummer laut Geraet |

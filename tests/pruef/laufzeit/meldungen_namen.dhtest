@@ -157,7 +157,7 @@ FOR i = 1 TO 4 : probe(i) : NEXT
 --- erwartet
 FILE_EXISTS: erwartet STRING, erhalten INTEGER
 FILEEXISTS: erwartet STRING, erhalten INTEGER
-TIME_PART: 'x' ist kein Feld -- moeglich sind jahr, monat, tag, stunde, minute, sekunde, wochentag
+TIME_PART: 'x' ist kein Feld -- moeglich sind year/jahr, month/monat, day/tag, hour/stunde, minute, second/sekunde, weekday/wochentag
 SET_COUNT: erwartet eine MAP OF INTEGER als Menge
 
 === ein befehl heisst in der meldung wie im quelltext (maschinencode)
@@ -188,12 +188,10 @@ END TRY
 --- erwartet
 J_PARSE: erwartet STRING, erhalten INTEGER
 
-=== die compiler-warnung nennt den geschriebenen namen
+=== der compiler-fehler nennt den geschriebenen namen
 PRINT MONEY_CENTS()
 --- fehler
-MONEY_CENTS: fehlendes Argument 1
---- stderr
-MONEY_CENTS: nur 0 Argument(e) uebergeben
+MONEY_CENTS: erwartet 1 Argument(e), erhalten 0
 
 === der neue name in der meldung bekommt seine aufrufform
 PRINT FILE_EXISTS(5)

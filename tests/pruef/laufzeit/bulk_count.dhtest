@@ -90,7 +90,7 @@ DIM xs[3] AS INTEGER
 DIM ys[3] AS INTEGER
 PLOTS(xs, ys, &HFF0000, 1, 2)
 --- fehler
-PLOTS: zu viele Argumente (5 statt hoechstens 4)
+PLOTS: erwartet 3 bis 4 Argumente, erhalten 5
 
 === falsche anzahl wird gemeldet[PLOTS(xs, ys, &HFF0000, -1)-nicht negativ]
 SCREEN(64, 64, "b", 1)

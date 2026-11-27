@@ -32,8 +32,11 @@ shows the new one; completion and signature help know both.
    `PRESSED` does not appear in new names: it meant "held" in `KEYPRESSED`
    and "just pressed" in `INPUT_PRESSED`.
 4. **Words with a fixed meaning:** `_FREE` releases, `_COUNT` is a number of
-   things (`MAP_COUNT`, `SET_COUNT`), `LEN` a length (text, bytes, array),
-   `_LOAD`/`_SAVE` read and write files.
+   things (`MAP_COUNT`, `SET_COUNT`, `JSON_COUNT`), `LEN` a length in
+   characters, bytes or elements of a dimension (`ARRAY_DIM_LEN`), a duration
+   is `_DURATION` (seconds, `SAMPLE_DURATION`), `_DONE` means "finished"
+   (`TWEEN_DONE`, `SPRITE_DONE`), `_NEXT` fetches the next one (`WS_NEXT`,
+   `MQTT_NEXT`), `_LOAD`/`_SAVE` read and write files.
 5. **The `$`:** a command that returns text may be written with or without
    `$` — `ENV_GET$("HOME")` and `ENV_GET("HOME")` are the same, and so are
    `CLIPBOARD_GET()` and `CLIPBOARD_GET$()`. Only where both forms exist as
@@ -55,7 +58,52 @@ shows the new one; completion and signature help know both.
    `path`, `text`, `width`, `count`, `encoding`. The same thing has the same
    name in every command. The command tables in the manual use the same
    names as `daten/builtin_index.json`; `dhrt pruef parameter` keeps them
-   together.
+   together. Where older commands carry differing names, a named argument
+   also takes the second name of the same group: `p`/`path`,
+   `digits`/`decimals`, `vol`/`volume`, `n`/`count`, `v`/`number`,
+   `wf`/`waveform`, `alt`/`old`, `fn`/`handler`, `flag`/`on`,
+   `bind`/`bind_addr`, `wdg`/`widget`, `x`/`x_mm`, `h`/`handle`, `c`/`conn`,
+   `r`/`result` — `FILE_EXISTS(path: "a.txt")` works
+   although the parameter is called `p`.
+9. **Time:** time spans and time limits count **milliseconds** (parameter
+   `ms` or `…_ms`): `TWEEN_NEW`, `TIMER_AFTER`, `SLEEP`, the fades, every
+   `…_SET_TIMEOUT`. The step of a frame counts **seconds** like `DELTA()`:
+   `PHYS2D_STEP`, `PHYS3D_STEP` (a value of 1 or more is an error there — that
+   would be milliseconds), likewise `CHAR_UPDATE` with `dt`. Position and
+   length in a medium (music, video, sample, MIDI file) count **seconds** as
+   FLOAT (`SAMPLE_LEN`, `VIDEO_SEEK`, `MIDI_FILE_DURATION`); notes in a MIDI
+   file are written in quarters, the unit of music. Old commands that take a
+   time span in seconds or frames stay that way; next to them there is the
+   version in ms: `HTTP_TIMEOUT` → `HTTP_SET_TIMEOUT`,
+   `SERIAL_TIMEOUT` → `SERIAL_SET_TIMEOUT`, `BT_SCAN` → `BT_SCAN_MS`,
+   `AUDIO_AUTOPAN` → `AUDIO_AUTOPAN_MS`, `CHAR_SET_COYOTE_TIME` →
+   `CHAR_SET_COYOTE_MS`, `CHAR_SET_JUMP_BUFFER` → `CHAR_SET_JUMP_BUFFER_MS`;
+   `SAMPLE_SET_LOOP` (frames) → `SAMPLE_SET_LOOP_TIME` (seconds like
+   `SAMPLE_LEN`).
+10. **Angles:** drawing counts **degrees**, 0 = right, **clockwise** on the
+    screen (`PIE`, `DRAWIMAGEROT`, `CAMERA_SET_ROTATION`, `ARC_DEG`); maths
+    counts **radians** (`SIN`, `ATAN2`, `VEC2_ANGLE`). The parameters are
+    called `…_deg` or `…_rad`. Two old commands stay with radians and have a
+    degree version: `ARC` (counter-clockwise) → `ARC_DEG`,
+    `PHYS2D_BODY_ANGLE` → `PHYS2D_BODY_ANGLE_DEG`.
+11. **Rectangles and rays:** drawn rectangles name two corners (`BOX`,
+    `IMAGE_FILL_RECT`: x1, y1, x2, y2, both corners belong to it); clippings
+    name a corner and the size (`IMAGE_DRAW_RECT`, `SCISSOR`, all gui
+    positions); physics names the centre and the half size (`PHYS2D_ADD_BOX`,
+    `PHYS3D_ADD_BOX`), `RAY_HIT_BOX` the centre and the whole size. A "ray" in
+    2D is a segment, the result the fraction t from 0 to 1 (`PHYSICS_RAY_*`);
+    in 3D a ray, the result the distance (`RAY_HIT_*`). No hit is -1; only
+    `PHYSICS_LINES_X` returns NaN then.
+12. **Counting:** elements count from **0**, "none" is **-1** (`INSTR`,
+    `GUI_LISTBOX_SELECTED`, array indices). Answers of dialogs count from
+    **1**, "none" is **0** (`GUI_ANSWER`, `GUI_INFOBAR_ANSWER`, where the cross is -1). Exceptions that
+    stay: the dimension of `LBOUND`/`UBOUND` counts from 1 (with `DIMSIZE`
+    from 0), the pages of `PDF_PREVIEW` from 1 as in print, the lines of a
+    text area from 1 as in an editor (`GUI_TEXTAREA_GOTO`, `_SCROLL`) --
+    only `GUI_TEXTAREA_VIEW` returns the first line from 0
+    (`GUI_TEXTAREA_GET_VIEW` from 1). Accepting "no guest" gives NIL
+    (`NET_TCP_ACCEPT`), -1 (`WS_ACCEPT`) or FALSE (`HTTPD_ACCEPT`) depending on
+    the module; `INSTR` takes a negative start as 0, `INSTRREV` returns -1 then.
 
 ## The recommended way per area
 
@@ -65,7 +113,7 @@ Some things can be done in several ways that grew over time. Recommended:
 |---|---|---|
 | Sound | `AUDIO_*` (buses, effects, spatial, music with `AUDIO_MUSIC_*`) | `SOUND_LOAD`/`SOUND_PLAY`, `MUSIC_PLAY` as the short form for a quick sound; `SAMPLE_*` for instruments |
 | Input | `INPUT_BIND` and `INPUT_DOWN`/`INPUT_HIT` — keyboard and gamepad in one | `KEY_*`, `MOUSE_*`, `JOYSTICK_*` for raw queries |
-| Clock | `MILLIS()` for timing inside the program, `TIME_NOW()` for date and time of day | `TIMER()` (the same clock in seconds), `GET_TIME()`, `DATE$()`, `TIME$()` |
+| Clock | `MILLIS()` for timing inside the program, `TIME_NOW()` for date and time of day | `TIMER()` (the same clock in seconds, both count from the start of the program), `GET_TIME()` (counts only from `SCREEN`), `DATE$()`, `TIME$()` |
 | Files | `FILE_READ$`, `FILE_WRITE`, `FILE_READ_LINES` by path | `FILE_OPEN`/`FILE_READ_LINE$`/`FILE_CLOSE` with a handle for large files |
 
 `TIMER()` is a clock; the family `TIMER_EVERY`, `TIMER_AFTER` … on the other
@@ -77,7 +125,7 @@ hand are callback timers from the `timer` module.
 
 | Name | What it does |
 |---|---|
-| `KEY_DOWN(key: Code oder Buchstabe)` | TRUE as long as the key with SDL code code is held — every frame again. For moving/steering — formerly `KEYPRESSED` |
+| `KEY_DOWN(key: Code oder Buchstabe)` | TRUE as long as the key `key` (a `KEY_*` constant or a letter) is held — every frame again. For moving/steering — formerly `KEYPRESSED` |
 | `KEY_HIT(key: Code oder Buchstabe)` | TRUE only in the one frame in which the key goes down. For shooting, jumping, toggling — formerly `KEYHIT` |
 | `KEY_RELEASED(key: Code oder Buchstabe)` | TRUE in the frame in which the key is released — for “charge up and fire on release”, say — formerly `KEYRELEASED` |
 | `KEY_REPEAT(key: Code oder Buchstabe)` | like KEYHIT, but while held it also fires with the system key repeat. For text cursors and quantity input — formerly `KEYREPEAT` |
@@ -160,6 +208,11 @@ hand are callback timers from the `timer` module.
 | `POLYGON_OUTLINE(points[, color[, width]])` | polygon as outline only — formerly `POLYGONOUTLINE` |
 | `NGON_OUTLINE(x, y, corners, r, angle[, color[, width]])` | regular polygon as outline only; width as with LINEW — formerly `NGONOUTLINE` |
 | `PIE_OUTLINE(x, y, r, from_deg, to_deg[, color])` | circle sector as outline only, with both radii — formerly `PIEOUTLINE` |
+| `DRAW_GRADIENT_H(x1, y1, x2, y2, color1: INTEGER, color2: INTEGER)` | rectangle with a horizontal colour gradient (left→right) — formerly `GRADIENTH` |
+| `DRAW_GRADIENT_V(x1, y1, x2, y2, color1: INTEGER, color2: INTEGER)` | rectangle with a vertical colour gradient (top→bottom) — formerly `GRADIENTV` |
+| `DRAW_TEXT_ROT(x, y, s, angle[, scale = 1.0[, color]])` | text centred on (x, y), rotated about the centre (degrees, like DRAWIMAGEROT) and scaled — for score pop-ups, … — formerly `TEXTROT` |
+| `DRAW_BOX_ROT(x, y, width, height, angle[, color])` | filled rectangle centred on (x, y), rotated about its centre (degrees, clockwise like DRAWIMAGEROT) — formerly `BOXROT` |
+| `DRAW_LINE_DASHED(x1, y1, x2, y2, dash, gap[, color])` | dashed line, dash and gap length in pixels — formerly `LINEDASHED` |
 
 ### images, fonts, sound, models: `AREA_VERB`
 
@@ -170,18 +223,20 @@ hand are callback timers from the `timer` module.
 | `IMAGE_GET_ALPHA(image, x, y)` | opacity at (x, y), 0..255; -1 for an index outside. Needed because GETPIXEL returns a colour, and there … — formerly `GETALPHA` |
 | `FONT_LOAD(path$, size[, chars$])` | load TTF/OTF/TTC → FONT handle (INTEGER); chars$ = script blocks ("kyrillisch, griechisch", "japanisch", … — formerly `LOADFONT` |
 | `FONT_LOAD_IMAGE(image: IMAGE, separator_color: Zahl, first_char: Zahl)` | Loads a pixel font from a PNG in which the characters are set apart by a separator colour — formerly `LOADFONT_IMAGE` |
-| `FONT_SET(handle: INTEGER [, size: INTEGER])` | set the active font; SETFONT(-1) = default font. Without size the size the font was loaded at applies … — formerly `SETFONT` |
+| `FONT_SET(font: INTEGER [, size: INTEGER])` | set the active font; SETFONT(-1) = default font. Without size the size the font was loaded at applies … — formerly `SETFONT` |
 | `SOUND_LOAD(path: STRING)` | load a sample (short effects: WAV, OGG) — formerly `LOADSOUND` |
 | `SOUND_PLAY(s[, loops[, volume]])` | play, default loops=0, volume=1.0 — formerly `PLAYSOUND` |
 | `SOUND_STOP(s)` | formerly `STOPSOUND` |
 | `SOUND_FREE(s)` | stop the sound and free its buffer — against buffers piling up with many AUDIO_TONE/AUDIO_SFX/AUDIO_NOISE … — formerly `UNLOADSOUND` |
-| `MUSIC_PLAY(path$[, loops[, volume]])` | stream a longer file (.ogg/.mp3/.qoa + tracker modules .mod/.xm — real Amiga sound), default loops=-1 … — formerly `PLAYMUSIC` |
+| `MUSIC_PLAY(path$[, loops[, volume]])` | stream a longer file (.ogg/.mp3/.flac + tracker modules .mod/.xm — real Amiga sound), default loops=-1 … — formerly `PLAYMUSIC` |
 | `MUSIC_STOP()` | one stream at a time. Refilling happens on the audio thread, not in the game loop: there is no … — formerly `STOPMUSIC` |
 | `MODEL_LOAD(path$: STRING)` | INTEGER — load a model from a file (OBJ, GLTF, IQM …) — formerly `LOADMODEL` |
 | `IMAGE_WIDTH(image)` | width of an image in pixels — formerly `IMAGEWIDTH` |
 | `IMAGE_HEIGHT(image)` | height of an image in pixels — formerly `IMAGEHEIGHT` |
-| `AUDIO_SET_VOLUME(ch, v)` | volume of a channel 0..1 — formerly `AUDIO_VOLUME` |
-| `AUDIO_MUSIC_SET_VOLUME(v)` | volume of the music 0..1 — formerly `AUDIO_MUSIC_VOLUME` |
+| `AUDIO_SET_VOLUME(ch, volume)` | volume of a channel 0..1 — formerly `AUDIO_VOLUME` |
+| `AUDIO_MUSIC_SET_VOLUME(volume)` | volume of the music 0..1 — formerly `AUDIO_MUSIC_VOLUME` |
+| `FONT_LOAD_SDF(path$, size[, chars$]) AS INTEGER` | a font that stays sharp at any size (distance field) — formerly `LOADFONT_SDF` |
+| `MIC_PEAK() AS FLOAT` | highest peak at the input since the last call (like AUDIO_PEAK at the output) — formerly `MIC_LEVEL` |
 
 ### files (by path), files (by handle), folders, paths
 
@@ -217,6 +272,18 @@ hand are callback timers from the `timer` module.
 | `ENV_SET(name, value)` | set an environment variable (this program + its children) — formerly `SETENV` |
 | `URL_OPEN(address: STRING)` | Opens an address in the default browser — the manual or the game's page, for instance — formerly `OPENURL` |
 | `DOC_OPEN(path$)` | Opens a local file with its default program – the PDF you have written in the viewer, the table in the … — formerly `OPENDOC` |
+| `FILE_RENAME(old, new)` | rename or move — formerly `RENAME` |
+| `FILE_TEMP$([prefix$ = "dh" [, extension$]]) AS STRING` | a free name in the temp directory, created empty — formerly `TEMPFILE$` |
+| `FILE_SEEK(file, position)` | set the position (0 = start) — formerly `SEEK` |
+| `FILE_TELL(file) AS INTEGER` | current position — formerly `TELL` |
+| `FILE_WRITE_TEXT(f, text)` | writes without \n — formerly `WRITE` |
+| `FILE_READ_BLOCK(file, count) AS BUFFER` | up to count bytes from the handle — formerly `READ_BYTES` |
+| `FILE_WRITE_BLOCK(file, buffer)` | bytes to the handle — formerly `WRITE_BYTES` |
+| `DIR_TEMP$() AS STRING` | the system's temp directory — formerly `TEMPDIR$` |
+| `DIR_CURRENT$() AS STRING` | current working directory — formerly `CWD$` |
+| `DIR_CHANGE(path)` | change the working directory — formerly `CHDIR` |
+| `DIR_CREATE(path)` | create a directory (including parents) — formerly `MKDIR` |
+| `DIR_DELETE(path$ [, with_content])` | delete a directory (empty; with TRUE including its contents) — formerly `RMDIR` |
 
 ### MAP like ARRAY_ and SET_: with underscore, the number is COUNT
 
@@ -234,6 +301,7 @@ hand are callback timers from the `timer` module.
 | `MAP_COUNT(m)` | The number of key-value pairs — formerly `MAPSIZE` |
 | `ARRAY_DIM_COUNT(arr)` | number of dimensions — formerly `DIMCOUNT` |
 | `ARRAY_DIM_SIZE(arr, n)` | size of the n-th dimension (0-based) — formerly `DIMSIZE` |
+| `MQTT_UNACKED_COUNT(handle)` | how many QoS 1 messages the broker has not acknowledged yet — formerly `MQTT_PENDING` |
 | `MOVE_TOWARD(cur, target, maxdelta)` | move cur by at most maxd towards target — formerly `MOVETOWARD` |
 
 ### English instead of German (modules zeit and geld, FFI pointers)
@@ -264,3 +332,107 @@ hand are callback timers from the `timer` module.
 | `MONEY_VALUE(g: GELD)` | step out deliberately (display in charts or the like) — formerly `GELD_ZAHL` |
 | `BUFFER_FROM_POINTER(pointer, length)` | copies laenge (length) bytes behind a pointer into a new BUFFER; 0 bytes give an empty one, a null pointer … — formerly `BUFFER_AUS_ZEIGER` |
 | `TEXT_FROM_POINTER$(pointer [, wide])` | copies the text behind a pointer up to the null character (UTF-8; with breit (wide) = TRUE wchar_t, i.e. … — formerly `TEXT_AUS_ZEIGER$` |
+| `NUMBER_TEXT$(number [, digits]) AS STRING` | a number in German notation with dots between thousands and a decimal comma (400.000, 1.234.567,89); with … — formerly `ZAHL$` |
+| `BUFFER_POINTER(buffer) AS INTEGER` | the address of the bytes of a BUFFER, for a struct field that points to another buffer; an empty buffer gives … — formerly `BUFFER_ZEIGER` |
+
+### The area first: text, types, system, cloud
+
+| Name | What it does |
+|---|---|
+| `TEXT_STARTS_WITH(s, prefix) AS BOOLEAN` | does the text start like this? — formerly `STARTSWITH` |
+| `TEXT_ENDS_WITH(s, suffix) AS BOOLEAN` | does the text end like this? — formerly `ENDSWITH` |
+| `TEXT_CONTAINS(s, part) AS BOOLEAN` | substring contained? (function form of part IN s) — formerly `CONTAINS` |
+| `TEXT_COUNT(text$, part$)` | number of non-overlapping occurrences of part — formerly `COUNT` |
+| `TEXT_REMOVE_SPACES$(s$)` | remove all whitespace (spaces, tabs, line breaks) — for input like "DE89 3704 0044" — formerly `NOSPACES$` |
+| `IS_NUM(x)` | a number? (BOOLEAN is not one) — formerly `ISNUM` |
+| `IS_INT(x)` | an integer? — formerly `ISINT` |
+| `IS_STR(x)` | a text? — formerly `ISSTR` |
+| `IS_BOOL(x)` | a BOOLEAN? — formerly `ISBOOL` |
+| `IS_NUMERIC(s) AS BOOLEAN` | parseable as a number? — formerly `ISNUMERIC` |
+| `SYSTEM_EXE_PATH$() AS STRING` | path of the running program file — formerly `EXEPATH$` |
+| `CLOUD_LEADERBOARD_SUBMIT(board$, name$, score[, best_low])` | submit a score; best_low = TRUE for "lower is better" — formerly `LEADERBOARD_SUBMIT` |
+| `CLOUD_LEADERBOARD_FETCH(board$, n[, ascending]) AS ARRAY OF TUPLE` | the best n entries as (name$, score) tuples, sorted (descending by default) — formerly `LEADERBOARD_FETCH` |
+
+### Setting is SET, reading is GET
+
+| Name | What it does |
+|---|---|
+| `MODBUS_SET_UNIT(m: MODBUS, unit)` | device address for the following requests (0..255; with RTU, 0 means "to all", and no answer comes) — formerly `MODBUS_UNIT` |
+| `SPI_SET_SPEED(spi: SPI_DEVICE, clock_hz: INTEGER)` | Changes the clock — formerly `SPI_SPEED` |
+| `SPI_SET_MODE(spi: SPI_DEVICE, mode: INTEGER)` | Changes the mode (0–3, clock polarity and phase) — formerly `SPI_MODE` |
+| `HOTPLUG_SET_INTERVAL(ms)` | how often to look (100..10000, default 500) — formerly `HOTPLUG_INTERVAL` |
+| `VIDEO_SET_LOOP(video: VIDEO, on)` | start over at the end instead of stopping — formerly `VIDEO_LOOP` |
+| `TRAY_SET_TOOLTIP(hint$)` | change the hint (to show progress, say) — formerly `TRAY_TOOLTIP` |
+| `TRAY_SET_MENU(entries$)` | the right-click menu (on macOS also Ctrl+click); the entries stand in one text separated by vertical bars, a … — formerly `TRAY_MENU` |
+| `FIRMATA_STEPPER_SET_SPEED(handle: FIRMATA_HANDLE, motor: INTEGER, steps_per_s: FLOAT)` | maximum speed — formerly `FIRMATA_STEPPER_SPEED` |
+| `FIRMATA_STEPPER_SET_ACCEL(handle: FIRMATA_HANDLE, motor: INTEGER, steps_per_s2: FLOAT)` | acceleration, 0 = none — formerly `FIRMATA_STEPPER_ACCEL` |
+| `AUDIO_SET_PITCH(ch, factor)` | pitch/speed: 1.0 = normal, 2.0 = an octave higher, 0.5 = lower — formerly `AUDIO_PITCH` |
+| `AUDIO_SET_PAN_POS(ch, p)` | set the position directly, 0 = left .. 1 = right (ends a running animation) — formerly `AUDIO_PAN_POS` |
+| `AUDIO_BUS_SET_VOLUME(bus$, vol)` | master volume of a bus (0..1) — formerly `AUDIO_BUS_VOLUME` |
+| `AUDIO_BUS_SET_PAN(bus: STRING, pos: Zahl)` | Moves a whole bus in the stereo image (-1 = left, 0 = centre, +1 = right). — formerly `AUDIO_BUS_PAN` |
+| `SPEAK_SET_RATE(factor)` | rate 0.5 (half as fast) .. 2.0 (double), default 1.0 — formerly `SPEAK_RATE` |
+| `SPRITE_SET_TINT(sp: ?, color: INTEGER)` | colour tint (RGB multiply) — formerly `SPRITE_TINT` |
+| `MODEL_SET_TEXTURE(model, image: IMAGE)` | apply an image as the surface — formerly `MODEL_TEXTURE` |
+| `TEXT_SET_SIZE(size: Zahl)` | font size for subsequent TEXT calls (4–400) — formerly `TEXT_SIZE` |
+| `MOUSE_SET_LOCK(on: BOOLEAN)` | capture the cursor: hide it + lock it into the window (relative movement) — for first-person/camera mouse … — formerly `MOUSE_LOCK` |
+| `BLEND_SET_MODE(name: STRING)` | blend mode for subsequent draws: "alpha" (default), "add" (additive – glow/light), "mult" (multiplicative – … — formerly `BLEND_MODE` |
+| `GUI_WINDOW_SET_TITLE(win: GUI_WINDOW, title$)` | change the title bar text later (name of the document, "Commands" / "Open file") — formerly `GUI_WINDOW_TITLE` |
+| `GUI_WINDOW_SET_MOVABLE(win: GUI_WINDOW, flag)` | movable by its title bar (default: on) — formerly `GUI_WINDOW_MOVABLE` |
+| `GUI_WINDOW_SET_VISIBLE(win: GUI_WINDOW, flag)` | set visibility — formerly `GUI_WINDOW_VISIBLE` |
+| `GUI_MENU_SET_ENABLED(item, on)` | disable an entry (grey, no click, no shortcut) or enable it — formerly `GUI_MENU_ENABLE` |
+| `GUI_LISTBOX_SET_ENABLED(lb: GUI_WIDGET, i, on)` | disable an entry: visible, but neither clickable nor reachable with the arrow keys — formerly `GUI_LISTBOX_ENABLE` |
+| `GUI_MENU_SET_CHECKED(item, on)` | makes the entry a check-mark entry and sets it; afterwards a click toggles it by itself — formerly `GUI_MENU_CHECK` |
+| `GUI_STATUSBAR_SET_TEXT(sb: GUI_WIDGET, field, text$)` | text of a field (GUI_SET_TEXT means field 0) — formerly `GUI_STATUSBAR_SET` |
+| `GUI_BREADCRUMB_SET_ITEMS(bc: GUI_WIDGET, parts)` | all parts at once (ARRAY OF STRING); the same path again changes nothing — formerly `GUI_BREADCRUMB_SET` |
+| `CAMERA_GET_ROTATION()` | read the current values — formerly `CAMERA_ROTATION` |
+| `AUDIO_MUSIC_GET_POSITION()` | seconds since start (from position 0) — formerly `AUDIO_MUSIC_POSITION` |
+| `AUDIO_CHANNEL_COUNT()` | current channel count — formerly `AUDIO_NUM_CHANNELS` |
+| `CHAR_GET_X(c)` | FLOAT — current position — formerly `CHAR_X` |
+| `CHAR_GET_Y(c)` | FLOAT — current position — formerly `CHAR_Y` |
+| `CHAR_GET_VX(c)` | FLOAT — current velocity per axis — formerly `CHAR_VX` |
+| `CHAR_GET_VY(c)` | FLOAT — current velocity per axis — formerly `CHAR_VY` |
+| `CHAR_GET_W(c)` | FLOAT — size of the collision box — formerly `CHAR_W` |
+| `CHAR_GET_H(c)` | FLOAT — size of the collision box — formerly `CHAR_H` |
+| `CHAR_GET_FACING(c)` | INTEGER (-1 = left, +1 = right) facing direction -- for mirroring the sprite — formerly `CHAR_FACING` |
+| `GUI_PALETTE_IS_OPEN() AS BOOLEAN` | is the command palette open? (GUI_PALETTE without an argument) — formerly `GUI_PALETTE` |
+| `GUI_PALETTE_SET_OPEN(on)` | open (TRUE) or close the command palette — formerly `GUI_PALETTE` |
+| `GUI_WINDOW_IS_CLOSED(win: GUI_WINDOW)` | is the window closed? (a state, not an event of one frame) — formerly `GUI_WINDOW_CLOSED` |
+| `WINDOW_GET_WAIT_EVENTS() AS FLOAT` | how long the window sleeps without an event (seconds) — formerly `WINDOW_WAIT_EVENTS` |
+| `WINDOW_SET_WAIT_EVENTS(seconds)` | wait up to this many seconds for an event when idle — formerly `WINDOW_WAIT_EVENTS` |
+
+### Counting, done, receiving: `_COUNT`, `_LEN`, `_DONE`, `_NEXT`
+
+| Name | What it does |
+|---|---|
+| `JSON_COUNT(h: ?, path: STRING)` | number of elements of a list or fields of an object — formerly `JSON_LEN` |
+| `ASTAR_PATH_COUNT(g)` | number of points of the path found — formerly `ASTAR_PATH_LEN` |
+| `SAMPLE_DURATION(sample: SAMPLE)` | length of the sample in seconds — formerly `SAMPLE_LEN` |
+| `ARRAY_DIM_LEN(arr, n)` | length of the n-th dimension (0-based) — formerly `ARRAY_DIM_SIZE` |
+| `XML_NAME_COUNT(k: XML_HANDLE, path$) AS INTEGER` | how many children of this name (next to XML_CHILD_COUNT, which counts all) — formerly `XML_COUNT` |
+| `TILED_GID_COUNT(m: ?, layer_idx: INTEGER, gid: INTEGER)` | how often a tile (GID) occurs in a layer — formerly `TILED_COUNT_GID` |
+| `SPRITE_DONE(sp)` | has the animation run through? (like TWEEN_DONE, VIDEO_DONE) — formerly `SPRITE_IS_FINISHED` |
+| `MQTT_NEXT(handle: MQTT_HANDLE) AS BOOLEAN` | fetch the next message (like WS_NEXT, OSC_NEXT) — formerly `MQTT_NEXT_MESSAGE` |
+| `MQTT_MESSAGE$(handle: MQTT_HANDLE) AS STRING` | the content of the fetched message (like WS_MESSAGE$) — formerly `MQTT_MESSAGE_PAYLOAD` |
+| `MQTT_TOPIC$(handle: MQTT_HANDLE) AS STRING` | the topic of the fetched message — formerly `MQTT_MESSAGE_TOPIC` |
+
+### Time limits: `_SET_TIMEOUT` in milliseconds
+
+| Name | What it does |
+|---|---|
+| `SMTP_SET_TIMEOUT(m: SMTP, ms)` | time limit per step when sending — formerly `SMTP_TIMEOUT` |
+| `MODBUS_SET_TIMEOUT(m, ms)` | how long to wait for an answer — formerly `MODBUS_TIMEOUT` |
+
+### Releasing is `_FREE`, closing a connection `_CLOSE`
+
+| Name | What it does |
+|---|---|
+| `AUDIO_CLOCK_FREE(clock)` | release a clock — formerly `AUDIO_CLOCK_REMOVE` |
+| `AUDIO_EMITTER_FREE(emitter)` | release an emitter — formerly `AUDIO_EMITTER_REMOVE` |
+| `AUDIO_LISTENER_FREE(listener)` | release a listener — formerly `AUDIO_LISTENER_REMOVE` |
+| `AUDIO_MOD_FREE(mod: AUDIO_MOD)` | release a modulator — formerly `AUDIO_MOD_REMOVE` |
+| `GUI_WIDGET_FREE(widget)` | remove a widget (the handle becomes invalid) — formerly `GUI_DESTROY` |
+| `GUI_WINDOW_FREE(win)` | remove a window with its widgets — formerly `GUI_WINDOW_DESTROY` |
+| `PHYS2D_BODY_FREE(w, idx)` | take a body out of the world — formerly `PHYS2D_REMOVE` |
+| `PHYS3D_BODY_FREE(w, idx)` | take a body out of the world — formerly `PHYS3D_REMOVE` |
+| `BT_CLOSE(handle)` | close the connection (like DB_CLOSE, NET_CLOSE) — formerly `BT_DISCONNECT` |
+| `MQTT_CLOSE(handle)` | close the connection (like DB_CLOSE, NET_CLOSE) — formerly `MQTT_DISCONNECT` |

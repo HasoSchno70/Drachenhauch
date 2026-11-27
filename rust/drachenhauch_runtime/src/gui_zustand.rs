@@ -49,7 +49,7 @@ impl Gui {
                         format!("{} \"{}\" {}", wer, kurz(&w.text), if w.checked { "an" } else { "aus" }),
                     Kind::Slider | Kind::Spinner | Kind::Knob | Kind::Progress => format!("{} {}", wer, zahl(w.value)),
                     Kind::Dropdown | Kind::ListBox => {
-                        let k = self.dropdown_selected(h).unwrap_or(-1);
+                        let k = self.dropdown_selected(h, "GUI_DROPDOWN_SELECTED").unwrap_or(-1);
                         let t = if k >= 0 { w.items.get(k as usize).map(|s| kurz(s)).unwrap_or_default() } else { String::new() };
                         format!("{} {} \"{}\"", wer, k, t)
                     }

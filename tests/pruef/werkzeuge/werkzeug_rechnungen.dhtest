@@ -42,10 +42,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -161,10 +161,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -301,10 +301,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -422,10 +422,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -538,10 +538,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -663,10 +663,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -715,7 +715,7 @@ END FUNCTION
 SUB prFall()
     prKlick(3, prMx(tfKName), prMy(tfKName))
     prTaste(7, 86, 341)
-    prKlick(12, GUI_CANVAS_X(nullpunkt) + GUI_GET_X(tKunden) + 60, GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(tKunden) + 52)
+    prKlick(12, GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(tKunden) + 60, GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(tKunden) + 52)
     prTaste(18, 256, 0)
     prAbspielen()
 END SUB
@@ -766,10 +766,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -816,7 +816,7 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
 SUB prFall()
-    prKlick(3, GUI_CANVAS_X(nullpunkt) + GUI_GET_X(tKunden) + 60, GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(tKunden) + 52)
+    prKlick(3, GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(tKunden) + 60, GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(tKunden) + 52)
     prAbspielen()
 END SUB
 --- programm ../../../examples/196_rechnungen.dh nach SETFPS(60)
@@ -866,10 +866,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -963,10 +963,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -1013,7 +1013,7 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
 SUB prFall()
-    prKlick(3, GUI_CANVAS_X(nullpunkt) + GUI_GET_X(tRech) + 40, GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(tRech) + 52)
+    prKlick(3, GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(tRech) + 40, GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(tRech) + 52)
     prKlick(8, prMx(bRPdf), prMy(bRPdf))
     prAbspielen()
 END SUB
@@ -1348,10 +1348,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -1398,7 +1398,7 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
 SUB prFall()
-    prKlick(3, GUI_CANVAS_X(nullpunkt) + GUI_GET_X(tRech) + 40, GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(tRech) + 52)
+    prKlick(3, GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(tRech) + 40, GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(tRech) + 52)
     prKlick(8, prMx(bPAdd), prMy(bPAdd))
     prKlick(13, prMx(bRSpeichern), prMy(bRSpeichern))
     prAbspielen()
@@ -1473,10 +1473,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -1592,10 +1592,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -1642,7 +1642,7 @@ FUNCTION prJa$(b AS BOOLEAN) AS STRING
     RETURN IIF(b, "ja", "nein")
 END FUNCTION
 SUB prFall()
-    prKlick(3, GUI_CANVAS_X(nullpunkt) + GUI_GET_X(tRech) + 40, GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(tRech) + 52)
+    prKlick(3, GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(tRech) + 40, GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(tRech) + 52)
     prKlick(8, prMx(bRLoeschen), prMy(bRLoeschen))
     prTaste(14, 257, 0)
     prAbspielen()
@@ -1720,10 +1720,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -1829,10 +1829,10 @@ SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
     IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
 END SUB
 FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
 END FUNCTION
 FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
-    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+    RETURN GUI_CANVAS_SCREEN_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -1920,7 +1920,7 @@ WEND
 PRINT "meldung " ; TRIM$(zeile)
 PRINT "laeuft mit eltern " ; PROCESS_RUNNING(pc)
 NET_CLOSE(sock)
-NET_CLOSE(lst)
+NET_CLOSE_LISTENER(lst)
 bis = MILLIS() + 10000
 WHILE PROCESS_RUNNING(pc) AND MILLIS() < bis
     SLEEP(50)

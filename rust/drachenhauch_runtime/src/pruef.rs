@@ -210,8 +210,12 @@ const FREMDE_FORMEN: &[&str] = &["umstieg.md"];
 
 pub fn parameter(wurzel: &Path, ordner: &Path) -> Vec<Befund> {
     use crate::compiler::signatur_params;
+    // Jeder Befehl in Backticks, in jeder Spalte ausser der letzten (dort
+    // steht die Beschreibung mit Beispielen) -- bis 2026.53 nur der erste am
+    // Zeilenanfang, und Sammelzeilen wie `GUI_X(a) · GUI_Y(b)` oder Tabellen
+    // mit einer Spalte davor (module-html) blieben ungeprueft.
     static ZEILE: OnceLock<Regex> = OnceLock::new();
-    let zeile = re(r"^\|\s*`([A-Za-z_][A-Za-z0-9_]*\$?)(\([^`]*\))`", &ZEILE);
+    let zeile = re(r"`([A-Za-z_][A-Za-z0-9_]*\$?)(\([^`]*\))`", &ZEILE);
     let raw = lesen(&wurzel.join("daten/builtin_index.json"));
     let mut index: std::collections::HashMap<String, Vec<String>> = Default::default();
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
@@ -227,7 +231,15 @@ pub fn parameter(wurzel: &Path, ordner: &Path) -> Vec<Befund> {
         let name = datei.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         if FREMDE_FORMEN.contains(&name.as_str()) || name.starts_with("entwurf-") { continue; }
         for (i, z) in lesen(&datei).lines().enumerate() {
-            let Some(k) = zeile.captures(z) else { continue };
+            let t = z.trim();
+            if !t.starts_with('|') || t.starts_with("|---") || t.starts_with("| ---") { continue; }
+            let zellen: Vec<&str> = t.trim_start_matches('|').trim_end_matches('|').split('|').collect();
+            if zellen.len() < 2 { continue; }
+            for zelle in &zellen[..zellen.len() - 1] {
+            for k in zeile.captures_iter(zelle) {
+            // Ein Beispiel mit Werten ist keine Signatur, `(...)` ein Platzhalter.
+            if k[2].contains('"') || k[2].contains("...") || k[2].contains('…') { continue; }
+            let erste_spalte = std::ptr::eq(*zelle, zellen[0]);
             if ANDERE_FORM.iter().any(|(n, l, _)| k[1].eq_ignore_ascii_case(n) && k[2] == format!("({})", l)) { continue; }
             let gross = k[1].to_uppercase();
             let anders = match gross.strip_suffix('$') { Some(o) => o.to_string(), None => format!("{}$", gross) };
@@ -241,10 +253,31 @@ pub fn parameter(wurzel: &Path, ordner: &Path) -> Vec<Befund> {
             }
             let Some((ist, _)) = signatur_params(&format!("X{}", &k[2])) else { continue };
             let ist: Vec<String> = ist.into_iter().map(|x| x.name).collect();
-            if ist != *soll {
+            // In einer Nebenspalte darf die Kurzform hinten Optionales weglassen
+            // (`CIRCLE(x, y, r)`); vorn steht die ganze Signatur.
+            let passt = ist == *soll || (!erste_spalte && !ist.is_empty() && soll.starts_with(&ist));
+            if !passt {
                 funde.push((name.clone(), i + 1, format!("{}{}", &k[1], &k[2]),
                     format!("der Index nennt die Parameter ({}) -- benannte Argumente nehmen diese Namen",
                             soll.join(", "))));
+            }
+            }
+            }
+        }
+    }
+    // Ein neuer Name oder Zweitname traegt dieselben Parameter wie sein
+    // Befehl -- benannte Argumente duerfen nicht davon abhaengen, welchen
+    // Namen man schreibt (Bericht B6.4; SPRITE_COLLIDE hiess (a, b),
+    // SPRITE_COLLIDES (sp1, sp2)).
+    for (neu, alt) in crate::namen::alle_paare() {
+        let (n, a) = (neu.to_uppercase(), alt.to_uppercase());
+        if let (Some(pn), Some(pa)) = (index.get(&n), index.get(&a)) {
+            // Ein Getter oder Setter, der aus einem Befehl mit optionalem
+            // Wert wurde (GUI_PALETTE([on]) -> GUI_PALETTE_IS_OPEN()), nimmt
+            // nur einen Anfang davon.
+            if !pa.starts_with(pn) && !pn.starts_with(pa) {
+                funde.push(("daten/builtin_index.json".into(), 0, n.clone(),
+                    format!("Parameter ({}) -- {} nennt sie ({})", pn.join(", "), a, pa.join(", "))));
             }
         }
     }
@@ -307,9 +340,10 @@ pub fn zaehlungen(wurzel: &Path) -> Vec<Befund> {
 /// ("`KEY_A` bis `KEY_Z`") gelten als Abdeckung.
 pub fn konstanten(ordner: &Path) -> Vec<Befund> {
     let doku: String = md_dateien(ordner, None).iter().map(|d| lesen(d)).collect::<Vec<_>>().join("\n");
-    let bereiche: [(&str, &str); 4] = [
+    let bereiche: [(&str, &str); 5] = [
         (r"^KEY_[A-Z]$", "`KEY_A` bis `KEY_Z`"), (r"^KEY_[0-9]$", "`KEY_0` bis `KEY_9`"),
         (r"^KEY_F\d+$", "`KEY_F1` bis `KEY_F12`"), (r"^KEY_KP\d$", "`KEY_KP0` bis `KEY_KP9`"),
+        (r"^KEY_KP_\d$", "`KEY_KP_0` bis `KEY_KP_9`"),
     ];
     let bereich_re: Vec<(Regex, &str)> = bereiche.iter().map(|(m, t)| (Regex::new(m).unwrap(), *t)).collect();
     // Nur die KEY_*-Namen -- die JOY_*-Codes derselben Tabelle sind Gamepad-Knoepfe
@@ -1121,6 +1155,30 @@ mod tests {
         assert_eq!(n, 3);
         assert_eq!(funde.len(), 1, "{:?}", funde);
         assert_eq!(funde[0].1, 8);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `dhrt pruef parameter` sieht jeden Befehl einer Tabellenzeile -- bis
+    /// 2026.53 nur den ersten am Zeilenanfang (E4).
+    #[test]
+    fn parameter_in_jeder_spalte() {
+        let dir = std::env::temp_dir().join(format!("dhrt_pruef_param_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("daten")).unwrap();
+        std::fs::create_dir_all(dir.join("docs")).unwrap();
+        std::fs::write(dir.join("daten/builtin_index.json"), r#"{"builtins": [
+            {"name": "FOO", "signature": "FOO(a, b)"},
+            {"name": "BAR", "signature": "BAR(x, y[, color])"}]}"#).unwrap();
+        std::fs::write(dir.join("docs/t.md"), "| Befehl | Was |
+|---|---|
+| `BAR(x, y, color)` · `FOO(von, nach)` | Sammelzeile: der zweite faellt auf |
+| Gruppe | `FOO(a, nach)` | Spalte davor: faellt auf |
+| a | `BAR(x, y)` | Kurzform in einer Nebenspalte: geht |
+| `FOO(a, b)` | Beispiel in der Beschreibung: `FOO(1, \"x\")` geht |
+").unwrap();
+        let f = parameter(&dir, &dir.join("docs"));
+        let zeilen: Vec<usize> = f.iter().map(|b| b.1).collect();
+        assert_eq!(zeilen, vec![3, 4], "{:?}", f);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -13,9 +13,9 @@
 //!
 //! **Bewusst ohne Fremd-Crate.** `encoding_rs` kann alles, wiegt aber schwer
 //! fuer zwei Ein-Byte-Kodierungen, deren Tabellen feststehen und oeffentlich
-//! sind. Der Preis dafuer ist, dass die Tabelle stimmen MUSS -- sie wird
-//! deshalb in `tests/test_kodierung.py` Byte fuer Byte gegen Pythons eigene
-//! Codecs geprueft, nicht gegen sich selbst.
+//! sind. Der Preis dafuer ist, dass die Tabelle stimmen MUSS: die Rust-Tests
+//! unten pruefen alle 256 Bytes von CP1252 gegen die festen Werte der
+//! WHATWG-Tabelle (aufgeschrieben, nicht aus sich selbst gerechnet).
 //!
 //! **Nicht dabei: UTF-16.** Excel schreibt es bei „Unicode Text (*.txt)".
 //! Es braucht BOM-Erkennung, zwei Byte-Reihenfolgen und Ersatzpaare -- das
@@ -139,6 +139,28 @@ fn utf8_meldung(fn_: &str, pfad: &str, bytes: &[u8], bis: usize) -> String {
             fn_, wo, zeile, byte, zeichen, NAMEN)
 }
 
+/// Bytes als Text in latin-1 (jedes Byte ein Zeichen U+0000..U+00FF) --
+/// so lesen USB und BT ihre Daten als STRING. EINE Stelle (bis 2026.53 je
+/// eine Kopie in usb.rs und bt.rs).
+#[cfg_attr(not(any(feature = "bt", feature = "usb")), allow(dead_code))]
+pub fn latin1_lesen(bytes: &[u8]) -> String {
+    bytes.iter().map(|&b| b as char).collect()
+}
+
+/// Text als latin-1-Bytes; ein Zeichen ueber U+00FF ist ein Fehler.
+#[cfg_attr(not(any(feature = "bt", feature = "usb")), allow(dead_code))]
+pub fn latin1_schreiben(text: &str, fn_: &str) -> Result<Vec<u8>, String> {
+    let mut out = Vec::with_capacity(text.len());
+    for c in text.chars() {
+        let n = c as u32;
+        if n > 0xFF {
+            return Err(format!("{}: STRING enthaelt Zeichen > 0xFF. Nur Bytes 0..255 sind erlaubt (latin-1) -- fuer Binaeres die _BYTES-Fassung mit BUFFER", fn_));
+        }
+        out.push(n as u8);
+    }
+    Ok(out)
+}
+
 /// Text zu Bytes.
 ///
 /// Latin-1 und Windows-1252 kennen nur 256 Zeichen. Ein Zeichen, das dort
@@ -225,6 +247,7 @@ pub fn ohne_bom(s: String) -> String {
 /// einem Mehrbyte-Zeichen nicht mitten in ihm schneidet. `plus_ist_leer`:
 /// Formular-Kodierung (`a+b` = `a b`, httpd); URL_DECODE laesst `+` stehen.
 /// Ein `%` ohne zwei Hexziffern bleibt, wie es ist.
+#[cfg_attr(not(feature = "http"), allow(dead_code))]
 pub fn prozent_auf(s: &str, plus_ist_leer: bool) -> String {
     fn hex(b: u8) -> Option<u8> { (b as char).to_digit(16).map(|d| d as u8) }
     let b = s.as_bytes();
@@ -294,6 +317,24 @@ mod tests {
         assert_eq!(s.chars().nth(0xE4).unwrap(), 'ä');
         // ... und zurueck ergibt wieder dieselben Bytes.
         assert_eq!(kodieren(&s, Kodierung::Latin1, "T").unwrap(), bytes);
+    }
+
+    #[test]
+    fn cp1252_gegen_die_whatwg_tafel() {
+        // 0x80..0x9F nach der WHATWG-Tafel "windows-1252", aufgeschrieben --
+        // nicht aus der eigenen Tafel gerechnet; darueber gilt Latin-1.
+        let soll: [u32; 32] = [
+            0x20AC, 0x0081, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+            0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008D, 0x017D, 0x008F,
+            0x0090, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+            0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x009D, 0x017E, 0x0178,
+        ];
+        let soll: String = soll.iter().map(|&c| char::from_u32(c).unwrap()).collect();
+        let bytes: Vec<u8> = (0x80u8..=0x9F).collect();
+        assert_eq!(dekodieren(&bytes, Kodierung::Cp1252, "T", "").unwrap(), soll);
+        let hoch: Vec<u8> = (0xA0u8..=0xFF).collect();
+        let latin: String = (0xA0u32..=0xFF).map(|c| char::from_u32(c).unwrap()).collect();
+        assert_eq!(dekodieren(&hoch, Kodierung::Cp1252, "T", "").unwrap(), latin);
     }
 
     #[test]

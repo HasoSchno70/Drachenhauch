@@ -1,7 +1,7 @@
-//! Ein Bild Eingabe (`update`): Maus, Menues, Treffertests, Texteingabe.
+//! Ein Bild Eingabe (`update`): Maus, Menues, Treffertests, das Textfeld. Der
+//! Textbereich steht in gui_textbereich.rs, die Tabelle in gui_tabelle.rs.
 //!
-//! Teil von `gui.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `gui.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
@@ -32,8 +32,10 @@ impl Gui {
     }
 
     pub fn update(&mut self, g: &mut Graphics) {
-        self.takt = g.uhr_jetzt();
-        if !self.ruhig { self.nebel_uhr += g.delta().clamp(0.0, 0.05); }
+        let jetzt = g.uhr_jetzt();
+        self.takt_dt = if self.takt > 0.0 { (jetzt - self.takt).max(0.0) } else { g.delta() };
+        self.takt = jetzt;
+        if !self.ruhig { self.nebel_uhr += self.takt_dt.clamp(0.0, 0.05); }
         // GUI_CHANGED: den Stand vor der Bedienung merken
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {
@@ -83,9 +85,9 @@ impl Gui {
         self.aussehen_pass(g);
         self.bewegung_pass();
         self.effekte_anlass_pass();
-        self.funken_pass(g.delta().clamp(0.0, 0.25));
+        self.funken_pass(self.takt_dt.clamp(0.0, 0.25));
         if !self.funken.is_empty() { self.bild_in(0.0); }
-        self.rs_pass(g.delta());
+        self.rs_pass(self.takt_dt);
         // Eine beobachtete Stildatei wird alle 0,5 s gelesen.
         if self.stil_beob.is_some() { self.bild_in(0.5); }
         for wi in 0..self.windows.len() {
@@ -184,11 +186,11 @@ impl Gui {
                 }
             }
         }
-        self.dateibaeume_auffrischen(g.get_time());
+        self.dateibaeume_auffrischen(g.uhr_jetzt());
         self.schnitte_laden(g);
         self.rt_pass(g);
         self.umbruch_layout(g);
-        self.akk_pass(g.delta());
+        self.akk_pass(self.takt_dt);
         self.layout_pass(g);
         self.panel_pass();
         self.tabctl_pass();
@@ -215,7 +217,7 @@ impl Gui {
                 let wheel = Self::rad(g);
                 if wheel != 0 {
                     let ms = self.max_scroll_y(top);
-                    self.windows[top].scroll_y = (self.windows[top].scroll_y - wheel as i32 * 40).clamp(0, ms);
+                    self.windows[top].scroll_y = (self.windows[top].scroll_y - wheel as i32 * self.rad_schritt_px()).clamp(0, ms);
                 }
             }
         }
@@ -254,10 +256,8 @@ impl Gui {
             for &wi in self.z_order.clone().iter().rev() {
                 if !self.windows[wi].alive || !self.windows[wi].visible { continue; }
                 if !self.windows[wi].tabs_closable || self.tabbar_h(wi) == 0 { continue; }
-                let by = self.windows[wi].y
-                    + (if self.windows[wi].chrome { self.m("title_h") } else { 0 })
-                    + self.menubar_h(wi);
-                if my < by || my >= by + TABBAR_H { continue; }
+                let by = self.tabbar_y(wi);
+                if my < by || my >= by + self.tabbar_h(wi) { continue; }
                 if let Some((ti, _, _)) = self.tab_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1) {
                     self.windows[wi].tab_zu = ti as i32;
                     break;
@@ -287,10 +287,8 @@ impl Gui {
         if just_pressed && !menu_consumed && !scroll_consumed {
             for &wi in self.z_order.clone().iter().rev() {
                 if !self.windows[wi].alive || !self.windows[wi].visible || self.tabbar_h(wi) == 0 { continue; }
-                let by = self.windows[wi].y
-                    + (if self.windows[wi].chrome { self.m("title_h") } else { 0 })
-                    + self.menubar_h(wi);
-                if my < by || my >= by + TABBAR_H { continue; }
+                let by = self.tabbar_y(wi);
+                if my < by || my >= by + self.tabbar_h(wi) { continue; }
                 if let Some((ti, _, x1)) = self.tab_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1) {
                     // Das Kreuz schliesst, statt umzuschalten -- und die
                     // MITTLERE Taste tut es von ueberall auf dem Reiter aus
@@ -408,13 +406,13 @@ impl Gui {
                 };
                 if rollt && Self::in_rect(mx, my, r) {
                     let wheel = Self::rad(g);
-                    if wheel != 0 { self.panel_scroll_um(top, i, -(wheel as i32) * 40); }
+                    if wheel != 0 { let s = self.rad_schritt_px(); self.panel_scroll_um(top, i, -(wheel as i32) * s); }
                 }
                 let akk = { let w = &self.windows[top].widgets[i]; w.akk.is_some() && self.widget_shown(top, w) };
                 if akk && Self::in_rect(mx, my, r) {
                     let wheel = Self::rad(g);
                     if wheel != 0 {
-                        let schritt = self.sk(40);
+                        let schritt = self.rad_schritt_px();
                         let (hh, a) = { let w = &mut self.windows[top].widgets[i]; (w.h, w.akk.as_mut().unwrap()) };
                         a.scroll = (a.scroll - wheel as i32 * schritt).clamp(0, (a.inhalt_h - hh).max(0));
                     }
@@ -656,7 +654,7 @@ impl Gui {
             // Doppelklick: zweiter Druck innerhalb DBL_TIME an fast derselben
             // Stelle. Die Ortspruefung muss sein -- sonst gaelten zwei rasche
             // Klicks auf verschiedene Zeilen als Doppelklick.
-            let jetzt = g.get_time();
+            let jetzt = g.uhr_jetzt();
             self.dbl_click = match self.last_click {
                 Some((t0, x0, y0)) =>
                     jetzt - t0 <= DBL_TIME && (mx - x0).abs() <= self.sk(DBL_DIST) && (my - y0).abs() <= self.sk(DBL_DIST),
@@ -757,7 +755,7 @@ impl Gui {
         // Geteilte Textbereiche gleich nach dem Tippen abgleichen -- wer nach
         // GUI_UPDATE den Text des Besitzers liest (Sichern!), bekommt so den
         // Stand dieses Bildes, nicht den des vorigen.
-        self.teil_pass(g.get_time());
+        self.teil_pass(g.uhr_jetzt());
         // Tastatur-Navigation: Tab / Shift+Tab wechselt den Fokus zwischen ALLEN
         // bedienbaren Widgets des aktiven Fensters (Anlege-Reihenfolge, nur
         // sichtbare + eingeschaltete). Frueher liefen nur die Textfelder mit --
@@ -847,7 +845,7 @@ impl Gui {
                 // ist verbraucht (CLAUDE.md). Bis 2026.53 fehlte das Kuerzel hier:
                 // ein Menueeintrag "Strg+Enter" loeste zusaetzlich den
                 // Standardknopf aus, ein Kuerzel "Esc" den Abbrechen-Knopf.
-                let liste_edit = liste_edit || self.liste_taste || self.kuerzel_gefeuert;
+                let liste_edit = liste_edit || self.taste_fuer_knoepfe_genommen();
                 let enter_frei = enter_frei && !liste_edit;
                 if enter_frei && g.key_pressed(KEY_ENTER) {
                     let k = self.windows[top].default_btn;
@@ -864,7 +862,6 @@ impl Gui {
         self.was_mouse_down = is_down;
         if !is_down { self.zug_feld = None; }
         self.was_right_down = right_down;
-        self.frame_count += 1;
     }
 
     /// Hat der offene Dialog in diesem Bild eine Antwort bekommen? Dann
@@ -1004,7 +1001,7 @@ impl Gui {
                 // natives steht bei 0,0 -- sonst traefe ein Klick oben im
                 // Hauptfenster seine Menueleiste) und, waehrend eines
                 // modalen Dialogs, nur dieser.
-                if self.windows[wi].nativ != self.flaeche { continue; }
+                if self.flaeche_von(wi) != self.flaeche { continue; }
                 if self.modal.is_some_and(|m| m != wi) { continue; }
                 if let Some(nm) = self.bar_menu_at(g, wi, mx, my) {
                     self.open_menu = Some((wi, nm));
@@ -1022,10 +1019,8 @@ impl Gui {
                 // Auf einem Reiter: das Menue der Reiterleiste, und es merkt
                 // sich, welcher Reiter gemeint war.
                 if let Some(mi) = self.windows[wi].menus.iter().position(|m| !m.in_bar && !m.unter && m.ziel == -2) {
-                    let by = self.windows[wi].y
-                        + (if self.windows[wi].chrome { self.m("title_h") } else { 0 })
-                        + self.menubar_h(wi);
-                    if self.tabbar_h(wi) > 0 && my >= by && my < by + TABBAR_H {
+                    let by = self.tabbar_y(wi);
+                    if self.tabbar_h(wi) > 0 && my >= by && my < by + self.tabbar_h(wi) {
                         if let Some((ti, _, _)) = self.tab_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1) {
                             self.windows[wi].tab_kontext = ti as i32;
                             self.context_open = Some((wi, mi, mx, my));
@@ -1135,10 +1130,10 @@ impl Gui {
             if g.key_pressed(KEY_ESC) { self.open_dropdown = None; self.liste_taste = true; return; }
             let rows = self.dd_zeilen(wi, i);
             let m = self.dd_mark;
-            let neu = if g.key_pressed(KEY_DOWN) { Some(m + 1) }
-                else if g.key_pressed(KEY_UP) { Some(if m < 0 { 0 } else { m - 1 }) }
-                else if g.key_pressed(KEY_PAGEDOWN) { Some(m + rows) }
-                else if g.key_pressed(KEY_PAGEUP) { Some(m - rows) }
+            let neu = if g.key_repeat(KEY_DOWN) { Some(m + 1) }
+                else if g.key_repeat(KEY_UP) { Some(if m < 0 { 0 } else { m - 1 }) }
+                else if g.key_repeat(KEY_PAGEDOWN) { Some(m + rows) }
+                else if g.key_repeat(KEY_PAGEUP) { Some(m - rows) }
                 else { None };
             if let Some(k) = neu {
                 if n > 0 {
@@ -1158,7 +1153,7 @@ impl Gui {
                     return;
                 }
             }
-        } else if g.key_pressed(KEY_DOWN) && n > 0 {
+        } else if g.key_repeat(KEY_DOWN) && n > 0 {
             self.open_dropdown = Some((wi, i));
             self.dd_pfeil = false;
             return;
@@ -1234,9 +1229,9 @@ impl Gui {
                 if Self::in_rect(mx, my, (rx + sl, ry, (rw - sl - sr).max(0), rh)) {
                     self.zug_feld = Some((wi, i));
                     caret = idx; anchor = idx;
-                    let jetzt = g.get_time();
+                    let jetzt = g.uhr_jetzt();
                     let w = &mut self.windows[wi].widgets[i];
-                    let n = if jetzt - w.klick_zeit < 0.4 && (idx - w.klick_idx).abs() <= 2 { w.klick_n % 3 + 1 } else { 1 };
+                    let n = super::bausteine::klick_zaehlen(jetzt, w.klick_zeit, w.klick_idx, idx, w.klick_n, 3);
                     w.klick_n = n; w.klick_zeit = jetzt; w.klick_idx = idx;
                     if n == 3 || (n == 2 && passwort) {
                         anchor = 0; caret = chars.len() as i32;
@@ -1286,7 +1281,7 @@ impl Gui {
         };
         let pfeil = if self.windows[wi].widgets[i].frei { self.sk(DD_PFEIL_B) } else { 0 };
         let (sl, sr) = self.ti_rand(&self.windows[wi].widgets[i]);
-        let inner = (fw - 10 - pfeil - sl - sr).max(1);
+        let inner = (fw - 2 * self.ta_pad() - pfeil - sl - sr).max(1);
         let mut scroll = scroll;
         if caret_px - scroll > inner { scroll = caret_px - inner; }
         if caret_px - scroll < 0 { scroll = caret_px; }
@@ -1294,7 +1289,7 @@ impl Gui {
 
         // --- Zurueckschreiben ---
         let geaendert = neu != before;
-        let jetzt = g.get_time();
+        let jetzt = g.uhr_jetzt();
         let w = &mut self.windows[wi].widgets[i];
         if geaendert { Self::undo_merken(w, &before, caret0, jetzt); }
         w.text = neu;
@@ -1390,548 +1385,4 @@ impl Gui {
         if g.key_pressed(KEY_END) { *caret = len; if !shift { *anchor = len; } }
     }
 
-    /// Zeilenanfang-Indizes (Char-Position nach jedem '\n', plus 0).
-    pub(super) fn line_starts(chars: &[char]) -> Vec<usize> {
-        let mut v = vec![0usize];
-        for (i, &c) in chars.iter().enumerate() { if c == '\n' { v.push(i + 1); } }
-        v
-    }
-    /// Zeilenhoehe der TextArea (Schriftgroesse + etwas Durchschuss).
-    /// Zeilenhoehe eines Textbereichs -- aus SEINER Schriftgroesse, nicht aus
-    /// der aktiven. Mit der aktiven stimmten Zeilen und Text nicht mehr,
-    /// sobald ein Feld eine eigene Groesse hatte (gezoomtes Code-Feld,
-    /// groessere Oberflaechenschrift): die Zeilen ueberlappten oder klafften.
-    pub(super) fn ta_line_h(&self, g: &Graphics, wdg: &Widget) -> i32 {
-        let gr = if wdg.font_size > 0 { self.sk(wdg.font_size) } else { self.ctext_height(g) };
-        (gr + self.sk(5)).max(self.sk(10))
-    }
-
-    /// Breite, auf die ein Textbereich umbricht (0 = kein Umbruch).
-    /// Sichtbare Breite fuer den Text eines Textbereichs (ohne Rand,
-    /// Nummernspalte und Rollbalken) -- gegen sie richtet `ta_versatz` aus.
-    pub(super) fn ta_innen(&self, g: &Graphics, wdg: &Widget, zeilen: usize) -> i32 {
-        let gutter = self.ta_gutter(g, wdg, zeilen);
-        (wdg.w - 2 * 5 - gutter - self.sk(8)).max(self.sk(20))
-    }
-
-    /// Wie weit eine Zeile des Textbereichs nach rechts rueckt: rechts
-    /// (GUI_SET_ALIGN "rechts", im gespiegelten Fenster ohne eigene
-    /// Ausrichtung) um den freien Platz, mittig um die Haelfte. EINE Quelle
-    /// fuer Zeichnen, Schreibmarke, Auswahl, Treffer und Eingabemethode;
-    /// eine Zeile, die breiter ist als das Feld, beginnt links und rollt.
-    pub(super) fn ta_versatz(&self, g: &Graphics, wi: usize, wdg: &Widget, zeile: &[char], innen: i32) -> i32 {
-        let a = self.ti_ausrichtung(wi, wdg);
-        if a != 1 && a != 2 { return 0; }
-        let frei = innen - self.zeilen_x(g, wdg, zeile, zeile.len());
-        // Breiter als das Feld: rechtsbuendig steht das Zeilenende am rechten
-        // Rand, und `scroll_x` legt den linken Teil frei (der Ursprung
-        // `tx0` zieht ihn einmal ab, darum zweimal dazu).
-        if frei < 0 { return if a == 2 { frei + 2 * wdg.scroll_x } else { 0 }; }
-        if a == 1 { frei / 2 } else { frei }
-    }
-
-    pub(super) fn ta_breite(&self, g: &Graphics, wdg: &Widget, zeilen: usize) -> i32 {
-        if !wdg.umbruch { return 0; }
-        let gutter = self.ta_gutter(g, wdg, zeilen);
-        (wdg.w - 2 * 5 - gutter - self.sk(8)).max(self.sk(20))
-    }
-
-    /// Was ein Textbereich ueber Einrueckung weiss -- herausgeloest, weil der
-    /// Enter-Zweig es in einem Verschluss braucht und dort kein Widget mehr
-    /// ausleihen kann.
-    pub(super) fn einzug_regeln(w: &Widget) -> EinzugRegeln {
-        EinzugRegeln {
-            auto_einzug: w.auto_einzug,
-            einzug_anfang: w.einzug_anfang.clone(),
-            einzug_ende: w.einzug_ende.clone(),
-            einzug_aus: w.einzug_aus.clone(),
-            schluss_oeffner: w.schluss_oeffner.clone(),
-            schluss_texte: w.schluss_texte.clone(),
-            tabbreite: w.tabbreite,
-        }
-    }
-
-    /// Anfang und Ende der Zeile, in der `pos` steht (Zeichen-Indizes).
-    pub(super) fn zeile_um(chars: &[char], pos: usize) -> (usize, usize) {
-        let pos = pos.min(chars.len());
-        let von = chars[..pos].iter().rposition(|&c| c == '\n').map(|i| i + 1).unwrap_or(0);
-        let bis = chars[pos..].iter().position(|&c| c == '\n').map(|i| pos + i).unwrap_or(chars.len());
-        (von, bis)
-    }
-
-    /// Der Einzug, mit dem eine neue Zeile hinter `pos` anfangen soll.
-    ///
-    /// Grundlage ist die Einrueckung der laufenden Zeile -- das allein ist
-    /// sprachfrei und schon der halbe Nutzen. Eine Stufe mehr gibt es, wenn
-    /// die Zeile mit einem der `einzug_anfang`-Woerter beginnt oder auf eines
-    /// der `einzug_ende`-Woerter endet. Zwei Listen und nicht eine: `SUB`
-    /// oeffnet am ANFANG, `THEN` am ENDE -- mit einer Liste ruckte auch ein
-    /// `END SUB` die naechste Zeile ein.
-    pub(super) fn neuer_einzug(w: &EinzugRegeln, chars: &[char], pos: usize) -> String {
-        if !w.auto_einzug { return String::new(); }
-        let (von, _) = Self::zeile_um(chars, pos);
-        let mut einzug = String::new();
-        for &c in &chars[von..pos.min(chars.len())] {
-            if c == ' ' || c == '\t' { einzug.push(c); } else { break; }
-        }
-        let bis_marke: String = chars[von..pos.min(chars.len())].iter().collect();
-        if Self::oeffnet(w, &bis_marke.trim().to_uppercase()) {
-            einzug.push_str(&" ".repeat(w.tabbreite.max(1) as usize));
-        }
-        einzug
-    }
-
-    /// Faengt `s` mit dem Wort `w` an? (Wort heisst: danach kommt kein
-    /// Namenszeichen mehr -- `ENDE` faengt nicht mit `END` an.)
-    pub(super) fn wort_am_anfang(s: &str, w: &str) -> bool {
-        s == w || (s.len() > w.len() && s.starts_with(w)
-                   && !s[w.len()..].starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_'))
-    }
-
-    /// Endet `s` auf dem Wort `w`?
-    pub(super) fn wort_am_ende(s: &str, w: &str) -> bool {
-        s == w || (s.len() > w.len() && s.ends_with(w)
-                   && !s[..s.len() - w.len()].ends_with(|c: char| c.is_ascii_alphanumeric() || c == '_'))
-    }
-
-    /// Oeffnet diese Zeile (GROSS, getrimmt) einen Block?
-    ///
-    /// Dieselbe Frage fuer die Einrueckung und fuer das Geruest -- getrennt
-    /// beantwortet liefen beide auseinander, und `IF x THEN y = 1` bekaeme
-    /// ein `END IF`, obwohl es nicht einmal einrueckt.
-    pub(super) fn oeffnet(w: &EinzugRegeln, text: &str) -> bool {
-        if text.is_empty() { return false; }
-        w.einzug_anfang.iter().any(|k| Self::wort_am_anfang(text, k))
-            || w.einzug_ende.iter().any(|k| Self::wort_am_ende(text, k))
-    }
-
-    /// Die Zeile, die den eben geoeffneten Block schliesst -- oder None.
-    ///
-    /// Gerufen VOR dem Umbruch, mit der Marke noch in der oeffnenden Zeile.
-    /// Drei Bedingungen, und jede hat ihren Grund:
-    /// * die Zeile oeffnet ueberhaupt einen Block (`oeffnet`) -- sonst
-    ///   bekaeme die einzeilige Form `IF x THEN y = 1` ein `END IF`;
-    /// * hinter der Marke steht nichts mehr -- sonst landete der Rest der
-    ///   Zeile HINTER dem Abschluss;
-    /// * der Block ist nicht schon geschlossen (`bereits_geschlossen`) --
-    ///   sonst saete jedes Enter am Ende einer alten `SUB`-Zeile ein zweites
-    ///   `END SUB`.
-    pub(super) fn geruest_schluss(w: &EinzugRegeln, chars: &[char], pos: usize) -> Option<String> {
-        if w.schluss_oeffner.is_empty() { return None; }
-        let (von, bis) = Self::zeile_um(chars, pos);
-        if chars[pos.min(bis)..bis].iter().any(|c| !c.is_whitespace()) { return None; }
-        let zeile: String = chars[von..bis].iter().collect();
-        let text = zeile.trim().to_uppercase();
-        if !Self::oeffnet(w, &text) { return None; }
-        // Das laengste passende Wort gewinnt: `DO WHILE` vor `DO`.
-        let mut treffer: Option<usize> = None;
-        for (k, o) in w.schluss_oeffner.iter().enumerate() {
-            if !Self::wort_am_anfang(&text, o) { continue; }
-            if treffer.map_or(true, |t| o.len() > w.schluss_oeffner[t].len()) { treffer = Some(k); }
-        }
-        let k = treffer?;
-        let schluss = w.schluss_texte[k].clone();
-        let einzug: String = zeile.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
-        if Self::bereits_geschlossen(w, chars, bis, einzug.chars().count(), &schluss.to_uppercase()) {
-            return None;
-        }
-        Some(einzug + &schluss)
-    }
-
-    /// Steht der Abschluss schon unter der Zeile?
-    ///
-    /// Gegangen wird ab `ab` (Ende der oeffnenden Zeile) nach unten: tiefer
-    /// eingerueckte Zeilen sind der Rumpf, eine Zeile aus der `aus`-Liste auf
-    /// gleicher Hoehe gehoert noch dazu (`ELSE`, `CASE`), alles andere auf
-    /// gleicher oder geringerer Hoehe beendet die Suche. Bei krumm
-    /// eingerueckten Dateien faellt die Antwort auf "nicht geschlossen" --
-    /// ein Abschluss zu viel ist leichter zu sehen als einer zu wenig.
-    pub(super) fn bereits_geschlossen(w: &EinzugRegeln, chars: &[char], ab: usize,
-                           einzug: usize, schluss: &str) -> bool {
-        let mut i = ab;
-        let mut gesehen = 0;
-        while i < chars.len() && gesehen < 500 {
-            i += 1;                       // ueber den Umbruch
-            if i >= chars.len() { break; }
-            let (von, bis) = Self::zeile_um(chars, i);
-            i = bis;
-            gesehen += 1;
-            let zeile: String = chars[von..bis].iter().collect();
-            let text = zeile.trim().to_uppercase();
-            if text.is_empty() { continue; }
-            let tief = zeile.chars().take_while(|c| *c == ' ' || *c == '\t').count();
-            if tief > einzug { continue; }
-            if tief == einzug {
-                if Self::wort_am_anfang(&text, schluss) { return true; }
-                if w.einzug_aus.iter().any(|k| text == *k) { continue; }
-            }
-            return false;
-        }
-        false
-    }
-
-    /// Alle Schreibmarken als (caret, anker), die erste ist die fuehrende.
-    pub(super) fn marken(w: &Widget) -> Vec<(i32, i32)> {
-        let mut m = vec![(w.caret, w.sel_anchor)];
-        m.extend(w.marken_zusatz.iter().copied());
-        m
-    }
-
-    /// Dieselbe Aenderung an JEDER Marke.
-    ///
-    /// `f` sagt fuer eine Marke, welcher Bereich weicht und was dafuer
-    /// hineinkommt -- Tippen, Enter, Ruecktaste, Entf und Einfuegen sind alle
-    /// von dieser Form. Gearbeitet wird von HINTEN nach vorn: dann bleiben
-    /// die Stellen der noch offenen Marken gueltig, und es braucht keine
-    /// Buchfuehrung ueber Verschiebungen.
-    ///
-    /// Mit einer einzigen Marke ist das genau der Weg von vorher.
-    pub(super) fn an_marken(chars: &mut Vec<char>, marken: &mut [(i32, i32)],
-                 f: impl Fn(&[char], i32, i32) -> (usize, usize, String)) {
-        let mut reihe: Vec<usize> = (0..marken.len()).collect();
-        reihe.sort_by_key(|&i| std::cmp::Reverse(marken[i].0.min(marken[i].1)));
-        for i in reihe {
-            let (c, a) = marken[i];
-            let (von, bis, ein) = f(chars, c, a);
-            let von = von.min(chars.len());
-            let bis = bis.clamp(von, chars.len());
-            let n = ein.chars().count();
-            chars.splice(von..bis, ein.chars());
-            let neu = (von + n) as i32;
-            marken[i] = (neu, neu);
-        }
-    }
-
-    /// Die Rechtecke der Farbfelder im sichtbaren Ausschnitt, je mit ihrer
-    /// Nummer: (index, x, y, kante).
-    ///
-    /// Sie stehen am ENDE ihrer Zeile, nicht direkt hinter dem Stueck: dort
-    /// laege das Quadrat auf dem naechsten Zeichen (bei `CLS(&HFF8800)` genau
-    /// auf der Klammer). Mehrere in einer Zeile reihen sich auf, in der
-    /// Reihenfolge des Textes.
-    ///
-    /// EINE Quelle fuer Zeichnen und Treffertest -- liefen sie auseinander,
-    /// oeffnete ein Klick neben dem Feld den Farbwaehler (oder gar keiner).
-    /// Die Rechtecke der Hinweise hinter dem Zeilenende (GUI_TEXTAREA_HINTS),
-    /// je (Zeile ab 0, x, y, b, h) -- EINE Quelle fuer Zeichnen, Klick und
-    /// Zeiger. Ein Hinweis steht an der LETZTEN sichtbaren Reihe seiner Zeile
-    /// (bei Umbruch), hinter dem Text und hinter der Faltmarke.
-    pub(super) fn ta_hinweis_rects(&self, g: &Graphics, wi: usize, wdg: &Widget, ax: i32, ay: i32, chars: &[char],
-                        starts: &[usize], rows: &[(usize, usize, usize)], sicht: i32)
-                        -> Vec<(usize, i32, i32, i32, i32)> {
-        let mut v = Vec::new();
-        if wdg.hinweise.is_empty() { return v; }
-        let pad = 5;
-        let lh = self.ta_line_h(g, wdg);
-        let gutter = self.ta_gutter(g, wdg, starts.len());
-        let tx0 = ax + pad + gutter - wdg.scroll_x;
-        for r in 0..sicht {
-            let ri = wdg.scroll + r;
-            if ri < 0 || ri as usize >= rows.len() { continue; }
-            let (li, rs, re) = rows[ri as usize];
-            let letzte = starts.get(li + 1).map(|&n| re + 1 >= n).unwrap_or(true);
-            if !letzte { continue; }
-            let Some((_, txt)) = wdg.hinweise.iter().find(|(z, _)| *z == li) else { continue };
-            let zeile: String = chars[rs..re].iter().collect();
-            let breite = self.wtext_width(g, wdg, &zeile);
-            let tx0 = tx0 + self.ta_versatz(g, wi, wdg, &chars[rs..re], self.ta_innen(g, wdg, starts.len()));
-            let mut ende_x = tx0 + breite;
-            if let Some(&(_, b)) = wdg.gefaltet.iter().find(|&&(v, _)| v == li + 1) {
-                let t = format!("... {} Zeilen", b - li - 1);
-                ende_x = tx0 + breite + self.sk(10) + self.wtext_width(g, wdg, &t) + self.sk(10);
-            }
-            let bx = ende_x + self.sk(18);
-            let bw = self.wtext_width(g, wdg, txt) + self.sk(12);
-            v.push((li, bx, ay + pad + r * lh + 1, bw, lh - 4));
-        }
-        v
-    }
-
-    pub(super) fn ta_farbfeld_rects(&self, g: &Graphics, wi: usize, wdg: &Widget, ax: i32, ay: i32,
-                         chars: &[char], rows: &[(usize, usize, usize)],
-                         starts_len: usize, view_lines: i32)
-                         -> Vec<(usize, i32, i32, i32)> {
-        let mut raus = Vec::new();
-        if wdg.farbfelder.is_empty() { return raus; }
-        let pad = 5;
-        let lh = self.ta_line_h(g, wdg);
-        let gutter = self.ta_gutter(g, wdg, starts_len);
-        let tx0 = ax + pad + gutter - wdg.scroll_x;
-        let kante = (lh - self.sk(6)).max(self.sk(6));
-        let luecke = self.sk(4);
-        // Je sichtbarer Zeile: wie viele Felder stehen dort schon?
-        let mut belegt: std::collections::HashMap<usize, i32> = Default::default();
-        for (k, &(s, l, _)) in wdg.farbfelder.iter().enumerate() {
-            let ende = (s as usize + l as usize).min(chars.len());
-            // In welcher sichtbaren Zeile endet das Stueck?
-            let Some(r) = rows.iter().position(|&(_, von, bis)| ende >= von && ende <= bis)
-                else { continue };
-            let zeile = r as i32 - wdg.scroll;
-            if zeile < 0 || zeile >= view_lines { continue; }
-            let nummer = belegt.entry(r).or_insert(0);
-            let ganze: String = chars[rows[r].1..rows[r].2].iter().collect();
-            let x = tx0 + self.ta_versatz(g, wi, wdg, &chars[rows[r].1..rows[r].2], self.ta_innen(g, wdg, starts_len))
-                    + self.wtext_width(g, wdg, &ganze) + luecke * 2
-                    + *nummer * (kante + luecke);
-            *nummer += 1;
-            let y = ay + pad + zeile * lh + (lh - kante) / 2;
-            raus.push((k, x, y, kante));
-        }
-        raus
-    }
-
-    /// Eine Spaltenauswahl als Marken: je Zeile eine, mit ihrer eigenen
-    /// Auswahl von Spalte `ca` bis `cb`. Zeilen, die nicht so weit reichen,
-    /// bekommen eine Marke an ihrem Ende -- sonst faellt beim Tippen mitten
-    /// im Block eine Zeile heraus, und das sieht man erst hinterher.
-    ///
-    /// Gerechnet wird in ZEICHEN je logischer Zeile. Fuer ein Code-Feld mit
-    /// fester Schrittweite ist das genau die Spalte; bei einer proportionalen
-    /// Schrift waere eine Spalte ohnehin keine Laenge.
-    pub(super) fn spalten_marken(chars: &[char], starts: &[usize], z0: i32, c0: i32, z1: i32, c1: i32)
-                      -> Vec<(i32, i32)> {
-        let (za, zb) = (z0.min(z1).max(0), z0.max(z1));
-        let (ca, cb) = (c0.min(c1).max(0), c0.max(c1));
-        let mut raus = Vec::new();
-        for z in za..=zb {
-            let zi = z as usize;
-            if zi >= starts.len() { break; }
-            let von = starts[zi];
-            let bis = if zi + 1 < starts.len() { starts[zi + 1].saturating_sub(1) } else { chars.len() };
-            let laenge = bis.saturating_sub(von) as i32;
-            let a = von as i32 + ca.min(laenge);
-            let b = von as i32 + cb.min(laenge);
-            raus.push((b, a));   // (Marke, Anker): die Marke steht rechts
-        }
-        raus
-    }
-
-    /// Spaltenauswahl setzen (GUI_TEXTAREA_SELECT_COLUMNS), Zeilen und Spalten
-    /// ab 1. Die erste Zeile traegt die fuehrende Marke, die uebrigen kommen
-    /// als weitere dazu -- getippt wird danach in allen zugleich.
-    pub fn textarea_select_columns(&mut self, h: i64, z1: i64, s1: i64, z2: i64, s2: i64)
-                                   -> Result<i64, String> {
-        let w = self.ta_wdg(h, "GUI_TEXTAREA_SELECT_COLUMNS")?;
-        let chars: Vec<char> = w.text.chars().collect();
-        let starts = Self::line_starts(&chars);
-        let marken = Self::spalten_marken(&chars, &starts,
-            (z1 - 1) as i32, (s1 - 1) as i32, (z2 - 1) as i32, (s2 - 1) as i32);
-        if marken.is_empty() { return Err("GUI_TEXTAREA_SELECT_COLUMNS: leerer Bereich".into()); }
-        let wd = self.wdg_mut(h, "GUI_TEXTAREA_SELECT_COLUMNS")?;
-        wd.caret = marken[0].0;
-        wd.sel_anchor = marken[0].1;
-        wd.marken_zusatz = marken[1..].to_vec();
-        Ok(marken.len() as i64)
-    }
-
-    /// Wie viele Einrueckungsstufen die (0-basierte) logische Zeile traegt.
-    ///
-    /// Eine LEERE Zeile nimmt die kleinere Tiefe ihrer beiden nicht-leeren
-    /// Nachbarn -- sonst risse die Linie in jedem Absatz auf, und gerade dort
-    /// will man sie sehen. Ein Tabulator zaehlt als eine volle Stufe.
-    pub(super) fn ta_einzug_tiefe(chars: &[char], starts: &[usize], li: usize, breite: usize) -> usize {
-        let stufen = |i: usize| -> Option<usize> {
-            let von = starts[i];
-            let bis = if i + 1 < starts.len() { starts[i + 1].saturating_sub(1) } else { chars.len() };
-            let mut n = 0usize;
-            for k in von..bis.min(chars.len()) {
-                match chars[k] {
-                    ' ' => n += 1,
-                    '\t' => n += breite,
-                    _ => return Some(n / breite),
-                }
-            }
-            None   // nur Leerraum: die Zeile zaehlt als leer
-        };
-        if let Some(n) = stufen(li) { return n; }
-        let mut vor = 0;
-        for i in (0..li).rev() { if let Some(n) = stufen(i) { vor = n; break; } }
-        let mut nach = 0;
-        for i in li + 1..starts.len() { if let Some(n) = stufen(i) { nach = n; break; } }
-        vor.min(nach)
-    }
-
-    /// Liegt die (1-basierte) Zeile in einem zugeklappten Block?
-    ///
-    /// Die Kopfzeile selbst bleibt sichtbar -- verborgen ist `von+1 ..= bis`.
-    pub(super) fn zeile_verborgen(wdg: &Widget, zeile: usize) -> bool {
-        wdg.gefaltet.iter().any(|&(v, b)| zeile > v && zeile <= b)
-    }
-
-    /// Der zugeklappte Block, in dem `zeile` liegt (Kopfzeile ausgenommen).
-    pub(super) fn falte_um(wdg: &Widget, zeile: usize) -> Option<usize> {
-        wdg.gefaltet.iter().position(|&(v, b)| zeile > v && zeile <= b)
-    }
-
-    /// Steht die Schreibmarke in verborgenem Text, klappt der Block auf.
-    ///
-    /// Pfeile und Klicks laufen ueber `ta_rows` und koennen gar nicht
-    /// hineinkommen; Links/Rechts, Backspace und `GUI_TEXTAREA_GOTO`
-    /// koennen es. Aufklappen statt Ausweichen, weil ein Sprung ueber den
-    /// Block hinweg bei einem Suchtreffer das Falsche waere -- man will die
-    /// Fundstelle sehen.
-    pub(super) fn falte_am_caret_oeffnen(wdg: &mut Widget) {
-        loop {
-            let chars: Vec<char> = wdg.text.chars().collect();
-            let starts = Self::line_starts(&chars);
-            let c = wdg.caret.clamp(0, chars.len() as i32) as usize;
-            let zeile = starts.iter().rposition(|&s| s <= c).unwrap_or(0) + 1;
-            match Self::falte_um(wdg, zeile) {
-                Some(k) => { wdg.gefaltet.remove(k); }
-                None => break,
-            }
-        }
-    }
-
-    /// Die Faltungen einer Aenderung nachziehen.
-    ///
-    /// Eine Falte haengt an ZEILENNUMMERN, und eine Aenderung darueber
-    /// verschiebt sie. Wer im Block selbst tippt, klappt ihn auf (dorthin
-    /// kommt die Marke ohnehin nur aufgeklappt) -- das ist billiger als eine
-    /// Buchfuehrung, die bei jedem Sonderfall daneben liegt.
-    pub(super) fn falten_nachziehen(w: &mut Widget, vorher: &str, nachher: &str, caret_vorher: i32) {
-        if w.gefaltet.is_empty() { return; }
-        let alt = vorher.split('\n').count() as i64;
-        let neu = nachher.split('\n').count() as i64;
-        let delta = neu - alt;
-        let zeile = vorher[..vorher.char_indices().nth(caret_vorher.max(0) as usize)
-                            .map(|(b, _)| b).unwrap_or(vorher.len())]
-                    .split('\n').count();
-        let gesamt = neu as usize;
-        w.gefaltet.retain_mut(|(v, b)| {
-            if zeile < *v {
-                let nv = *v as i64 + delta;
-                let nb = *b as i64 + delta;
-                if nv < 1 || nb <= nv { return false; }
-                *v = nv as usize; *b = nb as usize;
-            } else if zeile <= *b {
-                return false;   // im Block getippt -> aufgeklappt
-            }
-            *b = (*b).min(gesamt);
-            *b > *v
-        });
-    }
-
-    /// Sichtbare Zeilen eines Textbereichs: ohne Umbruch eine je logischer
-    /// Zeile; mit Umbruch an Wortgrenzen auf `breite` gebrochen -- ein Wort,
-    /// das allein nicht passt, wird im Zeichen gebrochen. Jede Zeile als
-    /// (logische Zeile, von, bis) in ZEICHEN, `bis` ohne den Umbruch.
-    ///
-    /// EINE Quelle fuer Zeichnen, Klick, Pfeile, Schreibmarke und Scroll --
-    /// liefe eine davon anders, saesse die Marke neben dem Text.
-    pub(super) fn ta_rows(&self, g: &Graphics, wdg: &Widget, chars: &[char], starts: &[usize], breite: i32) -> Vec<(usize, usize, usize)> {
-        let mut rows = Vec::new();
-        for (li, &ls) in starts.iter().enumerate() {
-            // Zugeklappt: die Zeilen INNERHALB eines Blocks fallen hier weg,
-            // und damit fuer alle auf einmal -- Zeichnen, Klick, Pfeile,
-            // Schreibmarke und Scroll fragen dieselbe Liste. Die Kopfzeile
-            // bleibt stehen und traegt beim Zeichnen die Sprechblase.
-            if Self::zeile_verborgen(wdg, li + 1) { continue; }
-            let le = if li + 1 < starts.len() { starts[li + 1] - 1 } else { chars.len() };
-            if breite <= 0 || le <= ls { rows.push((li, ls, le)); continue; }
-            let mut von = ls;
-            while von < le {
-                let mut bis = von;
-                let mut k = von;
-                // Wort fuer Wort anhaengen, solange es passt; gemessen wird
-                // OHNE die Leerzeichen dahinter, die aber zur Zeile gehoeren.
-                while k < le {
-                    let mut e = k;
-                    while e < le && chars[e] != ' ' { e += 1; }
-                    let wort_ende = e;
-                    while e < le && chars[e] == ' ' { e += 1; }
-                    let stueck: String = chars[von..wort_ende].iter().collect();
-                    if self.wtext_width(g, wdg, &stueck) > breite { break; }
-                    bis = e;
-                    k = e;
-                }
-                if bis == von {
-                    // Kein ganzes Wort passt: zeichenweise, mindestens eins.
-                    bis = von + 1;
-                    while bis < le {
-                        let stueck: String = chars[von..=bis].iter().collect();
-                        if self.wtext_width(g, wdg, &stueck) > breite { break; }
-                        bis += 1;
-                    }
-                }
-                rows.push((li, von, bis));
-                von = bis;
-            }
-        }
-        rows
-    }
-
-    /// Zeile, in der die Schreibmarke steht: die letzte, deren Anfang nicht
-    /// hinter ihr liegt -- am Umbruch gehoert die Marke damit zur NEUEN Zeile.
-    /// Die mitlaufenden Blockkoepfe (GUI_TEXTAREA_SET "kopfzeilen"): die
-    /// Kopfzeilen (logisch, ab 0) der faltbaren Bloecke, deren Kopf oben
-    /// hinausgerollt ist, die aber in der ersten Zeile UNTER den Koepfen
-    /// noch weitergehen -- aussen zuerst. Eine Quelle fuer Zeichnen, Klick,
-    /// Nummernspalte und Mitziehen der Marke. Die Koepfe verdecken selbst
-    /// Zeilen, darum wird wiederholt, bis sich die Liste nicht mehr aendert.
-    /// Mindestens eine Zeile Code bleibt frei.
-    pub(super) fn ta_koepfe(wdg: &Widget, rows: &[(usize, usize, usize)], sicht: i32, scroll: i32) -> Vec<usize> {
-        if wdg.kopfzeilen <= 0 || wdg.faltbar.is_empty() || scroll <= 0 { return Vec::new(); }
-        let n = (wdg.kopfzeilen as usize).min((sicht.max(1) as usize).saturating_sub(1));
-        let mut liste: Vec<usize> = Vec::new();
-        for _ in 0..=n {
-            let ri = scroll as usize + liste.len();
-            let Some(&(li, _, _)) = rows.get(ri) else { break };
-            let oben = li + 1;
-            let mut neu: Vec<usize> = wdg.faltbar.iter()
-                .filter(|&&(v, b)| v < oben && b >= oben && !Self::zeile_verborgen(wdg, v))
-                .map(|&(v, _)| v - 1).collect();
-            neu.truncate(n);
-            if neu == liste { break; }
-            liste = neu;
-        }
-        liste
-    }
-
-    pub(super) fn ta_row_of(rows: &[(usize, usize, usize)], caret: usize) -> usize {
-        rows.iter().rposition(|&(_, von, _)| von <= caret).unwrap_or(0)
-    }
-
-    /// Welcher Ausschnitt ist gerade zu sehen? (GUI_TEXTAREA_VIEW)
-    ///
-    /// Liefert `(erste_zeile, zeilen, start_zeichen, laenge_zeichen)` -- die
-    /// ersten beiden in ZEILEN, die letzten beiden in ZEICHEN.
-    ///
-    /// Wozu: Wer eine grosse Datei bei jedem Tastendruck GANZ einfaerbt,
-    /// zahlt mit der Dateigroesse (gemessen: 3000 Zeilen ~26 ms, 30000 Zeilen
-    /// ~270 ms je Anschlag). Mit diesem Ausschnitt faerbt ein Programm nur,
-    /// was man sieht -- und die Kosten haengen nur noch von der Fenstergroesse
-    /// ab. Dass das RICHTIG ist und nicht bloss schneller, liegt an der
-    /// Sprache: Kommentare und Zeichenketten enden in Drachenhauch an der
-    /// Zeile, ein Ausschnitt an Zeilengrenzen kann also nicht in der Mitte
-    /// eines Gebildes anfangen.
-    ///
-    /// Die Zeichen-Angaben zaehlen wie ueberall ZEICHEN, nicht Bytes.
-    pub fn textarea_view(&self, g: &Graphics, h: i64) -> Result<(i64, i64, i64, i64), String> {
-        let wd = self.wdg(h, "GUI_TEXTAREA_VIEW")?;
-        if wd.kind != Kind::TextArea {
-            return Err("GUI_TEXTAREA_VIEW: das Widget ist kein GUI_TEXTAREA".into());
-        }
-        let z = self.ta_zerlegt(h, &wd.text);
-        let (chars, starts) = (&z.0, &z.1);
-        // Dieselbe Rechnung wie beim Zeichnen (pad = 5, ta_line_h) -- liefe
-        // sie auseinander, faerbte das Programm einen anderen Ausschnitt, als
-        // zu sehen ist.
-        let lh = self.ta_line_h(g, wd);
-        let sicht = ((wd.h - 2 * 5) / lh).max(1);
-        let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
-        let erste_row = wd.scroll.clamp(0, (rows.len() as i32 - 1).max(0)) as usize;
-        let letzte_row = (erste_row + sicht as usize).min(rows.len());
-        // Nach aussen zaehlen weiter LOGISCHE Zeilen -- ein Programm, das den
-        // Ausschnitt einfaerbt, kennt keine umgebrochenen.
-        let erste = rows[erste_row].0;
-        let letzte = rows[letzte_row - 1].0 + 1;
-        // Ohne Umbruch bleibt `zeilen` die Zahl der sichtbaren PLAETZE (so
-        // war es immer, und Programme rechnen damit); mit Umbruch ist es die
-        // Zahl der logischen Zeilen, die im Ausschnitt liegen.
-        let zeilen = if wd.umbruch { (letzte - erste).max(1) } else { sicht as usize };
-        let von = starts[erste];
-        let bis = if letzte < starts.len() { starts[letzte].saturating_sub(1) } else { chars.len() };
-        Ok((erste as i64, zeilen as i64, von as i64, bis.saturating_sub(von) as i64))
-    }
 }

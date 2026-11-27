@@ -540,13 +540,13 @@ DIM x2 AS INTEGER
 DIM y2 AS INTEGER
 DIM b2 AS INTEGER
 DIM h2 AS INTEGER
-(x1, y1, b1, h1) = GUI_TREE_ITEM_RECT(t, a)
-(x2, y2, b2, h2) = GUI_TREE_ITEM_RECT(t, b)
+(x1, y1, b1, h1) = GUI_TREE_ITEM_SCREEN_RECT(t, a)
+(x2, y2, b2, h2) = GUI_TREE_ITEM_SCREEN_RECT(t, b)
 PRINT "untereinander "; y2 - y1 = h1; " eingerueckt "; x2 > x1
-PRINT "zugeklappt "; GUI_TREE_ITEM_RECT(t, d)
+PRINT "zugeklappt "; GUI_TREE_ITEM_SCREEN_RECT(t, d)
 DIM ok AS BOOLEAN : ok = FALSE
 TRY
-    GUI_TREE_ITEM_RECT(t, 9)
+    GUI_TREE_ITEM_SCREEN_RECT(t, 9)
 CATCH f
     ok = INSTR(f, "ausserhalb") >= 0
 END TRY
@@ -555,7 +555,7 @@ DIM x3 AS INTEGER
 DIM y3 AS INTEGER
 DIM b3 AS INTEGER
 DIM h3 AS INTEGER
-(x3, y3, b3, h3) = GUI_TREE_ITEM_RECT(t, c)
+(x3, y3, b3, h3) = GUI_TREE_ITEM_SCREEN_RECT(t, c)
 WRITEALL("ev.txt", "c 4" + CHR$(10) + "e 2 7 " + STR$(x3 + 10) + " " + STR$(y3 + h3 \ 2) + " 0 0" + CHR$(10) + "e 3 7 " + STR$(x3 + 10) + " " + STR$(y3 + h3 \ 2) + " 0 0" + CHR$(10) + "e 3 6 0 0 0 0" + CHR$(10) + "e 5 5 0 0 0 0" + CHR$(10))
 AUTOMATION_PLAY("ev.txt")
 DIM f2 AS INTEGER
@@ -572,3 +572,25 @@ untereinander TRUE eingerueckt TRUE
 zugeklappt (0, 0, 0, 0)
 falscher knoten TRUE
 geklickt Gemuese
+
+=== zaehlen, umbenennen, entfernen, aufgeklappt fragen
+' Dem einfachen Baum fehlten bis 2026.53 COUNT, SET_LABEL, REMOVE und
+' EXPANDED (die Liste hatte sie). REMOVE nimmt die Kinder mit, die Nummern
+' dahinter ruecken auf, Haken und Auswahl wandern mit.
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 200)
+DIM r AS INTEGER : r = GUI_TREE_ADD(t, -1, "Wurzel")
+DIM a AS INTEGER : a = GUI_TREE_ADD(t, r, "A")
+DIM a1 AS INTEGER : a1 = GUI_TREE_ADD(t, a, "A1")
+DIM b AS INTEGER : b = GUI_TREE_ADD(t, r, "B")
+GUI_TREE_SET_CHECKED(t, b, TRUE)
+GUI_TREE_EXPAND(t, r, TRUE)
+PRINT "anzahl "; GUI_TREE_COUNT(t); " offen "; GUI_TREE_EXPANDED(t, r); " "; GUI_TREE_EXPANDED(t, a)
+GUI_TREE_SET_LABEL(t, b, "Bee")
+GUI_TREE_SET_SELECTED(t, a1)
+GUI_TREE_REMOVE(t, a)
+PRINT "danach "; GUI_TREE_COUNT(t); " "; GUI_TREE_LABEL(t, 1); " haken "; GUI_TREE_CHECKED(t, 1); " gewaehlt "; GUI_TREE_SELECTED(t)
+--- erwartet
+anzahl 4 offen TRUE FALSE
+danach 2 Bee haken TRUE gewaehlt -1

@@ -23,7 +23,7 @@ When the `camera` module is active and `CAMERA_SET` has been called, all drawing
 |---|---|
 | `SCREEN(w, h[, title$[, scale]])` | opens a window with the logical size `w × h`. `scale > 1` makes every logical pixel bigger (retro look). |
 | `FLIP()` | output the frame to the screen (synchronized to 60 FPS) |
-| `CLS([color])` | fill the buffer with `color` (default: black) |
+| `CLS([color])` | fill the buffer with `color` (default: black); in a transparent window (`SCREEN_TRANSPARENT`) the top byte counts literally as opacity, 0 = see-through -- elsewhere 0 means opaque |
 | `SLEEP(ms)` | waits ms milliseconds without freezing the window |
 | `QUITREQUESTED()` → BOOLEAN | TRUE when the program should end: window X / Alt+F4, the frame limit of `DHRT_FRAMES`/`--bilder` — **and, by raylib default, also `ESC`**, EXCEPT in a program with `gui`: there `ESC` belongs to the widgets from the first `GUI_UPDATE` on (cancel a dialog, close a dropdown), otherwise every cancel would end the whole program. `WINDOW_ESC_QUIT` sets it explicitly |
 | `WINDOW_CLOSE_REQUESTED()` → BOOLEAN | TRUE when the USER wants to close the window (the X, Alt+F4, the quit key) -- without the frame limit. The window stays open: a program with unsaved work asks first and then ends itself. An event, not a state -- it holds for one frame |
@@ -59,7 +59,7 @@ When the `camera` module is active and `CAMERA_SET` has been called, all drawing
 | `FILE_DROPPED(i)` → STRING | path of the `i`-th of them |
 | `CLIPBOARD_GET()` → STRING | read text from the clipboard; empty if another program is holding it right now |
 | `CLIPBOARD_SET(text$)` | put text into the clipboard — an **error** if that does not succeed |
-| `CLIPBOARD_SET_IMAGE(image)` → BOOLEAN | put an `IMAGE` into the clipboard (other programs paste it as a picture) — an **error** if that does not succeed |
+| `CLIPBOARD_SET_IMAGE(image)` | put an `IMAGE` into the clipboard (other programs paste it as a picture) — an **error** if that does not succeed |
 | `CLIPBOARD_GET_IMAGE()` → INTEGER | the picture from the clipboard as a new `IMAGE`; `-1` if there is none |
 | `CLIPBOARD_HAS_IMAGE()` → BOOLEAN | is there a picture in it right now? |
 | `CLIPBOARD_SET_FILES(paths)` | put files (`ARRAY OF STRING`, relative or absolute) into the clipboard — “Paste” in Explorer/Finder copies them |
@@ -143,7 +143,7 @@ END IF
 
 Dragging out exists **only on Windows** so far (through the shell, like
 Explorer itself); on macOS and Linux it returns `""`. With
-`DHRT_ZWISCHENABLAGE=privat` (every program under `dhrt test`) pictures and
+`DHRT_CLIPBOARD=privat` (every program under `dhrt test`) pictures and
 file lists stay in the process as well.
 
 Classic game loop:
@@ -302,6 +302,7 @@ Colours are given as a 24-bit INTEGER (`&HRRGGBB`), most easily via `RGB(r, g, b
 | `ELLIPSE(x1, y1, x2, y2[, color])` | filled ellipse, fitted into the bounding box |
 | `ELLIPSEOUTLINE(x1, y1, x2, y2[, color[, width]])` | ellipse as outline only |
 | `ARC(x1, y1, x2, y2, start_rad, end_rad[, color[, width]])` | arc segment in the bounding box; angles in radians, counter-clockwise. `width` (float, optional) = stroke width; without it 1px (independent of zoom), with it scaled with the `CAMERA_SET` zoom like `LINEW`/`SPLINE` |
+| `ARC_DEG(x1, y1, x2, y2, from_deg, to_deg[, color[, width]])` | the same arc in **degrees**, 0 = right, clockwise -- like `PIE` |
 | `TEXT(x, y, s$[, color])` | text at (x, y) |
 | `TEXTROT(x, y, s$, angle[, scale[, color]])` | text **centred** on (x, y), rotated about the centre (degrees, like `DRAWIMAGEROT`) and scaled — for score pop-ups, slanted labels. Uses the active font/size |
 
@@ -818,11 +819,11 @@ WEND
 | Function | Purpose |
 |---|---|
 | `LOADSOUND(path$)` → SOUND | load a sample (short effects: WAV, OGG) |
-| `PLAYSOUND(s[, loops[, volume]])` | play, default loops=0, volume=1.0 |
+| `PLAYSOUND(s[, loops[, volume]])` | play: `loops` 0 once (default), -1 endless, n repetitions as with `AUDIO_PLAY` (up to 2026.53 `loops` was lost); volume=1.0 |
 | `STOPSOUND(s)` | stop |
 | `UNLOADSOUND(s)` | stop the sound **and free its buffer** — against buffers piling up with many `AUDIO_TONE`/`AUDIO_SFX`/`AUDIO_NOISE` notes (a long song). The handle stays valid; playing it again raises an error |
 | `AUDIO_SOUND_COUNT()` → INTEGER | number of live (not freed) sound slots — diagnostics against sound leaks |
-| `PLAYMUSIC(path$[, loops[, volume]])` | stream a longer file (`.ogg`/`.mp3`/`.qoa` **+ tracker modules `.mod`/`.xm`** — real Amiga sound), default loops=-1 (endless) |
+| `PLAYMUSIC(path$[, loops[, volume]])` | stream a longer file (`.ogg`/`.mp3`/`.flac` **+ tracker modules `.mod`/`.xm`** — real Amiga sound); `loops` n > 0 repetitions, 0 and -1 endless (the default; 0 as in old programs) |
 | `STOPMUSIC()` | stop |
 
 ```basic
@@ -921,7 +922,7 @@ sampler would stay black.
 
 | Function | Purpose |
 |---|---|
-| `KEYPRESSED(key)` → BOOLEAN | TRUE **as long as** the key with SDL code `code` is held — every frame again. For moving/steering. |
+| `KEYPRESSED(key)` → BOOLEAN | TRUE **as long as** the key `key` (a `KEY_*` constant or a letter) is held — every frame again. For moving/steering. |
 | `KEYHIT(key)` → BOOLEAN | TRUE only in **the one frame** in which the key goes down. For shooting, jumping, toggling. |
 | | *Letters:* `KEY_A`…`KEY_Z` are the clear spelling. `ASC("s")` and `ASC("S")` both mean the same key — until 2026-08-31 the **upper-case** spelling silently hit nothing at all, which looked like a forgotten call. |
 | | *Position or label:* a key code means the **position** of the key on the US keyboard — `KEY_Z` is the key labelled Y on a German keyboard, the one labelled W on a French one. That is right for WASD. For shortcuts like Ctrl+Z write the **letter as text**: `KEYHIT("z")` means the key the Z is printed on (also for `KEYPRESSED`, `KEYRELEASED`, `KEYREPEAT`; letters, digits and the space). |
@@ -948,7 +949,7 @@ sampler would stay black.
 | `KEY_ANY_HIT()` → INTEGER | code of the last key pressed, `-1` = none — for key-binding dialogs |
 | `KEY_NAME$(code)` → STRING | display name of a key (`LEER`, `LINKS`, `UMSCHALT`, `F5` …) |
 | `INKEY$()` → STRING | last typed character or `""` — does **not** wait, for text input during gameplay |
-| `WAITKEY()` → INTEGER | **stops** until a key arrives and returns its code (`-1` if the window is closed) |
+| `WAITKEY()` → INTEGER | **stops** until a key arrives and returns its code (`-1` if the window is closed): special keys like the constants (`WAITKEY() = KEY_LEFT`), letters and digits as ASCII capital (`ASC("A")`) |
 
 **A click between two frames is not lost.** If press and release arrive
 before the next frame begins (a tap on the touchpad, a played-back click, a
@@ -981,9 +982,9 @@ Available constants:
 | Arrows | `KEY_LEFT`, `KEY_RIGHT`, `KEY_UP`, `KEY_DOWN` |
 | Letters/digits | `KEY_A` to `KEY_Z`, `KEY_0` to `KEY_9` |
 | Function keys | `KEY_F1` to `KEY_F12` |
-| Modifiers | `KEY_LSHIFT`, `KEY_RSHIFT`, `KEY_LCTRL`, `KEY_RCTRL`, `KEY_LALT`, `KEY_RALT`, `KEY_LSUPER`, `KEY_RSUPER`, `KEY_CAPSLOCK` |
-| Navigation | `KEY_INSERT`, `KEY_DELETE`, `KEY_HOME`, `KEY_END`, `KEY_PAGEUP`, `KEY_PAGEDOWN` |
-| Numeric keypad | `KEY_KP0` to `KEY_KP9`, `KEY_KP_ENTER`, `KEY_KP_PLUS`, `KEY_KP_MINUS`, `KEY_KP_MULTIPLY`, `KEY_KP_DIVIDE`, `KEY_KP_PERIOD` |
+| Modifiers | `KEY_LSHIFT`, `KEY_RSHIFT`, `KEY_LCTRL`, `KEY_RCTRL`, `KEY_LALT`, `KEY_RALT`, `KEY_LSUPER`, `KEY_RSUPER`, `KEY_CAPSLOCK` — also `KEY_LEFT_SHIFT`, `KEY_RIGHT_SHIFT`, `KEY_LEFT_CTRL`, `KEY_RIGHT_CTRL`, `KEY_LEFT_ALT`, `KEY_RIGHT_ALT`, `KEY_LEFT_SUPER`, `KEY_RIGHT_SUPER`, `KEY_CAPS_LOCK` |
+| Navigation | `KEY_INSERT`, `KEY_DELETE`, `KEY_HOME`, `KEY_END`, `KEY_PAGEUP`/`KEY_PAGE_UP`, `KEY_PAGEDOWN`/`KEY_PAGE_DOWN`, `KEY_NUM_LOCK`, `KEY_SCROLL_LOCK`, `KEY_PRINT_SCREEN`, `KEY_PAUSE` |
+| Numeric keypad | `KEY_KP0` to `KEY_KP9` (also `KEY_KP_0` to `KEY_KP_9`), `KEY_KP_ENTER`, `KEY_KP_PLUS`, `KEY_KP_MINUS`, `KEY_KP_MULTIPLY`, `KEY_KP_DIVIDE`, `KEY_KP_PERIOD` |
 
 The numeric keypad has codes of its own — a game control may bind it
 separately from the top row of digits. Gamepad codes (`JOY_BUTTON_A`,
@@ -1028,7 +1029,8 @@ held” and “pressed right now”.
 | `JOYSTICK_MAPPINGS(sdl_db$)` → INTEGER | load mappings from the SDL GameControllerDB — this makes exotic devices map correctly |
 
 There are constants for the buttons (`JOY_BUTTON_A` … `JOY_BUTTON_Y`,
-`JOY_DPAD_*`). Whoever prefers working with action names instead of numbers
+`JOY_DPAD_*`); they apply in `JOYSTICK_BUTTON` as in `KEYPRESSED`, `KEYHIT`,
+`KEYRELEASED` and `KEYREPEAT` (there on any pad). Whoever prefers working with action names instead of numbers
 uses the module [`input`](module-input.md) — there it reads
 `INPUT_BIND("springen", KEY_SPACE, JOY_BUTTON_A)`.
 

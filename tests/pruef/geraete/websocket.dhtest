@@ -238,7 +238,7 @@ END TRY
 TRY
     w = WS_CONNECT("ws://127.0.0.1:1/")
 CATCH e
-    PRINT LEFT$(e, 26)
+    PRINT LEFT$(e, 46)
 END TRY
 TRY
     PRINT WS_SEND(5, "x")
@@ -247,5 +247,5 @@ CATCH e
 END TRY
 --- erwartet
 WS_CONNECT: "http://127.0.0.1/" ist keine WebSocket-Adresse (ws://... oder wss://...)
-WS_CONNECT: 127.0.0.1:1 --
+WS_CONNECT: keine Verbindung zu 127.0.0.1:1 --
 WS_SEND: ungueltiges/geschlossenes WEBSOCKET 5

@@ -42,7 +42,7 @@ am ende TRUE 2
 am anfang zurueck FALSE
 gesperrt FALSE 0
 GUI_WIZARD_SET_STEP: Schritt 7 gibt es nicht
-GUI_WIZARD_SET: unbekannter Schluessel 'schnell' (erlaubt: pruefen)
+GUI_WIZARD_SET: unbekannter Schluessel 'schnell' -- moeglich sind pruefen/validate
 
 === die knoepfe blaettern und melden je ein bild
 IMPORT "gui"

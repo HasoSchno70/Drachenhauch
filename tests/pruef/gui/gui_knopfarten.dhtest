@@ -54,7 +54,7 @@ DHRT_FRAMES=1
 --- enthaelt
 Knopfart 'knallrot' gibt es nicht
 bekannt sind: standard, primaer, erfolg, warnung, gefahr, umriss, flach, link
-kein Knopf
+kein GUI_BUTTON
 hover/pressed
 
 === gefuellte arten haben ihre farbe, umriss und flach keine flaeche
@@ -95,3 +95,22 @@ DHRT_FRAMES=3
 ' Gegenprobe: der Standard-Knopf ist NICHT unsichtbar.
 30 150 <> 350 250
 --- erwartet
+
+=== englische zweitnamen fuer knopfart, form, sinnbild und schluessel
+' Eingang zweisprachig, englisch zuerst; gespeichert wird der deutsche Name
+' (Bericht A14; bis 2026.53 nur deutsch).
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "B", 10, 10, 80, 24)
+GUI_BUTTON_VARIANT(b, "primary")
+GUI_SET_SHAPE(b, "pill")
+PRINT GUI_BUTTON_GET_VARIANT$(b); " "; GUI_GET_SHAPE$(b)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 40, 200, 100)
+DIM k AS INTEGER : k = GUI_TREE_ADD(t, -1, "x")
+GUI_TREE_ICON(t, k, "folder")
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 150, 200, 40, "")
+GUI_TEXTAREA_SET(ta, "line_numbers", 1)
+PRINT "geht"
+--- erwartet
+primaer pille
+geht

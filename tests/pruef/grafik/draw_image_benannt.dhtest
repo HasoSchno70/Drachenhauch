@@ -94,4 +94,4 @@ SET_WINDOW_POS(-3000, -3000)
 DIM b AS IMAGE : b = IMAGE_NEW(4, 4, &HFFFFFF)
 DRAW_IMAGE(b, 0, 0, 1, 2, 3.0, 4, FALSE, FALSE, 0, 0, 1, 1, 9)
 --- fehler
-DRAW_IMAGE: erwartet 3..13 Argumente, erhalten 14
+DRAW_IMAGE: erwartet 3 bis 13 Argumente, erhalten 14

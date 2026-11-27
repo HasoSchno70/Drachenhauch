@@ -39,6 +39,8 @@ mod zustand;
 mod stil;
 #[path = "gui_bausteine.rs"]
 mod bausteine;
+#[path = "gui_einstellungen.rs"]
+mod einstellungen;
 #[path = "gui_rechtschreibung.rs"]
 mod rechtschreibung;
 #[path = "gui_richtung.rs"]
@@ -57,6 +59,8 @@ mod richtext;
 mod menues;
 #[path = "gui_layout.rs"]
 mod layout;
+#[path = "gui_form.rs"]
+mod form;
 #[path = "gui_geometrie.rs"]
 mod geometrie;
 #[path = "gui_eingabe.rs"]
@@ -74,42 +78,60 @@ mod bindung;
 #[path = "gui_a11y.rs"]
 mod a11y;
 
-const KEY_BACKSPACE: i64 = 8;
-const KEY_TAB: i64 = 9;
-// Tastencodes (pygame/SDL) fuer die TextInput-Editierung.
-const KEY_DELETE: i64 = 127;
-const KEY_LEFT: i64 = 1073741904;
-const KEY_RIGHT: i64 = 1073741903;
-const KEY_UP: i64 = 1073741906;
-const KEY_DOWN: i64 = 1073741905;
-const KEY_HOME: i64 = 1073741898;
-const KEY_END: i64 = 1073741901;
-const KEY_ENTER: i64 = 13;
-const KEY_SPACE: i64 = 32;
-const KEY_ESC: i64 = 27;
-const KEY_PAGEUP: i64 = 1073741899;
-const KEY_PAGEDOWN: i64 = 1073741902;
-const KEY_F2: i64 = 1073741883;
-const KEY_F4: i64 = 1073741885;
-const K_A: i64 = 97;
-const K_B: i64 = 98;
-const K_I: i64 = 105;
-const K_U: i64 = 117;
-const K_C: i64 = 99;
-const K_V: i64 = 118;
-const K_X: i64 = 120;
-const K_Y: i64 = 121;
-const K_Z: i64 = 122;
+const KEY_BACKSPACE: i64 = crate::vm::taste("key_backspace");
+const KEY_TAB: i64 = crate::vm::taste("key_tab");
+// Tastencodes (SDL-Werte) aus DEFAULT_KEYS -- eine Quelle mit den KEY_*-Konstanten.
+const KEY_DELETE: i64 = crate::vm::taste("key_delete");
+const KEY_LEFT: i64 = crate::vm::taste("key_left");
+const KEY_RIGHT: i64 = crate::vm::taste("key_right");
+const KEY_UP: i64 = crate::vm::taste("key_up");
+const KEY_DOWN: i64 = crate::vm::taste("key_down");
+const KEY_HOME: i64 = crate::vm::taste("key_home");
+const KEY_END: i64 = crate::vm::taste("key_end");
+const KEY_ENTER: i64 = crate::vm::taste("key_enter");
+const KEY_SPACE: i64 = crate::vm::taste("key_space");
+const KEY_ESC: i64 = crate::vm::taste("key_escape");
+const KEY_PAGEUP: i64 = crate::vm::taste("key_pageup");
+const KEY_PAGEDOWN: i64 = crate::vm::taste("key_pagedown");
+const KEY_F2: i64 = crate::vm::taste("key_f2");
+const KEY_F4: i64 = crate::vm::taste("key_f4");
+const K_A: i64 = crate::vm::taste("key_a");
+const K_B: i64 = crate::vm::taste("key_b");
+const K_I: i64 = crate::vm::taste("key_i");
+const K_U: i64 = crate::vm::taste("key_u");
+const K_C: i64 = crate::vm::taste("key_c");
+const K_V: i64 = crate::vm::taste("key_v");
+const K_X: i64 = crate::vm::taste("key_x");
+const K_Y: i64 = crate::vm::taste("key_y");
+const K_Z: i64 = crate::vm::taste("key_z");
 
 // Tabellen-Layout (analog zum Immediate-Mode-UI_TABLE).
 const TBL_HEADER_H: i32 = 22;
 const TBL_ROW_H: i32 = 20;
-const TBL_SCROLL_W: i32 = 12;
+/// Breite JEDES Rollbalkens (logisch) -- Fenster, Panel, Liste, Baum,
+/// Tabelle, Klappliste, Richtext, Akkordeon. Bis 2026.53 sieben Bauarten mit
+/// 4, 5, 8, 10 und 12 Punkten (Bericht A18). Nur der Textbereich nimmt seinen
+/// Innenabstand (`ta_bar_geom`), weil der Balken darin liegt.
+const ROLLBALKEN_W: i32 = 8;
+
+/// Ein Radschritt (Bericht A18: bis 2026.53 sieben Schrittweiten). Was in
+/// Punkten rollt -- Fenster, Panel, Akkordeon, Richtext --, rollt
+/// `RAD_PUNKTE` (logisch, `rad_schritt_px`). Was in Zeilen rollt: Liste,
+/// Baum und Tabelle eine Zeile (eine Zeile ist dort ein Ziel fuer den
+/// Finger, die Pruefungen messen genau so), der Textbereich `RAD_ZEILEN_TEXT`
+/// Zeilen (Textzeilen sind dicht).
+const RAD_PUNKTE: i32 = 40;
+const RAD_ZEILEN_TEXT: i32 = 3;
+// Navigationstasten (Pfeile, Bild auf/ab) fragt die gui mit `key_repeat`:
+// gehalten wiederholen sie wie in jedem System. Bis 2026.53 nahm die Haelfte
+// der Widgets `key_pressed` und lief dann nur einen Schritt (Bericht A18).
 const TBL_PADDING: i32 = 6;
 const TBL_MIN_COL_W: i32 = 40;
 const TBL_FILTER_H: i32 = 22;   // Hoehe der Filterzeile im Kopf
 const TBL_EDGE_GRAB: i32 = 4;   // Fangbereich der Spaltenkante (px)
 const DBL_TIME: f64 = 0.4;      // Doppelklick-Fenster (Sekunden)
+/// Mehrfachklick in Text (Wort, Zeile): hoechstens so viele Zeichen daneben.
+const DBL_ZEICHEN: i32 = 2;
 const DBL_DIST: i32 = 4;        // erlaubter Versatz zwischen beiden Klicks
 const HEAD_DRAG_MIN: i32 = 5;   // ab hier gilt eine Kopf-Geste als Zug
 
@@ -331,11 +353,12 @@ fn mischen(a: i64, b: i64, t: f64) -> i64 {
     // ruht, darf eine halbdurchsichtige Farbe nicht deckend machen.
     if t <= 0.0 { return a; }
     if t >= 1.0 { return b; }
-    let ch = |sh: u32| -> i64 {
-        let (ca, cb) = (((a >> sh) & 0xFF) as f64, ((b >> sh) & 0xFF) as f64);
-        ((ca + (cb - ca) * t).round() as i64).clamp(0, 255)
-    };
-    (ch(16) << 16) | (ch(8) << 8) | ch(0)
+    // Auch die Deckkraft wird gemischt (farbraum::rgba: 0 = deckend). Bis
+    // 2026.53 fiel sie zwischen den Enden weg -- ein Glasknopf (#20FF0000)
+    // war mitten im Uebergang zum Fokus deckend rot.
+    let (ca, cb) = (crate::farbraum::rgba(a), crate::farbraum::rgba(b));
+    let k = |i: usize| (ca[i] as f64 + (cb[i] as f64 - ca[i] as f64) * t).round().clamp(0.0, 255.0) as u8;
+    crate::farbraum::aus_rgba(k(0), k(1), k(2), k(3))
 }
 
 /// Welche Schrift gilt: die eigene des Widgets, sonst die global aktive.
@@ -448,6 +471,16 @@ impl Kind {
             Kind::Label | Kind::Panel | Kind::Separator | Kind::GroupBox
             | Kind::Toolbar | Kind::Progress | Kind::Image | Kind::Canvas | Kind::Layout
             | Kind::StatusBar | Kind::Breadcrumb)
+    }
+
+    /// Braucht das Widget einen Namen und eine greifbare Groesse
+    /// (GUI_A11Y_CHECK$)? Alles, was den Fokus nimmt -- ausser den Behaeltern
+    /// und Ansichten, deren Teile (Reiter, Abschnitte, Seiten, der Text
+    /// selbst) die Namen tragen. Bis 2026.53 eine zweite, eigene Liste in
+    /// gui_pruefen.rs.
+    fn braucht_namen(self) -> bool {
+        self.fokussierbar()
+            && !matches!(self, Kind::Splitter | Kind::TabControl | Kind::RichText | Kind::Accordion | Kind::Wizard)
     }
 
     /// Widgets, die Text entgegennehmen -- dort darf die Leertaste NICHT
@@ -718,6 +751,21 @@ mod verlauf_tests {
         verlauf_kuerzen(&mut v);
         assert_eq!(v.len(), 1);
         assert_eq!(v[0].1, 1);
+    }
+}
+
+#[cfg(test)]
+mod mischen_tests {
+    use super::mischen;
+    #[test]
+    fn die_deckkraft_wird_mitgemischt() {
+        // Ein Glasknopf (#20FF0000) halb zum deckenden Weiss: die Deckkraft
+        // liegt dazwischen -- bis 2026.53 war die Mitte deckend.
+        let m = mischen(0x20FF0000, 0xFFFFFF, 0.5);
+        let a = ((m as u32) >> 24) & 0xFF;
+        assert!(a > 0x20 && a < 0xFF, "{:X}", m);
+        assert_eq!(mischen(0x000000, 0xFFFFFF, 0.5), 0x808080);
+        assert_eq!(mischen(0x20FF0000, 0xFFFFFF, 0.0), 0x20FF0000);
     }
 }
 
@@ -1693,8 +1741,9 @@ pub struct TreeState {
 
 impl TreeState {
     /// Die Auswahl-Liste auf die Knotenzahl bringen. Knoten kommen nur ueber
-    /// GUI_TREE_ADD dazu, verschwinden nur mit GUI_TREE_CLEAR -- ein
-    /// Nachziehen an jedem Abruf kostet also nichts und kann nie zu kurz sein.
+    /// GUI_TREE_ADD dazu, verschwinden nur mit GUI_TREE_CLEAR und
+    /// GUI_TREE_REMOVE (das die Listen selbst mitnimmt) -- ein Nachziehen an
+    /// jedem Abruf kostet also nichts und kann nie zu kurz sein.
     /// Beim DATEIbaum wird die Liste dagegen neu gebaut, sobald sich ein Ordner
     /// oeffnet; dort haengen Auswahl und Haken am WEG, nicht an der Nummer.
     fn sync(&mut self) {
@@ -1936,6 +1985,7 @@ fn cent_text(c: i64) -> String {
 /// Null) -- "0,99" und "0" sind dagegen Zahlen. Bis 2026.30 galt die Regel
 /// fuer alles, was mit 0 anfing und laenger war: ein Preis "0,99" ging als
 /// Text in die Datenbank.
+#[cfg_attr(not(feature = "db"), allow(dead_code))]
 fn nummer_mit_null(text: &str) -> bool {
     let t = text.trim();
     let mut z = t.chars();
@@ -2087,7 +2137,8 @@ struct WzState {
 impl Default for WzState {
     fn default() -> Self {
         WzState { pruefen: false, weiter_aus: false, ereignis: 0,
-                  texte: ["Zurück".into(), "Weiter".into(), "Fertig".into(), "Abbrechen".into()] }
+                  texte: [crate::meldung::text("Zurück", "Back").into(), crate::meldung::text("Weiter", "Next").into(),
+                          crate::meldung::text("Fertig", "Finish").into(), crate::meldung::text("Abbrechen", "Cancel").into()] }
     }
 }
 
@@ -2200,8 +2251,39 @@ pub const SINNBILDER: &[&str] = &[
     "datei_daten", "datei_text", "datei_ton", "datei_form",
 ];
 
-fn sinnbild_pruefen(name: &str, fn_: &str) -> Result<String, String> {
+/// Englische Zweitnamen fuer Sinnbilder, Knopfarten und Formen: Eingang
+/// zweisprachig, englisch zuerst; gespeichert und geliefert wird der
+/// deutsche Name (Bericht A14; bis 2026.53 nur deutsch).
+const ZWEITNAMEN_EN: &[(&str, &str)] = &[
+    ("new", "neu"), ("file", "datei"), ("open", "oeffnen"), ("save", "sichern"), ("print", "drucken"),
+    ("undo", "rueckgaengig"), ("redo", "wiederholen"), ("cut", "ausschneiden"), ("copy", "kopieren"),
+    ("paste", "einfuegen"), ("search", "suchen"), ("stop", "stopp"), ("breakpoint", "haltepunkt"),
+    ("check", "pruefen"), ("profile", "profil"), ("help", "handbuch"), ("manual", "handbuch"),
+    ("settings", "einstellungen"), ("tool", "werkzeug"), ("wrap", "umbruch"), ("warning", "warnung"),
+    ("close", "schliessen"), ("left", "links"), ("right", "rechts"), ("up", "hoch"), ("down", "runter"),
+    ("menu", "menue"), ("refresh", "aktualisieren"), ("pen", "stift"), ("eraser", "radierer"),
+    ("fill", "fuellen"), ("line", "linie"), ("rectangle", "rechteck"), ("eyedropper", "pipette"),
+    ("select", "auswahl"), ("magic_wand", "zauberstab"), ("move", "verschieben"), ("spray", "spruehen"),
+    ("dice", "wuerfel"), ("grid", "raster"), ("eye", "auge"), ("eye_closed", "auge_zu"),
+    ("mirror", "spiegeln"), ("rotate", "drehen"), ("folder", "ordner"), ("folder_open", "ordner_offen"),
+    ("file_code", "datei_code"), ("file_test", "datei_test"), ("file_image", "datei_bild"),
+    ("file_data", "datei_daten"), ("file_text", "datei_text"), ("file_sound", "datei_ton"),
+    ("file_form", "datei_form"),
+    // Knopfarten
+    ("default", "standard"), ("primary", "primaer"), ("success", "erfolg"), ("danger", "gefahr"),
+    ("outline", "umriss"), ("flat", "flach"),
+    // Formen
+    ("pill", "pille"), ("circle", "kreis"), ("diamond", "raute"), ("image", "bild"),
+];
+
+/// Ein Wort der gui (Sinnbild, Knopfart, Form), klein und deutsch.
+pub(crate) fn gui_wort(name: &str) -> String {
     let n = name.trim().to_lowercase();
+    ZWEITNAMEN_EN.iter().find(|(en, _)| *en == n).map(|(_, de)| de.to_string()).unwrap_or(n)
+}
+
+fn sinnbild_pruefen(name: &str, fn_: &str) -> Result<String, String> {
+    let n = gui_wort(name);
     if SINNBILDER.contains(&n.as_str()) { return Ok(n); }
     Err(format!("{}: Sinnbild '{}' gibt es nicht -- bekannt sind: {}", fn_, name, SINNBILDER.join(", ")))
 }
@@ -2748,7 +2830,9 @@ fn rt_inline(z: &str, grund_rolle: u8, ziele: &mut Vec<String>) -> Vec<RtWort> {
                     | (if unter { crate::schnitt::UNTER } else { 0 })
                     | (if durch { crate::schnitt::DURCH } else { 0 });
                 let anhaengen = !$puffer.starts_with(' ') && !$raus.is_empty() && !letzte_luecke;
-                letzte_luecke = $puffer.ends_with(' ');
+                // Nach dem letzten Spuelen liest ihn keiner mehr.
+                #[allow(unused_assignments)]
+                { letzte_luecke = $puffer.ends_with(' '); }
                 let mut erstes = true;
                 for w in $puffer.split(' ') {
                     if w.is_empty() { continue; }
@@ -2824,7 +2908,6 @@ struct DragState {
 
 /// Die Ablage dieses Bildes -- ein Ereignis, kein Zustand.
 struct DropInfo {
-    ziel: (usize, usize),
     quelle: (usize, usize),
     index_quelle: i32,
     index_ziel: i32,
@@ -3885,7 +3968,7 @@ pub struct Gui {
     bewegung: u8,
     ruhig: bool,
     /// Inspektor (gui_inspektor.rs): an, gewaehltes Widget, Taste erlaubt
-    /// (DHRT_INSPEKTOR=1).
+    /// (DHRT_INSPECTOR=1).
     insp_an: bool,
     insp_wahl: i64,
     insp_taste: bool,
@@ -3981,9 +4064,12 @@ pub struct Gui {
     listbar_zug: Option<(usize, usize, i32)>,
     /// Dasselbe fuer den Rollbalken eines Textbereichs.
     tabar_zug: Option<(usize, usize, i32)>,
-    /// Enter oder ESC hat in DIESEM Bild ein Umbenennen beendet -- dann
-    /// gehoert die Taste nicht mehr dem Standard-/Abbrechen-Knopf, obwohl
-    /// die Liste danach nicht mehr bearbeitet wird.
+    /// Enter oder ESC hat in DIESEM Bild ein Umbenennen beendet oder eine
+    /// Klappliste geschlossen -- dann gehoert die Taste nicht mehr dem
+    /// Standard-/Abbrechen-Knopf. Das Feld selbst darf sie noch melden
+    /// (GUI_ENTERED einer bearbeitbaren Klappliste); anders als
+    /// `kuerzel_gefeuert`, nach dem niemand sonst die Taste bekommt. Wer
+    /// beides fragt, nimmt `taste_fuer_knoepfe_genommen`.
     liste_taste: bool,
     /// Ein Drehfeld, in das gerade getippt wird: (Fenster, Widget, Zeichen,
     /// Schreibmarke, Anker, der Wert, zu dem der Text zuletzt passte, der Wert
@@ -4002,8 +4088,9 @@ pub struct Gui {
     rs_menue: Option<rechtschreibung::RsMenue>,
     // Strg/Umschalt zum Zeitpunkt des Drucks -- handle_press hat kein `g`.
     tasten_mod: (bool, bool),
-    // Hat in diesem Bild ein Menue-Kuerzel gefeuert? Dann gehoert die Taste
-    // dem Menue -- und NICHT zusaetzlich der Navigation im Textfeld.
+    // Hat in diesem Bild ein Menue-Kuerzel gefeuert (oder die Palette ist
+    // offen)? Dann gehoert die Taste dem Menue -- und NICHT zusaetzlich der
+    // Navigation im Textfeld.
     kuerzel_gefeuert: bool,
     // Offene Untermenues unter dem offenen Wurzelmenue: (Menue-Index, x, y)
     // je Ebene. Leer, wenn keine Kette offen ist.
@@ -4040,11 +4127,16 @@ pub struct Gui {
     /// zur Maus -- gefunden beim Dogfooding 2026-10-09: die ganze Notiz war
     /// markiert, und das erste Tippen haette sie ersetzt.
     zug_feld: Option<(usize, usize)>,
-    frame_count: i64,
     /// Sekunden seit dem Start (`Graphics::uhr_jetzt`, je GUI_UPDATE) --
     /// fuer Schreibmarke und Hilfetext (bis 2026.49 zaehlten beide Bilder;
     /// schlaeft das Programm im Leerlauf, gibt es keine Bilder zu zaehlen).
     takt: f64,
+    /// Wie viel Zeit seit dem vorigen GUI_UPDATE vergangen ist, nach `takt`
+    /// -- also MIT der Wartezeit von WINDOW_WAIT_EVENTS. Bis 2026.53 zogen
+    /// die Countdowns (Toast, Suche, Rechtschreibung) `g.delta()` ab, die
+    /// Dauer des vorigen Bildes ohne den Schlaf: ein Toast von 1000 ms stand
+    /// im Leerlauf nach 12 s noch da.
+    takt_dt: f64,
     /// GUI_SET_CONTRAST: 0 = wie das System, 1 = hoch, 2 = normal; und was
     /// gerade gilt (fuer `@hochkontrast` in der Stildatei).
     kontrast_modus: u8,
@@ -4157,7 +4249,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             schrift: None,
-            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(), canvas_offen: None, uhr: 0.0, haeute: std::collections::HashMap::new(), bewegung: 0, ruhig: false, insp_an: false, insp_wahl: -1, insp_taste: std::env::var("DHRT_INSPEKTOR").map(|v| v.trim() == "1").unwrap_or(false), stil_quelle: String::new(), stil_beob: None, stil_fehler: String::new(), stil_uhr_fest: None, klang_an: true, klang_warte: Vec::new(), klang_log: Vec::new(), funken: Vec::new(), funken_saat: 0x9E37_79B9_7F4A_7C15, vorher_ueber: Vec::new(), vorher_druck: None, vorher_fokus: None, palette: None, pal_taste: true,
+            windows: Vec::new(), z_order: Vec::new(), flaeche: 0, fokus_flaeche: 0, nativ_fokus_wunsch: None, leihe: None, teil_druck: None, teil_ids: Vec::new(), popup_fenster: Vec::new(), grenzen: Vec::new(), canvas_offen: None, uhr: 0.0, haeute: std::collections::HashMap::new(), bewegung: 0, ruhig: false, insp_an: false, insp_wahl: -1, insp_taste: crate::umgebung::var("DHRT_INSPECTOR").map(|v| v.trim() == "1").unwrap_or(false), stil_quelle: String::new(), stil_beob: None, stil_fehler: String::new(), stil_uhr_fest: None, klang_an: true, klang_warte: Vec::new(), klang_log: Vec::new(), funken: Vec::new(), funken_saat: 0x9E37_79B9_7F4A_7C15, vorher_ueber: Vec::new(), vorher_druck: None, vorher_fokus: None, palette: None, pal_taste: true,
             ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, modal_vorher: Vec::new(), modal_fokus: Vec::new(), cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
@@ -4171,7 +4263,7 @@ impl Gui {
             open_menu: None, context_open: None, kontext_neu: None, rs_menue: None, sub_chain: Vec::new(), tasten_mod: (false, false),
             kuerzel_gefeuert: false, was_right_down: false, was_mitte_down: false,
             scroll_drag: None,
-            was_mouse_down: false, zug_feld: None, frame_count: 0, takt: 0.0, kontrast_modus: 0, hoch_kontrast: false, bedarf: std::cell::Cell::new(f64::INFINITY),
+            was_mouse_down: false, zug_feld: None, takt: 0.0, takt_dt: 0.0, kontrast_modus: 0, hoch_kontrast: false, bedarf: std::cell::Cell::new(f64::INFINITY),
             theme: default_theme(), metrics: default_metrics(),
             stil: None, stil_stand: 0, rad_jetzt: std::cell::Cell::new(None), bahn_jetzt: std::cell::RefCell::new(None), nebel_jetzt: std::cell::Cell::new(None), nebel_uhr: 0.0, form_jetzt: std::cell::Cell::new(stil::FormStil::default()),
             mnemonics: false, label_zug: None, label_wahl: None, gruppen: HashMap::new(), schriftwahl: Vec::new(),
@@ -4210,7 +4302,7 @@ impl Gui {
     /// Metriken, die PIXEL sind und darum mitskalieren. Der Rest der
     /// Metrik-Tabelle sind Staerken und Zaehler (`gradient` = Helligkeits-
     /// Abstand, `gloss` = 0..100, `bevel` = Schalter, `caret_period` =
-    /// Bilder) -- die zu skalieren waere schlicht falsch.
+    /// Sechzigstelsekunden) -- die zu skalieren waere schlicht falsch.
     const M_PIXEL: [&'static str; 7] = [
         "title_h", "slider_h", "check_size", "slider_handle_w",
         "pad", "corner_radius", "shadow",
@@ -4259,23 +4351,42 @@ impl Gui {
         if self.scale == 1.0 { return n; }
         (n as f64 / self.scale).round() as i32
     }
+    /// Ein Rechteck in Bildschirmpunkten logisch machen -- fuer die Abfragen,
+    /// die es in beiden Formen gibt (`GUI_LISTBOX_ITEM_RECT` logisch,
+    /// `GUI_LISTBOX_ITEM_SCREEN_RECT` in Pixeln wie GUI_HIT_TEST).
+    pub fn rect_logisch(&self, r: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
+        (self.unsk(r.0), self.unsk(r.1), self.unsk(r.2), self.unsk(r.3))
+    }
+    pub fn logisch(&self, n: i64) -> i64 { if n < 0 { n } else { self.unsk(n as i32) as i64 } }
+    pub fn pixel(&self, n: i64) -> i64 { if n < 0 { n } else { self.sk(n as i32) as i64 } }
 
     // --- Handles ---
     fn enc_widget(win: usize, idx: usize) -> i64 { ((win as i64) << WIDGET_SHIFT) | idx as i64 }
     fn dec_widget(h: i64) -> (usize, usize) { ((h >> WIDGET_SHIFT) as usize, (h & WIDGET_MASK) as usize) }
 
+    // Die Handle-Regel fuer die gui (CLAUDE.md): ein freigegebenes Widget
+    // oder Fenster bleibt ein Grabstein, den man FRAGEN darf (Ereignisse sind
+    // FALSE -- eine Schleife fragt oft noch Knoepfe eines geschlossenen
+    // Dialogs ab), aber SETZEN ist ein Fehler, der den Befehl nennt. Bis
+    // 2026.53 ging auch GUI_SET_TEXT auf ein zerstoertes Widget still durch.
     fn win_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Window, String> {
-        self.windows.get_mut(h as usize).ok_or_else(|| format!("{}: ungueltiges GUI_WINDOW-Handle", fn_))
+        let w = self.windows.get_mut(h as usize).ok_or_else(|| format!("{}: ungueltiges GUI_WINDOW-Handle {}", fn_, h))?;
+        if !w.alive { return Err(format!("{}: das Fenster {} wurde mit GUI_WINDOW_FREE freigegeben", fn_, h)); }
+        Ok(w)
     }
     fn wdg(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
         let (w, i) = Self::dec_widget(h);
-        self.windows.get(w).and_then(|win| win.widgets.get(i))
-            .ok_or_else(|| format!("{}: ungueltiges GUI_WIDGET-Handle", fn_))
+        let win = self.windows.get(w).ok_or_else(|| format!("{}: ungueltiges GUI_WIDGET-Handle {}", fn_, h))?;
+        win.widgets.get(i).ok_or_else(|| format!("{}: ungueltiges GUI_WIDGET-Handle {}", fn_, h))
     }
     fn wdg_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
         let (w, i) = Self::dec_widget(h);
-        self.windows.get_mut(w).and_then(|win| win.widgets.get_mut(i))
-            .ok_or_else(|| format!("{}: ungueltiges GUI_WIDGET-Handle", fn_))
+        let win = self.windows.get_mut(w).ok_or_else(|| format!("{}: ungueltiges GUI_WIDGET-Handle {}", fn_, h))?;
+        let lebt = win.alive;
+        let wd = win.widgets.get_mut(i).ok_or_else(|| format!("{}: ungueltiges GUI_WIDGET-Handle {}", fn_, h))?;
+        if !wd.alive { return Err(format!("{}: das Widget wurde mit GUI_WIDGET_FREE freigegeben", fn_)); }
+        if !lebt { return Err(format!("{}: sein Fenster wurde mit GUI_WINDOW_FREE freigegeben", fn_)); }
+        Ok(wd)
     }
 
     // --- Konstruktion ---
@@ -4302,28 +4413,17 @@ impl Gui {
         idx as i64
     }
 
-    /// Modales Meldungs-/Rueckfragefenster.
-    ///
-    /// `frage = false` gibt einen "OK"-Knopf (Meldung), `true` gibt "Ja"/"Nein"
-    /// (Rueckfrage). Das Fenster wird auf dem Bildschirm zentriert und passt
-    /// sich dem Text an; `\n` im Text trennt Zeilen.
+    /// Der Dialog mit BELIEBIGEN Knoepfen (`GUI_DIALOG(t, x, "Speichern|Verwerfen|Abbrechen")`)
+    /// und wahlweise einem Eingabefeld (`GUI_PROMPT`). Antwort = Nummer des
+    /// Knopfs, 1-basiert. Enter drueckt den ERSTEN, ESC und das Schliessen-
+    /// Kreuz den LETZTEN -- die Konvention jedes Systemdialogs: Abbrechen
+    /// steht rechts. Bei nur einem Knopf ist der beides.
     ///
     /// Es ist BEWUSST nicht blockierend. `gui` ist ein Polling-Toolkit -- ein
     /// blockierender Dialog muesste mitten im Bild des Aufrufers eine eigene
     /// Zeichenschleife drehen und wuerde dessen Layer-/Render-Ziel-Zustand
     /// mitten im Frame uebernehmen. Stattdessen liegt die Antwort ein Bild
     /// lang in `GUI_ANSWER` an, genau wie ein Klick in `GUI_CLICKED`.
-    pub fn dialog(&mut self, g: &Graphics, titel: String, text: String, frage: bool)
-                  -> Result<i64, String> {
-        let knoepfe: Vec<String> = if frage { vec!["Ja".into(), "Nein".into()] } else { vec!["OK".into()] };
-        self.dialog_frei(g, titel, text, knoepfe, None)
-    }
-
-    /// Der Dialog mit BELIEBIGEN Knoepfen (`GUI_DIALOG(t, x, "Speichern|Verwerfen|Abbrechen")`)
-    /// und wahlweise einem Eingabefeld (`GUI_PROMPT`). Antwort = Nummer des
-    /// Knopfs, 1-basiert. Enter drueckt den ERSTEN, ESC und das Schliessen-
-    /// Kreuz den LETZTEN -- die Konvention jedes Systemdialogs: Abbrechen
-    /// steht rechts. Bei nur einem Knopf ist der beides.
     pub fn dialog_frei(&mut self, g: &Graphics, titel: String, text: String,
                        knoepfe: Vec<String>, eingabe: Option<String>) -> Result<i64, String> {
         if knoepfe.is_empty() || knoepfe.len() > 5 {
@@ -4586,10 +4686,9 @@ impl Gui {
         if w.kind != Kind::ColorPicker {
             return Err("GUI_COLORPICKER_SET: das Widget ist kein GUI_COLORPICKER".into());
         }
-        match key.to_lowercase().as_str() {
-            "alpha" | "deckkraft" => w.alpha_an = wert as i32 != 0,
-            other => return Err(std::format!(
-                "GUI_COLORPICKER_SET: '{}' unbekannt -- moeglich ist alpha", other)),
+        match einstellungen::schluessel("GUI_COLORPICKER_SET", key, einstellungen::COLORPICKER)? {
+            "deckkraft" => w.alpha_an = wert as i32 != 0,
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -4600,13 +4699,12 @@ impl Gui {
         if w.kind != Kind::DatePicker {
             return Err("GUI_DATEPICKER_SET: das Widget ist kein GUI_DATEPICKER".into());
         }
-        match key.to_lowercase().as_str() {
+        match einstellungen::schluessel("GUI_DATEPICKER_SET", key, einstellungen::DATEPICKER)? {
             // 0 = Montag ... 6 = Sonntag. In Deutschland beginnt die Woche am
             // Montag, in den USA am Sonntag -- eine feste Wahl waere fuer die
             // eine Haelfte der Welt falsch.
-            "wochenbeginn" | "week_start" => w.wochenbeginn = (wert as i32).clamp(0, 6),
-            other => return Err(std::format!(
-                "GUI_DATEPICKER_SET: '{}' unbekannt -- moeglich ist wochenbeginn", other)),
+            "wochenbeginn" => w.wochenbeginn = (wert as i32).clamp(0, 6),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -4994,7 +5092,7 @@ impl Gui {
         let gut = self.ta_gutter(g, wd, starts.len());
         if gut == 0 { return None; }
         let (ax, ay, _, fh) = self.abs_rect(wi, wd);
-        let pad = 5;
+        let pad = self.ta_pad();
         if mx < ax || mx >= ax + pad + gut - self.sk(4) { return None; }
         if my < ay + pad || my >= ay + fh - pad { return None; }
         if let Some((fx, fbw)) = self.ta_falt_spalte(g, wd, ax, starts.len()) {
@@ -5149,7 +5247,9 @@ impl Gui {
             return Err("GUI_TEXTAREA_SET: das Widget ist kein GUI_TEXTAREA".into());
         }
         let n = wert as i32;
-        match key.to_lowercase().as_str() {
+        match einstellungen::schluessel("GUI_TEXTAREA_SET", key, einstellungen::TEXTAREA)? {
+            // Englische Zweitnamen fuer alle (Bericht A14; bis 2026.53 fehlten
+            // sie bei den ersten vier).
             "zeilennummern" => wd.zeilennummern = n != 0,
             "aktive_zeile" => wd.aktive_zeile = n != 0,
             // Ohne diesen Schalter waere ein Code-Feld nicht benutzbar: TAB
@@ -5160,9 +5260,9 @@ impl Gui {
             "tabbreite" => wd.tabbreite = n.clamp(1, 16),
             // Umbruch an Wortgrenzen -- fuer Notizen und Briefe, nicht fuer
             // Code. Mit Umbruch gibt es keinen waagerechten Versatz mehr.
-            "umbruch" | "wrap" => { wd.umbruch = n != 0; if wd.umbruch { wd.scroll_x = 0; } }
+            "umbruch" => { wd.umbruch = n != 0; if wd.umbruch { wd.scroll_x = 0; } }
             // Inline-Formate: an = alles ungeformt, aus = die Formate fallen weg.
-            "formatiert" | "formatted" => {
+            "formatiert" => {
                 wd.formatiert = n != 0;
                 wd.stile = if wd.formatiert { vec![0; wd.text.chars().count()] } else { Vec::new() };
                 wd.stile_text = if wd.formatiert { wd.text.clone() } else { String::new() };
@@ -5171,27 +5271,24 @@ impl Gui {
             // Eine neue Zeile faengt mit der Einrueckung der alten an. Das
             // allein ist sprachfrei; die Woerter, die eine Stufe mehr oder
             // weniger bedeuten, kommen ueber GUI_TEXTAREA_INDENT_WORDS.
-            "auto_einzug" | "auto_indent" => wd.auto_einzug = n != 0,
+            "auto_einzug" => wd.auto_einzug = n != 0,
             // Ein Strich je Einrueckungsstufe. Die Breite einer Stufe haengt
             // an `tabbreite` -- die Laufzeit misst sie an Leerzeichen, statt
             // sie zu raten.
-            "einzugslinien" | "indent_guides" => wd.einzugslinien = n != 0,
+            "einzugslinien" => wd.einzugslinien = n != 0,
             // Der Tabulator gehoert ganz dem Aufrufer: das Feld rueckt nicht
             // ein, sieht nicht nach Abkuerzungen, sondern MELDET ihn nur
             // (GUI_TEXTAREA_TAB_HIT). Fuer Felder, in denen der Tabulator
             // mehrere Bedeutungen hat und der Aufrufer die Reihenfolge kennt.
-            "tab_meldet" | "tab_reports" => wd.tab_meldet = n != 0,
+            "tab_meldet" => wd.tab_meldet = n != 0,
             // Mitlaufende Blockkoepfe, hoechstens n Zeilen. Welche Zeilen
             // einen Block bilden, sagt GUI_TEXTAREA_FOLDABLE -- dieselben
             // Bloecke, die sich falten lassen.
-            "kopfzeilen" | "sticky_headers" => wd.kopfzeilen = n.clamp(0, 10) as i32,
+            "kopfzeilen" => wd.kopfzeilen = n.clamp(0, 10) as i32,
             // Hinweise hinter dem Zeilenende nehmen Klicks an
             // (GUI_TEXTAREA_HINT_CLICKED) -- etwa "3 Aufrufe" hinter einer SUB.
-            "hinweise_klickbar" | "hints_clickable" => wd.hinweise_klickbar = n != 0,
-            other => return Err(format!(
-                "GUI_TEXTAREA_SET: '{}' unbekannt -- moeglich sind zeilennummern, \
-                 aktive_zeile, tab_fuegt_ein, tabbreite, umbruch, auto_einzug, \
-                 einzugslinien, tab_meldet, kopfzeilen, hinweise_klickbar", other)),
+            "hinweise_klickbar" => wd.hinweise_klickbar = n != 0,
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -5242,7 +5339,7 @@ impl Gui {
         if fw == 0 { return None; }
         let gutter = self.ta_gutter(g, wdg, zeilen);
         if gutter == 0 { return None; }
-        Some((ax + 5 + gutter - self.sk(4) - fw, fw))
+        Some((ax + self.ta_pad() + gutter - self.sk(4) - fw, fw))
     }
 
     /// Breite der Nummernspalte (0 = aus).
@@ -5263,7 +5360,8 @@ impl Gui {
         // Massstab VOR dem veraenderlichen Zugriff auf `windows` -- `sk` liest
         // `self`, und beides gleichzeitig laesst der Compiler nicht zu.
         let (sx, sy, sw, sh) = (self.sk(wdg.x), self.sk(wdg.y), self.sk(wdg.w), self.sk(wdg.h));
-        let w = self.windows.get_mut(wi).ok_or_else(|| format!("{}: erwartet GUI_WINDOW", fn_))?;
+        let w = self.windows.get_mut(wi).ok_or_else(|| format!("{}: ungueltiges GUI_WINDOW-Handle {}", fn_, win))?;
+        if !w.alive { return Err(format!("{}: das Fenster {} wurde mit GUI_WINDOW_FREE freigegeben", fn_, win)); }
         // `color` wird hier BEWUSST nicht aus dem Thema gefuellt. Frueher wurde
         // die Textfarbe beim Anlegen kopiert und damit eingefroren: wer danach
         // das Thema wechselte, hatte Beschriftungen in der Farbe des alten --
@@ -5536,8 +5634,24 @@ impl Gui {
         if let Some((pw, f)) = self.teil_druck { if pw == wi { return f; } }
         match self.leihe.as_ref().filter(|l| l.wi == wi) {
             Some(l) => l.nativ,
-            None => self.windows.get(wi).map(|w| w.nativ).unwrap_or(0),
+            None => self.flaeche_von(wi),
         }
+    }
+    /// Die Flaeche, auf der ein Fenster liegt: sein natives Fenster (0 =
+    /// Hauptfenster) -- beim Popover die Flaeche des Widgets, an dem er
+    /// haengt; ein Popover ist nie selbst nativ. Bis 2026.53 lag er immer auf
+    /// dem Hauptfenster, auch wenn sein Widget in einem nativen Fenster stand:
+    /// gezeichnet an der falschen Stelle, nicht anzuklicken (Bericht EF.1).
+    pub(super) fn flaeche_von(&self, wi: usize) -> u32 {
+        let mut wi = wi;
+        for _ in 0..8 {
+            let Some(w) = self.windows.get(wi) else { return 0 };
+            match w.pop.as_ref() {
+                Some(p) => wi = Self::dec_widget(p.anker).0,
+                None => return w.nativ,
+            }
+        }
+        0
     }
     /// Ein natives Fenster (Weg E) in sein Render-Ziel zeichnen, mit dem
     /// Zeiger in seiner Sicht; der Hilfetext gehoert hinein, wenn er zu

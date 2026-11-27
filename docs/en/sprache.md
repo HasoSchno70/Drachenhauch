@@ -245,6 +245,33 @@ nobody.
 `SELECT CASE` comparisons (`CASE IS > 5`) are not affected — there the
 `IS` belongs to the `CASE`.
 
+### Handles
+
+What a module manages — a PDF, a database connection, an image, a widget —
+it hands out as a **handle**: a number that knows its kind.
+
+```basic
+IMPORT "pdf"
+IMPORT "xlsx"
+DIM p AS PDF = PDF_NEW()
+PRINT TYPEOF(p)          ' "PDF"
+PRINT p IS PDF           ' TRUE
+PRINT p = 0              ' TRUE -- calculates and compares like its number
+DIM x AS XLSX = XLSX_NEW("Blatt")
+' XLSX_SHEET_COUNT(p)    ' error: expects an XLSX handle, got a PDF handle
+```
+
+- A handle **of another kind** at a command is an error naming both;
+  `dhrt --check` reports it beforehand when the kind of the variable is
+  known. Which parameter takes which kind is in the signature
+  (`PDF_TEXT(p: PDF, …)`).
+- An **INTEGER** variable (or an `ARRAY OF INTEGER`) holds just the number —
+  that is how older programs keep their handles, and it keeps working.
+  Conversely, a number assigned to a variable of the handle type becomes a
+  handle.
+- A handle type accepts only its own kind, a number or `NIL`:
+  `DIM d AS DB_CONN = TRUE` is an error.
+
 ## What the compiler checks
 
 Types do not only apply at run time. `dhrt --check` (in the editor the yellow
@@ -1647,15 +1674,15 @@ PRINT Distance(0.0, 0.0, 3.0, 4.0)    ' 5.0 - from mathlib.dh
    `dhrt paket hole` puts there (see [Packages](pakete.md)). If a package
    itself needs a package, that one lies in its own `pakete/` and is found
    first.
-3. **Every folder from `DH_PATH`**, in the order given (like
+3. **Every folder from `DHRT_PATH`**, in the order given (like
    `PATH` and `PYTHONPATH`; the separator is `;` on Windows, `:` elsewhere).
 4. **`<user folder>/.drachenhauch/bibliothek`** — the place for things that
    should be available to all projects on this machine. It is not
    created automatically; whoever creates it meant it.
 
 ```bash
-set DH_PATH=D:\dh-bibliothek          &:: Windows
-export DH_PATH=~/dh-bibliothek         # macOS/Linux
+set DHRT_PATH=D:\dh-bibliothek          &:: Windows
+export DHRT_PATH=~/dh-bibliothek         # macOS/Linux
 ```
 
 If the file is not found anywhere, the message names **all** the places

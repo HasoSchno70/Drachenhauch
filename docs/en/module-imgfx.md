@@ -299,7 +299,7 @@ gedreht = IMAGE_ROTATE(hero, 45.0)           ' 45 degrees
 
 ## Important properties
 
-**Immutable:** The original is never changed. `IMAGE_TINT(hero, ...)` returns a new image, `hero` stays unchanged.
+**Filters leave the original alone:** `IMAGE_TINT(hero, ...)` and the other effects return a new image, `hero` stays unchanged. The drawing commands `IMAGE_DRAW_*` and `IMAGE_FILL_*` are different: they paint into the image itself and return nothing.
 
 **Chainable:** Effects can be combined:
 

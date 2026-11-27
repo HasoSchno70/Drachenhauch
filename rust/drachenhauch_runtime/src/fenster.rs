@@ -157,9 +157,7 @@ impl Fenster {
         cmd.env(ENV_PORT, port.to_string());
         // Die Kopfzeilen-Steuerung der Tests gilt fuer die Eltern, nicht fuer
         // das Kind -- ein Kind mit geerbtem DHRT_FRAMES stuerbe nach N Bildern.
-        for v in ["DHRT_FRAMES", "DHRT_SCREENSHOT", "DHRT_CONTACT", "DHRT_CONTACT_MAX", "DHRT_CONTACT_COLS", "DHRT_CONTACT_EVERY"] {
-            cmd.env_remove(v);
-        }
+        crate::prozess::test_variablen_entfernen(&mut cmd);
         let prozess = cmd.spawn().map_err(|e| format!("WINDOW_OPEN: '{}' laesst sich nicht starten: {}", exe.display(), e))?;
         let leitung = Leitung::neu(false);
         // Auf die Verbindung warten -- in einem Thread, mit Frist, ohne den

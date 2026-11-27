@@ -101,7 +101,7 @@ pub mod op {
     pub const ADD_STORE_GLOBAL_SLOT: u16 = 121; // dasselbe fuer einen globalen Platz
     pub const BIND_GLOBAL_SLOT: u16 = 122;      // globalen Eintrag (Feld/Map/Struktur) in seinen Platz haengen
     pub const TYP_PRUEFEN: u16 = 123;
-    pub const CALL_METHOD_BYREF: u16 = 124;     // Methode mit BYREF-Parametern: [name, argc, [byref-Stellen]]           // nur DHRT_TYPEN_PRUEFEN: Typ des Stapelwerts gegen den Compiler pruefen
+    pub const CALL_METHOD_BYREF: u16 = 124;     // Methode mit BYREF-Parametern: [name, argc, [byref-Stellen]]           // nur DHRT_CHECK_TYPES: Typ des Stapelwerts gegen den Compiler pruefen
     pub const ADD_STORE_FIELD: u16 = 125;       // text = text + e in einer Methode (Feld von Self)
     pub const ADD_STORE_MEMBER: u16 = 126;      // obj.x = obj.x + e: [obj, a, b]
     pub const ADD_STORE_INDEX: u16 = 127;       // c[i] = c[i] + e: [c, i.., a, b] (Feld oder MAP)
@@ -210,6 +210,7 @@ pub struct Instr {
     /// Nur Ruecksprung (FOR_NEXT, JUMP nach hinten), nur mit Maschinencode:
     /// 0 = noch nicht versucht, 1 = die Schleife bleibt in der VM, n >= 2 =
     /// uebersetzt als Schleife n - 2 (`jit::Jit::schleife`).
+    #[cfg_attr(not(feature = "jit"), allow(dead_code))]
     pub schleife: std::cell::Cell<u32>,
 }
 
@@ -617,6 +618,17 @@ pub(crate) struct FuncRoh {
     pub local_names: Vec<String>,
 }
 
+/// Die Art des Handles, das ein CALL_BUILTIN liefert, + 1 (0 = keines).
+fn handle_merk(op: u16, arg: &Arg) -> usize {
+    if op != op::CALL_BUILTIN { return 0; }
+    let name = match arg {
+        Arg::Call(n, _, _) => &n[..],
+        Arg::List(l) => match l.first() { Some(Arg::Str(s)) => &s[..], _ => return 0 },
+        _ => return 0,
+    };
+    crate::handle::liefert(name).map(|a| a as usize + 1).unwrap_or(0)
+}
+
 pub(crate) fn func_bauen(r: FuncRoh) -> Func {
     let mut local_defaults = r.local_defaults;
     // Mathe-Typen starten mit ihrem neutralen Element statt mit NIL. Der
@@ -631,14 +643,16 @@ pub(crate) fn func_bauen(r: FuncRoh) -> Func {
         }
     }
     let mut code: Vec<Instr> = r.code.into_iter().map(|(op, arg)| Instr {
+        // CALL_BUILTIN merkt sich in `merk`, ob der Befehl ein Handle liefert
+        // (Art + 1, `handle.rs`) -- einmal beim Laden statt je Aufruf.
+        merk: std::cell::Cell::new((std::ptr::null(), handle_merk(op, &arg))),
         op,
         arg,
         familie: std::cell::Cell::new(0),
-        merk: std::cell::Cell::new((std::ptr::null(), 0)),
         schnell: 0,
         schleife: std::cell::Cell::new(0),
     }).collect();
-    if std::env::var_os("DHRT_OHNE_VERSCHMELZEN").is_none() {
+    if crate::umgebung::var_os("DHRT_NO_FUSION").is_none() {
         verschmelzen(&mut code);
     }
     Func {
@@ -920,7 +934,7 @@ DATA 1, "x", 2.5
         let toks = crate::lexer::Lexer::new(quelle).tokenize().unwrap_or_else(|e| panic!("lexen: {}", e.msg));
         let ast = crate::parser::Parser::new(toks).parse().unwrap_or_else(|e| panic!("parsen {}: {}", e.line, e.msg));
         let leer = std::collections::HashSet::new();
-        crate::compiler::compile_to_gbc(&ast, &leer, &[], &leer, &[], "probe.dh").expect("uebersetzen").0
+        crate::compiler::compile_to_dhc(&ast, &leer, &[], &leer, &[], "probe.dh").expect("uebersetzen").0
     }
 
     /// Alle Stellen eines JSON-Baums als Zeiger (`/main/code/3/1`).

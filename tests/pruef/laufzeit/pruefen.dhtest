@@ -330,7 +330,7 @@ FUNCTION lauf(datei AS STRING) AS INTEGER
     WEND
     RETURN PROCESS_CODE(pc)
 END FUNCTION
-SETENV("DH_LOG", "debug")
+SETENV("DHRT_LOG", "debug")
 lauf("k.dh")
 PRINT "sichtbar " ; INSTR(prErr, "jetzt sichtbar") >= 0
 --- datei k.dh
@@ -370,7 +370,7 @@ FUNCTION lauf(datei AS STRING) AS INTEGER
     WEND
     RETURN PROCESS_CODE(pc)
 END FUNCTION
-SETENV("DH_LOG", "warn")
+SETENV("DHRT_LOG", "warn")
 lauf("k.dh")
 PRINT "weg fehlt " ; INSTR(prErr, "weg") < 0 ; " beide da " ; INSTR(prErr, "da") >= 0 AND INSTR(prErr, "auch da") >= 0
 --- datei k.dh
@@ -412,7 +412,7 @@ FUNCTION lauf(datei AS STRING) AS INTEGER
     WEND
     RETURN PROCESS_CODE(pc)
 END FUNCTION
-SETENV("DH_LOG", "quatsch")
+SETENV("DHRT_LOG", "quatsch")
 lauf("k.dh")
 PRINT "leise fehlt " ; INSTR(prErr, "leise") < 0 ; " laut da " ; INSTR(prErr, "laut") >= 0
 --- datei k.dh

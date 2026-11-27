@@ -92,8 +92,8 @@ PRINT HEX$(RGB(255, 0, 0))  ' "FF0000"
 | `POW(base, exponent)` | b to the power of e |
 | `EXP(x)` | e^x |
 | `LOG(x[, base])` | Logarithm, natural by default |
-| `DEG(rad)`, `RAD(grad)` | Radians ↔ degrees |
-| `FLOOR(x)`, `CEIL(x)`, `ROUND(x)` | INT conversion |
+| `DEG(rad)`, `RAD(deg)` | Radians ↔ degrees |
+| `FLOOR(x)`, `CEIL(x)`, `ROUND(x[, digits])` | INT conversion |
 | `ROUND(x, digits)` → FLOAT | round to N decimal places, **to the even number** (see below) |
 | `ROUND_HALF_UP(x[, decimals])` | commercial rounding: away from zero |
 | `MIN(a, ...)`, `MAX(a, b, ...)` | variadic |
@@ -462,8 +462,8 @@ PRINT LEN(stack)                 ' 1
 
 > The `ARRAY_*` aggregates and the dynamic array ops
 > (`ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`) are implemented in `dhrt`
-> (`builtins.rs`/`vm.rs`) and work along every path — `dhrt run` (also from the IDE),
-> `--runsrc` and the `dhrt --export` standalone build.
+> (`builtins.rs`/`vm.rs`) and work along every path — `dhrt run` (also from the IDE)
+> and the `dhrt --export` standalone build.
 
 ## Maps
 
@@ -523,7 +523,7 @@ as one.
 | Function | Purpose |
 |---|---|
 | `ZIP_LIST(archive$)` → ARRAY OF STRING | names of all entries |
-| `ZIP_READ$(archive$, name$)` → STRING | one entry as text |
+| `ZIP_READ$(archive$, name$ [, encoding$])` → STRING | one entry as text -- reads like `READALL$`: a BOM is dropped, an encoding other than UTF-8 goes last (`"cp1252"`, `"latin1"`, `"auto"`); invalid UTF-8 is an error |
 | `ZIP_READ(archive$, name$)` → BUFFER | one entry as bytes |
 | `ZIP_EXTRACT(archive$, folder$)` → INTEGER | extract everything, returns the number of files |
 | `ZIP_CREATE(archive$, files)` → INTEGER | archive from a list of file paths |
@@ -980,7 +980,7 @@ Path-based, without a FILE handle *(native runtime only)*:
 | `READALL$(f$[, encoding$])` → STRING | read a whole file as text |
 | `FILESIZE(path$)` → INTEGER | size in bytes |
 | `FILE_ENCODING$(path$)` → STRING | what `"auto"` would choose: `utf8`, `utf8bom`, `cp1252` or `binaer` (see encodings) |
-| `DELETEFILE(path$)`, `RENAME(alt$, neu$)` | delete / rename·move |
+| `DELETEFILE(path$)`, `RENAME(old$, new$)` | delete / rename·move |
 | `DIREXISTS(path$)` → BOOLEAN | directory present? |
 | `DIRLIST(path$, pattern$ = "", recursive = FALSE)` → ARRAY OF STRING | entry names (sorted), optionally filtered; with `recursive: TRUE` like `DIRLIST_REC` |
 | `DIRLIST_REC(path$[, pattern$])` → ARRAY OF STRING | as above, but recursive — files only, relative paths with `/` |
@@ -1068,8 +1068,8 @@ trimmed — otherwise it would only show up in the finished output file.
 |---|---|
 | `BUFFER_FROM_STRING(text$)` → BUFFER | text as UTF-8 bytes |
 | `BUFFER_TO_STRING$(buffer)` → STRING | bytes as UTF-8 text |
-| `BUFFER_TO_HEX$(buffer)` / `BUFFER_FROM_HEX(s$)` | hex text (`"deadbeef"`) |
-| `BUFFER_TO_BASE64$(buffer)` / `BUFFER_FROM_BASE64(s$)` | Base64 |
+| `BUFFER_TO_HEX$(buffer)` / `BUFFER_FROM_HEX(hex$)` | hex text (`"deadbeef"`) |
+| `BUFFER_TO_BASE64$(buffer)` / `BUFFER_FROM_BASE64(text$)` | Base64 |
 
 `BUFFER_TO_STRING$` is **strict**: if the bytes are not valid UTF-8, there is
 an error instead of silently replaced characters — a `?` in the wrong
@@ -1503,9 +1503,9 @@ LOG_ERROR("Datenbank nicht lesbar")
 Output: `20:45:43 INFO  Saison 2026 geladen` — to **stderr**, so that `PRINT`
 can be passed through as payload.
 
-How much of it appears is controlled by the environment variable **`DH_LOG`**:
+How much of it appears is controlled by the environment variable **`DHRT_LOG`** (formerly `DHRT_LOG`, still works):
 
-| `DH_LOG` | what appears |
+| `DHRT_LOG` | what appears |
 |---|---|
 | `debug` | everything |
 | *(not set)* / `info` | INFO, WARN, ERROR — **default** |
@@ -1517,7 +1517,7 @@ So `LOG_DEBUG` stays silent until someone switches it on — debug messages can
 stay in the code without cluttering normal operation:
 
 ```bash
-DH_LOG=debug dhrt run werkzeug.dh
+DHRT_LOG=debug dhrt run werkzeug.dh
 ```
 
 ## Time & random
@@ -1691,8 +1691,9 @@ Container method `arr.join(trenner)` ≡ `JOIN$(arr, trenner)`.
 - **The suffix `2` is ambiguous** and context-dependent: `PHYSICS_DISTANCE2` =
   *squared* distance (faster), `LINE3D`/Vec2 functions mean *2D*, and
   `VEC2_*` is the type name. No uniform scheme — read it from the function name.
-- **`SPRITE_COLLIDE` vs `SPRITE_COLLIDES`.** The `sprite` module uses
-  `SPRITE_COLLIDES` (with `S`). Watch out for the core `COLLIDES` (AABB from raw values)
+- **`SPRITE_COLLIDE` and `SPRITE_COLLIDES`** are the same command with the
+  same parameters (`sp1, sp2`), as are `BATCH_DRAW` and `ATLAS_DRAW`, `EOF`
+  and `ENDOFFILE`. Watch out for the core `COLLIDES` (AABB from raw values)
   — a different use case.
 - **`CAMERA_X` (2D) vs `CAMERA3D_X`.** The 2D `camera` module and the native
   3D camera (`g3d`) have separate getters — do not mix them up.

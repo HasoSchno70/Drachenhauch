@@ -33,7 +33,7 @@ IMPORT "controller"
 | Function | Effect |
 |---|---|
 | `CHAR_SET_INPUT(c, axis_x, jump_pressed, jump_held)` | set this frame's input |
-| `CHAR_UPDATE(c, map, layer_idx)` | run one frame: compute velocity, collide, update position |
+| `CHAR_UPDATE(c, map, layer_idx [, dt])` | run one frame: compute velocity, collide, update position. Without `dt` one step per frame; with `dt` (seconds, like `DELTA`) the character moves equally fast at 30 or 144 frames -- speeds stay "pixels per 1/60 s" |
 
 ### Configuration
 
@@ -45,6 +45,8 @@ IMPORT "controller"
 | `CHAR_SET_MAX_FALL(c, max_vy)` | 7.0 | maximum falling speed -- without it a character falls through thin floors |
 | `CHAR_SET_COYOTE_TIME(c, frames)` | 6 | for this many frames after leaving the edge a jump still counts |
 | `CHAR_SET_JUMP_BUFFER(c, frames)` | 6 | pressed this many frames before landing, the jump already counts |
+| `CHAR_SET_COYOTE_MS(c, ms)` | 100 | the coyote time in milliseconds (fits `CHAR_UPDATE` with `dt`) |
+| `CHAR_SET_JUMP_BUFFER_MS(c, ms)` | 100 | the jump buffer in milliseconds |
 | `CHAR_SET_VARIABLE_JUMP(c, enabled)` | TRUE | shorter jump on a short key press |
 | `CHAR_SET_VARIABLE_JUMP_CUT(c, factor)` | 0.5 (= Mario) | the fraction the rising speed drops to on release |
 

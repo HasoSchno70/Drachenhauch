@@ -337,7 +337,7 @@ rechts
 === gespiegelt steht der baum rechts und der winkel klappt auf
 ' Einzug, Winkel und Name von rechts (gui_zeichnen_teile.rs `sp`); der
 ' Klick auf den Winkel am rechten Rand klappt auf, weil der Treffer mit
-' gespiegelter Maus rechnet. GUI_TREE_ITEM_RECT beginnt am linken Rand.
+' gespiegelter Maus rechnet. GUI_TREE_ITEM_SCREEN_RECT beginnt am linken Rand.
 IMPORT "gui"
 SCREEN(480, 220, "T", 1)
 SET_WINDOW_POS(-3000, -3000)
@@ -365,16 +365,16 @@ END FUNCTION
 GUI_UPDATE()
 ' Der Baum liegt gespiegelt bei 160..460; der Name am rechten Rand.
 PRINT "name links "; rot_zwischen(162, 300); " rechts "; rot_zwischen(380, 458)
-DIM r AS TUPLE : r = GUI_TREE_ITEM_RECT(b, wurzel)
+DIM r AS TUPLE : r = GUI_TREE_ITEM_SCREEN_RECT(b, wurzel)
 PRINT "rechteck ab "; r[0]
-PRINT "zu "; GUI_TREE_ITEM_RECT(b, kind)[2] = 0
+PRINT "zu "; GUI_TREE_ITEM_SCREEN_RECT(b, kind)[2] = 0
 AUTOMATION_PLAY("ev.txt")
 DIM n AS INTEGER
 FOR n = 1 TO 20
     GUI_UPDATE()
     CLS(0) : GUI_DRAW() : FLIP()
 NEXT
-PRINT "auf "; GUI_TREE_ITEM_RECT(b, kind)[2] > 0
+PRINT "auf "; GUI_TREE_ITEM_SCREEN_RECT(b, kind)[2] > 0
 --- datei ev.txt
 c 4
 e 0 7 10 10 0 0
@@ -472,7 +472,7 @@ FOR n = 1 TO 40
     CLS(0) : GUI_DRAW() : FLIP()
 NEXT
 PRINT "a breiter "; GUI_TABLE_GET_COL_WIDTHS(t)[0] > 110
-PRINT "baum auf "; GUI_TREE_ITEM_RECT(b, kind)[2] > 0
+PRINT "baum auf "; GUI_TREE_ITEM_SCREEN_RECT(b, kind)[2] > 0
 --- datei ev.txt
 c 9
 e 0 7 10 10 0 0
@@ -579,14 +579,14 @@ END FUNCTION
 ' Der Baum liegt gespiegelt bei 160..460; der Name im Feld rechts.
 PRINT "umbenennen links "; rot_zwischen(175, 300); " rechts "; rot_zwischen(380, 445)
 GUI_TREE_EDITED(b)
-DIM vorher AS INTEGER : vorher = GUI_TREE_ITEM_RECT(b, erster)[1]
+DIM vorher AS INTEGER : vorher = GUI_TREE_ITEM_SCREEN_RECT(b, erster)[1]
 AUTOMATION_PLAY("ev.txt")
 DIM n AS INTEGER
 FOR n = 1 TO 20
     GUI_UPDATE()
     CLS(0) : GUI_DRAW() : FLIP()
 NEXT
-PRINT "gerollt "; GUI_TREE_ITEM_RECT(b, erster)[1] < vorher
+PRINT "gerollt "; GUI_TREE_ITEM_SCREEN_RECT(b, erster)[1] < vorher
 --- datei ev.txt
 c 4
 e 0 7 10 10 0 0
@@ -738,8 +738,8 @@ GUI_LISTBOX_SET(lb, "kaestchen", 1)
 GUI_LISTBOX_DETAIL(lb, 1, "neben")
 DIM ziel AS INTEGER : ziel = RENDERTARGET_NEW(400, 240)
 GUI_UPDATE()
-DIM r2 AS TUPLE : r2 = GUI_LISTBOX_ITEM_RECT(lb, 2)
-DIM r0 AS TUPLE : r0 = GUI_LISTBOX_ITEM_RECT(lb, 0)
+DIM r2 AS TUPLE : r2 = GUI_LISTBOX_ITEM_SCREEN_RECT(lb, 2)
+DIM r0 AS TUPLE : r0 = GUI_LISTBOX_ITEM_SCREEN_RECT(lb, 0)
 DIM oben0 AS INTEGER : oben0 = r0[1]
 ' Kaestchen der Zeile 2 rechts, dann den Balken links nach unten ziehen.
 DIM ev AS STRING
@@ -756,7 +756,7 @@ WRITEALL("ev.txt", ev)
 ' Text der Zeile 3 im Bild: rechts ja, links nein.
 RENDERTARGET_BEGIN(ziel) : CLS(0) : GUI_DRAW() : RENDERTARGET_END()
 DIM b AS IMAGE : b = RENDERTARGET_IMAGE(ziel)
-DIM r3 AS TUPLE : r3 = GUI_LISTBOX_ITEM_RECT(lb, 3)
+DIM r3 AS TUPLE : r3 = GUI_LISTBOX_ITEM_SCREEN_RECT(lb, 3)
 DIM links AS INTEGER = 0
 DIM rechts AS INTEGER = 0
 DIM x AS INTEGER
@@ -775,7 +775,7 @@ FOR n = 1 TO 30
     GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
 NEXT
 PRINT "haken 2 "; GUI_LISTBOX_CHECKED(lb, 2); " auswahl "; GUI_LISTBOX_SELECTED(lb)
-PRINT "gerollt "; GUI_LISTBOX_ITEM_RECT(lb, 0)[1] < oben0
+PRINT "gerollt "; GUI_LISTBOX_ITEM_SCREEN_RECT(lb, 0)[1] < oben0
 --- umgebung
 DHRT_FRAMES=40
 --- erwartet

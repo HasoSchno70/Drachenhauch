@@ -1,5 +1,5 @@
 ' Fenster unter `dhrt test` nehmen keine echte Eingabe an (stillfenster.rs):
-' der Laeufer setzt DHRT_OHNE_EINGABE, das Fenster geht ohne Fokus auf und
+' der Laeufer setzt DHRT_NO_INPUT, das Fenster geht ohne Fokus auf und
 ' laesst die Maus durch. Vorher schrieb, wer waehrend eines Laufs tippte, in
 ' die IDE eines Falls ("BSCREEN" statt "SCREEN"), und eine Maus ueber dem
 ' Fenster nahm einem Fall seinen Tooltip. Gefragt wird ein fremder Leser
@@ -56,6 +56,6 @@ WEND
 {sammlung}/../_hilfen/fensterlage.ps1
 --- system windows
 --- umgebung
-DHRT_OHNE_EINGABE=0
+DHRT_NO_INPUT=0
 --- enthaelt
 durchlaessig False

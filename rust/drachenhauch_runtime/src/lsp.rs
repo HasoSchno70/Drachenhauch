@@ -344,6 +344,7 @@ fn einfaches_dim(zeile: &str) -> Option<String> {
 /// Lexer schreibt alles klein, darum geht das nur hier am Quelltext. Die
 /// Warnung fuer lokale Variablen bleibt, wie sie war. `source` = die
 /// gemergte Quelle, auf die sich die Zeilen der Warnungen beziehen.
+#[cfg(test)]
 pub fn verdeckung_filtern(warns: Vec<(u32, String)>, source: &str) -> Vec<(u32, String)> {
     verdeckung_filtern_in_raeumen(warns, source, &[])
 }
@@ -488,6 +489,7 @@ impl<'a> KorrKontext<'a> {
     }
 }
 
+#[cfg(test)]
 pub fn korrekturen(text: &str, z0: usize, von: usize, bis: usize, meldung: &str) -> Vec<(String, Vec<Aenderung>)> {
     korrekturen_mit(&KorrKontext::neu(text), z0, von, bis, meldung)
 }

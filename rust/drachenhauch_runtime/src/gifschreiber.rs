@@ -23,6 +23,7 @@
 //!   durchsichtig oder deckend, nichts dazwischen. Halbdurchsichtige Punkte
 //!   werden an der Schwelle 128 entschieden. Das ist keine Nachlaessigkeit,
 //!   das Format kennt nichts anderes.
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
 
 /// Ein Bild fuer den Schreiber: Masse und RGBA-Bytes (4 je Punkt).
 pub struct Bild {

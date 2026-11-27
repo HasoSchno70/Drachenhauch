@@ -78,13 +78,12 @@ impl ActionHandler for Aktionen {
 }
 
 /// Das Hilfsprogramm ist weg (Linux): nichts mehr bauen, bis wieder gefragt wird.
-#[allow(dead_code)]
+#[cfg_attr(windows, allow(dead_code))]
 struct Deaktivierung { aktiv: Arc<AtomicBool> }
 impl accesskit::DeactivationHandler for Deaktivierung {
     fn deactivate_accessibility(&mut self) { self.aktiv.store(false, Ordering::SeqCst); }
 }
 
-#[allow(dead_code)]
 fn aktionen_abholen(queue: &Arc<Mutex<Vec<ActionRequest>>>) -> Vec<ActionRequest> {
     match queue.lock() { Ok(mut q) => std::mem::take(&mut *q), Err(_) => Vec::new() }
 }

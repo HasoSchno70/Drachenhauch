@@ -17,6 +17,7 @@
 //! Was er NICHT ist: kein HTTPS (dafuer einen Reverse-Proxy davorstellen),
 //! kein gleichzeitiges Bedienen mehrerer Anfragen, kein Hochladen grosser
 //! Dateien (der Rumpf wird ganz in den Speicher gelesen, mit Obergrenze).
+#![cfg_attr(not(feature = "net"), allow(dead_code))]
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};

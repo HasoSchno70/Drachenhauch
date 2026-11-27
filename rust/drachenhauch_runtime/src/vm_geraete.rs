@@ -1,14 +1,10 @@
-//! Befehle fuer Geraete: midi, video, serial, modbus, hotplug, websocket, osc, mdns, webcam, Mikrofon, Pins (gpio/i2c/spi), firmata, usb, wifi, bt.
+//! Befehle fuer Geraete: midi, video, serial, modbus, hotplug, webcam, Mikrofon, Pins (gpio/i2c/spi), firmata, usb, wifi, bt.
 //!
-//! Teil von `vm.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `vm.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
 impl<'p> Vm<'p> {
-    // ===================================================================
-    // Modul serial (Feature `serial`)
-    // ===================================================================
     /// Modul `midi` (midi.rs) -- Noten lesen und schicken.
     ///
     /// Die beiden Umrechner (`MIDI_NOTE_NAME$`, `MIDI_NOTE_FREQ`) stehen VOR
@@ -43,8 +39,9 @@ impl<'p> Vm<'p> {
         if !name.starts_with("video_") { return Ok(None); }
         #[cfg(all(feature = "video", feature = "graphics"))]
         { return self.try_video_impl(name, a); }
-        // Ohne das Feature: unbekannter Befehl -- "im Rust-Kern noch nicht
-        // verfuegbar", wie jeder andere, den dieser Bau nicht hat.
+        // Ohne das Feature: niemand antwortet -- "gibt es in dieser Laufzeit
+        // nicht (ohne video gebaut)" (bau.rs), wie jeder andere, den dieser
+        // Bau nicht hat.
         #[allow(unreachable_code)]
         { let _ = a; Ok(None) }
     }
@@ -163,7 +160,7 @@ impl<'p> Vm<'p> {
             "video_loop" => {
                 let i = self.video_z(a, "VIDEO_LOOP")?;
                 let an = match a.get(1) { Some(Value::Bool(b)) => *b, Some(Value::Int(n)) => *n != 0,
-                    _ => return Err("VIDEO_LOOP: erwartet (video, an)".into()) };
+                    _ => return Err(crate::vm::falsche_argumente("VIDEO_LOOP", a.len())) };
                 self.videos[i].as_mut().unwrap().schleife = an;
                 Value::Nil
             }
@@ -174,7 +171,7 @@ impl<'p> Vm<'p> {
             }
             "video_draw" => {
                 let i = self.video_z(a, "VIDEO_DRAW")?;
-                if !(a.len() == 3 || a.len() == 5) { return Err("VIDEO_DRAW: erwartet (video, x, y [, breite, hoehe])".into()); }
+                if !(a.len() == 3 || a.len() == 5) { return Err(crate::vm::falsche_argumente("VIDEO_DRAW", a.len())); }
                 let x = bi_int(a, 1, "VIDEO_DRAW")? as i32;
                 let y = bi_int(a, 2, "VIDEO_DRAW")? as i32;
                 self.video_weiter(i)?;
@@ -264,15 +261,20 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "midi_file_free" => {
-                let i = bi_int(a, 0, "MIDI_FILE_FREE")? as usize;
-                if let Some(x) = self.midi_dateien.get_mut(i) { *x = None; }
+                // Handle-Regel: freigeben still, auch doppelt -- nur eine
+                // Nummer, die es nie gab, ist ein Fehler (bis 2026.53 still).
+                let n = bi_int(a, 0, "MIDI_FILE_FREE")?;
+                match usize::try_from(n).ok().and_then(|i| self.midi_dateien.get_mut(i)) {
+                    Some(x) => *x = None,
+                    None => return Err(format!("MIDI_FILE_FREE: ungueltiges MIDI_FILE-Handle {}", n)),
+                }
                 Value::Nil
             }
             "midi_file_tracks" => Value::Int(datei!("MIDI_FILE_TRACKS").spuren.len() as i64),
             "midi_file_ppq" => Value::Int(datei!("MIDI_FILE_PPQ").ppq().map(|p| p as i64).unwrap_or(0)),
             "midi_file_duration" => Value::Float(datei!("MIDI_FILE_DURATION").dauer()),
             "midi_file_tempo" => Value::Float(datei!("MIDI_FILE_TEMPO").anfangstempo()),
-            "midi_file_track_name$" | "midi_file_track_name" => {
+            "midi_file_track_name$" => {
                 const F: &str = "MIDI_FILE_TRACK_NAME$";
                 let k = spur_nr(a, 1, F)?;
                 Value::str_rc(datei!(F).spuren.get(k).map(|s| s.name.clone()).unwrap_or_default())
@@ -406,9 +408,23 @@ impl<'p> Vm<'p> {
             // --- Anschluesse finden ---
             "midi_in_count" => Value::Int(midi::in_count()?),
             "midi_out_count" => Value::Int(midi::out_count()?),
-            "midi_in_name$" | "midi_in_name" =>
+            // Die Namen als ARRAY OF STRING (Bericht A16), der Index ist der
+            // fuer MIDI_IN_OPEN/MIDI_OUT_OPEN.
+            "midi_in_devices" => {
+                let n = midi::in_count()?;
+                let mut v = Vec::new();
+                for i in 0..n { v.push(midi::in_name(i)?); }
+                crate::builtins::new_str_array(v)
+            }
+            "midi_out_devices" => {
+                let n = midi::out_count()?;
+                let mut v = Vec::new();
+                for i in 0..n { v.push(midi::out_name(i)?); }
+                crate::builtins::new_str_array(v)
+            }
+            "midi_in_name$" =>
                 Value::str_rc(midi::in_name(bi_int(a, 0, "MIDI_IN_NAME$")?)?),
-            "midi_out_name$" | "midi_out_name" =>
+            "midi_out_name$" =>
                 Value::str_rc(midi::out_name(bi_int(a, 0, "MIDI_OUT_NAME$")?)?),
             // --- Oeffnen und schliessen ---
             "midi_in_open" => {
@@ -487,6 +503,9 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
+    // ===================================================================
+    // Modul serial (Feature `serial`)
+    // ===================================================================
     pub(super) fn try_serial(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("serial_")) { return Ok(None); }
         #[cfg(feature = "serial")]
@@ -503,6 +522,9 @@ impl<'p> Vm<'p> {
         use crate::serial;
         let v = match name {
             "serial_ports" => Value::str_rc(serial::ports()),
+            // Die Liste als ARRAY OF STRING (Bericht A16; SERIAL_PORTS liefert
+            // einen Text mit ", ").
+            "serial_devices" => crate::builtins::new_str_array(serial::port_liste()),
             "serial_open" => {
                 let p = serial::open(bi_str(a, 0, "SERIAL_OPEN")?, bi_int(a, 1, "SERIAL_OPEN")?)?;
                 self.serial_ports.push(Some(p));
@@ -510,41 +532,21 @@ impl<'p> Vm<'p> {
             }
             "serial_close" => { let i = bi_int(a, 0, "SERIAL_CLOSE")? as usize; if let Some(s) = self.serial_ports.get_mut(i) { *s = None; } Value::Nil }
             "serial_is_open" => { let i = bi_int(a, 0, "SERIAL_IS_OPEN")?; Value::Bool(self.serial_ports.get(i as usize).map(|o| o.is_some()).unwrap_or(false)) }
+            // Bytes als BUFFER (Bericht A13): SERIAL_WRITE/_READ sprechen UTF-8-Text.
+            "serial_write_bytes" => { let i = bi_int(a, 0, "SERIAL_WRITE_BYTES")?; let d = crate::argument::a_bytes(a, 1, "SERIAL_WRITE_BYTES")?; Value::Int(serial::write_bytes(self.ser_port(i, name)?, &d)?) }
+            "serial_read_bytes" => { let i = bi_int(a, 0, "SERIAL_READ_BYTES")?; let n = bi_int(a, 1, "SERIAL_READ_BYTES")?; crate::argument::buffer_wert(serial::read_bytes(self.ser_port(i, name)?, n)?) }
             "serial_write" => { let i = bi_int(a, 0, "SERIAL_WRITE")?; let s = bi_str(a, 1, "SERIAL_WRITE")?.to_string(); Value::Int(serial::write(self.ser_port(i, name)?, &s)?) }
             "serial_read" => { let i = bi_int(a, 0, "SERIAL_READ")?; let n = bi_int(a, 1, "SERIAL_READ")?; Value::str_rc(serial::read(self.ser_port(i, name)?, n)?) }
             "serial_readline" => { let i = bi_int(a, 0, "SERIAL_READLINE")?; Value::str_rc(serial::readline(self.ser_port(i, name)?)?) }
             "serial_available" => { let i = bi_int(a, 0, "SERIAL_AVAILABLE")?; Value::Int(serial::available(self.ser_port(i, name)?)?) }
             "serial_flush" => { let i = bi_int(a, 0, "SERIAL_FLUSH")?; serial::flush(self.ser_port(i, name)?); Value::Nil }
+            // SERIAL_SET_TIMEOUT(handle, ms): die Lesefrist in Millisekunden
+            // (SERIAL_TIMEOUT zaehlt Sekunden und bleibt dabei).
+            "serial_set_timeout" => { let i = bi_int(a, 0, "SERIAL_SET_TIMEOUT")?; let ms = bi_num(a, 1, "SERIAL_SET_TIMEOUT")?; serial::set_timeout(self.ser_port(i, name)?, ms / 1000.0); Value::Nil }
             "serial_timeout" => { let i = bi_int(a, 0, "SERIAL_TIMEOUT")?; let s = bi_num(a, 1, "SERIAL_TIMEOUT")?; serial::set_timeout(self.ser_port(i, name)?, s); Value::Nil }
             _ => return Ok(None),
         };
         Ok(Some(v))
-    }
-
-    // ===================================================================
-    // Module gpio/i2c/spi: die Pins des Kernels (pins.rs). In jedem Bau;
-    // ausserhalb von Linux meldet jeder Aufruf "nur unter Linux".
-    // ===================================================================
-    // ===================================================================
-    // Mikrofon (MIC_*, src/mikrofon.rs): ein Eingang zur Zeit
-    // ===================================================================
-    // ===================================================================
-    // Modul webcam (src/webcam.rs): Bilder einer Kamera in ein IMAGE
-    // ===================================================================
-    // ===================================================================
-    // WebSocket (WS_*), OSC (OSC_*), mDNS (MDNS_*): src/websocket.rs,
-    // src/osc.rs, src/mdns.rs
-    // ===================================================================
-    pub(super) fn try_netzdienste(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        if name.starts_with("ws_") {
-            #[cfg(feature = "net")]
-            { return self.try_websocket(name, a); }
-            #[allow(unreachable_code)]
-            { return Ok(None); }
-        }
-        if name.starts_with("osc_") { return self.try_osc(name, a); }
-        if name.starts_with("mdns_") { return self.try_mdns(name, a); }
-        Ok(None)
     }
 
     // ===================================================================
@@ -730,12 +732,7 @@ impl<'p> Vm<'p> {
 
     pub(super) fn try_hotplug(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         use crate::hotplug;
-        fn text_feld(v: Vec<String>) -> Value {
-            let n = v.len() as i64;
-            let mut arr = crate::value::DhArray::new("string".to_string(), vec![n], || Value::str_rc(String::new()));
-            for (k, x) in v.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(x)); }
-            Value::Array(Rc::new(RefCell::new(arr)))
-        }
+        let text_feld = crate::builtins::new_str_array;
         let v = match name {
             "hotplug_kinds" => text_feld(hotplug::arten().into_iter().map(String::from).collect()),
             "hotplug_list" => text_feld(hotplug::aktuelle(bi_str(a, 0, "HOTPLUG_LIST")?)?),
@@ -744,226 +741,17 @@ impl<'p> Vm<'p> {
                 self.hotplug_aktuell = hotplug::naechstes();
                 Value::Bool(self.hotplug_aktuell.is_some())
             }
-            "hotplug_kind$" | "hotplug_kind" => Value::str_rc(self.hotplug_aktuell.as_ref().map(|e| e.art.clone()).unwrap_or_default()),
-            "hotplug_name$" | "hotplug_name" => Value::str_rc(self.hotplug_aktuell.as_ref().map(|e| e.name.clone()).unwrap_or_default()),
+            "hotplug_kind$" => Value::str_rc(self.hotplug_aktuell.as_ref().map(|e| e.art.clone()).unwrap_or_default()),
+            "hotplug_name$" => Value::str_rc(self.hotplug_aktuell.as_ref().map(|e| e.name.clone()).unwrap_or_default()),
             "hotplug_added" => Value::Bool(self.hotplug_aktuell.as_ref().map(|e| e.dazu).unwrap_or(false)),
             _ => return Ok(None),
         };
         Ok(Some(v))
     }
 
-    #[cfg(feature = "net")]
-    pub(super) fn try_websocket(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        use crate::websocket as ws;
-        fn puffer(v: Vec<u8>) -> Value { Value::Buffer(Rc::new(RefCell::new(v))) }
-        macro_rules! vb { ($f:expr) => {
-            Self::handle_get_mut(&mut self.ws_verbindungen, bi_int(a, 0, $f)?, $f, "ungueltiges/geschlossenes WEBSOCKET")?
-        }; }
-        macro_rules! srv { ($f:expr) => {
-            Self::handle_get_mut(&mut self.ws_server, bi_int(a, 0, $f)?, $f, "ungueltiger/geschlossener WS_SERVER")?
-        }; }
-        let v = match name {
-            "ws_connect" => {
-                let url = bi_str(a, 0, "WS_CONNECT")?.to_string();
-                self.ws_verbindungen.push(Some(ws::verbinden(&url)?));
-                Value::Int((self.ws_verbindungen.len() - 1) as i64)
-            }
-            "ws_listen" => {
-                let port = bi_int(a, 0, "WS_LISTEN")?;
-                let bind = if a.len() >= 2 { bi_str(a, 1, "WS_LISTEN")?.to_string() } else { "0.0.0.0".to_string() };
-                self.ws_server.push(Some(ws::lauschen(port, &bind)?));
-                Value::Int((self.ws_server.len() - 1) as i64)
-            }
-            "ws_port" => Value::Int(srv!("WS_PORT").port as i64),
-            "ws_accept" => {
-                match srv!("WS_ACCEPT").annehmen() {
-                    Some(v) => { self.ws_verbindungen.push(Some(v)); Value::Int((self.ws_verbindungen.len() - 1) as i64) }
-                    None => Value::Int(-1),
-                }
-            }
-            "ws_stop" => { let i = bi_int(a, 0, "WS_STOP")? as usize; if let Some(x) = self.ws_server.get_mut(i) { *x = None; } Value::Nil }
-            "ws_send" => {
-                const F: &str = "WS_SEND";
-                let (daten, binaer) = match a.get(1) {
-                    Some(Value::Str(t)) => (t.as_bytes().to_vec(), false),
-                    Some(Value::Buffer(b)) => (b.borrow().clone(), true),
-                    Some(v) => return Err(format!("{}: erwartet einen Text oder einen BUFFER, nicht {}", F, v.type_name())),
-                    None => return Err(format!("{}: fehlendes Argument 2", F)),
-                };
-                if daten.len() > ws::MAX_NACHRICHT { return Err(format!("{}: hoechstens {} Bytes je Nachricht", F, ws::MAX_NACHRICHT)); }
-                Value::Bool(vb!(F).senden(&daten, binaer)?)
-            }
-            "ws_next" => Value::Bool(vb!("WS_NEXT").naechste()),
-            "ws_message$" | "ws_message" => {
-                let n = vb!("WS_MESSAGE$").aktuell().map(|n| String::from_utf8_lossy(&n.daten).into_owned()).unwrap_or_default();
-                Value::str_rc(n)
-            }
-            "ws_message_bytes" => puffer(vb!("WS_MESSAGE_BYTES").aktuell().map(|n| n.daten.clone()).unwrap_or_default()),
-            "ws_is_binary" => Value::Bool(vb!("WS_IS_BINARY").aktuell().map_or(false, |n| n.binaer)),
-            "ws_pending" => Value::Int(vb!("WS_PENDING").wartend() as i64),
-            "ws_connected" => Value::Bool(vb!("WS_CONNECTED").offen()),
-            "ws_ping" => Value::Bool(vb!("WS_PING").ping()),
-            "ws_path$" | "ws_path" => Value::str_rc(vb!("WS_PATH$").pfad.clone()),
-            "ws_peer$" | "ws_peer" => Value::str_rc(vb!("WS_PEER$").gegenstelle.clone()),
-            "ws_close_code" => Value::Int(vb!("WS_CLOSE_CODE").schliess_code),
-            "ws_close_reason$" | "ws_close_reason" => Value::str_rc(vb!("WS_CLOSE_REASON$").schliess_grund.clone()),
-            "ws_close" => {
-                const F: &str = "WS_CLOSE";
-                let code = if a.len() >= 2 { bi_int(a, 1, F)? } else { 1000 };
-                if !(1000..=4999).contains(&code) || matches!(code, 1004..=1006 | 1015) {
-                    return Err(format!("{}: Code {} ist nicht erlaubt (1000 normal, 1001 weg, 4000..4999 eigene)", F, code));
-                }
-                let grund = if a.len() >= 3 { bi_str(a, 2, F)?.to_string() } else { String::new() };
-                let i = bi_int(a, 0, F)?;
-                vb!(F).schliessen(code as u16, &grund);
-                let _ = i;
-                Value::Nil
-            }
-            _ => return Ok(None),
-        };
-        Ok(Some(v))
-    }
-
-    pub(super) fn try_osc(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        use crate::osc;
-        macro_rules! anschluss { ($f:expr) => {
-            Self::handle_get_mut(&mut self.osc_anschluesse, bi_int(a, 0, $f)?, $f, "ungueltiger/geschlossener OSC")?
-        }; }
-        let v = match name {
-            "osc_open" => {
-                let port = if a.is_empty() { 0 } else { bi_int(a, 0, "OSC_OPEN")? };
-                let bind = if a.len() >= 2 { bi_str(a, 1, "OSC_OPEN")?.to_string() } else { "0.0.0.0".to_string() };
-                self.osc_anschluesse.push(Some(osc::oeffnen(port, &bind)?));
-                Value::Int((self.osc_anschluesse.len() - 1) as i64)
-            }
-            "osc_close" => { let i = bi_int(a, 0, "OSC_CLOSE")? as usize; if let Some(x) = self.osc_anschluesse.get_mut(i) { *x = None; } Value::Nil }
-            "osc_port" => Value::Int(anschluss!("OSC_PORT").port as i64),
-            "osc_send" => {
-                const F: &str = "OSC_SEND";
-                if a.len() < 4 { return Err(format!("{}: erwartet (osc, host$, port, adresse$, werte...)", F)); }
-                let host = bi_str(a, 1, F)?.to_string();
-                let port = bi_int(a, 2, F)?;
-                if !(1..=65535).contains(&port) { return Err(format!("{}: Port {} ausserhalb 1..65535", F, port)); }
-                let adresse = bi_str(a, 3, F)?.to_string();
-                if !adresse.starts_with('/') { return Err(format!("{}: eine OSC-Adresse beginnt mit /, nicht {:?}", F, adresse)); }
-                let mut werte = Vec::new();
-                for (k, w) in a[4..].iter().enumerate() {
-                    werte.push(match w {
-                        Value::Int(n) => if let Ok(x) = i32::try_from(*n) { osc::Wert::Int(x) } else { osc::Wert::Long(*n) },
-                        Value::Float(f) => osc::Wert::Float(*f as f32),
-                        Value::Str(t) => osc::Wert::Text(t.to_string()),
-                        Value::Bool(b) => if *b { osc::Wert::Wahr } else { osc::Wert::Falsch },
-                        Value::Buffer(b) => osc::Wert::Blob(b.borrow().clone()),
-                        Value::Nil => osc::Wert::Nichts,
-                        v => return Err(format!("{}: Wert {} ist {} -- OSC kennt Zahlen, Texte, Wahrheitswerte und BUFFER", F, k + 1, v.type_name())),
-                    });
-                }
-                let n = osc::Nachricht { adresse, werte };
-                anschluss!(F).senden(&host, port as u16, &n)?;
-                Value::Nil
-            }
-            "osc_next" => Value::Bool(anschluss!("OSC_NEXT").naechste()),
-            "osc_address$" | "osc_address" => Value::str_rc(anschluss!("OSC_ADDRESS$").aktuell().map(|(n, _)| n.adresse.clone()).unwrap_or_default()),
-            "osc_types$" | "osc_types" => Value::str_rc(anschluss!("OSC_TYPES$").aktuell().map(|(n, _)| n.werte.iter().map(|w| w.kennung()).collect::<String>()).unwrap_or_default()),
-            "osc_count" => Value::Int(anschluss!("OSC_COUNT").aktuell().map_or(0, |(n, _)| n.werte.len() as i64)),
-            "osc_arg" => {
-                const F: &str = "OSC_ARG";
-                let i = bi_int(a, 1, F)?;
-                let werte = anschluss!(F).aktuell().map(|(n, _)| n.werte.clone()).unwrap_or_default();
-                let w = usize::try_from(i).ok().and_then(|i| werte.get(i))
-                    .ok_or_else(|| format!("{}: Wert {} gibt es nicht -- die Nachricht hat {} (gezaehlt ab 0)", F, i, werte.len()))?;
-                match w {
-                    osc::Wert::Int(x) => Value::Int(*x as i64),
-                    osc::Wert::Long(x) => Value::Int(*x),
-                    osc::Wert::Float(x) => Value::Float(*x as f64),
-                    osc::Wert::Double(x) => Value::Float(*x),
-                    osc::Wert::Text(t) => Value::str_rc(t.clone()),
-                    osc::Wert::Blob(d) => Value::Buffer(Rc::new(RefCell::new(d.clone()))),
-                    osc::Wert::Wahr => Value::Bool(true),
-                    osc::Wert::Falsch => Value::Bool(false),
-                    osc::Wert::Nichts => Value::Nil,
-                    osc::Wert::Unendlich => Value::Float(f64::INFINITY),
-                    osc::Wert::Zeit(t) => Value::Int(*t as i64),
-                    osc::Wert::Zeichen(c) => Value::str_rc(c.to_string()),
-                    osc::Wert::Farbe(c) => Value::Int(*c as i64),
-                    osc::Wert::Midi(m) => Value::Int(u32::from_be_bytes(*m) as i64),
-                }
-            }
-            "osc_sender$" | "osc_sender" => Value::str_rc(anschluss!("OSC_SENDER$").aktuell().map(|(_, s)| s.ip().to_string()).unwrap_or_default()),
-            "osc_sender_port" => Value::Int(anschluss!("OSC_SENDER_PORT").aktuell().map_or(0, |(_, s)| s.port() as i64)),
-            "osc_match" => {
-                let m = bi_str(a, 0, "OSC_MATCH")?.to_string();
-                let ad = bi_str(a, 1, "OSC_MATCH")?.to_string();
-                Value::Bool(osc::passt(&m, &ad))
-            }
-            _ => return Ok(None),
-        };
-        Ok(Some(v))
-    }
-
-    pub(super) fn try_mdns(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        use crate::mdns;
-        fn frist(a: &[Value], i: usize, f: &str, vorgabe: i64) -> R<u64> {
-            let ms = if a.len() > i { bi_int(a, i, f)? } else { vorgabe };
-            if !(50..=30000).contains(&ms) { return Err(format!("{}: Wartezeit {} ms ausserhalb 50..30000", f, ms)); }
-            Ok(ms as u64)
-        }
-        macro_rules! dienst { ($f:expr) => {{
-            let i = bi_int(a, 0, $f)?;
-            let n = self.mdns_dienste.len();
-            usize::try_from(i).ok().and_then(|i| self.mdns_dienste.get(i))
-                .ok_or_else(|| format!("{}: Dienst {} gibt es nicht -- die letzte Suche fand {} (gezaehlt ab 0)", $f, i, n))?
-        }}; }
-        let v = match name {
-            "mdns_resolve$" | "mdns_resolve" => {
-                let n = bi_str(a, 0, "MDNS_RESOLVE$")?.to_string();
-                let ms = frist(a, 1, "MDNS_RESOLVE$", 1500)?;
-                Value::str_rc(mdns::aufloesen(&n, ms)?)
-            }
-            "mdns_browse" => {
-                let d = bi_str(a, 0, "MDNS_BROWSE")?.to_string();
-                if !d.starts_with('_') { return Err(format!("MDNS_BROWSE: ein Diensttyp sieht aus wie \"_http._tcp\", nicht {:?}", d)); }
-                let ms = frist(a, 1, "MDNS_BROWSE", 2000)?;
-                self.mdns_typ = mdns::lokal(&d);
-                self.mdns_dienste = mdns::suchen(&d, ms)?;
-                Value::Int(self.mdns_dienste.len() as i64)
-            }
-            "mdns_service_name$" | "mdns_service_name" => { let t = self.mdns_typ.clone(); let d = dienst!("MDNS_SERVICE_NAME$"); Value::str_rc(mdns::kurzname(&d.name, &t)) }
-            "mdns_service_host$" | "mdns_service_host" => Value::str_rc(dienst!("MDNS_SERVICE_HOST$").host.clone()),
-            "mdns_service_address$" | "mdns_service_address" => Value::str_rc(dienst!("MDNS_SERVICE_ADDRESS$").adresse.clone()),
-            "mdns_service_port" => Value::Int(dienst!("MDNS_SERVICE_PORT").port as i64),
-            "mdns_service_txt$" | "mdns_service_txt" => {
-                let k = bi_str(a, 1, "MDNS_SERVICE_TXT$")?.to_string();
-                let d = dienst!("MDNS_SERVICE_TXT$");
-                Value::str_rc(d.txt.iter().find(|(n, _)| n.eq_ignore_ascii_case(&k)).map(|(_, w)| w.clone()).unwrap_or_default())
-            }
-            "mdns_announce" => {
-                const F: &str = "MDNS_ANNOUNCE";
-                let n = bi_str(a, 0, F)?.to_string();
-                let d = bi_str(a, 1, F)?.to_string();
-                let port = bi_int(a, 2, F)?;
-                if !(1..=65535).contains(&port) { return Err(format!("{}: Port {} ausserhalb 1..65535", F, port)); }
-                if n.is_empty() || n.contains('.') { return Err(format!("{}: der Name darf nicht leer sein und keinen Punkt enthalten, nicht {:?}", F, n)); }
-                if !d.starts_with('_') { return Err(format!("{}: ein Diensttyp sieht aus wie \"_http._tcp\", nicht {:?}", F, d)); }
-                let txt = if a.len() >= 4 { mdns::txt_aus_text(bi_str(a, 3, F)?) } else { Vec::new() };
-                let host: String = n.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' { c.to_ascii_lowercase() } else { '-' }).collect();
-                let ank = mdns::Ankuendigung { name: n, dienst: mdns::lokal(&d), host: mdns::lokal(&host), port: port as u16, txt };
-                if self.mdns_antworter.is_none() { self.mdns_antworter = Some(mdns::antworter_starten()?); }
-                let liste = self.mdns_antworter.as_ref().unwrap().liste.clone();
-                {
-                    let mut l = liste.lock().unwrap_or_else(|e| e.into_inner());
-                    l.retain(|x| x.instanz() != ank.instanz());
-                    l.push(ank.clone());
-                }
-                mdns::melden(&ank);
-                Value::str_rc(ank.host)
-            }
-            "mdns_stop" => { self.mdns_antworter = None; Value::Nil }
-            _ => return Ok(None),
-        };
-        Ok(Some(v))
-    }
-
+    // ===================================================================
+    // Modul webcam (src/webcam.rs): Bilder einer Kamera in ein IMAGE
+    // ===================================================================
     pub(super) fn try_webcam(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("webcam_") { return Ok(None); }
         #[cfg(feature = "graphics")]
@@ -1018,7 +806,7 @@ impl<'p> Vm<'p> {
             "webcam_open" => {
                 const F: &str = "WEBCAM_OPEN";
                 if a.len() > 3 || a.len() == 2 {
-                    return Err(format!("{}: erwartet 0, 1 oder 3 Argumente (geraet$, breite, hoehe), erhalten {}", F, a.len()));
+                    return Err(format!("{}: erwartet 0, 1 oder 3 Argumente, erhalten {}", F, a.len()));
                 }
                 let wunsch = if a.is_empty() { String::new() } else { bi_str(a, 0, F)?.to_string() };
                 let (b, h) = if a.len() == 3 { (bi_int(a, 1, F)?, bi_int(a, 2, F)?) } else { (0, 0) };
@@ -1063,6 +851,9 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
+    // ===================================================================
+    // Mikrofon (MIC_*, src/mikrofon.rs): ein Eingang zur Zeit
+    // ===================================================================
     pub(super) fn try_mikrofon(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("mic_") { return Ok(None); }
         #[cfg(feature = "graphics")]
@@ -1111,7 +902,7 @@ impl<'p> Vm<'p> {
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
             "mic_start" => {
-                if a.len() > 1 { return Err(format!("MIC_START: erwartet 0..1 Argumente, erhalten {}", a.len())); }
+                if a.len() > 1 { return Err(format!("MIC_START: erwartet 0 bis 1 Argumente, erhalten {}", a.len())); }
                 let wunsch = if a.is_empty() { String::new() } else { bi_str(a, 0, "MIC_START")?.to_string() };
                 self.mikrofon = None;
                 self.mic_baender.clear();
@@ -1160,7 +951,7 @@ impl<'p> Vm<'p> {
             }
             "mic_samples" => { keine_args(a, "MIC_SAMPLES")?; lauf!("MIC_SAMPLES"); Value::Int(mic::gesamt() as i64) }
             "mic_record_start" => {
-                if a.len() > 1 { return Err(format!("MIC_RECORD_START: erwartet 0..1 Argumente, erhalten {}", a.len())); }
+                if a.len() > 1 { return Err(format!("MIC_RECORD_START: erwartet 0 bis 1 Argumente, erhalten {}", a.len())); }
                 let sek = if a.is_empty() { 600.0 } else { bi_num(a, 0, "MIC_RECORD_START")? };
                 if !(sek > 0.0 && sek <= mic::MAX_SEKUNDEN) {
                     return Err("MIC_RECORD_START: max_sekunden muss 0 < x <= 3600 sein".into());
@@ -1193,29 +984,14 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
+    // ===================================================================
+    // Module gpio/i2c/spi: die Pins des Kernels (pins.rs). In jedem Bau;
+    // ausserhalb von Linux meldet jeder Aufruf "nur unter Linux".
+    // ===================================================================
     pub(super) fn try_pins(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("gpio_") || name.starts_with("i2c_") || name.starts_with("spi_")) { return Ok(None); }
         use crate::pins;
-        fn bytes(a: &[Value], i: usize, f: &str) -> R<Vec<u8>> {
-            let roh: Vec<i64> = match a.get(i) {
-                Some(Value::Buffer(b)) => return Ok(b.borrow().clone()),
-                Some(Value::Array(arr)) => {
-                    let arr = arr.borrow();
-                    let mut out = Vec::with_capacity(arr.cells.len());
-                    for k in 0..arr.cells.len() {
-                        match arr.cells.get(k) {
-                            Value::Int(x) => out.push(x),
-                            Value::Float(v) if v.fract() == 0.0 => out.push(v as i64),
-                            v => return Err(format!("{}: im Feld steht an Stelle {} keine ganze Zahl ({})", f, k, v.type_name())),
-                        }
-                    }
-                    out
-                }
-                Some(v) => return Err(format!("{}: erwartet ein Feld aus Zahlen oder einen BUFFER, nicht {}", f, v.type_name())),
-                None => return Err(format!("{}: die Bytes fehlen", f)),
-            };
-            pins::bytes_pruefen(f, &roh)
-        }
+        fn bytes(a: &[Value], i: usize, f: &str) -> R<Vec<u8>> { crate::argument::a_bytes(a, i, f) }
         fn feld(v: Vec<u8>) -> Value {
             let n = v.len() as i64;
             let mut arr = crate::value::DhArray::new("integer".to_string(), vec![n], || Value::Int(0));
@@ -1355,25 +1131,7 @@ impl<'p> Vm<'p> {
     pub(super) fn try_firmata_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         use crate::firmata;
         // Bytes fuer I2C: ein Feld aus Zahlen oder ein BUFFER.
-        fn bytes_arg(a: &[Value], i: usize, fn_: &str) -> R<Vec<i64>> {
-            match a.get(i) {
-                Some(Value::Buffer(b)) => Ok(b.borrow().iter().map(|&x| x as i64).collect()),
-                Some(Value::Array(arr)) => {
-                    let arr = arr.borrow();
-                    let mut out = Vec::with_capacity(arr.cells.len());
-                    for k in 0..arr.cells.len() {
-                        match arr.cells.get(k) {
-                            Value::Int(x) => out.push(x),
-                            Value::Float(f) if f.fract() == 0.0 => out.push(f as i64),
-                            v => return Err(format!("{}: im Feld steht an Stelle {} keine ganze Zahl ({})", fn_, k, v.type_name())),
-                        }
-                    }
-                    Ok(out)
-                }
-                Some(v) => Err(format!("{}: erwartet ein Feld aus Zahlen oder einen BUFFER, nicht {}", fn_, v.type_name())),
-                None => Err(format!("{}: die Bytes fehlen", fn_)),
-            }
-        }
+        fn bytes_arg(a: &[Value], i: usize, fn_: &str) -> R<Vec<i64>> { crate::argument::a_zahlenfeld(a, i, fn_) }
         fn int_opt(a: &[Value], i: usize, vorgabe: i64, fn_: &str) -> R<i64> {
             if a.len() > i { bi_int(a, i, fn_) } else { Ok(vorgabe) }
         }
@@ -1518,9 +1276,13 @@ impl<'p> Vm<'p> {
         use crate::usb;
         let v = match name {
             "usb_list" => Value::str_rc(usb::list()?),
+            "usb_devices" => crate::builtins::new_str_array(usb::geraete()?),
             "usb_open" => { let d = usb::open(bi_int(a, 0, "USB_OPEN")?, bi_int(a, 1, "USB_OPEN")?)?; self.usb_devs.push(Some(d)); Value::Int((self.usb_devs.len() - 1) as i64) }
             "usb_open_path" => { let d = usb::open_path(bi_str(a, 0, "USB_OPEN_PATH")?)?; self.usb_devs.push(Some(d)); Value::Int((self.usb_devs.len() - 1) as i64) }
             "usb_close" => { let i = bi_int(a, 0, "USB_CLOSE")? as usize; if let Some(s) = self.usb_devs.get_mut(i) { *s = None; } Value::Nil }
+            // Bytes als BUFFER (Bericht A13): USB_WRITE/_READ nehmen latin-1-Text.
+            "usb_write_bytes" => { let i = bi_int(a, 0, "USB_WRITE_BYTES")?; let d = crate::argument::a_bytes(a, 1, "USB_WRITE_BYTES")?; Value::Int(usb::write_bytes(self.usb_dev(i, name)?, &d)?) }
+            "usb_read_bytes" => { let i = bi_int(a, 0, "USB_READ_BYTES")?; let n = bi_int(a, 1, "USB_READ_BYTES")?; let ms = if a.len() > 2 { bi_int(a, 2, "USB_READ_BYTES")? } else { 1000 }; crate::argument::buffer_wert(usb::read_bytes(self.usb_dev(i, name)?, n, ms)?) }
             "usb_write" => { let i = bi_int(a, 0, "USB_WRITE")?; let s = bi_str(a, 1, "USB_WRITE")?.to_string(); Value::Int(usb::write(self.usb_dev(i, name)?, &s)?) }
             "usb_read" => { let i = bi_int(a, 0, "USB_READ")?; let n = bi_int(a, 1, "USB_READ")?; let t = bi_int(a, 2, "USB_READ")?; Value::str_rc(usb::read(self.usb_dev(i, name)?, n, t)?) }
             "usb_product" => Value::str_rc(usb::product(self.usb_dev(bi_int(a, 0, "USB_PRODUCT")?, name)?)),
@@ -1532,7 +1294,7 @@ impl<'p> Vm<'p> {
     }
 
     // ===================================================================
-    // Modul wifi (Feature `wifi`, Windows-only)
+    // Modul wifi (Feature `wifi`: Windows netsh, Linux nmcli, macOS networksetup)
     // ===================================================================
     pub(super) fn try_wifi(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("wifi_")) { return Ok(None); }
@@ -1550,6 +1312,8 @@ impl<'p> Vm<'p> {
             "wifi_current" => Value::str_rc(wifi::current()?),
             "wifi_signal" => Value::Int(wifi::signal()?),
             "wifi_scan" => Value::str_rc(wifi::scan()?),
+            // Dieselben Netze als ARRAY OF STRING, je eins eine Zeile (A16).
+            "wifi_networks" => crate::builtins::new_str_array(wifi::scan()?.lines().filter(|z| !z.is_empty()).map(str::to_string).collect()),
             "wifi_connect" => Value::Bool(wifi::connect(bi_str(a, 0, "WIFI_CONNECT")?, bi_str(a, 1, "WIFI_CONNECT")?)?),
             "wifi_disconnect" => Value::Bool(wifi::disconnect()?),
             "wifi_profiles" => Value::str_rc(wifi::profiles()?),
@@ -1578,11 +1342,20 @@ impl<'p> Vm<'p> {
         use crate::bt;
         let v = match name {
             "bt_scan" => Value::str_rc(bt::scan(bi_num(a, 0, "BT_SCAN")?)?),
+            // Die Suchdauer in ms (Regel 9); BT_SCAN bleibt bei Sekunden.
+            // Je Geraet eine Zeile "Adresse|Name|RSSI" als ARRAY OF STRING
+            // (Bericht A16: Listen sind Felder); BT_SCAN liefert sie als Text.
+            "bt_scan_ms" => {
+                let t = bt::scan(bi_num(a, 0, "BT_SCAN_MS")? / 1000.0)?;
+                crate::builtins::new_str_array(t.lines().filter(|z| !z.is_empty()).map(str::to_string).collect())
+            }
             "bt_connect" => { let p = bt::connect(bi_str(a, 0, "BT_CONNECT")?)?; self.bt_periphs.push(Some(p)); Value::Int((self.bt_periphs.len() - 1) as i64) }
             "bt_disconnect" => { let i = bi_int(a, 0, "BT_DISCONNECT")?; if Self::schon_frei(&self.bt_periphs, i) { return Ok(Some(Value::Nil)); } bt::disconnect(self.bt_periph(i, name)?)?; if let Some(s) = self.bt_periphs.get_mut(i as usize) { *s = None; } Value::Nil }
             "bt_is_connected" => { let i = bi_int(a, 0, "BT_IS_CONNECTED")?; Value::Bool(match self.bt_periphs.get(i as usize).and_then(|o| o.as_ref()) { Some(p) => bt::is_connected(p), None => false }) }
             "bt_services" => { let i = bi_int(a, 0, "BT_SERVICES")?; Value::str_rc(bt::services(self.bt_periph(i, name)?)?) }
             "bt_characteristics" => { let i = bi_int(a, 0, "BT_CHARACTERISTICS")?; let s = bi_str(a, 1, "BT_CHARACTERISTICS")?.to_string(); Value::str_rc(bt::characteristics(self.bt_periph(i, name)?, &s)?) }
+            "bt_read_bytes" => { let i = bi_int(a, 0, "BT_READ_BYTES")?; let c = bi_str(a, 1, "BT_READ_BYTES")?.to_string(); crate::argument::buffer_wert(bt::read_bytes(self.bt_periph(i, name)?, &c)?) }
+            "bt_write_bytes" => { let i = bi_int(a, 0, "BT_WRITE_BYTES")?; let c = bi_str(a, 1, "BT_WRITE_BYTES")?.to_string(); let d = crate::argument::a_bytes(a, 2, "BT_WRITE_BYTES")?; bt::write_bytes(self.bt_periph(i, name)?, &c, &d)?; Value::Nil }
             "bt_read" => { let i = bi_int(a, 0, "BT_READ")?; let c = bi_str(a, 1, "BT_READ")?.to_string(); Value::str_rc(bt::read(self.bt_periph(i, name)?, &c)?) }
             "bt_write" => { let i = bi_int(a, 0, "BT_WRITE")?; let c = bi_str(a, 1, "BT_WRITE")?.to_string(); let d = bi_str(a, 2, "BT_WRITE")?.to_string(); bt::write(self.bt_periph(i, name)?, &c, &d)?; Value::Nil }
             _ => return Ok(None),

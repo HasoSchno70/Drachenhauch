@@ -32,10 +32,10 @@ Motor stoppt).
 | `MQTT_TLS_CA(path$)` | — | eigene CA (PEM-Datei) fuer jedes folgende `mqtts://`-Verbinden; `""` = wieder die oeffentlichen Wurzeln |
 | `MQTT_DISCONNECT(handle)` | — | Verbindung schliessen |
 | `MQTT_IS_CONNECTED(handle)` | BOOLEAN | steht die Verbindung noch? |
-| `MQTT_PUBLISH(handle, topic$, payload$[, retain[, qos]])` | BOOLEAN | Nachricht auf ein Topic senden; `retain` laesst der Broker sie fuer spaetere Abonnenten aufheben, `qos` 0 oder 1. FALSE, wenn die Verbindung weg ist |
+| `MQTT_PUBLISH(handle, topic$, payload$[, retain[, qos]])` | BOOLEAN | Nachricht auf ein Topic senden; `retain` laesst der Broker sie fuer spaetere Abonnenten aufheben, `qos` 0 oder 1. FALSE, wenn die Verbindung weg ist Die Nutzlast darf ein BUFFER sein. |
 | `MQTT_SUBSCRIBE(handle, topic$[, qos])` | BOOLEAN | Topic abonnieren -- eingehende Nachrichten holt danach `MQTT_UPDATE` ab; `qos` 0 oder 1. FALSE, wenn die Verbindung weg ist |
 | `MQTT_UNSUBSCRIBE(handle, topic$)` | BOOLEAN | ein Abonnement beenden |
-| `MQTT_PENDING(handle)` | INTEGER | wie viele QoS-1-Nachrichten der Broker noch nicht bestaetigt hat |
+| `MQTT_UNACKED_COUNT(handle)` | INTEGER | wie viele QoS-1-Nachrichten der Broker noch nicht bestaetigt hat |
 | `MQTT_FLUSH(handle[, ms])` | BOOLEAN | warten, bis alle QoS-1-Nachrichten bestaetigt sind (Vorgabe 2000 ms); FALSE, wenn die Zeit um ist |
 | `MQTT_WILL(topic$, content$[, retain])` | — | der **letzte Wille** fuer das naechste `MQTT_CONNECT`: reisst die Verbindung ohne Abmeldung ab, veroeffentlicht der Broker diese Nachricht |
 | `MQTT_UPDATE(handle)` | — | **pro Frame aufrufen**: liest eingegangene Nachrichten ein und haelt die Verbindung mit PINGREQ am Leben |
@@ -151,7 +151,7 @@ END IF
 ## QoS 1: sicher ankommen
 
 Mit QoS 1 bestätigt der Broker jede Nachricht. Bis dahin zählt sie in
-`MQTT_PENDING`; `MQTT_FLUSH` wartet darauf — nützlich in einem Programm, das
+`MQTT_UNACKED_COUNT`; `MQTT_FLUSH` wartet darauf — nützlich in einem Programm, das
 eine Nachricht schickt und gleich endet. Abonniert man mit QoS 1, bestätigt
 der Client eingehende Nachrichten selbst. QoS 1 heißt „mindestens einmal":
 geht eine Bestätigung verloren, kommt dieselbe Nachricht ein zweites Mal.
@@ -160,12 +160,12 @@ geht eine Bestätigung verloren, kommt dieselbe Nachricht ein zweites Mal.
 IMPORT "mqtt"
 DIM h AS MQTT_HANDLE : h = MQTT_CONNECT("192.168.1.50", 1883, "werkstatt-steuerung")
 MQTT_PUBLISH(h, "werkstatt/motor", "stopp", FALSE, 1)
-IF NOT MQTT_FLUSH(h, 3000) THEN PRINT "nicht bestaetigt: "; MQTT_PENDING(h)
+IF NOT MQTT_FLUSH(h, 3000) THEN PRINT "nicht bestaetigt: "; MQTT_UNACKED_COUNT(h)
 MQTT_DISCONNECT(h)
 ```
 
 Bricht die Verbindung ab, bevor die Bestätigung kam, schickt der Client die
-Nachricht nicht von selbst neu; `MQTT_PENDING` zeigt, ob etwas offen war.
+Nachricht nicht von selbst neu; `MQTT_UNACKED_COUNT` zeigt, ob etwas offen war.
 
 ## Verschlüsselt: mqtts://
 

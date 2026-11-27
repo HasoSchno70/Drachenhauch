@@ -529,7 +529,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
                     ARRAY_PUSH(takt, "        IF MOUSE_HIT(0) AND GUI_HIT_TEST(MOUSEX(), MOUSEY()) = " + ctl + " AND studioFrei(Self.studioWin) THEN " + zf + " = TRUE")
                     ARRAY_PUSH(takt, "        IF " + zf + " THEN")
                     ARRAY_PUSH(takt, "            IF MOUSEBUTTON(0) THEN")
-                    ARRAY_PUSH(takt, "                Self." + MAPGET(evMeth, schl) + "(MOUSEX() - GUI_CANVAS_X(" + ctl + "), MOUSEY() - GUI_CANVAS_Y(" + ctl + "))")
+                    ARRAY_PUSH(takt, "                Self." + MAPGET(evMeth, schl) + "(MOUSEX() - GUI_CANVAS_SCREEN_X(" + ctl + "), MOUSEY() - GUI_CANVAS_SCREEN_Y(" + ctl + "))")
                     ARRAY_PUSH(takt, "            ELSE")
                     ARRAY_PUSH(takt, "                " + zf + " = FALSE")
                     ARRAY_PUSH(takt, "            END IF")
@@ -538,7 +538,7 @@ FUNCTION basisCode$(ei AS INTEGER) AS STRING
                     ' Nur, wenn die Fläche zu sehen ist: auf einer Reiterseite
                     ' im Hintergrund malte sie sonst über die vordere.
                     ARRAY_PUSH(zeichnen, "        IF GUI_SHOWN(" + ctl + ") THEN")
-                    ARRAY_PUSH(zeichnen, "            SCISSOR(GUI_CANVAS_X(" + ctl + "), GUI_CANVAS_Y(" + ctl + "), GUI_CANVAS_W(" + ctl + "), GUI_CANVAS_H(" + ctl + "))")
+                    ARRAY_PUSH(zeichnen, "            SCISSOR(GUI_CANVAS_SCREEN_X(" + ctl + "), GUI_CANVAS_SCREEN_Y(" + ctl + "), GUI_CANVAS_SCREEN_W(" + ctl + "), GUI_CANVAS_SCREEN_H(" + ctl + "))")
                     ARRAY_PUSH(zeichnen, "            studioSchriftAn()")
                     ARRAY_PUSH(zeichnen, "            " + mn)
                     ARRAY_PUSH(zeichnen, "            studioSchriftAus()")
@@ -923,7 +923,7 @@ SUB befundLagenNachziehen()
         DIM y AS INTEGER
         DIM b AS INTEGER
         DIM h AS INTEGER
-        (x, y, b, h) = GUI_LISTBOX_ITEM_RECT(lstProbleme, k)
+        (x, y, b, h) = GUI_LISTBOX_ITEM_SCREEN_RECT(lstProbleme, k)
         IF h > 0 THEN protokoll("lage befund " + STR$(k) + " " + STR$(x + b \ 2) + " " + STR$(y + h \ 2))
     NEXT
 END SUB

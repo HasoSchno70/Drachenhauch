@@ -1,9 +1,60 @@
-//! Die Grafik-Befehle (`try_graphics`): Fenster, Zeichnen, Texte, Bilder, Eingabe, Audio, 3D und alle Module, die ein Fenster brauchen.
+//! Die Grafik-Befehle (`try_graphics`): Fenster, Zeichnen, Texte, Bilder, Eingabe, 3D und alle Module, die ein Fenster brauchen; dazu das Immediate-Mode-`ui`. Der Ton steht in vm_ton.rs.
 //!
-//! Teil von `vm.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `vm.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
+
+/// INPUT_BIND mit einem Buchstaben: der Buchstabe steht in den unteren Bits,
+/// die Taste dazu wird je Bild nach der Belegung gesucht.
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
+const BUCHSTABEN_MARKE: i64 = 1 << 40;
+
+/// Argument-Helfer der Grafik- und Ton-Befehle (`try_graphics`, `try_ton`).
+// Grafik-Zahlen (Koordinaten, Groessen, Handles): eine Kommazahl
+// verliert ihre Nachkommastellen (zur Null hin) -- die Regel der
+// Zeichenbefehle seit jeher (`BOX(w / 2, ...)`), siehe argument.rs.
+#[cfg(feature = "graphics")]
+pub(super) fn gi(a: &[Value], i: usize, fn_: &str) -> R<i64> {
+    // NIL ist hier fast immer ein Bild/Klang/Handle, das nie
+    // geladen wurde -- das sagt die Meldung dazu.
+    if let Some(v @ Value::Nil) = a.get(i) {
+        return Err(format!("{} -- die Variable hat noch keinen Wert (Bild/Klang vorher laden, z.B. b = LOADIMAGE(\"bild.png\"))",
+            crate::argument::erwartet(fn_, "Zahl", Some(i + 1), v)));
+    }
+    crate::argument::a_koord(a, i, fn_)
+}
+
+#[cfg(feature = "graphics")]
+pub(super) fn gs<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
+    crate::argument::a_text(a, i, fn_)
+}
+
+// Schalter (an/aus): TRUE/FALSE oder 1/0; fehlt er, ist er aus.
+// Bis 2026.53 galt hier nur TRUE -- `TEXT_BOLD(1)` tat still nichts.
+// `fn_` ist der Name, unter dem der Arm steht (klein); gross
+// geschrieben wird erst fuer die Meldung.
+#[cfg(feature = "graphics")]
+pub(super) fn gb(a: &[Value], i: usize, fn_: &str) -> R<bool> {
+    crate::argument::a_schalter_oder(a, i, false, fn_)
+        .map_err(|_| crate::argument::erwartet(&fn_.to_uppercase(), "BOOLEAN oder Zahl", Some(i + 1), &a[i]))
+}
+
+#[cfg(feature = "graphics")]
+pub(super) fn need_f(a: &[Value], i: usize, fn_: &str) -> R<f64> {
+    crate::argument::a_num(a, i, fn_)
+}
+
+// Optionaler Easing-Name fuer Fades/Slides (linear/in/out/inout,
+// Default "linear" bei fehlendem Argument). Pruefung VOR der Audio-
+// Initialisierung -> golden-testbar (wie die Bus-Namen-Checks).
+#[cfg(feature = "graphics")]
+pub(super) fn easing_name(a: &[Value], i: usize, fn_: &str) -> R<String> {
+    let name = if a.len() > i { gs(a, i, fn_)?.to_lowercase() } else { "linear".to_string() };
+    if !matches!(name.as_str(), "linear" | "in" | "out" | "inout") {
+        return Err(format!("{}: unbekanntes Easing '{}' (linear, in, out, inout)", fn_, name));
+    }
+    Ok(name)
+}
 
 impl<'p> Vm<'p> {
     /// Eine Warnung, die ein `SHADER_SET*` hinterlassen hat, mit Datei und
@@ -18,18 +69,6 @@ impl<'p> Vm<'p> {
 
     #[cfg(feature = "graphics")]
     pub(super) fn try_graphics(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        // Grafik-Zahlen (Koordinaten, Groessen, Handles): eine Kommazahl
-        // verliert ihre Nachkommastellen (zur Null hin) -- die Regel der
-        // Zeichenbefehle seit jeher (`BOX(w / 2, ...)`), siehe argument.rs.
-        fn gi(a: &[Value], i: usize, fn_: &str) -> R<i64> {
-            // NIL ist hier fast immer ein Bild/Klang/Handle, das nie
-            // geladen wurde -- das sagt die Meldung dazu.
-            if let Some(v @ Value::Nil) = a.get(i) {
-                return Err(format!("{} -- die Variable hat noch keinen Wert (Bild/Klang vorher laden, z.B. b = LOADIMAGE(\"bild.png\"))",
-                    crate::argument::erwartet(fn_, "Zahl", Some(i + 1), v)));
-            }
-            crate::argument::a_koord(a, i, fn_)
-        }
         // Tastenargument von KEYHIT & Co.: eine Zahl ist die LAGE der Taste,
         // ein einzelner Buchstabe (oder eine Ziffer) die Taste, auf der er steht.
         fn taste(g: &crate::graphics::Graphics, a: &[Value], fn_: &str) -> R<i64> {
@@ -44,20 +83,6 @@ impl<'p> Vm<'p> {
             }
             gi(a, 0, fn_)
         }
-        fn gs<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
-            crate::argument::a_text(a, i, fn_)
-        }
-        // Schalter (an/aus): TRUE/FALSE oder 1/0; fehlt er, ist er aus.
-        // Bis 2026.53 galt hier nur TRUE -- `TEXT_BOLD(1)` tat still nichts.
-        // `fn_` ist der Name, unter dem der Arm steht (klein); gross
-        // geschrieben wird erst fuer die Meldung.
-        fn gb(a: &[Value], i: usize, fn_: &str) -> R<bool> {
-            crate::argument::a_schalter_oder(a, i, false, fn_)
-                .map_err(|_| crate::argument::erwartet(&fn_.to_uppercase(), "BOOLEAN oder Zahl", Some(i + 1), &a[i]))
-        }
-        fn need_f(a: &[Value], i: usize, fn_: &str) -> R<f64> {
-            crate::argument::a_num(a, i, fn_)
-        }
         // Farbe fuer die Leinwand-Befehle (IMAGE_FILL_* & Co.). Ohne Deckkraft
         // gilt die Farbe wie ueberall (oberstes Byte 0 = deckend); mit ihr
         // bestimmt allein die Deckkraft -- auch 0, was sich als Farbe nicht
@@ -67,10 +92,7 @@ impl<'p> Vm<'p> {
                 Some(Value::Int(n)) => *n,
                 _ => return Err(format!("{}: Argument {} muss eine Farbe sein", fn_, i + 1)),
             };
-            let u = v as u32;
-            let al = ((u >> 24) & 0xFF) as u8;
-            let mut c = [((u >> 16) & 0xFF) as u8, ((u >> 8) & 0xFF) as u8, (u & 0xFF) as u8,
-                         if al == 0 { 255 } else { al }];
+            let mut c = crate::farbraum::rgba(v);
             if let Some(d) = deck.and_then(|k| a.get(k)) {
                 let d = match d {
                     Value::Int(n) => *n,
@@ -91,16 +113,6 @@ impl<'p> Vm<'p> {
                 return Err(format!("{}: erwartet {} Zahlen, erhalten {}", fn_, n, a.len()));
             }
             (0..n).map(|i| Ok(need_f(a, i, fn_)? as f32)).collect()
-        }
-        // Optionaler Easing-Name fuer Fades/Slides (linear/in/out/inout,
-        // Default "linear" bei fehlendem Argument). Pruefung VOR der Audio-
-        // Initialisierung -> golden-testbar (wie die Bus-Namen-Checks).
-        fn easing_name(a: &[Value], i: usize, fn_: &str) -> R<String> {
-            let name = if a.len() > i { gs(a, i, fn_)?.to_lowercase() } else { "linear".to_string() };
-            if !matches!(name.as_str(), "linear" | "in" | "out" | "inout") {
-                return Err(format!("{}: unbekanntes Easing '{}' (linear, in, out, inout)", fn_, name));
-            }
-            Ok(name)
         }
         // 1D-INTEGER-Array -> Vec<i32> (fuer Bulk-Draws).
         fn arr_i32(v: &Value, fn_: &str) -> R<Vec<i32>> {
@@ -295,9 +307,9 @@ impl<'p> Vm<'p> {
                 let k = punkte * 2;
                 if a.len() < k || a.len() > k + 2 {
                     return Err(if name == "bezier" {
-                        format!("BEZIER: erwartet (x1, y1, kx, ky, x2, y2[, farbe[, breite]]), erhalten {} Argumente", a.len())
+                        crate::vm::falsche_argumente("BEZIER", a.len())
                     } else {
-                        format!("BEZIER3: erwartet (x1, y1, k1x, k1y, k2x, k2y, x2, y2[, farbe[, breite]]), erhalten {} Argumente", a.len())
+                        crate::vm::falsche_argumente("BEZIER3", a.len())
                     });
                 }
                 let mut xs = Vec::with_capacity(punkte);
@@ -314,7 +326,7 @@ impl<'p> Vm<'p> {
             "spline_basis" | "spline_bezier" => {
                 let n = if name == "spline_basis" { "SPLINE_BASIS" } else { "SPLINE_BEZIER" };
                 if a.len() < 2 || a.len() > 4 {
-                    return Err(format!("{}: erwartet (xs, ys[, farbe[, breite]]), erhalten {} Argumente", n, a.len()));
+                    return Err(crate::vm::falsche_argumente(n, a.len()));
                 }
                 let xs = arr_i32(&a[0], n)?;
                 let ys = arr_i32(&a[1], n)?;
@@ -401,12 +413,13 @@ impl<'p> Vm<'p> {
             // Bilder und Dateien ueber die Zwischenablage, Ziehen hinaus
             // (ablage.rs) -- Text geht oben ueber GLFW.
             "clipboard_set_image" => { let n = "CLIPBOARD_SET_IMAGE";
-                if a.len() != 1 { return Err(format!("{}: erwartet (bild)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let (px, b, h) = g!().image_rgba(gi(a,0,n)?, n)?;
-                match crate::ablage::bild_setzen(b, h, px) {
-                    Ok(()) => Value::Bool(true),
-                    Err(e) => return Err(format!("{}: {}", n, e)),
-                } }
+                // Wie CLIPBOARD_SET und _SET_FILES: gelingt es nicht, ist es ein
+                // Fehler; ein Rueckgabewert, der nie FALSE wird, sagte nichts
+                // (bis 2026.53 BOOLEAN, Bericht E2).
+                if let Err(e) = crate::ablage::bild_setzen(b, h, px) { return Err(format!("{}: {}", n, e)); }
+                Value::Nil }
             "clipboard_get_image" => { let n = "CLIPBOARD_GET_IMAGE";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 match crate::ablage::bild_holen() {
@@ -421,19 +434,19 @@ impl<'p> Vm<'p> {
                 if !a.is_empty() { return Err("CLIPBOARD_HAS_IMAGE: erwartet keine Argumente".into()); }
                 Value::Bool(crate::ablage::bild_holen().is_some()) }
             "clipboard_set_files" => { let n = "CLIPBOARD_SET_FILES";
-                if a.len() != 1 { return Err(format!("{}: erwartet (pfade)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 if let Err(e) = crate::ablage::dateien_setzen(&crate::builtins::str_array(&a[0], n)?) { return Err(format!("{}: {}", n, e)); }
                 Value::Nil }
             "clipboard_get_files" => {
                 if !a.is_empty() { return Err("CLIPBOARD_GET_FILES: erwartet keine Argumente".into()); }
                 crate::builtins::new_str_array(crate::ablage::dateien_holen()) }
             "drag_out_files" => { let n = "DRAG_OUT_FILES";
-                if a.len() != 1 { return Err(format!("{}: erwartet (pfade)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let pfade = crate::builtins::str_array(&a[0], n)?;
                 if pfade.is_empty() { return Err(format!("{}: keine Dateien", n)); }
                 Value::str_rc(crate::ablage::ziehen(g!().haupt_os_handle(), &pfade, "")) }
             "drag_out_text" => { let n = "DRAG_OUT_TEXT";
-                if a.len() != 1 { return Err(format!("{}: erwartet (text$)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let s = gs(a,0,n)?.to_string();
                 Value::str_rc(crate::ablage::ziehen(g!().haupt_os_handle(), &[], &s)) }
             "files_dropped" => Value::Int(g!().dropped_files().len() as i64),
@@ -486,9 +499,20 @@ impl<'p> Vm<'p> {
                 let breite = if a.len() >= 6 { Some(need_f(a, 5, "ELLIPSEOUTLINE")?) } else { None };
                 g!().ellipse_outline(gi(a,0,"ELLIPSEOUTLINE")? as i32, gi(a,1,"ELLIPSEOUTLINE")? as i32, gi(a,2,"ELLIPSEOUTLINE")? as i32, gi(a,3,"ELLIPSEOUTLINE")? as i32, c, breite); Value::Nil
             }
+            // Derselbe Bogen nach der Leitlinie des Zeichnens (Regel 10):
+            // Grad, 0 = rechts, im Uhrzeigersinn -- wie PIE. ARC selbst nimmt
+            // Bogenmass gegen den Uhrzeigersinn und bleibt dabei.
+            "arc_deg" => {
+                let f = "ARC_DEG";
+                let start = -need_f(a, 4, f)?.to_radians();
+                let end = -need_f(a, 5, f)?.to_radians();
+                let c = if a.len() >= 7 { gi(a, 6, f)? } else { 0xFFFFFF };
+                let width = if a.len() >= 8 { Some(need_f(a, 7, f)?) } else { None };
+                g!().arc(gi(a,0,f)? as i32, gi(a,1,f)? as i32, gi(a,2,f)? as i32, gi(a,3,f)? as i32, start, end, width, c); Value::Nil
+            }
             "arc" => {
-                let start = match a.get(4) { Some(Value::Int(n)) => *n as f64, Some(Value::Float(f)) => *f, _ => return Err("ARC: start muss Zahl sein".into()) };
-                let end = match a.get(5) { Some(Value::Int(n)) => *n as f64, Some(Value::Float(f)) => *f, _ => return Err("ARC: end muss Zahl sein".into()) };
+                let start = need_f(a, 4, "ARC")?;
+                let end = need_f(a, 5, "ARC")?;
                 let c = if a.len() >= 7 { gi(a, 6, "ARC")? } else { 0xFFFFFF };
                 let width = if a.len() >= 8 { Some(need_f(a, 7, "ARC")?) } else { None };
                 g!().arc(gi(a,0,"ARC")? as i32, gi(a,1,"ARC")? as i32, gi(a,2,"ARC")? as i32, gi(a,3,"ARC")? as i32, start, end, width, c); Value::Nil
@@ -497,7 +521,7 @@ impl<'p> Vm<'p> {
             "pie" | "pieoutline" => {
                 let n = if name == "pie" { "PIE" } else { "PIEOUTLINE" };
                 if a.len() < 5 || a.len() > 6 {
-                    return Err(format!("{}: erwartet (x, y, r, von_grad, bis_grad[, farbe]), erhalten {} Argumente", n, a.len()));
+                    return Err(crate::vm::falsche_argumente(n, a.len()));
                 }
                 let c = if a.len() == 6 { gi(a, 5, n)? } else { 0xFFFFFF };
                 g!().ring(gi(a,0,n)? as i32, gi(a,1,n)? as i32, 0, gi(a,2,n)? as i32,
@@ -506,7 +530,7 @@ impl<'p> Vm<'p> {
             }
             "circle_gradient" => {
                 if a.len() != 5 {
-                    return Err(format!("CIRCLE_GRADIENT: erwartet (x, y, r, innen, aussen), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("CIRCLE_GRADIENT", a.len()));
                 }
                 g!().circle_gradient(gi(a,0,"CIRCLE_GRADIENT")? as i32, gi(a,1,"CIRCLE_GRADIENT")? as i32,
                     gi(a,2,"CIRCLE_GRADIENT")? as i32, gi(a,3,"CIRCLE_GRADIENT")?, gi(a,4,"CIRCLE_GRADIENT")?);
@@ -514,7 +538,7 @@ impl<'p> Vm<'p> {
             }
             "boxrot" => {
                 if a.len() < 5 || a.len() > 6 {
-                    return Err(format!("BOXROT: erwartet (x, y, breite, hoehe, winkel[, farbe]), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("BOXROT", a.len()));
                 }
                 let c = if a.len() == 6 { gi(a, 5, "BOXROT")? } else { 0xFFFFFF };
                 g!().box_rot(gi(a,0,"BOXROT")? as i32, gi(a,1,"BOXROT")? as i32, gi(a,2,"BOXROT")? as i32,
@@ -523,7 +547,7 @@ impl<'p> Vm<'p> {
             }
             "gradient4" => {
                 if a.len() != 8 {
-                    return Err(format!("GRADIENT4: erwartet (x1, y1, x2, y2, oben_links, oben_rechts, unten_rechts, unten_links), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("GRADIENT4", a.len()));
                 }
                 g!().gradient4(gi(a,0,"GRADIENT4")? as i32, gi(a,1,"GRADIENT4")? as i32, gi(a,2,"GRADIENT4")? as i32,
                     gi(a,3,"GRADIENT4")? as i32,
@@ -535,9 +559,9 @@ impl<'p> Vm<'p> {
                 let max = if name == "ngon" { 6 } else { 7 };
                 if a.len() < 5 || a.len() > max {
                     return Err(if name == "ngon" {
-                        format!("NGON: erwartet (x, y, ecken, r, winkel[, farbe]), erhalten {} Argumente", a.len())
+                        crate::vm::falsche_argumente("NGON", a.len())
                     } else {
-                        format!("NGONOUTLINE: erwartet (x, y, ecken, r, winkel[, farbe[, breite]]), erhalten {} Argumente", a.len())
+                        crate::vm::falsche_argumente("NGONOUTLINE", a.len())
                     });
                 }
                 let ecken = gi(a, 2, n)?;
@@ -552,7 +576,7 @@ impl<'p> Vm<'p> {
             }
             "linedashed" => {
                 if a.len() < 6 || a.len() > 7 {
-                    return Err(format!("LINEDASHED: erwartet (x1, y1, x2, y2, strich, luecke[, farbe]), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("LINEDASHED", a.len()));
                 }
                 let (st, lu) = (gi(a,4,"LINEDASHED")?, gi(a,5,"LINEDASHED")?);
                 if st < 1 || lu < 1 {
@@ -565,7 +589,7 @@ impl<'p> Vm<'p> {
             }
             "drawimage9" => {
                 if a.len() < 9 || a.len() > 10 {
-                    return Err(format!("DRAWIMAGE9: erwartet (bild, x, y, breite, hoehe, links, oben, rechts, unten[, farbe]), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("DRAWIMAGE9", a.len()));
                 }
                 let tint = if a.len() == 10 { Some(gi(a, 9, "DRAWIMAGE9")?) } else { None };
                 g!().draw_image_9(gi(a,0,"DRAWIMAGE9")?, gi(a,1,"DRAWIMAGE9")? as i32, gi(a,2,"DRAWIMAGE9")? as i32,
@@ -617,10 +641,10 @@ impl<'p> Vm<'p> {
                 let bits = crate::schnitt::stil_parsen(&gs(a,0,"TEXT_STYLE")?).map_err(|e| format!("TEXT_STYLE: {}", e))?;
                 g!().set_text_stil(bits); Value::Nil
             }
-            "text_get_style$" | "text_get_style" => Value::Str(crate::schnitt::stil_text(g!().text_stil()).into()),
+            "text_get_style$" => Value::Str(crate::schnitt::stil_text(g!().text_stil()).into()),
             "font_style" | "font_has_style" => {
                 let f = if name == "font_style" { "FONT_STYLE" } else { "FONT_HAS_STYLE" };
-                if a.len() != 2 { return Err(format!("{}: erwartet (font, stil$)", f)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(f, a.len())); }
                 let bits = crate::schnitt::stil_parsen(&gs(a,1,f)?).map_err(|e| format!("{}: {}", f, e))?;
                 let (h, echt) = g!().font_schnitt(gi(a,0,f)?, bits)?;
                 if name == "font_style" { Value::Int(h) } else { Value::Bool(echt) }
@@ -631,11 +655,11 @@ impl<'p> Vm<'p> {
             // Notenschluessel auf seine Linie, ein Symbol mittig in einen
             // Knopf), ohne die Datei selbst auszulesen.
             "font_baseline" => {
-                if a.len() != 2 { return Err("FONT_BASELINE: erwartet (font, groesse)".into()); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente("FONT_BASELINE", a.len())); }
                 Value::Float(g!().font_baseline(gi(a,0,"FONT_BASELINE")?, zahl_arg(a,1,"FONT_BASELINE")?)?)
             }
             "font_glyph_box" => {
-                if a.len() != 3 { return Err("FONT_GLYPH_BOX: erwartet (font, zeichen$, groesse)".into()); }
+                if a.len() != 3 { return Err(crate::vm::falsche_argumente("FONT_GLYPH_BOX", a.len())); }
                 let t = gs(a,1,"FONT_GLYPH_BOX")?;
                 let mut it = t.chars();
                 let c = match (it.next(), it.next()) {
@@ -648,15 +672,15 @@ impl<'p> Vm<'p> {
             // Ligaturen einer Schrift (formung.rs): ihre Laeufe gehen durch
             // die Formung (rustybuzz) statt Glyphe fuer Glyphe durch raylib.
             "font_ligatures" => { let n = "FONT_LIGATURES";
-                if a.len() != 2 { return Err(format!("{}: erwartet (font, an)", n)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let h = gi(a,0,n)?;
                 let _ = g!();
-                if !crate::formung::ligaturen_setzen(h, a[1].truthy()) {
+                if !crate::formung::ligaturen_setzen(h, crate::argument::a_schalter(a, 1, n)?) {
                     return Err(format!("{}: {} ist keine mit LOADFONT geladene Schrift", n, h));
                 }
                 Value::Nil }
             "loadfont" => {
-                if a.len() > 3 { return Err("LOADFONT: erwartet (pfad$, groesse[, zeichen$])".into()); }
+                if a.len() > 3 { return Err(crate::vm::falsche_argumente("LOADFONT", a.len())); }
                 if a.len() == 3 {
                     Value::Int(g!().load_font_mit(gs(a,0,"LOADFONT")?, gi(a,1,"LOADFONT")? as i32, &gs(a,2,"LOADFONT")?)?)
                 } else {
@@ -669,7 +693,7 @@ impl<'p> Vm<'p> {
                 // Lade-Groesse -- wer scharf bei 32 laedt und bei 16 zeichnen
                 // will, schrieb vorher SETFONT + TEXT_SIZE und vergass das zweite.
                 if a.is_empty() || a.len() > 2 {
-                    return Err(format!("SETFONT: erwartet (handle[, groesse]), erhalten {} Argument(e)", a.len()));
+                    return Err(format!("SETFONT: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
                 }
                 g!().set_font(gi(a,0,"SETFONT")?)?;
                 if a.len() == 2 {
@@ -680,7 +704,7 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "loadfont_sdf" => {
-                if a.len() < 2 || a.len() > 3 { return Err("LOADFONT_SDF: erwartet (pfad$, groesse[, zeichen$])".into()); }
+                if a.len() < 2 || a.len() > 3 { return Err(crate::vm::falsche_argumente("LOADFONT_SDF", a.len())); }
                 let z = if a.len() == 3 { Some(gs(a,2,"LOADFONT_SDF")?) } else { None };
                 Value::Int(g!().load_font_sdf(gs(a,0,"LOADFONT_SDF")?, gi(a,1,"LOADFONT_SDF")? as i32, z.as_deref())?)
             }
@@ -703,7 +727,7 @@ impl<'p> Vm<'p> {
                 }
             }
             "font_to_image" => {
-                if a.is_empty() || a.len() > 3 { return Err("FONT_TO_IMAGE: erwartet (font[, erstes[, letztes]])".into()); }
+                if a.is_empty() || a.len() > 3 { return Err(crate::vm::falsche_argumente("FONT_TO_IMAGE", a.len())); }
                 let erstes = if a.len() > 1 { gi(a,1,"FONT_TO_IMAGE")? } else { 32 };
                 let letztes = if a.len() > 2 { gi(a,2,"FONT_TO_IMAGE")? } else if a.len() > 1 { erstes.max(126) } else { 126 };
                 if erstes < 0 || letztes < 0 || erstes > 0x10FFFF || letztes > 0x10FFFF {
@@ -712,7 +736,7 @@ impl<'p> Vm<'p> {
                 Value::Int(g!().font_to_image(gi(a,0,"FONT_TO_IMAGE")?, erstes as u32, letztes as u32)?)
             }
             "drawfps" => {
-                if a.len() != 2 && a.len() != 3 { return Err("DRAWFPS: erwartet (x, y[, farbe])".into()); }
+                if a.len() != 2 && a.len() != 3 { return Err(crate::vm::falsche_argumente("DRAWFPS", a.len())); }
                 let farbe = if a.len() == 3 { Some(gi(a,2,"DRAWFPS")?) } else { None };
                 g!().draw_fps(gi(a,0,"DRAWFPS")? as i32, gi(a,1,"DRAWFPS")? as i32, farbe);
                 Value::Nil
@@ -729,7 +753,7 @@ impl<'p> Vm<'p> {
                     // sx, sy, sw, sh]) -- gedacht fuer benannte Argumente:
                     // DRAW_IMAGE(held, x, y, angle: 30, flip_x: TRUE).
                     if a.len() > 13 {
-                        return Err(format!("DRAW_IMAGE: erwartet 3..13 Argumente, erhalten {}", a.len()));
+                        return Err(format!("DRAW_IMAGE: erwartet 3 bis 13 Argumente, erhalten {}", a.len()));
                     }
                     let ganz = |i: usize, vorgabe: i64| -> Result<i64, String> {
                         if a.len() > i { gi(a, i, "DRAW_IMAGE") } else { Ok(vorgabe) } };
@@ -773,19 +797,20 @@ impl<'p> Vm<'p> {
                 // Gesammelte PRINT-Zeilen eines Spiels gehen spaetestens nach
                 // 50 ms hinaus, nicht erst beim Beenden.
                 if !self.out.is_empty() && self.out_zeit.elapsed() >= std::time::Duration::from_millis(50) { self.flush_out(); }
-                // Musik-Stream nachfuettern (sonst stockt die Wiedergabe).
+                // Ton je Bild: endliche Loops, AUTOPAN, Musik-Warteschlange
+                // (`Audio::update`; Kira spielt selbst, hier wird nur gesteuert).
                 if let Some(au) = self.audio.as_mut() { au.update(); }
                 Value::Nil
             }
             "keypressed" => { let k = taste(g!(), a, "KEYPRESSED")?; Value::Bool(g!().key_down(k)) }
             "inkey$" | "inkey" => Value::Str(g!().inkey().into()),
             "waitkey" => Value::Int(g!().waitkey()),
-            // SCROLL verschiebt persistente Framebuffer-Pixel -- die native
-            // Runtime zeichnet jeden Frame neu aus dem Command-Buffer (Layer
-            // werden pro FLIP geleert), es gibt also keine persistenten Pixel
-            // zum Verschieben. Graceful No-Op (Programm laeuft); SCROLL ist
-            // Tree-Walker-only (siehe docs/intern/befehlssatz-roadmap.md).
-            "scroll" => { let _ = (gi(a,0,"SCROLL")?, gi(a,1,"SCROLL")?); Value::Nil }
+            // SCROLL verschob einst die Pixel eines bleibenden Bildspeichers.
+            // dhrt zeichnet jedes Bild neu, es gibt keine bleibenden Pixel --
+            // bis 2026.53 tat SCROLL darum still nichts. Jetzt sagt es, was
+            // stattdessen geht (Bericht C4.1).
+            "scroll" => { let _ = (gi(a,0,"SCROLL")?, gi(a,1,"SCROLL")?);
+                return Err("SCROLL: verschiebt in Drachenhauch nichts -- jedes Bild wird neu gezeichnet; zum Verschieben CAMERA_SET(x, y) oder ein Render-Ziel (RENDERTARGET_DRAW) nehmen".into()); }
             "joystick_count" => Value::Int(g!().joystick_count()),
             "joystick_name" => Value::Str(g!().joystick_name(gi(a,0,"JOYSTICK_NAME")?)?.into()),
             "joystick_axis" => Value::Float(g!().joystick_axis(gi(a,0,"JOYSTICK_AXIS")?, gi(a,1,"JOYSTICK_AXIS")?)?),
@@ -816,7 +841,7 @@ impl<'p> Vm<'p> {
             "mouse_on_screen" => Value::Bool(g!().mouse_on_screen()),
             "mouse_cursor" => { let s = gs(a,0,"MOUSE_CURSOR")?.to_string();
                                 g!().mouse_cursor(&s)?; Value::Nil }
-            "mouse_cursor_get$" | "mouse_cursor_get" => Value::str_rc(g!().zeiger_jetzt()),
+            "mouse_cursor_get$" => Value::str_rc(g!().zeiger_jetzt()),
             "mouse_cursor_new" => { let (b, x, y) = (gi(a,0,"MOUSE_CURSOR_NEW")?, gi(a,1,"MOUSE_CURSOR_NEW")?, gi(a,2,"MOUSE_CURSOR_NEW")?);
                                     Value::str_rc(g!().zeiger_neu(b, x, y)?) }
             "joystick_hit" => Value::Bool(g!().joystick_hit(gi(a,0,"JOYSTICK_HIT")?,
@@ -852,7 +877,7 @@ impl<'p> Vm<'p> {
             "window_hide" => { g!().window_hide(true); Value::Nil }
             "window_show" => { g!().window_hide(false); Value::Nil }
             "tray_show" => {
-                if a.len() > 2 { return Err("TRAY_SHOW: erwartet ([bild[, hinweis$]])".into()); }
+                if a.len() > 2 { return Err(crate::vm::falsche_argumente("TRAY_SHOW", a.len())); }
                 // Ein Bild ist ein Handle (Zahl); ein Text allein ist der Hinweis.
                 let (bild, tipp) = match (a.first(), a.get(1)) {
                     (Some(Value::Str(s)), None) => (None, Some(s.to_string())),
@@ -880,10 +905,10 @@ impl<'p> Vm<'p> {
             "tray_shown" => { let _ = g!(); Value::Bool(crate::tray::sichtbar()) }
             "tray_clicked" => { let _ = g!(); Value::Bool(crate::tray::bild().klick) }
             "tray_double_clicked" => { let _ = g!(); Value::Bool(crate::tray::bild().doppel) }
-            "tray_menu_clicked$" | "tray_menu_clicked" => { let _ = g!(); Value::str_rc(crate::tray::bild().menue.unwrap_or_default()) }
+            "tray_menu_clicked$" => { let _ = g!(); Value::str_rc(crate::tray::bild().menue.unwrap_or_default()) }
             "notify" => {
                 let (titel, text) = (gs(a,0,"NOTIFY")?.to_string(), if a.len() > 1 { gs(a,1,"NOTIFY")?.to_string() } else { String::new() });
-                if a.len() > 2 { return Err("NOTIFY: erwartet (titel$[, text$])".into()); }
+                if a.len() > 2 { return Err(crate::vm::falsche_argumente("NOTIFY", a.len())); }
                 g!().notify(&titel, &text)?;
                 Value::Nil
             }
@@ -1148,7 +1173,7 @@ impl<'p> Vm<'p> {
             }
             "postfx" => {
                 if a.is_empty() || a.len() > 2 {
-                    return Err("POSTFX: erwartet (shader [, massstab])".into());
+                    return Err(crate::vm::falsche_argumente("POSTFX", a.len()));
                 }
                 let m = if a.len() == 2 { Some(need_f(a, 1, "POSTFX")? as f64) } else { None };
                 g!().set_postfx(gi(a, 0, "POSTFX")?, m)?;
@@ -1397,7 +1422,7 @@ impl<'p> Vm<'p> {
             }
             "billboard_part" => {
                 if a.len() != 10 {
-                    return Err(format!("BILLBOARD_PART: erwartet (bild, sx, sy, sb, sh, x, y, z, groesse, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("BILLBOARD_PART", a.len()));
                 }
                 let f = "BILLBOARD_PART";
                 g!().billboard_part(gi(a,0,f)?,
@@ -1408,7 +1433,7 @@ impl<'p> Vm<'p> {
             }
             "billboard_ex" => {
                 if a.len() != 8 {
-                    return Err(format!("BILLBOARD_EX: erwartet (bild, x, y, z, breite, hoehe, winkel, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("BILLBOARD_EX", a.len()));
                 }
                 let f = "BILLBOARD_EX";
                 g!().billboard_ex(gi(a,0,f)?, need_f(a,1,f)? as f32, need_f(a,2,f)? as f32, need_f(a,3,f)? as f32,
@@ -1418,7 +1443,7 @@ impl<'p> Vm<'p> {
             "capsule" | "capsule_wires" => {
                 let f = if name == "capsule" { "CAPSULE" } else { "CAPSULE_WIRES" };
                 if a.len() != 8 {
-                    return Err(format!("{}: erwartet (x1, y1, z1, x2, y2, z2, r, farbe), erhalten {} Argumente", f, a.len()));
+                    return Err(crate::vm::falsche_argumente(f, a.len()));
                 }
                 let mut p = [0f32; 6];
                 for (i, v) in p.iter_mut().enumerate() { *v = need_f(a, i, f)? as f32; }
@@ -1428,7 +1453,7 @@ impl<'p> Vm<'p> {
             "cylinder_ex" => {
                 let f = "CYLINDER_EX";
                 if a.len() != 9 {
-                    return Err(format!("CYLINDER_EX: erwartet (x1, y1, z1, x2, y2, z2, r_anfang, r_ende, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("CYLINDER_EX", a.len()));
                 }
                 let mut p = [0f32; 6];
                 for (i, v) in p.iter_mut().enumerate() { *v = need_f(a, i, f)? as f32; }
@@ -1438,7 +1463,7 @@ impl<'p> Vm<'p> {
             "cylinder_wires" => {
                 let f = "CYLINDER_WIRES";
                 if a.len() != 7 {
-                    return Err(format!("CYLINDER_WIRES: erwartet (x, y, z, r_oben, r_unten, hoehe, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("CYLINDER_WIRES", a.len()));
                 }
                 g!().cylinder_wires(need_f(a,0,f)? as f32, need_f(a,1,f)? as f32, need_f(a,2,f)? as f32,
                     need_f(a,3,f)? as f32, need_f(a,4,f)? as f32, need_f(a,5,f)? as f32, gi(a,6,f)?);
@@ -1447,7 +1472,7 @@ impl<'p> Vm<'p> {
             "triangle3d" => {
                 let f = "TRIANGLE3D";
                 if a.len() != 10 {
-                    return Err(format!("TRIANGLE3D: erwartet (x1, y1, z1, x2, y2, z2, x3, y3, z3, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("TRIANGLE3D", a.len()));
                 }
                 let mut p = [0f32; 9];
                 for (i, v) in p.iter_mut().enumerate() { *v = need_f(a, i, f)? as f32; }
@@ -1457,7 +1482,7 @@ impl<'p> Vm<'p> {
             "circle3d" => {
                 let f = "CIRCLE3D";
                 if a.len() != 5 {
-                    return Err(format!("CIRCLE3D: erwartet (x, y, z, r, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("CIRCLE3D", a.len()));
                 }
                 g!().circle3d(need_f(a,0,f)? as f32, need_f(a,1,f)? as f32, need_f(a,2,f)? as f32,
                     need_f(a,3,f)? as f32, gi(a,4,f)?);
@@ -1466,7 +1491,7 @@ impl<'p> Vm<'p> {
             "bbox_wires" => {
                 let f = "BBOX_WIRES";
                 if a.len() != 7 {
-                    return Err(format!("BBOX_WIRES: erwartet (x1, y1, z1, x2, y2, z2, farbe), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("BBOX_WIRES", a.len()));
                 }
                 let mut p = [0f32; 6];
                 for (i, v) in p.iter_mut().enumerate() { *v = need_f(a, i, f)? as f32; }
@@ -1546,9 +1571,23 @@ impl<'p> Vm<'p> {
             "mouse_ground_hit" => Value::Bool(g!().mouse_ground(need_f(a,0,"MOUSE_GROUND_HIT")? as f32).2),
 
             // --- Kamera-Modi (raylib UpdateCamera) ---
-            "camera3d_update" => { g!().camera3d_update(gi(a,0,"CAMERA3D_UPDATE")?); Value::Nil }
+            // Der Modus als Zahl (1..4) oder als Text wie bei den anderen
+            // Modus-Befehlen (Bericht B9; bis 2026.53 nur die Zahl).
+            "camera3d_update" => {
+                let f = "CAMERA3D_UPDATE";
+                let m = match a.first() {
+                    Some(Value::Str(s)) => match s.trim().to_lowercase().as_str() {
+                        "free" | "frei" => 1, "orbital" | "umkreisend" => 2,
+                        "first_person" | "ego" => 3, "third_person" | "verfolger" => 4,
+                        "custom" | "eigen" => 0,
+                        x => return Err(format!("{}: unbekannter Modus '{}' -- free/frei, orbital/umkreisend, first_person/ego, third_person/verfolger, custom/eigen", f, x)),
+                    },
+                    _ => gi(a,0,f)?,
+                };
+                g!().camera3d_update(m); Value::Nil
+            }
             "camera3d_move" => {
-                if a.len() != 5 && a.len() != 6 { return Err("CAMERA3D_MOVE: erwartet (vor, rechts, hoch, gieren, neigen[, zoom])".into()); }
+                if a.len() != 5 && a.len() != 6 { return Err(crate::vm::falsche_argumente("CAMERA3D_MOVE", a.len())); }
                 let mut v = [0f32; 6];
                 for (i, w) in v.iter_mut().enumerate().take(a.len()) {
                     let x = need_f(a, i, "CAMERA3D_MOVE")?;
@@ -1609,667 +1648,6 @@ impl<'p> Vm<'p> {
             "shadow_target" => { g!().shadow_target(
                 need_f(a,0,"SHADOW_TARGET")? as f32, need_f(a,1,"SHADOW_TARGET")? as f32, need_f(a,2,"SHADOW_TARGET")? as f32); Value::Nil }
 
-            // --- Audio (Core: SFX + Stream-Musik) ---
-            "loadsound" => {
-                let path = gs(a, 0, "LOADSOUND")?.to_string();
-                Value::Int(self.audio_mut()?.load_sound(&path)?)
-            }
-            "sample_load" => {
-                // SAMPLE_LOAD(path$) -> SAMPLE (Amiga-Stil-Sampler)
-                let path = gs(a, 0, "SAMPLE_LOAD")?.to_string();
-                Value::Int(self.audio_mut()?.sample_load(&path)?)
-            }
-            "sample_set_loop" => {
-                // SAMPLE_SET_LOOP(sample, start, end[, art$]) -- Loop-Region in
-                // Frames; art$ = "vorwaerts" (Vorgabe) oder "pingpong".
-                let idx = gi(a, 0, "SAMPLE_SET_LOOP")?;
-                let start = gi(a, 1, "SAMPLE_SET_LOOP")?;
-                let end = gi(a, 2, "SAMPLE_SET_LOOP")?;
-                let art = if a.len() >= 4 { Some(gs(a, 3, "SAMPLE_SET_LOOP")?.to_string()) } else { None };
-                self.audio_mut()?.sample_set_loop(idx, start, end, art.as_deref())?;
-                Value::Nil
-            }
-            "sample_from_buffer" => {
-                // SAMPLE_FROM_BUFFER(puffer, abtastrate) -> SAMPLE (16-Bit-PCM,
-                // little endian, mono -- so liegen die Samples im Tracker-Format)
-                let bytes = match a.first() {
-                    Some(Value::Buffer(b)) => b.borrow().clone(),
-                    Some(v) => return Err(format!(
-                        "SAMPLE_FROM_BUFFER: erwartet BUFFER, erhalten {}", v.type_name())),
-                    None => return Err("SAMPLE_FROM_BUFFER: erwartet (puffer, abtastrate)".into()),
-                };
-                let sr = gi(a, 1, "SAMPLE_FROM_BUFFER")?;
-                Value::Int(self.audio_mut()?.sample_from_pcm16(&bytes, sr)?)
-            }
-            "sample_from_sound" => {
-                // SAMPLE_FROM_SOUND(sound) -> SAMPLE (Kanaele gemittelt)
-                let idx = gi(a, 0, "SAMPLE_FROM_SOUND")?;
-                Value::Int(self.audio_mut()?.sample_from_sound(idx)?)
-            }
-            "sample_note" => {
-                // SAMPLE_NOTE(sample, halbtoene, dauer_ms, attack, decay, sustain,
-                //   release, vol[, slide_halbtoene]) -> SOUND
-                let f = "SAMPLE_NOTE";
-                if a.len() < 8 || a.len() > 9 {
-                    return Err("SAMPLE_NOTE: erwartet (sample, halbtoene, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_halbtoene])".into());
-                }
-                let idx = gi(a, 0, f)?;
-                let semis = need_f(a, 1, f)?;
-                let dauer = gi(a, 2, f)?;
-                let atk = gi(a, 3, f)?;
-                let dec = gi(a, 4, f)?;
-                let sus = need_f(a, 5, f)?;
-                let rel = gi(a, 6, f)?;
-                let vol = need_f(a, 7, f)?;
-                let sl = if a.len() >= 9 { need_f(a, 8, f)? } else { 0.0 };
-                Value::Int(self.audio_mut()?.sample_note(idx, semis, dauer, atk, dec, sus, rel, vol, sl)?)
-            }
-            "sample_free" => { let i = gi(a, 0, "SAMPLE_FREE")?; self.audio_mut()?.sample_free(i)?; Value::Nil }
-            "sample_len" => {
-                // SAMPLE_LEN(sample) -> Sekunden bei Originaltonhoehe
-                let idx = gi(a, 0, "SAMPLE_LEN")?;
-                Value::Float(self.audio_mut()?.sample_len(idx)?)
-            }
-            "sample_play" => {
-                // SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms]) -> AUDIO_CHANNEL
-                let idx = gi(a, 0, "SAMPLE_PLAY")?;
-                let semis = need_f(a, 1, "SAMPLE_PLAY")?;
-                // Review-Fund: `semis`/`dur_ms` waren voellig unbeschraenkt.
-                // resample() leitet aus `semis` ein Pitch-Verhaeltnis
-                // `2^(semis/12)` ab und daraus `out_len = n/ratio` -- ein
-                // stark negativer Wert (z.B. -700) macht `ratio` astronomisch
-                // klein, `out_len` ueberlief/saettigte auf usize::MAX, und
-                // `Vec::with_capacity(out_len)` paniked mit einem
-                // Kapazitaets-Ueberlauf (nicht fangbar per TRY/CATCH) --
-                // direkt aus einem einzigen, gewoehnlich aussehenden
-                // SAMPLE_PLAY-Aufruf heraus. +/-120 Halbtoene (10 Oktaven)
-                // ist bereits weit jenseits jedes musikalischen Sinns.
-                if !(-120.0..=120.0).contains(&semis) {
-                    return Err("SAMPLE_PLAY: Halbtoene muss -120..120 sein".into());
-                }
-                let vol = if a.len() >= 3 { need_f(a, 2, "SAMPLE_PLAY")? } else { 1.0 };
-                let dur = if a.len() >= 4 { gi(a, 3, "SAMPLE_PLAY")? } else { 0 };
-                if !(0..=600_000).contains(&dur) {
-                    return Err("SAMPLE_PLAY: dur_ms muss 0..600000 sein".into());
-                }
-                Value::Int(self.audio_mut()?.sample_play(idx, semis, vol, dur)?)
-            }
-            "audio_lofi" => {
-                // AUDIO_LOFI(an[, bits[, cutoff_hz]]) -- Paula/Amiga-Lo-Fi.
-                // Argument-Pruefung VOR der Audio-Initialisierung (golden-testbar).
-                let on = match a.first() {
-                    Some(v) => v.truthy(),
-                    None => return Err("AUDIO_LOFI: erwartet (an[, bits[, cutoff_hz]])".into()),
-                };
-                let bits = if a.len() >= 2 {
-                    let b = gi(a, 1, "AUDIO_LOFI")?;
-                    if !(1..=16).contains(&b) {
-                        return Err("AUDIO_LOFI: bits muss 1..16 sein".into());
-                    }
-                    b as u32
-                } else { 8 };
-                let cutoff = if a.len() >= 3 {
-                    let c = need_f(a, 2, "AUDIO_LOFI")?;
-                    if c < 0.0 { return Err("AUDIO_LOFI: cutoff_hz muss >= 0 sein".into()); }
-                    c
-                } else { 3300.0 };
-                self.audio_mut()?.set_lofi(on, bits, cutoff);
-                Value::Nil
-            }
-            "audio_bus_volume" => {
-                // AUDIO_BUS_VOLUME(bus$, vol) -- Master pro Bus (sfx/music/master).
-                // Bus-Name VOR der Audio-Initialisierung pruefen (golden-testbar).
-                let bus = gs(a, 0, "AUDIO_BUS_VOLUME")?.to_lowercase();
-                if !matches!(bus.as_str(), "sfx" | "music" | "master" | "speech") {
-                    return Err(format!("AUDIO_BUS_VOLUME: unbekannter Bus '{}' (sfx, music, master, speech)", bus));
-                }
-                let v = need_f(a, 1, "AUDIO_BUS_VOLUME")?;
-                self.audio_mut()?.set_bus_volume(&bus, v)?;
-                Value::Nil
-            }
-            "audio_bus_get_volume" => {
-                let bus = gs(a, 0, "AUDIO_BUS_GET_VOLUME")?.to_lowercase();
-                if !matches!(bus.as_str(), "sfx" | "music" | "master" | "speech") {
-                    return Err(format!("AUDIO_BUS_GET_VOLUME: unbekannter Bus '{}' (sfx, music, master, speech)", bus));
-                }
-                Value::Float(round_audio(self.audio_mut()?.get_bus_volume(&bus)?))
-            }
-            "audio_filter" => {
-                // AUDIO_FILTER(bus$, cutoff_hz[, resonance]) -- Tiefpass.
-                let bus = gs(a, 0, "AUDIO_FILTER")?.to_lowercase();
-                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
-                    return Err(format!("AUDIO_FILTER: unbekannter Bus '{}' (sfx, music, master)", bus));
-                }
-                let cutoff = need_f(a, 1, "AUDIO_FILTER")?;
-                let res = if a.len() >= 3 { need_f(a, 2, "AUDIO_FILTER")? } else { 0.0 };
-                self.audio_mut()?.set_filter(&bus, cutoff, res)?;
-                Value::Nil
-            }
-            "audio_reverb" => {
-                // AUDIO_REVERB(bus$, mix[, feedback[, damping]]) -- Hall.
-                let bus = gs(a, 0, "AUDIO_REVERB")?.to_lowercase();
-                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
-                    return Err(format!("AUDIO_REVERB: unbekannter Bus '{}' (sfx, music, master)", bus));
-                }
-                let mix = need_f(a, 1, "AUDIO_REVERB")?;
-                let fb = if a.len() >= 3 { need_f(a, 2, "AUDIO_REVERB")? } else { 0.9 };
-                let damp = if a.len() >= 4 { need_f(a, 3, "AUDIO_REVERB")? } else { 0.1 };
-                self.audio_mut()?.set_reverb(&bus, mix, fb, damp)?;
-                Value::Nil
-            }
-            "audio_delay" => {
-                // AUDIO_DELAY(bus$, mix[, feedback]) -- Echo (300 ms).
-                let bus = gs(a, 0, "AUDIO_DELAY")?.to_lowercase();
-                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
-                    return Err(format!("AUDIO_DELAY: unbekannter Bus '{}' (sfx, music, master)", bus));
-                }
-                let mix = need_f(a, 1, "AUDIO_DELAY")?;
-                let fb = if a.len() >= 3 { need_f(a, 2, "AUDIO_DELAY")? } else { 0.5 };
-                let time_ms = if a.len() >= 4 { gi(a, 3, "AUDIO_DELAY")? } else { 0 };
-                self.audio_mut()?.set_delay(&bus, mix, fb, time_ms)?;
-                Value::Nil
-            }
-            "audio_distortion" => {
-                // AUDIO_DISTORTION(bus$, amount[, mix]) -- Overdrive/Fuzz.
-                let bus = gs(a, 0, "AUDIO_DISTORTION")?.to_lowercase();
-                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
-                    return Err(format!("AUDIO_DISTORTION: unbekannter Bus '{}' (sfx, music, master)", bus));
-                }
-                let amount = need_f(a, 1, "AUDIO_DISTORTION")?;
-                let mix = if a.len() >= 3 { need_f(a, 2, "AUDIO_DISTORTION")? } else { 1.0 };
-                self.audio_mut()?.set_distortion(&bus, amount, mix)?;
-                Value::Nil
-            }
-            "audio_compressor" => {
-                // AUDIO_COMPRESSOR(bus$, threshold_db, ratio[, makeup_db]).
-                let bus = gs(a, 0, "AUDIO_COMPRESSOR")?.to_lowercase();
-                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
-                    return Err(format!("AUDIO_COMPRESSOR: unbekannter Bus '{}' (sfx, music, master)", bus));
-                }
-                let thresh = need_f(a, 1, "AUDIO_COMPRESSOR")?;
-                let ratio = need_f(a, 2, "AUDIO_COMPRESSOR")?;
-                let makeup = if a.len() >= 4 { need_f(a, 3, "AUDIO_COMPRESSOR")? } else { 0.0 };
-                self.audio_mut()?.set_compressor(&bus, thresh, ratio, makeup)?;
-                Value::Nil
-            }
-            "audio_eq" => {
-                // AUDIO_EQ(bus$, freq_hz, gain_db[, q]) -- parametrischer Bell-EQ.
-                let bus = gs(a, 0, "AUDIO_EQ")?.to_lowercase();
-                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
-                    return Err(format!("AUDIO_EQ: unbekannter Bus '{}' (sfx, music, master)", bus));
-                }
-                let freq = need_f(a, 1, "AUDIO_EQ")?;
-                let gain = need_f(a, 2, "AUDIO_EQ")?;
-                let q = if a.len() >= 4 { need_f(a, 3, "AUDIO_EQ")? } else { 1.0 };
-                self.audio_mut()?.set_eq(&bus, freq, gain, q)?;
-                Value::Nil
-            }
-            "playsound" => {
-                // PLAYSOUND(sound[, loops, volume]). `loops` wird nativ ignoriert
-                // (raylib-Sounds loopen nicht) -- SFX spielen einmal.
-                let idx = gi(a, 0, "PLAYSOUND")?;
-                let vol = if a.len() >= 3 { need_f(a, 2, "PLAYSOUND")? } else { 1.0 };
-                self.audio_mut()?.play_sound(idx, vol)?;
-                Value::Nil
-            }
-            "stopsound" => {
-                let idx = gi(a, 0, "STOPSOUND")?;
-                self.audio_mut()?.stop_sound(idx)?;
-                Value::Nil
-            }
-            "unloadsound" => {
-                // UNLOADSOUND(sound) -- stoppt + gibt den Frame-Puffer frei.
-                // Index bleibt als Tombstone gueltig (kein Recycling).
-                let idx = gi(a, 0, "UNLOADSOUND")?;
-                self.audio_mut()?.unload_sound(idx)?;
-                Value::Nil
-            }
-            "audio_sound_count" => {
-                // AUDIO_SOUND_COUNT() -> Anzahl lebender Sound-Slots (Diagnose).
-                Value::Int(self.audio_mut()?.sound_count())
-            }
-            "playmusic" => {
-                // PLAYMUSIC(pfad$[, loops, volume]). Musik loopt (raylib-Default);
-                // `loops` wird nativ nicht ausgewertet.
-                let path = gs(a, 0, "PLAYMUSIC")?.to_string();
-                let vol = if a.len() >= 3 { need_f(a, 2, "PLAYMUSIC")? } else { 1.0 };
-                self.audio_mut()?.play_music(&path, vol)?;
-                Value::Nil
-            }
-            "stopmusic" => { self.audio_mut()?.stop_music(); Value::Nil }
-            "audio_fft" => {
-                // AUDIO_FFT(arr): fuellt ein 1D ARRAY OF FLOAT mit B Band-Pegeln
-                // (0..1) aus dem aktuell hoerbaren Audio (echte FFT).
-                let arr = match a.first() {
-                    Some(Value::Array(x)) => x.clone(),
-                    _ => return Err("AUDIO_FFT: erwartet ARRAY OF FLOAT".into()),
-                };
-                let n = {
-                    let b = arr.borrow();
-                    if b.element_type != "float" || b.dims.len() != 1 {
-                        return Err("AUDIO_FFT: erwartet 1D ARRAY OF FLOAT".into());
-                    }
-                    if b.cells.len() == 0 { return Err(leeres_feld("AUDIO_FFT")); }
-                    b.cells.len()
-                };
-                let mut tmp = vec![0.0f32; n];
-                self.audio_mut()?.fft_bands(&mut tmp);
-                let mut b = arr.borrow_mut();
-                for i in 0..n { b.cells.set(i, Value::Float(tmp[i] as f64)); }
-                Value::Nil
-            }
-
-            // --- erweitertes audio-Modul (AUDIO_*) ---
-            "audio_init" => { self.audio_mut()?; Value::Nil }
-            "audio_set_num_channels" => { let n = gi(a, 0, "AUDIO_SET_NUM_CHANNELS")?; if n < 0 { return Err("AUDIO_SET_NUM_CHANNELS: n muss >= 0 sein".into()); } self.audio_mut()?.set_num_channels(n); Value::Nil }
-            "audio_num_channels" => Value::Int(self.audio_mut()?.get_num_channels()),
-            "audio_busy_channels" => Value::Int(self.audio_mut()?.busy_channels()),
-            "audio_pause_all" => { self.audio_mut()?.pause_all(); Value::Nil }
-            "audio_resume_all" => { self.audio_mut()?.resume_all(); Value::Nil }
-            "audio_stop_all" => { self.audio_mut()?.stop_all(); Value::Nil }
-            "audio_play" => {
-                // AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms[, easing$]]]]) -- loops=0 einmal (Default), -1 endlos
-                let idx = gi(a, 0, "AUDIO_PLAY")?;
-                let loops = if a.len() >= 2 { gi(a, 1, "AUDIO_PLAY")? } else { 0 };
-                let vol = if a.len() >= 3 { need_f(a, 2, "AUDIO_PLAY")? } else { 1.0 };
-                let fade = if a.len() >= 4 { gi(a, 3, "AUDIO_PLAY")? } else { 0 };
-                if fade < 0 { return Err("AUDIO_PLAY: fade_in_ms muss >= 0 sein".into()); }
-                let easing = easing_name(a, 4, "AUDIO_PLAY")?;
-                Value::Int(self.audio_mut()?.ch_play(idx, loops, vol, fade, &easing)?)
-            }
-            "audio_pause" => { let i = gi(a, 0, "AUDIO_PAUSE")?; self.audio_mut()?.ch_pause(i)?; Value::Nil }
-            "audio_resume" => { let i = gi(a, 0, "AUDIO_RESUME")?; self.audio_mut()?.ch_resume(i)?; Value::Nil }
-            "audio_stop" => {
-                // AUDIO_STOP(ch[, fade_out_ms[, easing$]])
-                let i = gi(a, 0, "AUDIO_STOP")?;
-                let fade = if a.len() >= 2 { gi(a, 1, "AUDIO_STOP")? } else { 0 };
-                if fade < 0 { return Err("AUDIO_STOP: fade_out_ms muss >= 0 sein".into()); }
-                let easing = easing_name(a, 2, "AUDIO_STOP")?;
-                self.audio_mut()?.ch_stop(i, fade, &easing)?; Value::Nil
-            }
-            "audio_is_playing" => { let i = gi(a, 0, "AUDIO_IS_PLAYING")?; Value::Bool(self.audio_mut()?.ch_is_playing(i)?) }
-            "audio_is_waiting" => { let i = gi(a, 0, "AUDIO_IS_WAITING")?; Value::Bool(self.audio_mut()?.ch_is_waiting(i)?) }
-            "audio_record_start" => {
-                if a.len() > 1 { return Err(format!("AUDIO_RECORD_START: erwartet 0..1 Argumente, erhalten {}", a.len())); }
-                let m = if a.is_empty() { 600.0 } else { need_f(a, 0, "AUDIO_RECORD_START")? };
-                self.audio_mut()?.record_start(m)?; Value::Nil
-            }
-            "audio_record_stop" => { Value::Int(self.audio_mut()?.record_stop()?) }
-            "audio_recording" => { Value::Bool(self.audio_mut()?.recording()) }
-            "audio_peak" => { Value::Float(round_audio(self.audio_mut()?.peak())) }
-            // AUDIO_SET_VOLUME ist der neue Name (namen.rs).
-            "audio_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
-            "audio_get_volume" => { let i = gi(a, 0, "AUDIO_GET_VOLUME")?; Value::Float(round_audio(self.audio_mut()?.ch_get_volume(i)?)) }
-            "audio_pan" => { let i = gi(a, 0, "AUDIO_PAN")?; let l = need_f(a, 1, "AUDIO_PAN")?; let r = need_f(a, 2, "AUDIO_PAN")?; self.audio_mut()?.ch_pan(i, l, r)?; Value::Nil }
-            "audio_pitch" => {
-                let i = gi(a, 0, "AUDIO_PITCH")?;
-                let f = need_f(a, 1, "AUDIO_PITCH")?;
-                if f <= 0.0 { return Err("AUDIO_PITCH: faktor muss > 0 sein".into()); }
-                self.audio_mut()?.ch_pitch(i, f)?; Value::Nil
-            }
-            "audio_music_pitch" => {
-                let f = need_f(a, 0, "AUDIO_MUSIC_PITCH")?;
-                if f <= 0.0 { return Err("AUDIO_MUSIC_PITCH: faktor muss > 0 sein".into()); }
-                self.audio_mut()?.music_set_pitch(f); Value::Nil
-            }
-            "audio_music_get_pitch" => Value::Float(self.audio_mut()?.music_get_pitch()),
-            "audio_pan_pos" => { let i = gi(a, 0, "AUDIO_PAN_POS")?; let p = need_f(a, 1, "AUDIO_PAN_POS")?; self.audio_mut()?.ch_pan_pos(i, p)?; Value::Nil }
-            "audio_pan_slide" => {
-                // AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms[, easing$]) -- Positionen 0=links..1=rechts
-                let i = gi(a, 0, "AUDIO_PAN_SLIDE")?;
-                let von = need_f(a, 1, "AUDIO_PAN_SLIDE")?;
-                let nach = need_f(a, 2, "AUDIO_PAN_SLIDE")?;
-                let dauer = gi(a, 3, "AUDIO_PAN_SLIDE")?;
-                if dauer <= 0 { return Err("AUDIO_PAN_SLIDE: dauer_ms muss > 0 sein".into()); }
-                let easing = easing_name(a, 4, "AUDIO_PAN_SLIDE")?;
-                self.audio_mut()?.ch_pan_slide(i, von, nach, dauer, &easing)?; Value::Nil
-            }
-            "audio_autopan" => {
-                // AUDIO_AUTOPAN(ch, periode_s[, tiefe]) -- periode_s <= 0 = aus
-                let i = gi(a, 0, "AUDIO_AUTOPAN")?;
-                let periode = need_f(a, 1, "AUDIO_AUTOPAN")?;
-                let tiefe = if a.len() >= 3 { need_f(a, 2, "AUDIO_AUTOPAN")? } else { 1.0 };
-                self.audio_mut()?.ch_autopan(i, periode, tiefe)?; Value::Nil
-            }
-            "audio_tone" => {
-                let freq = need_f(a, 0, "AUDIO_TONE")?;
-                let dur = gi(a, 1, "AUDIO_TONE")?;
-                // Review-Fund: keine Obergrenze -- `dur` geht direkt in
-                // `vec![0.0f64; n]` (n = Samples fuer die Dauer), ein absurd
-                // grosser Wert (z.B. eine fehlerhafte Berechnung) fuehrte zu
-                // einer Mehrere-GB-Allokation / Allocator-Abort statt eines
-                // DH-Fehlers.
-                if !(0..=600_000).contains(&dur) {
-                    return Err("AUDIO_TONE: dur_ms muss 0..600000 sein".into());
-                }
-                let wf = if a.len() >= 3 { gs(a, 2, "AUDIO_TONE")?.to_string() } else { "sine".to_string() };
-                let vol = if a.len() >= 4 { need_f(a, 3, "AUDIO_TONE")? } else { 1.0 };
-                Value::Int(self.audio_mut()?.tone(freq, dur, &wf, vol)?)
-            }
-            "audio_noise" => {
-                let dur = gi(a, 0, "AUDIO_NOISE")?;
-                if !(0..=600_000).contains(&dur) {
-                    return Err("AUDIO_NOISE: dur_ms muss 0..600000 sein".into());
-                }
-                let vol = if a.len() >= 2 { need_f(a, 1, "AUDIO_NOISE")? } else { 1.0 };
-                Value::Int(self.audio_mut()?.noise(dur, vol)?)
-            }
-            "audio_sfx" => {
-                // AUDIO_SFX(wf, freq, slide, atk, sus, dec, vib_d, vib_s, vol
-                //   [, stereo_width, duty, pwm_depth, pwm_speed,
-                //    flt_cutoff, flt_sweep, flt_res]) -- SID-Args optional.
-                let wf = gs(a, 0, "AUDIO_SFX")?.to_string();
-                let freq = need_f(a, 1, "AUDIO_SFX")?;
-                let slide = need_f(a, 2, "AUDIO_SFX")?;
-                let atk = gi(a, 3, "AUDIO_SFX")?;
-                let sus = gi(a, 4, "AUDIO_SFX")?;
-                let dec = gi(a, 5, "AUDIO_SFX")?;
-                let vd = need_f(a, 6, "AUDIO_SFX")?;
-                let vs = need_f(a, 7, "AUDIO_SFX")?;
-                let vol = need_f(a, 8, "AUDIO_SFX")?;
-                let optf = |i: usize, d: f64| -> R<f64> {
-                    if a.len() > i { need_f(a, i, "AUDIO_SFX") } else { Ok(d) }
-                };
-                let width = optf(9, 0.0)?;
-                let duty = optf(10, 0.5)?;
-                let pwm_depth = optf(11, 0.0)?;
-                let pwm_speed = optf(12, 0.0)?;
-                let flt_cutoff = optf(13, 0.0)?;
-                let flt_sweep = optf(14, 0.0)?;
-                let flt_res = optf(15, 0.0)?;
-                Value::Int(self.audio_mut()?.sfx(
-                    &wf, freq, slide, atk, sus, dec, vd, vs, vol, width,
-                    duty, pwm_depth, pwm_speed, flt_cutoff, flt_sweep, flt_res)?)
-            }
-            "audio_note" => {
-                // AUDIO_NOTE(wf$, freq, dauer_ms, attack_ms, decay_ms, sustain,
-                //   release_ms, vol [, vib_depth, vib_speed, detune_cents,
-                //   slide_halbtoene]) -- eine gehaltene Note mit echter ADSR.
-                let wf = gs(a, 0, "AUDIO_NOTE")?.to_string();
-                let freq = need_f(a, 1, "AUDIO_NOTE")?;
-                let dauer = gi(a, 2, "AUDIO_NOTE")?;
-                let atk = gi(a, 3, "AUDIO_NOTE")?;
-                let dec = gi(a, 4, "AUDIO_NOTE")?;
-                let sus = need_f(a, 5, "AUDIO_NOTE")?;
-                let rel = gi(a, 6, "AUDIO_NOTE")?;
-                let vol = need_f(a, 7, "AUDIO_NOTE")?;
-                let optf = |i: usize, d: f64| -> R<f64> {
-                    if a.len() > i { need_f(a, i, "AUDIO_NOTE") } else { Ok(d) }
-                };
-                let vd = optf(8, 0.0)?;
-                let vs = optf(9, 0.0)?;
-                let det = optf(10, 0.0)?;
-                let slide = optf(11, 0.0)?;
-                Value::Int(self.audio_mut()?.note(&wf, freq, dauer, atk, dec, sus, rel, vol,
-                                                   vd, vs, det, slide)?)
-            }
-            "audio_sound_new" => {
-                let dauer = gi(a, 0, "AUDIO_SOUND_NEW")?;
-                Value::Int(self.audio_mut()?.sound_new(dauer)?)
-            }
-            "audio_sound_mix" => {
-                // AUDIO_SOUND_MIX(ziel, quelle, offset_ms[, vol[, pan]])
-                let ziel = gi(a, 0, "AUDIO_SOUND_MIX")?;
-                let quelle = gi(a, 1, "AUDIO_SOUND_MIX")?;
-                let offset = need_f(a, 2, "AUDIO_SOUND_MIX")?;
-                let vol = if a.len() > 3 { need_f(a, 3, "AUDIO_SOUND_MIX")? } else { 1.0 };
-                let pan = if a.len() > 4 { Some(need_f(a, 4, "AUDIO_SOUND_MIX")?) } else { None };
-                if !(0.0..=4.0).contains(&vol) {
-                    return Err("AUDIO_SOUND_MIX: vol muss 0..4 sein".into());
-                }
-                self.audio_mut()?.sound_mix(ziel, quelle, offset, vol, pan)?;
-                Value::Nil
-            }
-            "audio_sound_normalize" => {
-                let idx = gi(a, 0, "AUDIO_SOUND_NORMALIZE")?;
-                let spitze = if a.len() > 1 { need_f(a, 1, "AUDIO_SOUND_NORMALIZE")? } else { 1.0 };
-                Value::Float(self.audio_mut()?.sound_normalize(idx, spitze)?)
-            }
-            // Am SOUND-Handle, nicht an AUDIO_SFX: so gelten beide fuer jede
-            // Klangquelle (TONE, NOISE, SFX, geladene Datei).
-            "audio_sound_wave" => {
-                let w = self.audio_mut()?.sound_wave(
-                    gi(a, 0, "AUDIO_SOUND_WAVE")?, gi(a, 1, "AUDIO_SOUND_WAVE")?)?;
-                crate::builtins::new_float_array(w)
-            }
-            "audio_save_wav" => {
-                let idx = gi(a, 0, "AUDIO_SAVE_WAV")?;
-                let pfad = gs(a, 1, "AUDIO_SAVE_WAV")?.to_string();
-                let bits = if a.len() > 2 { gi(a, 2, "AUDIO_SAVE_WAV")? } else { 16 };
-                self.audio_mut()?.save_wav(idx, &pfad, bits)?;
-                Value::Nil
-            }
-            // --- Sprachausgabe (sprache.rs, Weg C aus docs/intern/entwurf-speak.md) ---
-            // SPEAK fragt ZUERST, ob ein Bildschirmleser zuhoert: dann geht der
-            // Satz als Ansage in den Baum (seine Stimme, sein Tempo, seine
-            // Braillezeile -- und nicht zwei Stimmen zugleich). Sonst die
-            // Systemstimme durch Kira. SPEAK_SOUND ist immer Synthese.
-            "speak" => {
-                let text = gs(a, 0, "SPEAK")?.to_string();
-                let unterbrechen = a.len() > 1 && gb(a, 1, name)?;
-                if a.len() > 2 { return Err("SPEAK: erwartet (text$[, unterbrechen])".into()); }
-                if self.gfx.as_ref().map_or(false, |g| g.a11y_aktiv()) {
-                    self.gui.announce(text.clone(), unterbrechen);
-                    if let Some(g) = self.gfx.as_mut() { g.a11y_ansagen(text, unterbrechen); }
-                } else {
-                    self.audio_mut()?;
-                    let au = self.audio.as_mut().unwrap();
-                    self.sprecher.sprechen(au, &text, unterbrechen)?;
-                }
-                Value::Nil
-            }
-            "speak_stop" => {
-                if !a.is_empty() { return Err("SPEAK_STOP: erwartet keine Argumente".into()); }
-                if let Some(au) = self.audio.as_mut() { self.sprecher.stopp(au); }
-                Value::Nil
-            }
-            "speaking" => {
-                if !a.is_empty() { return Err("SPEAKING: erwartet keine Argumente".into()); }
-                Value::Bool(self.sprecher.spricht())
-            }
-            "speak_wait" => {
-                if !a.is_empty() { return Err("SPEAK_WAIT: erwartet keine Argumente".into()); }
-                if let Some(au) = self.audio.as_mut() { self.sprecher.warten(au); }
-                Value::Nil
-            }
-            "speak_voice" => { self.sprecher.stimme_setzen(&gs(a, 0, "SPEAK_VOICE")?)?; Value::Nil }
-            "speak_voices" => {
-                if !a.is_empty() { return Err("SPEAK_VOICES: erwartet keine Argumente".into()); }
-                let namen = self.sprecher.stimmen()?;
-                let n = namen.len() as i64;
-                let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
-                for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(&s)); }
-                Value::Array(Rc::new(RefCell::new(arr)))
-            }
-            "speak_rate" => { self.sprecher.tempo_setzen(need_f(a, 0, "SPEAK_RATE")?)?; Value::Nil }
-            "speak_sound" => {
-                let text = gs(a, 0, "SPEAK_SOUND")?.to_string();
-                if a.len() != 1 { return Err("SPEAK_SOUND: erwartet (text$)".into()); }
-                self.audio_mut()?;
-                let au = self.audio.as_mut().unwrap();
-                // Eine eigene Kopie: der Slot im Vorrat gehoert SPEAK und wird
-                // nach 64 weiteren Saetzen verdraengt. Bis 2026.53 bekam das
-                // Programm ihn selbst -- derselbe Text lieferte dasselbe
-                // Handle, und das Handle starb spaeter still.
-                let vorrat = self.sprecher.klang(au, &text)?;
-                Value::Int(au.sound_kopie(vorrat, "SPEAK_SOUND")?)
-            }
-            "audio_music_load" => { let p = gs(a, 0, "AUDIO_MUSIC_LOAD")?.to_string(); self.audio_mut()?.music_load(&p)?; Value::Nil }
-            "audio_music_play" => {
-                // AUDIO_MUSIC_PLAY([loops[, fade_in_ms[, easing$]]]) -- loops=-1 endlos (Default)
-                let loops = if !a.is_empty() { gi(a, 0, "AUDIO_MUSIC_PLAY")? } else { -1 };
-                let fade = if a.len() >= 2 { gi(a, 1, "AUDIO_MUSIC_PLAY")? } else { 0 };
-                if fade < 0 { return Err("AUDIO_MUSIC_PLAY: fade_in_ms muss >= 0 sein".into()); }
-                let easing = easing_name(a, 2, "AUDIO_MUSIC_PLAY")?;
-                self.audio_mut()?.music_play(loops, fade, &easing)?; Value::Nil
-            }
-            "audio_music_stop" => {
-                // AUDIO_MUSIC_STOP([fade_out_ms[, easing$]])
-                let fade = if !a.is_empty() { gi(a, 0, "AUDIO_MUSIC_STOP")? } else { 0 };
-                if fade < 0 { return Err("AUDIO_MUSIC_STOP: fade_out_ms muss >= 0 sein".into()); }
-                let easing = easing_name(a, 1, "AUDIO_MUSIC_STOP")?;
-                self.audio_mut()?.music_stop(fade, &easing)?; Value::Nil
-            }
-            "audio_music_pause" => { self.audio_mut()?.music_pause(); Value::Nil }
-            "audio_music_resume" => { self.audio_mut()?.music_resume(); Value::Nil }
-            "audio_music_volume" => { let v = need_f(a, 0, "AUDIO_MUSIC_VOLUME")?; self.audio_mut()?.music_set_volume(v); Value::Nil }
-            "audio_music_get_volume" => Value::Float(round_audio(self.audio_mut()?.music_get_volume())),
-            "audio_music_position" => Value::Float(self.audio_mut()?.music_position()),
-            "audio_music_seek" => {
-                let s = need_f(a, 0, "AUDIO_MUSIC_SEEK")?;
-                // Nicht `s < 0.0` schreiben -- so faellt NAN mit durch.
-                if !(s >= 0.0) {
-                    return Err(format!(
-                        "AUDIO_MUSIC_SEEK: Position muss >= 0 sein (war {})", s));
-                }
-                self.audio_mut()?.music_seek(s)?;
-                Value::Nil
-            }
-            "audio_music_busy" => Value::Bool(self.audio_mut()?.music_busy()),
-            "audio_music_queue" => { let p = gs(a, 0, "AUDIO_MUSIC_QUEUE")?.to_string(); self.audio_mut()?.music_queue(&p); Value::Nil }
-
-            // --- Clock (Kira-Uhr fuer sample-genaues Musik-/Rhythmus-Timing) ---
-            // --- Modulatoren: LFO + Tweener ---------------------------------
-            // Kira faehrt sie auf dem Audio-Thread: ein Tremolo/Filter-Sweep
-            // laeuft sample-genau weiter, auch wenn ein Frame einbricht -- und
-            // das DH-Programm ruft dafuer NICHTS pro Frame.
-            "audio_lfo_new" => {
-                let wave = gs(a, 0, "AUDIO_LFO_NEW")?.to_string();
-                let hz = need_f(a, 1, "AUDIO_LFO_NEW")?;
-                if hz < 0.0 { return Err("AUDIO_LFO_NEW: Frequenz darf nicht negativ sein".into()); }
-                let amp = if a.len() > 2 { need_f(a, 2, "AUDIO_LFO_NEW")? } else { 1.0 };
-                let off = if a.len() > 3 { need_f(a, 3, "AUDIO_LFO_NEW")? } else { 0.0 };
-                Value::Int(self.audio_mut()?.lfo_new(&wave, hz, amp, off)?)
-            }
-            "audio_lfo_set" => {
-                let m = gi(a, 0, "AUDIO_LFO_SET")?;
-                let hz = if a.len() > 1 { Some(need_f(a, 1, "AUDIO_LFO_SET")?) } else { None };
-                let amp = if a.len() > 2 { Some(need_f(a, 2, "AUDIO_LFO_SET")?) } else { None };
-                let off = if a.len() > 3 { Some(need_f(a, 3, "AUDIO_LFO_SET")?) } else { None };
-                self.audio_mut()?.lfo_set(m, hz, amp, off)?; Value::Nil
-            }
-            "audio_lfo_waveform" => {
-                let m = gi(a, 0, "AUDIO_LFO_WAVEFORM")?;
-                let w = gs(a, 1, "AUDIO_LFO_WAVEFORM")?.to_string();
-                self.audio_mut()?.lfo_waveform(m, &w)?; Value::Nil
-            }
-            "audio_tweener_new" => {
-                let v = if a.is_empty() { 0.0 } else { need_f(a, 0, "AUDIO_TWEENER_NEW")? };
-                Value::Int(self.audio_mut()?.tweener_new(v)?)
-            }
-            "audio_tweener_to" => {
-                let m = gi(a, 0, "AUDIO_TWEENER_TO")?;
-                let target = need_f(a, 1, "AUDIO_TWEENER_TO")?;
-                let ms = if a.len() > 2 { need_f(a, 2, "AUDIO_TWEENER_TO")? } else { 0.0 };
-                let ez = if a.len() > 3 { gs(a, 3, "AUDIO_TWEENER_TO")?.to_string() } else { String::new() };
-                self.audio_mut()?.tweener_to(m, target, ms, &ez)?; Value::Nil
-            }
-            "audio_mod_remove" => {
-                let m = gi(a, 0, "AUDIO_MOD_REMOVE")?;
-                self.audio_mut()?.mod_remove(m)?; Value::Nil
-            }
-            "audio_modulate" => {
-                let bus = gs(a, 0, "AUDIO_MODULATE")?.to_string();
-                let target = gs(a, 1, "AUDIO_MODULATE")?.to_string();
-                let m = gi(a, 2, "AUDIO_MODULATE")?;
-                let lo = need_f(a, 3, "AUDIO_MODULATE")?;
-                let hi = need_f(a, 4, "AUDIO_MODULATE")?;
-                self.audio_mut()?.modulate(&bus, &target, m, lo, hi)?; Value::Nil
-            }
-            "audio_bus_pan" => {
-                let bus = gs(a, 0, "AUDIO_BUS_PAN")?.to_string();
-                let pos = need_f(a, 1, "AUDIO_BUS_PAN")?;
-                self.audio_mut()?.bus_pan(&bus, pos)?; Value::Nil
-            }
-            "audio_clock_new" => {
-                // AUDIO_CLOCK_NEW(ticks_per_second) -- Wertpruefung VOR der
-                // Audio-Initialisierung (golden-testbar).
-                let tps = need_f(a, 0, "AUDIO_CLOCK_NEW")?;
-                if tps <= 0.0 { return Err("AUDIO_CLOCK_NEW: ticks_per_second muss > 0 sein".into()); }
-                Value::Int(self.audio_mut()?.clock_new(tps)?)
-            }
-            "audio_clock_start" => { let c = gi(a, 0, "AUDIO_CLOCK_START")?; self.audio_mut()?.clock_start(c)?; Value::Nil }
-            "audio_clock_pause" => { let c = gi(a, 0, "AUDIO_CLOCK_PAUSE")?; self.audio_mut()?.clock_pause(c)?; Value::Nil }
-            "audio_clock_stop" => { let c = gi(a, 0, "AUDIO_CLOCK_STOP")?; self.audio_mut()?.clock_stop(c)?; Value::Nil }
-            "audio_clock_ticking" => { let c = gi(a, 0, "AUDIO_CLOCK_TICKING")?; Value::Bool(self.audio_mut()?.clock_ticking(c)?) }
-            "audio_clock_ticks" => { let c = gi(a, 0, "AUDIO_CLOCK_TICKS")?; Value::Int(self.audio_mut()?.clock_ticks(c)?) }
-            "audio_clock_set_speed" => {
-                let c = gi(a, 0, "AUDIO_CLOCK_SET_SPEED")?;
-                let tps = need_f(a, 1, "AUDIO_CLOCK_SET_SPEED")?;
-                if tps <= 0.0 { return Err("AUDIO_CLOCK_SET_SPEED: ticks_per_second muss > 0 sein".into()); }
-                self.audio_mut()?.clock_set_speed(c, tps)?; Value::Nil
-            }
-            "audio_clock_remove" => { let c = gi(a, 0, "AUDIO_CLOCK_REMOVE")?; self.audio_mut()?.clock_remove(c)?; Value::Nil }
-            "audio_play_at" => {
-                // AUDIO_PLAY_AT(sound, clock, ticks[, volume[, loops]]) -- Start
-                // exakt auf Tick `ticks` der Uhr `clock` statt sofort.
-                let idx = gi(a, 0, "AUDIO_PLAY_AT")?;
-                let clock = gi(a, 1, "AUDIO_PLAY_AT")?;
-                let ticks = gi(a, 2, "AUDIO_PLAY_AT")?;
-                let vol = if a.len() >= 4 { need_f(a, 3, "AUDIO_PLAY_AT")? } else { 1.0 };
-                let loops = if a.len() >= 5 { gi(a, 4, "AUDIO_PLAY_AT")? } else { 0 };
-                if ticks < 0 { return Err("AUDIO_PLAY_AT: ticks muss >= 0 sein".into()); }
-                Value::Int(self.audio_mut()?.ch_play_at(idx, clock, ticks, vol, loops)?)
-            }
-
-            // --- Listener/Emitter (raeumliches Audio) ---
-            "audio_listener_new" => {
-                let x = need_f(a, 0, "AUDIO_LISTENER_NEW")?;
-                let y = need_f(a, 1, "AUDIO_LISTENER_NEW")?;
-                let z = need_f(a, 2, "AUDIO_LISTENER_NEW")?;
-                Value::Int(self.audio_mut()?.listener_new(x, y, z)?)
-            }
-            "audio_listener_set_position" => {
-                let l = gi(a, 0, "AUDIO_LISTENER_SET_POSITION")?;
-                let x = need_f(a, 1, "AUDIO_LISTENER_SET_POSITION")?;
-                let y = need_f(a, 2, "AUDIO_LISTENER_SET_POSITION")?;
-                let z = need_f(a, 3, "AUDIO_LISTENER_SET_POSITION")?;
-                self.audio_mut()?.listener_set_position(l, x, y, z)?; Value::Nil
-            }
-            "audio_listener_set_orientation" => {
-                let l = gi(a, 0, "AUDIO_LISTENER_SET_ORIENTATION")?;
-                let yaw = need_f(a, 1, "AUDIO_LISTENER_SET_ORIENTATION")?;
-                self.audio_mut()?.listener_set_orientation(l, yaw)?; Value::Nil
-            }
-            "audio_listener_remove" => {
-                let l = gi(a, 0, "AUDIO_LISTENER_REMOVE")?;
-                self.audio_mut()?.listener_remove(l)?; Value::Nil
-            }
-            "audio_emitter_new" => {
-                // AUDIO_EMITTER_NEW(listener, x, y, z[, min_dist[, max_dist]])
-                let l = gi(a, 0, "AUDIO_EMITTER_NEW")?;
-                let x = need_f(a, 1, "AUDIO_EMITTER_NEW")?;
-                let y = need_f(a, 2, "AUDIO_EMITTER_NEW")?;
-                let z = need_f(a, 3, "AUDIO_EMITTER_NEW")?;
-                let min_d = if a.len() >= 5 { need_f(a, 4, "AUDIO_EMITTER_NEW")? } else { 1.0 };
-                let max_d = if a.len() >= 6 { need_f(a, 5, "AUDIO_EMITTER_NEW")? } else { 100.0 };
-                if min_d < 0.0 { return Err("AUDIO_EMITTER_NEW: min_dist muss >= 0 sein".into()); }
-                if max_d <= min_d { return Err("AUDIO_EMITTER_NEW: max_dist muss > min_dist sein".into()); }
-                Value::Int(self.audio_mut()?.emitter_new(l, x, y, z, min_d, max_d)?)
-            }
-            "audio_emitter_set_position" => {
-                let e = gi(a, 0, "AUDIO_EMITTER_SET_POSITION")?;
-                let x = need_f(a, 1, "AUDIO_EMITTER_SET_POSITION")?;
-                let y = need_f(a, 2, "AUDIO_EMITTER_SET_POSITION")?;
-                let z = need_f(a, 3, "AUDIO_EMITTER_SET_POSITION")?;
-                self.audio_mut()?.emitter_set_position(e, x, y, z)?; Value::Nil
-            }
-            "audio_emitter_remove" => {
-                let e = gi(a, 0, "AUDIO_EMITTER_REMOVE")?;
-                self.audio_mut()?.emitter_remove(e)?; Value::Nil
-            }
-            "audio_play_on" => {
-                // AUDIO_PLAY_ON(sound, emitter[, loops[, volume[, fade_in_ms[, easing$]]]])
-                let idx = gi(a, 0, "AUDIO_PLAY_ON")?;
-                let emitter = gi(a, 1, "AUDIO_PLAY_ON")?;
-                let loops = if a.len() >= 3 { gi(a, 2, "AUDIO_PLAY_ON")? } else { 0 };
-                let vol = if a.len() >= 4 { need_f(a, 3, "AUDIO_PLAY_ON")? } else { 1.0 };
-                let fade = if a.len() >= 5 { gi(a, 4, "AUDIO_PLAY_ON")? } else { 0 };
-                if fade < 0 { return Err("AUDIO_PLAY_ON: fade_in_ms muss >= 0 sein".into()); }
-                let easing = easing_name(a, 5, "AUDIO_PLAY_ON")?;
-                Value::Int(self.audio_mut()?.ch_play_on(idx, emitter, loops, vol, fade, &easing)?)
-            }
-
             // --- Bulk-Draws ---
             "plots" => {
                 let xs = arr_i32(&a[0], "PLOTS")?; let ys = arr_i32(&a[1], "PLOTS")?;
@@ -2313,7 +1691,7 @@ impl<'p> Vm<'p> {
             }
             "drawimagepartex" => {
                 let idx = gi(a,0,"DRAWIMAGEPARTEX")?;
-                if a.len() < 9 || a.len() > 10 { return Err("DRAWIMAGEPARTEX: erwartet (img, sx, sy, sw, sh, x, y, w, h [, farbe])".into()); }
+                if a.len() < 9 || a.len() > 10 { return Err(crate::vm::falsche_argumente("DRAWIMAGEPARTEX", a.len())); }
                 // Die Farbe toent das Bild; ihr Alpha-Byte ist die Deckkraft
                 // (RGBA(255, 255, 255, 128) = halb durchsichtig, Farben wie ueberall).
                 let tint = if a.len() == 10 { Some(gi(a,9,"DRAWIMAGEPARTEX")?) } else { None };
@@ -2371,7 +1749,7 @@ impl<'p> Vm<'p> {
 
             // --- Sprite-Atlas ---
             "atlas_load" => Value::Int(g!().atlas_load(gs(a,0,"ATLAS_LOAD")?)?),
-            "atlas_draw" | "batch_draw" => {
+            "atlas_draw" => {
                 let atlas = gi(a,0,"ATLAS_DRAW")?;
                 let name = gs(a,1,"ATLAS_DRAW")?.to_string();
                 let tint = if a.len() > 4 { Some(gi(a,4,"ATLAS_DRAW")?) } else { None };
@@ -2391,10 +1769,29 @@ impl<'p> Vm<'p> {
 
             // --- Modul: input ---
             "input_bind" => {
-                if a.len() < 2 { return Err("INPUT_BIND: erwartet Action + mind. 1 Key".into()); }
+                if a.len() < 2 { return Err(format!("INPUT_BIND: erwartet mindestens 2 Argument(e), erhalten {}", a.len())); }
                 let action = gs(a, 0, "INPUT_BIND")?.to_lowercase();
                 let mut keys = Vec::with_capacity(a.len() - 1);
-                for i in 1..a.len() { keys.push(gi(a, i, "INPUT_BIND")?); }
+                // Ein Buchstabe oder eine Ziffer als Text wie bei KEYHIT (Bericht
+                // A17; bis 2026.53 nahm INPUT_BIND nur Codes). Ohne Fenster
+                // gilt die Taste mit diesem Zeichen nach US-Belegung.
+                for i in 1..a.len() {
+                    match &a[i] {
+                        Value::Str(t) => {
+                            let mut z = t.chars();
+                            // Gemerkt wird der BUCHSTABE (BUCHSTABEN_MARKE); welche
+                            // Taste ihn traegt, entscheidet INPUT_UPDATE nach der
+                            // Belegung -- beim Binden kennt raylib sie oft noch nicht.
+                            let k = match (z.next(), z.next()) {
+                                (Some(c), None) if c.is_ascii_alphanumeric() => BUCHSTABEN_MARKE | c.to_ascii_lowercase() as i64,
+                                _ => return Err(format!(
+                                    "INPUT_BIND: ein Text meint den Buchstaben oder die Ziffer auf der Taste -- \"{}\" ist keins (Sondertasten als Konstante: KEY_ENTER, KEY_LEFT, ...)", t)),
+                            };
+                            keys.push(k);
+                        }
+                        _ => keys.push(gi(a, i, "INPUT_BIND")?),
+                    }
+                }
                 self.input_state.actions.insert(action, keys);
                 Value::Nil
             }
@@ -2407,7 +1804,14 @@ impl<'p> Vm<'p> {
                 let keys: Vec<i64> = self.input_state.actions.values().flatten().copied().collect();
                 let mut cur = HashSet::new();
                 if let Some(g) = self.gfx.as_ref() {
-                    for k in keys { if g.key_down(k) { cur.insert(k); } }
+                    for k in keys {
+                        // Ein gebundener Buchstabe: die Taste, auf der er steht.
+                        let t = if k & BUCHSTABEN_MARKE != 0 {
+                            let c = (k & 0x7F) as u8 as char;
+                            g.taste_fuer_zeichen(c).unwrap_or(c as i64)
+                        } else { k };
+                        if g.key_down(t) { cur.insert(k); }
+                    }
                 }
                 self.input_state.prev = std::mem::replace(&mut self.input_state.cur, cur);
                 Value::Nil
@@ -2516,7 +1920,7 @@ impl<'p> Vm<'p> {
             // --- Modul: imgfx (immutable, liefern neues IMAGE-Handle) ---
             "image_scale" => {
                 let (b, h) = (gi(a,1,"IMAGE_SCALE")? as i32, gi(a,2,"IMAGE_SCALE")? as i32);
-                if a.len() > 4 { return Err("IMAGE_SCALE: erwartet (bild, breite, hoehe [, filter$])".into()); }
+                if a.len() > 4 { return Err(crate::vm::falsche_argumente("IMAGE_SCALE", a.len())); }
                 if a.len() == 4 {
                     let name = gs(a, 3, "IMAGE_SCALE")?;
                     let f = crate::resample::Filter::aus_namen(&name).ok_or_else(|| format!(
@@ -2527,7 +1931,7 @@ impl<'p> Vm<'p> {
                 }
             }
             "image_enhance" => {
-                if a.len() != 3 { return Err("IMAGE_ENHANCE: erwartet (bild, art$, faktor)".into()); }
+                if a.len() != 3 { return Err(crate::vm::falsche_argumente("IMAGE_ENHANCE", a.len())); }
                 let name = gs(a, 1, "IMAGE_ENHANCE")?;
                 let art = crate::resample::Anpassung::aus_namen(&name).ok_or_else(|| format!(
                     "IMAGE_ENHANCE: unbekannte Art '{}' -- moeglich sind helligkeit, kontrast, saettigung", name))?;
@@ -2560,8 +1964,7 @@ impl<'p> Vm<'p> {
                     Some((gi(a,4,"IMAGE_DRAW_IMAGE")? as i32, gi(a,5,"IMAGE_DRAW_IMAGE")? as i32,
                           gi(a,6,"IMAGE_DRAW_IMAGE")? as i32, gi(a,7,"IMAGE_DRAW_IMAGE")? as i32))
                 } else if a.len() == 4 || a.len() == 5 { None } else {
-                    return Err("IMAGE_DRAW_IMAGE: erwartet (ziel, quelle, x, y), \
-optional dahinter (qx, qy, qb, qh) und eine Faerbung".into());
+                    return Err(crate::vm::falsche_argumente("IMAGE_DRAW_IMAGE", a.len()));
                 };
                 // Die Faerbung steht hinter der Quelle, bei kurzer Form direkt
                 // hinter y. WEISS ist "unveraendert".
@@ -2591,14 +1994,14 @@ optional dahinter (qx, qy, qb, qh) und eine Faerbung".into());
             "atlas_free" => { g!().atlas_free(gi(a,0,"ATLAS_FREE")?)?; Value::Nil }
             "image_from_buffer" => {
                 if a.len() != 1 {
-                    return Err(format!("IMAGE_FROM_BUFFER: erwartet (puffer), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("IMAGE_FROM_BUFFER", a.len()));
                 }
                 let bytes = crate::builtins::buf_h(&a[0], "IMAGE_FROM_BUFFER")?.borrow().clone();
                 Value::Int(g!().image_from_buffer(&bytes)?)
             }
             "image_to_buffer" => {
                 if a.is_empty() || a.len() > 2 {
-                    return Err(format!("IMAGE_TO_BUFFER: erwartet (bild[, mit_alpha]), erhalten {} Argumente", a.len()));
+                    return Err(crate::vm::falsche_argumente("IMAGE_TO_BUFFER", a.len()));
                 }
                 let ohne_alpha = match a.get(1) {
                     None => false,
@@ -2629,7 +2032,7 @@ optional dahinter (qx, qy, qb, qh) und eine Faerbung".into());
                 let mut bilder = Vec::with_capacity(anzahl as usize);
                 for (i, x) in roh.iter().take(anzahl as usize).enumerate() {
                     match x {
-                        Value::Int(n) => bilder.push(*n),
+                        Value::Int(n) | Value::Handle(_, n) => bilder.push(*n),
                         Value::Nil => return Err(std::format!(
                             "IMAGE_SAVE_GIF: Platz {} ist leer -- mit `anzahl` sagen, \
 wie viele Plaetze gelten", i + 1)),
@@ -2723,7 +2126,7 @@ wie viele Plaetze gelten", i + 1)),
             "image_invert" => Value::Int(g!().image_invert(gi(a,0,"IMAGE_INVERT")?)?),
             "image_color_to_alpha" => {
                 const F: &str = "IMAGE_COLOR_TO_ALPHA";
-                if a.len() != 2 && a.len() != 3 { return Err(format!("{}: erwartet (bild, farbe [, schwelle])", F)); }
+                if a.len() != 2 && a.len() != 3 { return Err(crate::vm::falsche_argumente(F, a.len())); }
                 let s = if a.len() == 3 { need_f(a, 2, F)? as f32 } else { 0.0 };
                 if !(0.0..1.0).contains(&s) { return Err(format!("{}: die Schwelle liegt zwischen 0 und 1 (nicht {})", F, s)); }
                 Value::Int(g!().image_color_to_alpha(gi(a, 0, F)?, gi(a, 1, F)?, s)?)
@@ -2735,14 +2138,14 @@ wie viele Plaetze gelten", i + 1)),
             // --- Formen mit Kommazahlen und Deckkraft (leinwand.rs) ---
             "image_fill_rect" => {
                 const F: &str = "IMAGE_FILL_RECT";
-                if a.len() != 6 && a.len() != 7 { return Err(format!("{}: erwartet (bild, x0, y0, x1, y1, farbe [, deckkraft])", F)); }
+                if a.len() != 6 && a.len() != 7 { return Err(crate::vm::falsche_argumente(F, a.len())); }
                 let (x0, y0, x1, y1) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
                 let c = lw_farbe(a, 5, Some(6), F)?;
                 g!().image_leinwand(gi(a,0,F)?, F, |l| l.rechteck(x0, y0, x1, y1, c))?; Value::Nil
             }
             "image_frame" => {
                 const F: &str = "IMAGE_FRAME";
-                if a.len() != 7 && a.len() != 8 { return Err(format!("{}: erwartet (bild, x0, y0, x1, y1, breite, farbe [, deckkraft])", F)); }
+                if a.len() != 7 && a.len() != 8 { return Err(crate::vm::falsche_argumente(F, a.len())); }
                 let (x0, y0, x1, y1) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
                 let b = need_f(a,5,F)? as f32;
                 let c = lw_farbe(a, 6, Some(7), F)?;
@@ -2750,7 +2153,7 @@ wie viele Plaetze gelten", i + 1)),
             }
             "image_fill_roundrect" => {
                 const F: &str = "IMAGE_FILL_ROUNDRECT";
-                if a.len() != 7 && a.len() != 8 { return Err(format!("{}: erwartet (bild, x0, y0, x1, y1, radius, farbe [, deckkraft])", F)); }
+                if a.len() != 7 && a.len() != 8 { return Err(crate::vm::falsche_argumente(F, a.len())); }
                 let (x0, y0, x1, y1) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
                 let r = need_f(a,5,F)? as f32;
                 let c = lw_farbe(a, 6, Some(7), F)?;
@@ -2758,14 +2161,14 @@ wie viele Plaetze gelten", i + 1)),
             }
             "image_fill_ellipse" => {
                 const F: &str = "IMAGE_FILL_ELLIPSE";
-                if a.len() != 6 && a.len() != 7 { return Err(format!("{}: erwartet (bild, cx, cy, rx, ry, farbe [, deckkraft])", F)); }
+                if a.len() != 6 && a.len() != 7 { return Err(crate::vm::falsche_argumente(F, a.len())); }
                 let (cx, cy, rx, ry) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
                 let c = lw_farbe(a, 5, Some(6), F)?;
                 g!().image_leinwand(gi(a,0,F)?, F, |l| l.ellipse(cx, cy, rx, ry, c))?; Value::Nil
             }
             "image_ring" => {
                 const F: &str = "IMAGE_RING";
-                if a.len() != 6 && a.len() != 7 { return Err(format!("{}: erwartet (bild, cx, cy, r, breite, farbe [, deckkraft])", F)); }
+                if a.len() != 6 && a.len() != 7 { return Err(crate::vm::falsche_argumente(F, a.len())); }
                 let (cx, cy, r, b) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
                 let c = lw_farbe(a, 5, Some(6), F)?;
                 g!().image_leinwand(gi(a,0,F)?, F, |l| l.ring(cx, cy, r, b, c))?; Value::Nil
@@ -2775,7 +2178,7 @@ wie viele Plaetze gelten", i + 1)),
                 let f: &str = if linie { "IMAGE_POLYLINE" } else { "IMAGE_FILL_POLY" };
                 let (soll, extra) = if linie { (5, "breite, ") } else { (4, "") };
                 if a.len() != soll && a.len() != soll + 1 {
-                    return Err(format!("{}: erwartet (bild, xs, ys, {}farbe [, deckkraft])", f, extra));
+                    let _ = extra; return Err(crate::vm::falsche_argumente(f, a.len()));
                 }
                 let xs = gfloats(a, 1, f)?;
                 let ys = gfloats(a, 2, f)?;
@@ -2796,7 +2199,7 @@ wie viele Plaetze gelten", i + 1)),
             "image_gradient" => {
                 const F: &str = "IMAGE_GRADIENT";
                 if a.len() != 7 && a.len() != 8 && a.len() != 10 {
-                    return Err(format!("{}: erwartet (bild, x0, y0, x1, y1, farbe1, farbe2 [, senkrecht [, deckkraft1, deckkraft2]])", F));
+                    return Err(crate::vm::falsche_argumente(F, a.len()));
                 }
                 let (x0, y0, x1, y1) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
                 let (d1, d2) = if a.len() == 10 { (Some(8), Some(9)) } else { (None, None) };
@@ -2806,7 +2209,7 @@ wie viele Plaetze gelten", i + 1)),
                 g!().image_leinwand(gi(a,0,F)?, F, |l| l.verlauf(x0, y0, x1, y1, c1, c2, senkrecht))?; Value::Nil
             }
             "image_draw_text" => {
-                if a.len() != 6 && a.len() != 7 { return Err("IMAGE_DRAW_TEXT: erwartet (bild, x, y, text$, groesse, farbe[, font])".into()); }
+                if a.len() != 6 && a.len() != 7 { return Err(crate::vm::falsche_argumente("IMAGE_DRAW_TEXT", a.len())); }
                 let txt = gs(a,3,"IMAGE_DRAW_TEXT")?.to_string();
                 let (b, x, y) = (gi(a,0,"IMAGE_DRAW_TEXT")?, gi(a,1,"IMAGE_DRAW_TEXT")? as i32, gi(a,2,"IMAGE_DRAW_TEXT")? as i32);
                 let (sz, c) = (gi(a,4,"IMAGE_DRAW_TEXT")? as i32, gi(a,5,"IMAGE_DRAW_TEXT")?);
@@ -2816,7 +2219,7 @@ wie viele Plaetze gelten", i + 1)),
                 Value::Nil
             }
             "image_text" => {
-                if a.len() != 3 && a.len() != 4 { return Err("IMAGE_TEXT: erwartet (text$, groesse, farbe[, font])".into()); }
+                if a.len() != 3 && a.len() != 4 { return Err(crate::vm::falsche_argumente("IMAGE_TEXT", a.len())); }
                 let txt = gs(a,0,"IMAGE_TEXT")?.to_string();
                 let font = if a.len() == 4 { gi(a,3,"IMAGE_TEXT")? } else { -1 };
                 Value::Int(g!().image_text(&txt, gi(a,1,"IMAGE_TEXT")? as i32, gi(a,2,"IMAGE_TEXT")?, font)?)
@@ -2869,7 +2272,7 @@ wie viele Plaetze gelten", i + 1)),
                 let (x,y) = (gi(a,1,"UI_CHECKBOX")? as i32 + self.ui_state.offset_x, gi(a,2,"UI_CHECKBOX")? as i32 + self.ui_state.offset_y);
                 let label = gs(a,3,"UI_CHECKBOX")?.to_string();
                 if !self.ui_state.checkbox.contains_key(&id) {
-                    let init = if a.len() == 5 { matches!(a[4], Value::Bool(true)) } else { false };
+                    let init = crate::argument::a_schalter_oder(a, 4, false, "UI_CHECKBOX")?;
                     self.ui_state.checkbox.insert(id.clone(), init);
                 }
                 let bs = self.ui_state.metric("checkbox_size") as i32;
@@ -3217,7 +2620,8 @@ wie viele Plaetze gelten", i + 1)),
                 Value::Nil
             }
 
-            _ => return Ok(None), // kein Grafik-Builtin -> pure-Pfad
+            // Ton steht in vm_ton.rs (dieselbe Familie, nur eine eigene Datei).
+            _ => return self.try_ton(name, a),
         };
         Ok(Some(r))
     }
@@ -3226,7 +2630,49 @@ wie viele Plaetze gelten", i + 1)),
 /// Ein Feld ohne Plaetze fuer AUDIO_FFT, MIC_FFT, MIC_WAVE: Sie fuellen so
 /// viele Werte, wie das Feld Plaetze hat -- bei `DIM sp AS ARRAY OF FLOAT`
 /// (leer) also still keinen (Buch "Kleine Wunder", Kapitel 19).
-#[allow(dead_code)]
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub(crate) fn leeres_feld(f: &str) -> String {
     format!("{}: das Feld hat keine Plaetze -- es bekommt so viele Werte, wie es Plaetze hat: DIM werte[64] AS FLOAT", f)
+}
+
+impl UiState {
+    pub(super) fn new() -> Self {
+        UiState {
+            checkbox: HashMap::new(), slider: HashMap::new(), radio: HashMap::new(),
+            text: HashMap::new(), focused: None, prev_backspace: false,
+            offset_x: 0, offset_y: 0, input_blocked: false,
+            windows: HashMap::new(), win_stack: Vec::new(), drag_win: None,
+            drag_off: (0, 0), active_win: None, hover_win: None,
+            was_mouse_down: false, click_origin: None, frame_count: 0,
+            theme: DEFAULT_UI_THEME.iter().map(|(k, v)| (k.to_string(), *v)).collect(),
+            metrics: DEFAULT_UI_METRICS.iter().map(|(k, v)| (k.to_string(), *v)).collect(),
+            tables: HashMap::new(),
+        }
+    }
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
+    fn th(&self, key: &str) -> i64 { *self.theme.get(key).unwrap_or(&0xFFFFFF) }
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
+    fn metric(&self, key: &str) -> i64 { *self.metrics.get(key).unwrap_or(&14) }
+    /// Plastik-Werte gebuendelt (siehe `UiPlastik`).
+    #[cfg(feature = "graphics")]
+    fn plastik(&self) -> UiPlastik {
+        UiPlastik {
+            rad: *self.metrics.get("corner_radius").unwrap_or(&0) as i32,
+            grad: *self.metrics.get("gradient").unwrap_or(&0) as i32,
+            gloss: *self.metrics.get("gloss").unwrap_or(&0) as i32,
+            bevel: *self.metrics.get("bevel").unwrap_or(&0) as i32,
+        }
+    }
+}
+
+/// Metrik-Profil eines Presets. Nur die "glas_*"-Themen bringen Plastik mit;
+/// alle anderen bleiben flach, damit bestehende Programme unveraendert
+/// aussehen.
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
+fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
+    if name.starts_with("glas") {
+        vec![("corner_radius", 5), ("gradient", 16), ("gloss", 26), ("bevel", 1)]
+    } else {
+        vec![("corner_radius", 0), ("gradient", 0), ("gloss", 0), ("bevel", 0)]
+    }
 }

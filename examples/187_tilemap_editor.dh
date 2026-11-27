@@ -1428,10 +1428,10 @@ WHILE NOT beenden
     NEXT
 
     ' ------------------------------------------------------- Kartenmaus
-    DIM cx AS INTEGER : cx = GUI_CANVAS_X(leinwand)
-    DIM cy AS INTEGER : cy = GUI_CANVAS_Y(leinwand)
-    DIM cw AS INTEGER : cw = GUI_CANVAS_W(leinwand)
-    DIM ch AS INTEGER : ch = GUI_CANVAS_H(leinwand)
+    DIM cx AS INTEGER : cx = GUI_CANVAS_SCREEN_X(leinwand)
+    DIM cy AS INTEGER : cy = GUI_CANVAS_SCREEN_Y(leinwand)
+    DIM cw AS INTEGER : cw = GUI_CANVAS_SCREEN_W(leinwand)
+    DIM ch AS INTEGER : ch = GUI_CANVAS_SCREEN_H(leinwand)
     DIM mx AS INTEGER : mx = MOUSEX()
     DIM my AS INTEGER : my = MOUSEY()
     DIM z AS INTEGER : z = zell()
@@ -1498,8 +1498,8 @@ WHILE NOT beenden
     panY = MAX(0, MIN(panY, MAX(0, kh * z - ch)))
 
     ' ----------------------------------------------------- Kachelauswahl
-    DIM px AS INTEGER : px = GUI_CANVAS_X(palette)
-    DIM py AS INTEGER : py = GUI_CANVAS_Y(palette)
+    DIM px AS INTEGER : px = GUI_CANVAS_SCREEN_X(palette)
+    DIM py AS INTEGER : py = GUI_CANVAS_SCREEN_Y(palette)
     DIM ueberPal AS BOOLEAN
     ueberPal = mx >= px AND mx < px + PAL_SP * KACHEL * PZ AND _
                my >= py AND my < py + PAL_RE * KACHEL * PZ AND NOT neuOffen

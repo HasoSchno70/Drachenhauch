@@ -10,7 +10,7 @@
 //! sind; nur die Grenze, an der ein Popup ausweicht, ist dann der
 //! Arbeitsbereich des Schirms statt des Fensterrands (`grenze`).
 //!
-//! Wo es keine Popup-Fenster gibt (Wayland, `DHRT_OHNE_POPUP_FENSTER=1`),
+//! Wo es keine Popup-Fenster gibt (Wayland, `DHRT_NO_POPUP_WINDOWS=1`),
 //! weicht ein Popup am Rand seines Fensters aus. Im Hauptfenster bleibt es
 //! wie immer: dort weicht es am Rand des Hauptfensters aus.
 
@@ -18,7 +18,7 @@ use super::*;
 
 /// Ein Popup-Fenster: zeigt den Ausschnitt `r` (x, y, b, h) der Flaeche
 /// `flaeche`.
-pub(super) struct PopupFenster {
+pub(crate) struct PopupFenster {
     pub(super) flaeche: u32,
     pub(super) id: u32,
     pub(super) r: (i32, i32, i32, i32),
@@ -82,6 +82,11 @@ impl Gui {
             for i in 0..w.widgets.len() {
                 if let Some((x, y, b, h, _, _)) = self.vorschlag_rect(wi, i) { out.push((x, y, b, h)); }
             }
+            // Ein Popover samt Pfeil und Schatten.
+            if self.ist_offener_pop(wi) {
+                let r = self.sk(super::ueber::POP_PFEIL) + self.sk(8);
+                out.push((w.x - r, w.y - r, w.w + 2 * r, w.h + 2 * r));
+            }
         }
         out
     }
@@ -96,7 +101,7 @@ impl Gui {
         eigner.extend(self.datum_auf.map(|d| d.0));
         eigner.extend(self.rs_fenster());
         for (wi, w) in self.windows.iter().enumerate() {
-            if w.alive && self.vorschlaege_offen(wi) { eigner.push(wi); }
+            if w.alive && (self.vorschlaege_offen(wi) || self.ist_offener_pop(wi)) { eigner.push(wi); }
         }
         let mut out: Vec<u32> = Vec::new();
         for wi in eigner {

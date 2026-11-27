@@ -8,20 +8,20 @@
 ' Format: docs/werkzeuge.md.
 
 === eine glatte kommazahl gilt in jeder familie als integer
-' SLEEP gehoert zur Familie mit bi_int (db, net, Geraete, Prozesse) -- dort
-' war bis 2026.53 auch 2.0 ein Fehler.
-SLEEP(10 / 5)
-PRINT "SLEEP(10 / 5) ging"
+' COOLDOWN gehoert zur timer-Familie (t_int) -- dort war bis 2026.53 auch
+' 2.0 ein Fehler. (Bis 2026.53 stand hier SLEEP; das nimmt seit Punkt 6
+' der Rangliste Kommazahlen, es zaehlt Millisekunden.)
+PRINT COOLDOWN("a", 10 / 5)
 PRINT MID$("abcdef", 4 / 2, 2)
 TRY
-    SLEEP(1.5)
+    PRINT COOLDOWN("b", 1.5)
 CATCH e
     PRINT e
 END TRY
 --- erwartet
-SLEEP(10 / 5) ging
+TRUE
 cd
-SLEEP: erwartet INTEGER (Arg 1), erhalten FLOAT 1.5 -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig
+COOLDOWN: erwartet INTEGER (Arg 2), erhalten FLOAT 1.5 -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig
 
 === eine zeitangabe mit nachkommastellen ist ein fehler
 ' ZEIT_PLUS(t, 1.7) zaehlte bis 2026.53 still eine Sekunde.
@@ -81,6 +81,24 @@ CATCH e
 END TRY
 --- erwartet
 SORT: 2. Argument muss BOOLEAN (absteigend) oder FUNCREF (Comparator) sein
+
+=== auch die letzten schalter nehmen kein wort
+' DIRLIST (rekursiv), CODE_FORMAT$, FONT_LIGATURES, AUDIO_LOFI,
+' GUI_TEXTAREA_FOLD* und UI_CHECKBOX nahmen bis 2026.53 jeden Wert ueber
+' truthy() -- "nein" war wahr. Jetzt die Regel aller Schalter.
+TRY
+    PRINT LEN(DIRLIST(".", "", "nein"))
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT CODE_FORMAT$("x", "nein")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+DIRLIST: erwartet BOOLEAN oder Zahl (Arg 3), erhalten STRING
+CODE_FORMAT$: erwartet BOOLEAN oder Zahl (Arg 2), erhalten STRING
 
 === die meldung hat den doppelpunkt und darum den aufruf
 ' "UPPER$ erwartet STRING" (ohne Doppelpunkt) bekam von mit_signatur keine

@@ -1,7 +1,6 @@
 //! Der Debugger der VM (`dhrt debug`): Haltepunkte, Schritte, Variablen als JSON, Ausdruecke auswerten.
 //!
-//! Teil von `vm.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `vm.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
@@ -54,7 +53,7 @@ impl<'p> Vm<'p> {
         const JE_EBENE: usize = 100;
         if tiefe >= 3 || *budget == 0 { return None; }
         let mut paare: Vec<(String, Value)> = Vec::new();
-        let mut gesamt = 0usize;
+        let gesamt: usize;
         match v {
             Value::Instance(rc) => {
                 let inst = rc.borrow();
@@ -312,7 +311,7 @@ impl<'p> Vm<'p> {
                 let bed_ok = match &hp.bed {
                     None => true,
                     Some(expr) => self.eval_node(expr, fn_, locals)
-                        .map(|v| dbg_truthy(&v)).unwrap_or(true),
+                        .map(|v| v.truthy()).unwrap_or(true),
                 };
                 if bed_ok {
                     hp.zaehler += 1;
@@ -589,9 +588,9 @@ impl<'p> Vm<'p> {
             Node::UnaryOp { op, operand } => {
                 let v = self.eval_node(operand, fn_, locals)?;
                 match op.as_str() {
-                    "-" => match v { Value::Int(i) => Ok(Value::Int(-i)),
-                                     _ => Ok(Value::Float(-as_f64(&v))) },
-                    "not" => Ok(Value::Bool(!dbg_truthy(&v))),
+                    "-" => crate::vm::konstant_negieren(&v)
+                        .ok_or_else(|| "eval: '-' erwartet eine Zahl".to_string()),
+                    "not" => Ok(Value::Bool(!v.truthy())),
                     _ => Err(format!("eval: unaerer Operator '{}' nicht unterstuetzt", op)),
                 }
             }
@@ -644,5 +643,44 @@ impl<'p> Vm<'p> {
             }
             _ => Err("eval: Ausdruck nicht unterstuetzt (nur Namen, Literale, Operatoren, Felder und Indizes -- keine Aufrufe)".into()),
         }
+    }
+}
+
+/// Ein JSON-Event als Zeile auf stdout schreiben + flushen.
+pub(super) fn dbg_emit(ev: &serde_json::Value) {
+    use std::io::Write;
+    let stdout = std::io::stdout();
+    let mut h = stdout.lock();
+    let _ = writeln!(h, "{}", serde_json::to_string(ev).unwrap_or_default());
+    let _ = h.flush();
+}
+
+/// Wert fuer die Variablen-Anzeige formatieren (gekappt wie debugger._fmt_value).
+pub(super) fn dbg_short(v: &Value) -> String {
+    let s = v.fmt();
+    if s.chars().count() > 200 {
+        let t: String = s.chars().take(200).collect();
+        format!("{}...", t)
+    } else { s }
+}
+
+/// Binaerer Operator fuer den Debugger-Mini-Evaluator: dieselben Regeln wie
+/// die Befehle der VM (`vm_helfer::cmp`, `wert_rechnen`), keine zweite
+/// Rechnung (CLAUDE.md). Bis 2026.53 rechnete der Debugger selbst -- ueber
+/// f64: `"apfel" < "birne"` war FALSE, `2^53 + 1` verlor die letzte Stelle,
+/// und ein Ueberlauf saettigte (Bericht A20.1).
+pub(super) fn dbg_binop(op: &str, a: &Value, b: &Value) -> R<Value> {
+    let vergleich = |o: char| cmp(a, b, o).map(Value::Bool).map_err(|e| format!("eval: {}", e));
+    match op {
+        "=" => Ok(Value::Bool(value_eq(a, b))),
+        "<>" => Ok(Value::Bool(!value_eq(a, b))),
+        "and" => Ok(Value::Bool(a.truthy() && b.truthy())),
+        "or" => Ok(Value::Bool(a.truthy() || b.truthy())),
+        "<" => vergleich('<'),
+        ">" => vergleich('>'),
+        "<=" => vergleich('l'),
+        ">=" => vergleich('g'),
+        _ => wert_rechnen(op, a, b)
+            .ok_or_else(|| format!("eval: Operator '{}' geht mit diesen Werten nicht", op)),
     }
 }

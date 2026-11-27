@@ -21,7 +21,7 @@ use regex::Regex;
 /// Built-in-Modul-Namen -- die EINZIGE Liste (bis 2026-09-21 gab es daneben
 /// `KNOWN_MODULES` im Python-Paket). dhrt implementiert diese Module nativ;
 /// ein `IMPORT "<modul>"` wird hier nur zu einem Kommentar.
-const MODULES: &[&str] = &[
+pub(crate) const MODULES: &[&str] = &[
     "animfsm", "astar", "audio", "bt", "camera", "chart", "cloud", "controller", "curves", "db", "ecs",
     "firmata", "g3d", "gpio", "gui", "hotplug", "html", "httpd", "i2c", "imgfx", "ini", "input", "json", "m3d", "mdns", "midi", "modbus", "mqtt", "net", "osc", "particles",
     "geld", "pdf", "smtp", "xlsx", "xml",
@@ -30,69 +30,26 @@ const MODULES: &[&str] = &[
 ];
 
 
-/// Externe Typen, die ein Built-in-Modul registriert (lowercase, wie der
-/// Lexer IDENTs liefert). Spiegelt `register_type(...)` der Module -- damit
-/// der Rust-Compiler `DIM x AS VEC2` & Co. akzeptiert, sobald das Modul
-/// importiert wurde (entspricht Pythons `EXTERNAL_TYPES` nach `load_module`).
-/// Module ohne eigenen Typ stehen nicht in der Tabelle.
-/// Alle Typnamen der Module (klein) -- fuer die Vervollstaendigung hinter
-/// `AS` (lsp.rs).
+/// Alle Typnamen der Module (klein, wie der Lexer IDENTs liefert) -- fuer
+/// die Vervollstaendigung hinter `AS` (lsp.rs). Die Typen selbst stehen in
+/// EINER Tafel, `typtafel::TYPEN`.
 pub(crate) fn modul_typen() -> impl Iterator<Item = &'static str> {
-    MODULE_TYPES.iter().flat_map(|(_, t)| t.iter().copied())
+    static K: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    K.get_or_init(|| crate::typtafel::TYPEN.iter().filter(|t| !t.module.is_empty())
+        .map(|t| t.name.to_lowercase()).collect()).iter().map(String::as_str)
 }
 
-const MODULE_TYPES: &[(&str, &[&str])] = &[
-    ("animfsm", &["anim_fsm"]),
-    ("astar", &["astar_grid"]),
-    ("chart", &["chart"]),
-    ("audio", &["audio_channel", "sample", "audio_clock", "audio_listener", "audio_emitter", "audio_mod"]),
-    ("bt", &["bt_handle"]),
-    ("controller", &["char_controller", "tiled_map"]),
-    ("db", &["db_conn", "db_result"]),
-    ("ecs", &["ecs_world"]),
-    ("firmata", &["firmata_handle"]),
-    ("gpio", &["gpio_chip"]),
-    ("i2c", &["i2c_bus"]),
-    ("spi", &["spi_device"]),
-    ("webcam", &["webcam"]),
-    ("websocket", &["websocket", "ws_server"]),
-    ("osc", &["osc"]),
-    ("gui", &["gui_widget", "gui_window"]),
-    ("json", &["json_handle"]),
-    ("m3d", &["vec3", "vec4", "quat", "mat4"]),
-    ("mqtt", &["mqtt_handle"]),
-    ("httpd", &["httpd"]),
-    ("xml", &["xml_handle"]),
-    ("pdf", &["pdf"]),
-    ("geld", &["geld"]),
-    ("smtp", &["smtp"]),
-    ("xlsx", &["xlsx"]),
-    ("net", &["net_listener", "net_socket", "net_udp"]),
-    ("particles", &["particle_system"]),
-    ("physics", &["physics_broad"]),
-    ("physics2d", &["phys2d_world"]),
-    ("physics3d", &["phys_world"]),
-    ("save", &["save_handle"]),
-    ("midi", &["midi_in", "midi_out", "midi_file"]),
-    ("modbus", &["modbus"]),
-    ("serial", &["serial_handle"]),
-    ("sprite", &["sprite"]),
-    ("tile_collide", &["tiled_map"]),
-    ("tiled", &["tiled_map"]),
-    ("tween", &["tween"]),
-    ("usb", &["usb_handle"]),
-    ("vec2", &["vec2"]),
-    ("video", &["video"]),
-];
+/// Die Typen, die `IMPORT "modul"` bringt (klein).
+fn typen_des_moduls(modul: &str) -> Vec<String> {
+    crate::typtafel::TYPEN.iter().filter(|t| t.module.contains(&modul))
+        .map(|t| t.name.to_lowercase()).collect()
+}
 
 /// Alle Built-in-Module, die den externen Typ `t` (lowercase, kanonisch)
 /// bereitstellen. Fuer hilfreiche „IMPORT fehlt?"-Compiler-Fehlermeldungen,
 /// wenn ein `DIM x AS <Modul-Typ>` ohne das passende IMPORT auftaucht.
 pub fn modules_for_type(t: &str) -> Vec<&'static str> {
-    MODULE_TYPES.iter()
-        .filter(|(_, types)| types.contains(&t))
-        .map(|(m, _)| *m)
-        .collect()
+    crate::typtafel::typ(t).map(|t| t.module.to_vec()).unwrap_or_default()
 }
 
 /// Remap eines Namens unter einem Modul-Alias -- gleiche Konvention wie
@@ -127,16 +84,15 @@ pub fn compile_env(imports: &[(String, Option<String>)])
         module.insert(modul.to_lowercase());
     }
     for (module, alias) in imports {
-        let mod_types: &[&str] = MODULE_TYPES.iter()
-            .find(|(n, _)| n == module).map(|(_, t)| *t).unwrap_or(&[]);
-        for t in mod_types {
-            types.insert((*t).to_string());
+        let mod_types = typen_des_moduls(module);
+        for t in &mod_types {
+            types.insert(t.clone());
         }
         if let Some(a) = alias {
             if !aliases.iter().any(|(x, y)| x == a && y == module) {
                 aliases.push((a.clone(), module.clone()));
             }
-            for t in mod_types {
+            for t in &mod_types {
                 if let Some(at) = remap_name(t, module, a) {
                     types.insert(at);
                 }
@@ -275,7 +231,7 @@ pub fn hardware_missing_msg(module: &str) -> String {
 ///    Datei danebenlegt, will genau die, und keine, die irgendwo auf dem
 ///    Rechner liegt und sich unbemerkt aendert.
 /// 1b. `pakete/` von dort nach oben (`paketpfade`, die Pakete des Projekts).
-/// 2. `DH_PATH` -- wie `PYTHONPATH`, mehrere Ordner mit dem Trenner des
+/// 2. `DHRT_PATH` -- wie `PYTHONPATH`, mehrere Ordner mit dem Trenner des
 ///    Betriebssystems (`;` unter Windows, sonst `:`). Getrennt wird mit
 ///    `std::env::split_paths`, nicht von Hand: unter Windows ist der
 ///    Doppelpunkt in `C:\lib` sonst ein Trenner.
@@ -289,7 +245,7 @@ pub fn hardware_missing_msg(module: &str) -> String {
 /// Antworten auf "wo liegt die Bibliothek" waeren schlimmer als eine, die
 /// einen Ort weniger kennt.
 /// Die `pakete/`-Ordner von der importierenden Datei aus nach oben -- der
-/// Schritt zwischen "neben der Datei" und `DH_PATH` (`dhrt paket`, siehe
+/// Schritt zwischen "neben der Datei" und `DHRT_PATH` (`dhrt paket`, siehe
 /// docs/intern/entwurf-pakete.md). Von innen nach aussen wie bei `node_modules`:
 /// braucht ein Paket selbst ein Paket, liegt es in seinem eigenen `pakete/`
 /// und wird dort zuerst gefunden, auch wenn das Projekt eine andere Fassung
@@ -300,7 +256,7 @@ pub fn paketpfade(base: &std::path::Path) -> Vec<std::path::PathBuf> {
 
 pub fn bibliothekspfade() -> Vec<std::path::PathBuf> {
     let mut raus: Vec<std::path::PathBuf> = Vec::new();
-    if let Some(p) = std::env::var_os("DH_PATH") {
+    if let Some(p) = crate::umgebung::var_os("DHRT_PATH") {
         raus.extend(std::env::split_paths(&p).filter(|p| !p.as_os_str().is_empty()));
     }
     let heim = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"));

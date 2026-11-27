@@ -1,5 +1,5 @@
 ' Mikrofon (MIC_*, src/mikrofon.rs). Die Laeufer der CI haben keinen Eingang,
-' darum spielt eine WAV-Datei das Mikrofon: `DHRT_MIKROFON=datei.wav` speist
+' darum spielt eine WAV-Datei das Mikrofon: `DHRT_MICROPHONE=datei.wav` speist
 ' sie in Echtzeit und in Schleife ueber denselben Puffer ein wie der Rueckruf
 ' des echten Geraets. Jeder Fall schreibt seinen Ton selbst
 ' (_hilfen/tonwav.dh) und setzt die Variable mit SETENV. Nicht geprueft ist
@@ -10,7 +10,7 @@
 IMPORT "audio"
 IMPORT "ton.dh"
 tonWav("ton.wav", "sinus", 440.0, 0.5, 0.5, 48000)
-SETENV("DHRT_MIKROFON", "ton.wav")
+SETENV("DHRT_MICROPHONE", "ton.wav")
 DIM g AS ARRAY OF STRING
 g = MIC_DEVICES()
 PRINT LEN(g); " "; g[0]
@@ -31,7 +31,7 @@ FALSE 0
 IMPORT "audio"
 IMPORT "ton.dh"
 tonWav("ton.wav", "sinus", 440.0, 0.5, 0.5, 48000)
-SETENV("DHRT_MIKROFON", "ton.wav")
+SETENV("DHRT_MICROPHONE", "ton.wav")
 MIC_START()
 SLEEP(200)
 DIM sp AS FLOAT : sp = MIC_LEVEL()
@@ -62,7 +62,7 @@ FOR EACH p IN paare
     teile = SPLIT(p, " ")
     DIM hz AS FLOAT : hz = VAL(teile[1])
     tonWav("ton.wav", teile[0], hz, 0.3, 0.4, 44100)
-    SETENV("DHRT_MIKROFON", "ton.wav")
+    SETENV("DHRT_MICROPHONE", "ton.wav")
     MIC_START()
     SLEEP(150)
     DIM f AS FLOAT : f = MIC_PITCH()
@@ -81,7 +81,7 @@ sinus 1250 TRUE
 IMPORT "audio"
 IMPORT "ton.dh"
 tonWav("ton.wav", "stille", 0.0, 0.3, 0.0, 48000)
-SETENV("DHRT_MIKROFON", "ton.wav")
+SETENV("DHRT_MICROPHONE", "ton.wav")
 MIC_START()
 SLEEP(150)
 PRINT MIC_LEVEL(); " "; MIC_RMS(); " "; MIC_PITCH()
@@ -97,7 +97,7 @@ IMPORT "audio"
 IMPORT "ton.dh"
 FUNCTION staerkstes(hz AS FLOAT) AS INTEGER
     tonWav("ton.wav", "sinus", hz, 0.3, 0.5, 48000)
-    SETENV("DHRT_MIKROFON", "ton.wav")
+    SETENV("DHRT_MICROPHONE", "ton.wav")
     MIC_START()
     SLEEP(150)
     DIM b[16] AS FLOAT
@@ -127,7 +127,7 @@ hoch rechts von tief TRUE
 IMPORT "audio"
 IMPORT "ton.dh"
 tonWav("ton.wav", "sinus", 400.0, 0.3, 0.5, 48000)
-SETENV("DHRT_MIKROFON", "ton.wav")
+SETENV("DHRT_MICROPHONE", "ton.wav")
 MIC_START()
 SLEEP(150)
 DIM w[480] AS FLOAT
@@ -149,7 +149,7 @@ periode TRUE TRUE
 IMPORT "audio"
 IMPORT "ton.dh"
 tonWav("ton.wav", "sinus", 440.0, 0.25, 0.5, 48000)
-SETENV("DHRT_MIKROFON", "ton.wav")
+SETENV("DHRT_MICROPHONE", "ton.wav")
 MIC_START()
 MIC_RECORD_START(0.5)
 PRINT MIC_RECORDING()
@@ -176,7 +176,7 @@ spitze 0.5 +-0.01
 IMPORT "audio"
 IMPORT "ton.dh"
 tonWav("ton.wav", "sinus", 440.0, 0.25, 0.5, 48000)
-SETENV("DHRT_MIKROFON", "ton.wav")
+SETENV("DHRT_MICROPHONE", "ton.wav")
 MIC_START()
 MIC_RECORD_START(0.3)
 SLEEP(500)
@@ -206,7 +206,7 @@ MIC_LEVEL: es laeuft kein Mikrofon -- erst MIC_START
 IMPORT "audio"
 IMPORT "ton.dh"
 tonWav("ton.wav", "sinus", 440.0, 0.25, 0.5, 48000)
-SETENV("DHRT_MIKROFON", "ton.wav")
+SETENV("DHRT_MICROPHONE", "ton.wav")
 MIC_START()
 MIC_STOP()
 DIM b[8] AS FLOAT
@@ -220,7 +220,7 @@ MIC_FFT: es laeuft kein Mikrofon -- erst MIC_START
 IMPORT "audio"
 IMPORT "ton.dh"
 tonWav("ton.wav", "sinus", 440.0, 0.25, 0.5, 48000)
-SETENV("DHRT_MIKROFON", "ton.wav")
+SETENV("DHRT_MICROPHONE", "ton.wav")
 MIC_START("Studiomikrofon")
 --- datei ton.dh
 IMPORT "{sammlung}/../_hilfen/tonwav.dh"
@@ -231,7 +231,7 @@ MIC_START: kein Eingang 'Studiomikrofon' -- es gibt: Datei: ton.wav
 IMPORT "audio"
 IMPORT "ton.dh"
 tonWav("ton.wav", "sinus", 440.0, 0.25, 0.5, 48000)
-SETENV("DHRT_MIKROFON", "ton.wav")
+SETENV("DHRT_MICROPHONE", "ton.wav")
 MIC_START()
 PRINT MIC_RECORD_SAVE("x.wav")
 --- datei ton.dh

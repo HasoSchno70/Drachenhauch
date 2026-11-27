@@ -42,7 +42,7 @@ mehrere TRUE TRUE
 zurueck zu einem TRUE FALSE
 zu FALSE
 GUI_ACCORDION_OPEN: Abschnitt 5 gibt es nicht (erst GUI_ACCORDION_ADD)
-GUI_ACCORDION_SET: unbekannter Schluessel 'breit' (erlaubt: mehrere)
+GUI_ACCORDION_SET: unbekannter Schluessel 'breit' -- moeglich sind mehrere/multiple
 
 === ein kind vor dem akkordeon ist ein fehler
 IMPORT "gui"

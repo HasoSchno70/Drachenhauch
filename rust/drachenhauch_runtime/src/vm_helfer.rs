@@ -1,6 +1,6 @@
 //! Freie Helfer der VM: Meldungen, Index und Scheiben, Rechnen (`konstant_rechnen`, `cmp`, `div` ...), Wandeln (`coerce`), Felder anhaengen.
 //!
-//! Teil von `vm.rs`, herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `vm.rs` (dort die Typen); `vm.rs` reicht diese Helfer weiter (`pub(crate) use helfer::*`).
 
 use super::*;
 
@@ -14,7 +14,19 @@ use super::*;
 /// Der Name steht am Anfang jeder solchen Meldung, und das Befehlsverzeichnis
 /// kennt die Form -- also wird sie angehaengt. Nur bei Meldungen, in denen es
 /// erkennbar um Argumente geht: "Datei nicht gefunden" braucht sie nicht.
+/// Die Meldung fuer eine falsche Zahl von Argumenten zur Laufzeit -- mit der
+/// Aufrufform aus dem Index (`mit_signatur`), nicht mit einer eigenen
+/// Kurzhilfe. Bis 2026.53 schrieben rund 130 Stellen ihre Form selbst hin,
+/// oft mit deutschen Parameternamen ("(tbl, ab, zellen)"), die es fuer
+/// benannte Argumente gar nicht gibt (Bericht B6).
+pub(crate) fn falsche_argumente(fn_: &str, n: usize) -> String {
+    mit_signatur(&format!("{}: falsche Zahl von Argumenten, erhalten {}", fn_, n))
+}
+
 pub(crate) fn mit_signatur(msg: &str) -> String {
+    // Schon mit Aufrufform (eine Meldung, die sie selbst baut, etwa fuer
+    // DECLARE-Funktionen): nicht noch einmal.
+    if msg.contains(" -- Aufruf: ") { return msg.to_string(); }
     let Some((kopf, rest)) = msg.split_once(':') else { return msg.to_string() };
     if kopf.is_empty() || kopf.len() > 40
         || !kopf.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_' || c == '$') {
@@ -26,10 +38,28 @@ pub(crate) fn mit_signatur(msg: &str) -> String {
     let low = kopf.to_lowercase();
     for (n, sig, _) in crate::compiler::builtin_eintraege() {
         if n.to_lowercase() == low && !sig.is_empty() && !sig.contains("Argumente") {
-            return format!("{} -- Aufruf: {}", msg, sig);
+            return format!("{} -- Aufruf: {}", msg, aufrufform(&sig));
         }
     }
     msg.to_string()
+}
+
+/// Die Signatur als Aufruf: ohne den Rueckgabetyp hinter der schliessenden
+/// Klammer (`REPEAT$(s, n) AS STRING` -> `REPEAT$(s, n)`). Seit der Index
+/// Rueckgabetypen traegt, stand er sonst in jeder Kurzhilfe.
+pub(crate) fn aufrufform(sig: &str) -> &str {
+    let mut tiefe = 0i32;
+    for (i, c) in sig.char_indices() {
+        match c {
+            '(' | '[' => tiefe += 1,
+            ')' | ']' => {
+                tiefe -= 1;
+                if tiefe == 0 && c == ')' { return sig[..=i].trim_end(); }
+            }
+            _ => {}
+        }
+    }
+    sig
 }
 
 /// Zeichnet dieser Befehl auf den BILDSCHIRM? Dann braucht er ein Fenster
@@ -40,6 +70,7 @@ pub(crate) fn mit_signatur(msg: &str) -> String {
 /// Befehle ab, mit denen ein erstes Grafikprogramm anfaengt. Ein Befehl, der
 /// hier fehlt, verhaelt sich wie bisher -- ein Befehl, der zu Unrecht
 /// darinstuende, braeche fremden Code.
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub(crate) fn ist_schirmbefehl(name: &str) -> bool {
     matches!(name,
         "flip" | "cls"
@@ -52,7 +83,7 @@ pub(crate) fn ist_schirmbefehl(name: &str) -> bool {
         | "text" | "drawfps"
         | "drawimage" | "drawimagerot" | "drawimageflipped"
         | "drawimagepart" | "drawimagepartex" | "drawtilemap"
-        | "atlas_draw" | "atlas_draw_flipped" | "batch_draw")
+        | "atlas_draw" | "atlas_draw_flipped")
 }
 
 /// `DIM p AS Spieler` legt die Variable an, aber kein Objekt -- sie ist NIL,
@@ -210,6 +241,7 @@ pub(super) fn arg_value(a: &Arg) -> Value {
 }
 
 /// Gibt es eine Methode dieses Namens fuer Text, Feld, MAP oder Tupel?
+#[cfg_attr(not(feature = "jit"), allow(dead_code))]
 pub(crate) fn ist_container_methode(name: &str) -> bool {
     let n = name.to_lowercase();
     ["string", "array", "map", "tuple"].iter().any(|k| container_method(k, &n).is_some())
@@ -315,7 +347,7 @@ pub(crate) fn store_index(arr: &Value, idx_vals: &[Value], v: Value) -> R<()> {
                 x => return Err(format!("MAP-Schluessel muss STRING sein, erhalten {}", x.type_name())),
             };
             let vt = m.borrow().value_type.clone();
-            let cv = crate::builtins::coerce_map_value(&v, &vt)?;
+            let cv = crate::builtins::coerce_map_value(&v, &vt, "Zuweisung in die MAP")?;
             m.borrow_mut().put(k, cv);
             Ok(())
         }
@@ -526,7 +558,7 @@ pub(super) fn int_pair2(stack: &mut Vec<Value>, op: &str) -> R<(i64, i64)> {
     let b = vm_pop(stack)?;
     let a = vm_pop(stack)?;
     match (&a, &b) {
-        (Value::Int(x), Value::Int(y)) => Ok((*x, *y)),
+        (Value::Int(x) | Value::Handle(_, x), Value::Int(y) | Value::Handle(_, y)) => Ok((*x, *y)),
         _ => Err(format!("{} erwartet INTEGER, erhalten {} / {}", op, a.type_name(), b.type_name())),
     }
 }
@@ -536,23 +568,22 @@ pub(super) fn int_pair2(stack: &mut Vec<Value>, op: &str) -> R<(i64, i64)> {
 pub(super) fn particle_color(start: i64, end: i64, has_end: bool, fade: bool, age: i32, lifetime: i32) -> i64 {
     if !has_end && !fade { return start; }
     let life_t = (age as f64 / lifetime.max(1) as f64).clamp(0.0, 1.0);
-    let mut sr = ((start >> 16) & 0xFF) as f64;
-    let mut sg = ((start >> 8) & 0xFF) as f64;
-    let mut sb = (start & 0xFF) as f64;
+    // Die Deckkraft der Farben zaehlt mit (farbraum::rgba; bis 2026.53 nahmen
+    // PARTICLE_SET_COLOR/_END keine an).
+    let s = crate::farbraum::rgba(start).map(|x| x as f64);
+    let mut c = s;
     if has_end {
-        let (er, eg, eb) = (((end >> 16) & 0xFF) as f64, ((end >> 8) & 0xFF) as f64, (end & 0xFF) as f64);
+        let e = crate::farbraum::rgba(end).map(|x| x as f64);
         let inv = 1.0 - life_t;
-        sr = sr * inv + er * life_t; sg = sg * inv + eg * life_t; sb = sb * inv + eb * life_t;
+        for k in 0..4 { c[k] = s[k] * inv + e[k] * life_t; }
     }
-    // FADE senkt jetzt das ALPHA (statt RGB Richtung Schwarz zu verdunkeln) ->
+    // FADE senkt das ALPHA (statt RGB Richtung Schwarz zu verdunkeln) ->
     // funktioniert auch im additiven Glow-Modus und auf hellem Hintergrund.
-    // col() liest das obere Byte als Alpha; 0 = deckend, daher min. 1 (so wird
-    // ein fast erloschener Partikel transparent, nicht ploetzlich deckend).
-    let alpha: i64 = if fade { (((1.0 - life_t) * 255.0).round().clamp(1.0, 255.0)) as i64 } else { 255 };
-    (alpha << 24)
-        | ((sr.clamp(0.0, 255.0) as i64) << 16)
-        | ((sg.clamp(0.0, 255.0) as i64) << 8)
-        | (sb.clamp(0.0, 255.0) as i64)
+    // Ein fast erloschener Partikel wird durchsichtig, nicht ploetzlich
+    // deckend (aus_rgba macht aus 0 die 1).
+    if fade { c[3] *= 1.0 - life_t; }
+    let k = |x: f64| x.round().clamp(0.0, 255.0) as u8;
+    crate::farbraum::aus_rgba(k(c[0]), k(c[1]), k(c[2]), k(c[3]))
 }
 
 /// Modul-Operator-Dispatch (entspricht `modules.dispatch_binary_op`): vec2 +
@@ -569,6 +600,15 @@ pub(super) fn module_op(op: char, a: &Value, b: &Value) -> Option<R<Value>> {
     // `other` akzeptiert) NIE erreichen lassen.
     if matches!(a, Value::Str(_)) || matches!(b, Value::Str(_)) {
         return None;
+    }
+    // Ein Handle rechnet wie seine Nummer (`handle.rs`): `bild + 1` ist eine
+    // Zahl, die an einer IMAGE-Variablen wieder zum Handle wird.
+    if matches!(a, Value::Handle(..)) || matches!(b, Value::Handle(..)) {
+        let (a, b) = (a.ohne_handle(), b.ohne_handle());
+        return Some(wert_rechnen(&op.to_string(), &a, &b).ok_or_else(|| match require_number(&a, &b, &op.to_string()) {
+            Err(e) => e,
+            Ok(()) => int_overflow_msg(&op.to_string()),
+        }));
     }
     let is_mod = |v: &Value| matches!(v,
         Value::Vec2(..) | Value::Vec3(..) | Value::Vec4(..) | Value::Quat(..)
@@ -655,7 +695,7 @@ pub(super) fn module_op(op: char, a: &Value, b: &Value) -> Option<R<Value>> {
 /// Die Meldung, fuer die es den Typ ueberhaupt gibt.
 pub(super) fn geld_mischt_nicht(op: char) -> String {
     format!("{} : GELD und eine gewoehnliche Zahl mischen sich nicht -- genau \
-             dafuer gibt es den Typ. Entweder GELD_NEU(zahl) daraus machen \
+             dafuer gibt es den Typ. Entweder MONEY_NEW(zahl) daraus machen \
              oder mit GELD_ZAHL(betrag) bewusst herausgehen.", op)
 }
 
@@ -685,9 +725,10 @@ pub(crate) fn konstant_rechnen(op: &str, a: &Value, b: &Value) -> Option<Value> 
 /// Grenzen des Faltens (fuer den Wertemodus des Maschinencodes, `jit::w_op`).
 /// `None` bei einem Fehler: dann rechnet die VM und meldet ihn.
 pub(crate) fn wert_rechnen(op: &str, a: &Value, b: &Value) -> Option<Value> {
+    // Ein Handle rechnet wie seine Nummer (`handle.rs`).
+    let (a, b) = (a.ohne_handle(), b.ohne_handle());
     let schlicht = |v: &Value| matches!(v, Value::Int(_) | Value::Float(_) | Value::Str(_) | Value::Bool(_));
-    if !schlicht(a) || !schlicht(b) { return None; }
-    let (a, b) = (a.clone(), b.clone());
+    if !schlicht(&a) || !schlicht(&b) { return None; }
     let r = match op {
         "+" => match zahlen_addieren(&a, &b) {
             Some(r) => r,
@@ -772,6 +813,7 @@ pub(super) fn mul(a: Value, b: Value) -> R<Value> {
 /// Rundet f32-gestuetzte Audio-Werte (Lautstaerken 0..1) auf 6 Nachkommastellen,
 /// damit die f32->f64-Verbreiterung nicht als „0.800000011920929" durchschlaegt
 /// (siehe docs/drachenhauch-stolpersteine.md D2). 6 Stellen reichen fuer Volumes weit.
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub(super) fn round_audio(f: f64) -> f64 { (f * 1_000_000.0).round() / 1_000_000.0 }
 
 /// Baut aus den Werten eines Array-Literals `[a, b, c]` ein 1D-DhArray.
@@ -898,6 +940,7 @@ pub(super) fn div(a: Value, b: Value) -> R<Value> {
 }
 
 pub(super) fn int_div(a: Value, b: Value) -> R<Value> {
+    let (a, b) = handles_weg(a, b);
     match (&a, &b) {
         (Value::Int(x), Value::Int(y)) => {
             if *y == 0 { return Err("Integer-Division durch 0".into()); }
@@ -914,6 +957,7 @@ pub(super) fn int_div(a: Value, b: Value) -> R<Value> {
 }
 
 pub(super) fn modulo(a: Value, b: Value) -> R<Value> {
+    let (a, b) = handles_weg(a, b);
     require_number(&a, &b, "MOD")?;
     match (&a, &b) {
         (Value::Int(x), Value::Int(y)) => {
@@ -927,6 +971,7 @@ pub(super) fn modulo(a: Value, b: Value) -> R<Value> {
 }
 
 pub(super) fn pow(a: Value, b: Value) -> R<Value> {
+    let (a, b) = handles_weg(a, b);
     require_number(&a, &b, "^")?;
     match (&a, &b) {
         (Value::Int(x), Value::Int(y)) if *y >= 0 => {
@@ -937,8 +982,16 @@ pub(super) fn pow(a: Value, b: Value) -> R<Value> {
     }
 }
 
+/// Handles als Nummern (fuer die Rechenbefehle ohne `module_op`).
+#[inline]
+fn handles_weg(a: Value, b: Value) -> (Value, Value) {
+    if matches!(a, Value::Handle(..)) || matches!(b, Value::Handle(..)) {
+        (a.ohne_handle(), b.ohne_handle())
+    } else { (a, b) }
+}
+
 pub(super) fn neg(v: Value) -> R<Value> {
-    match v {
+    match v.ohne_handle() {
         Value::Int(i) => i.checked_neg().map(Value::Int).ok_or_else(|| int_overflow_msg("-")),
         Value::Float(f) => Ok(Value::Float(-f)),
         Value::Geld(w) => w.checked_neg().map(Value::Geld)
@@ -948,6 +1001,9 @@ pub(super) fn neg(v: Value) -> R<Value> {
 }
 
 pub(crate) fn cmp(a: &Value, b: &Value, op: char) -> R<bool> {
+    if matches!(a, Value::Handle(..)) || matches!(b, Value::Handle(..)) {
+        return cmp(&a.ohne_handle(), &b.ohne_handle(), op);
+    }
     let ord = if let (Value::Geld(x), Value::Geld(y)) = (a, b) {
         // Betraege vergleichen sich EXAKT -- das ist einer der Gruende,
         // warum es den Typ gibt.
@@ -1008,6 +1064,9 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
         "" | "any" => Ok(value),
         "integer" => match value {
             Value::Int(_) => Ok(value),
+            // Ein Handle in einer INTEGER-Variablen ist seine Nummer -- so
+            // halten Programme Handles seit jeher (`DIM b AS INTEGER = LOADIMAGE(...)`).
+            Value::Handle(_, n) => Ok(Value::Int(n)),
             Value::Float(f) => {
                 if f.fract() != 0.0 {
                     Err(format!("{}: FLOAT {} passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \\ statt / nehmen, sonst mit INT()/ROUND() runden", ctx, f))
@@ -1026,7 +1085,7 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
         },
         "float" => match value {
             Value::Float(_) => Ok(value),
-            Value::Int(i) => Ok(Value::Float(i as f64)),
+            Value::Int(i) | Value::Handle(_, i) => Ok(Value::Float(i as f64)),
             Value::Bool(_) => Err(format!("{}: Erwartet FLOAT, erhalten BOOLEAN", ctx)),
             _ => Err(format!("{}: Erwartet FLOAT, erhalten {}", ctx, value.type_name())),
         },
@@ -1065,7 +1124,7 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
         "geld" => match value {
             Value::Geld(_) | Value::Nil => Ok(value),
             v if is_num(&v) => Err(format!(
-                "{}: Erwartet GELD, erhalten {} -- mit GELD_NEU({}) einen Betrag daraus machen",
+                "{}: Erwartet GELD, erhalten {} -- mit MONEY_NEW({}) einen Betrag daraus machen",
                 ctx, v.type_name(), v.fmt())),
             v => Err(format!("{}: Erwartet GELD, erhalten {}", ctx, v.type_name())),
         },
@@ -1073,6 +1132,7 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
         // coerce_map wie ein Feld coerce_array; eine Klasse
         // nimmt nur NIL und Instanzen ihrer selbst oder einer Unterklasse.
         _ => match target.strip_prefix("array:") {
+            None if crate::handle::art(target).is_some() => handle_annehmen(value, target, ctx),
             Some(elem) => coerce_array(value, elem, ctx),
             None if target.starts_with("map:") => coerce_map(value, &target[4..], ctx),
             None => {
@@ -1083,10 +1143,26 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
     }
 }
 
+/// Zuweisung an einen Handle-Typ (`DIM p AS PDF`): ein Handle derselben Art
+/// oder NIL; eine nackte Zahl wird zum Handle dieser Art (so lagen Handles
+/// bis 2026.53 vor, als INTEGER). Ein Handle einer anderen Art oder ein
+/// anderer Wert ist ein Fehler -- bis 2026.53 ging `DIM d AS DB_CONN = TRUE`
+/// durch (Bericht A4).
+#[cold]
+fn handle_annehmen(value: Value, target: &str, ctx: &str) -> R<Value> {
+    let art = crate::handle::art(target).expect("Handle-Art");
+    match value {
+        Value::Nil => Ok(value),
+        Value::Handle(a, _) if a == art => Ok(value),
+        Value::Int(n) => Ok(Value::Handle(art, n)),
+        v => Err(format!("{}: Erwartet {}, erhalten {}", ctx, crate::handle::name(art), v.type_name())),
+    }
+}
+
 /// Einen internen Typnamen so schreiben, wie er im Quelltext steht
 /// (`array:integer` -> `ARRAY OF INTEGER`). Gegenstueck zu
 /// `Compiler::typ_klartext` -- die interne Schreibweise sagt einem Nutzer nichts.
-pub(super) fn typ_lesbar(t: &str) -> String {
+pub(crate) fn typ_lesbar(t: &str) -> String {
     if let Some(e) = t.strip_prefix("array:") { return format!("ARRAY OF {}", typ_lesbar(e)); }
     if let Some(e) = t.strip_prefix("map:") { return format!("MAP OF {}", typ_lesbar(e)); }
     t.to_uppercase()
@@ -1440,11 +1516,11 @@ mod panik_tests {
         let prog = programm();
         let mut vm = Vm::new(&prog);
         let merk = std::cell::Cell::new(0u8);
-        let e = vm.builtin_rufen("__panik_probe", &[Value::Int(1)], &merk).err().expect("ein Fehler");
+        let e = vm.builtin_rufen("__panik_probe", &[Value::Int(1)], &merk, 0).err().expect("ein Fehler");
         assert!(e.starts_with("__PANIK_PROBE: interner Fehler der Laufzeit (index out of bounds"), "{}", e);
         assert!(e.contains("vm.rs:"), "der Ort fehlt: {}", e);
         // Danach geht es weiter wie sonst.
-        assert!(matches!(vm.builtin_rufen("abs", &[Value::Int(-2)], &merk), Ok(Value::Int(2))));
+        assert!(matches!(vm.builtin_rufen("abs", &[Value::Int(-2)], &merk, 0), Ok(Value::Int(2))));
     }
 
     #[test]

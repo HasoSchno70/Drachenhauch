@@ -68,7 +68,7 @@ fn text_statt_zahl(fn_: &str, was: &str, nr: Option<usize>, v: &Value) -> String
 /// INTEGER: ganze Zahl oder Kommazahl ohne Nachkommastellen.
 pub(crate) fn int(v: &Value, fn_: &str, nr: Option<usize>) -> R<i64> {
     match v {
-        Value::Int(i) => Ok(*i),
+        Value::Int(i) | Value::Handle(_, i) => Ok(*i),
         Value::Float(f) => crate::builtins::glatt_int(*f).ok_or_else(||
             format!("{}{}", erwartet(fn_, "INTEGER", nr, v), crate::builtins::KEIN_GANZ_HINWEIS)),
         _ => Err(text_statt_zahl(fn_, "INTEGER", nr, v)),
@@ -80,7 +80,7 @@ pub(crate) fn int(v: &Value, fn_: &str, nr: Option<usize>) -> R<i64> {
 #[cfg_attr(not(feature = "graphics"), allow(dead_code))] // nur die Grafik
 pub(crate) fn koord(v: &Value, fn_: &str, nr: Option<usize>) -> R<i64> {
     match v {
-        Value::Int(i) => Ok(*i),
+        Value::Int(i) | Value::Handle(_, i) => Ok(*i),
         Value::Float(f) => Ok(*f as i64),
         _ => Err(text_statt_zahl(fn_, "Zahl", nr, v)),
     }
@@ -144,14 +144,62 @@ pub(crate) fn a_text<'a>(a: &'a [Value], i: usize, fn_: &str) -> R<&'a str> { te
 pub(crate) fn a_schalter(a: &[Value], i: usize, fn_: &str) -> R<bool> { schalter(an(a, i, fn_)?, fn_, Some(i + 1)) }
 
 /// Ein optionaler Schalter: fehlt er, gilt `vorgabe`.
-#[cfg_attr(not(feature = "graphics"), allow(dead_code))] // nur die Grafik
 pub(crate) fn a_schalter_oder(a: &[Value], i: usize, vorgabe: bool, fn_: &str) -> R<bool> {
     match a.get(i) { None => Ok(vorgabe), Some(v) => schalter(v, fn_, Some(i + 1)) }
+}
+
+/// Zahlen aus einem Feld oder einem BUFFER (Pins, Firmata, I2C/SPI, die
+/// Byte-Befehle der Geraete). EIN Leser -- bis 2026.53 standen zwei Kopien
+/// in vm_geraete.rs (`bytes`, `bytes_arg`).
+pub(crate) fn a_zahlenfeld(a: &[Value], i: usize, fn_: &str) -> R<Vec<i64>> {
+    match a.get(i) {
+        Some(Value::Buffer(b)) => Ok(b.borrow().iter().map(|&x| x as i64).collect()),
+        Some(Value::Array(arr)) => {
+            let arr = arr.borrow();
+            let mut out = Vec::with_capacity(arr.cells.len());
+            for k in 0..arr.cells.len() {
+                match arr.cells.get(k) {
+                    Value::Int(x) => out.push(x),
+                    Value::Float(f) if f.fract() == 0.0 => out.push(f as i64),
+                    v => return Err(format!("{}: im Feld steht an Stelle {} keine ganze Zahl ({})", fn_, k, v.type_name())),
+                }
+            }
+            Ok(out)
+        }
+        Some(v) => Err(format!("{}: erwartet ein Feld aus Zahlen oder einen BUFFER, nicht {}", fn_, v.type_name())),
+        None => Err(format!("{}: die Bytes fehlen", fn_)),
+    }
+}
+
+/// Dasselbe als Bytes 0..255 (ein Wert ausserhalb ist ein Fehler).
+pub(crate) fn a_bytes(a: &[Value], i: usize, fn_: &str) -> R<Vec<u8>> {
+    let roh = a_zahlenfeld(a, i, fn_)?;
+    let mut out = Vec::with_capacity(roh.len());
+    for (k, &x) in roh.iter().enumerate() {
+        if !(0..=255).contains(&x) { return Err(format!("{}: Byte {} an Stelle {} ausserhalb 0..255", fn_, x, k)); }
+        out.push(x as u8);
+    }
+    Ok(out)
+}
+
+/// Ein BUFFER als Wert (die Byte-Befehle liefern ihn).
+#[cfg_attr(not(any(feature = "net", feature = "serial", feature = "usb", feature = "bt")), allow(dead_code))]
+pub(crate) fn buffer_wert(v: Vec<u8>) -> Value {
+    Value::Buffer(std::rc::Rc::new(std::cell::RefCell::new(v)))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bytes_aus_feld_und_buffer() {
+        let feld = Value::Array(std::rc::Rc::new(std::cell::RefCell::new({
+            let mut a = crate::value::DhArray::new("integer".to_string(), vec![2], || Value::Int(0));
+            a.cells.set(0, Value::Int(1)); a.cells.set(1, Value::Int(256)); a })));
+        assert!(a_bytes(&[feld], 0, "I2C_WRITE").unwrap_err().contains("Stelle 1"));
+        assert_eq!(a_bytes(&[buffer_wert(vec![7, 255])], 0, "X").unwrap(), vec![7, 255]);
+    }
 
     #[test]
     fn int_nimmt_glatte_kommazahl() {

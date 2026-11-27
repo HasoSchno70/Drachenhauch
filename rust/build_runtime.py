@@ -170,10 +170,6 @@ def main() -> int:
         feats += ["db", "pg", "mysql", "net", "http", "smtp", "jit", "ffi"]
     if "--hardware" in args:
         feats += ["serial", "usb", "bt", "wifi", "midi"]
-        if system != "Windows" and "wifi" in feats:
-            print("Hinweis: 'wifi' ist aktuell nur unter Windows funktionsfaehig "
-                  "(netsh-basiert) -- WIFI_*-Builtins werfen auf diesem System "
-                  "zur Laufzeit einen klaren Fehler, der Build selbst geht aber durch.")
     if feats:
         cmd += ["--features", " ".join(feats)]
 

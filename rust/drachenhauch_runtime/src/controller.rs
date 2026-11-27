@@ -1,5 +1,4 @@
-//! Character-Controller (CHAR_*) -- nativer Port von
-//! `drachenhauch/modules/controller.py`. Reine Platformer-Physik mit
+//! Character-Controller (CHAR_*). Reine Platformer-Physik mit
 //! Coyote-Time, Jump-Buffering und Variable-Jump-Height. Nutzt
 //! `TiledMap::sweep_axis` (tile_collide-Port) fuer die Kollision.
 
@@ -21,13 +20,15 @@ pub struct CharController {
     pub jump_velocity: f64, // positiv gespeichert
     pub gravity: f64,
     pub max_fall: f64,
-    pub coyote_max: i64,
-    pub jump_buffer_max: i64,
+    /// Gnadenfristen in Bildern zu 1/60 s (f64, damit `CHAR_SET_COYOTE_MS`
+    /// und ein dt in `CHAR_UPDATE` keine Bruchteile verlieren).
+    pub coyote_max: f64,
+    pub jump_buffer_max: f64,
     pub variable_jump: bool,
     pub variable_jump_cut: f64,
     // Interne Counter
-    coyote_counter: i64,
-    jump_buffer_counter: i64,
+    coyote_counter: f64,
+    jump_buffer_counter: f64,
     prev_jump_held: bool,
     was_jumping: bool,
     // Frame-Input
@@ -47,12 +48,12 @@ impl CharController {
             jump_velocity: 6.0,
             gravity: 0.25,
             max_fall: 7.0,
-            coyote_max: 6,
-            jump_buffer_max: 6,
+            coyote_max: 6.0,
+            jump_buffer_max: 6.0,
             variable_jump: true,
             variable_jump_cut: 0.5,
-            coyote_counter: 0,
-            jump_buffer_counter: 0,
+            coyote_counter: 0.0,
+            jump_buffer_counter: 0.0,
             prev_jump_held: false,
             was_jumping: false,
             in_axis_x: 0,
@@ -67,13 +68,17 @@ impl CharController {
         self.in_jump_held = jump_held;
     }
 
-    /// Ein Frame-Update (Velocity -> Kollision -> Status). 1:1 zu `_b_update`.
-    pub fn update(&mut self, map: &TiledMap, layer: &TiledLayer) {
+    /// Ein Schritt (Velocity -> Kollision -> Status). `bilder` ist die Dauer
+    /// des Schritts in Bildern zu 1/60 s: 1.0 ohne dt (wie bisher, je Bild),
+    /// sonst `dt * 60`. Geschwindigkeiten bleiben "Pixel je 1/60 s", damit
+    /// ein Spiel mit festem Takt sich nicht aendert und eines mit dt bei 30
+    /// oder 144 Bildern gleich schnell laeuft.
+    pub fn update(&mut self, map: &TiledMap, layer: &TiledLayer, bilder: f64) {
         // 1. Coyote-Counter
         if self.on_ground {
             self.coyote_counter = self.coyote_max;
-        } else if self.coyote_counter > 0 {
-            self.coyote_counter -= 1;
+        } else if self.coyote_counter > 0.0 {
+            self.coyote_counter = (self.coyote_counter - bilder).max(0.0);
         }
         // 2. Jump-Buffer setzen/decrement -- bewusst dasselbe if/else-if-Muster
         // wie der Coyote-Counter oben (Schritt 1): GENAU eine der beiden
@@ -85,8 +90,8 @@ impl CharController {
         // bei max=6), obwohl beide dieselbe Gnadenfrist-Semantik haben sollen.
         if self.in_jump_pressed {
             self.jump_buffer_counter = self.jump_buffer_max;
-        } else if self.jump_buffer_counter > 0 {
-            self.jump_buffer_counter -= 1;
+        } else if self.jump_buffer_counter > 0.0 {
+            self.jump_buffer_counter = (self.jump_buffer_counter - bilder).max(0.0);
         }
         // 3. Variable-Jump-Cut
         if self.variable_jump && self.was_jumping
@@ -104,17 +109,17 @@ impl CharController {
             self.facing = -1;
         }
         // 5. Gravitation + Terminal
-        self.vy += self.gravity;
+        self.vy += self.gravity * bilder;
         if self.vy > self.max_fall {
             self.vy = self.max_fall;
         }
         // 6. Kollision: X dann Y
-        let (nx, hit_x) = map.sweep_axis(layer, self.x, self.y, self.w, self.h, self.vx, 0);
+        let (nx, hit_x) = map.sweep_axis(layer, self.x, self.y, self.w, self.h, self.vx * bilder, 0);
         self.x = nx;
         if hit_x {
             self.vx = 0.0;
         }
-        let (ny, hit_y) = map.sweep_axis(layer, self.x, self.y, self.w, self.h, self.vy, 1);
+        let (ny, hit_y) = map.sweep_axis(layer, self.x, self.y, self.w, self.h, self.vy * bilder, 1);
         self.y = ny;
         if hit_y {
             if self.vy > 0.0 {
@@ -126,12 +131,12 @@ impl CharController {
             self.on_ground = false;
         }
         // 7. Sprung-Try (nach Y-Sweep)
-        let can_jump = self.on_ground || self.coyote_counter > 0;
-        if self.jump_buffer_counter > 0 && can_jump {
+        let can_jump = self.on_ground || self.coyote_counter > 0.0;
+        if self.jump_buffer_counter > 0.0 && can_jump {
             self.vy = -self.jump_velocity;
             self.on_ground = false;
-            self.coyote_counter = 0;
-            self.jump_buffer_counter = 0;
+            self.coyote_counter = 0.0;
+            self.jump_buffer_counter = 0.0;
             self.was_jumping = true;
         }
         // 8. Wand-Detection

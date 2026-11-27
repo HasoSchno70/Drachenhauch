@@ -572,7 +572,7 @@ SUB lagenProtokollieren()
         DIM y AS INTEGER
         DIM b AS INTEGER
         DIM h AS INTEGER
-        (x, y, b, h) = GUI_LISTBOX_ITEM_RECT(lstBib, r)
+        (x, y, b, h) = GUI_LISTBOX_ITEM_SCREEN_RECT(lstBib, r)
         IF h > 0 AND y >= GUI_GET_Y(lstBib) + inhaltOben AND y + h <= GUI_GET_Y(lstBib) + GUI_GET_H(lstBib) + inhaltOben THEN
             protokoll("lage zeile " + bausteine[bibZeile[r]].kind + "/" + bausteine[bibZeile[r]].grundname + " " + STR$(x + b \ 2) + " " + STR$(y + h \ 2))
         END IF

@@ -68,11 +68,11 @@ pub fn woerter(text: &str) -> Vec<(usize, usize, String)> {
     aus
 }
 
-/// Ordner, in denen Hunspell-Woerterbuecher liegen. `DHRT_WOERTERBUECHER`
+/// Ordner, in denen Hunspell-Woerterbuecher liegen. `DHRT_DICTIONARIES`
 /// geht vor (fuer Pruefungen und eigene Sammlungen) -- dann nimmt auch
 /// Windows die Dateien statt der Systempruefung.
 fn ordner() -> Vec<std::path::PathBuf> {
-    if let Ok(o) = std::env::var("DHRT_WOERTERBUECHER") {
+    if let Ok(o) = crate::umgebung::var("DHRT_DICTIONARIES") {
         return std::env::split_paths(&o).collect();
     }
     let mut v: Vec<std::path::PathBuf> = Vec::new();
@@ -107,7 +107,7 @@ fn hunspell_dateien() -> Vec<(String, std::path::PathBuf)> {
 }
 
 fn nimmt_dateien() -> bool {
-    !cfg!(windows) || std::env::var("DHRT_WOERTERBUECHER").is_ok()
+    !cfg!(windows) || crate::umgebung::var("DHRT_DICTIONARIES").is_ok()
 }
 
 /// SPELL_LANGUAGES(): die Sprachen, fuer die SPELL_SYSTEM ein Woerterbuch hat.

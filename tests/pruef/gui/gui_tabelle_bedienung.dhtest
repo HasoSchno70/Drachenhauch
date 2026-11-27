@@ -25,21 +25,21 @@ DIM b AS INTEGER
 DIM h AS INTEGER
 DIM r AS INTEGER
 FOR r = 0 TO 2
-    (x, y, b, h) = GUI_TABLE_ROW_RECT(tb, r)
+    (x, y, b, h) = GUI_TABLE_ROW_SCREEN_RECT(tb, r)
     PRINT r; ": "; y; " "; h; " "; x >= 10 AND b > 250
 NEXT
 GUI_TABLE_SORT(tb, 0, TRUE)
 GUI_UPDATE()
-(x, y, b, h) = GUI_TABLE_ROW_RECT(tb, 0)
+(x, y, b, h) = GUI_TABLE_ROW_SCREEN_RECT(tb, 0)
 PRINT "absteigend apfel "; y
 GUI_TABLE_FILTER(tb, 0, "Bir")
 GUI_UPDATE()
-(x, y, b, h) = GUI_TABLE_ROW_RECT(tb, 0)
+(x, y, b, h) = GUI_TABLE_ROW_SCREEN_RECT(tb, 0)
 PRINT "weggefiltert "; x; " "; y; " "; b; " "; h
-(x, y, b, h) = GUI_TABLE_ROW_RECT(tb, 1)
+(x, y, b, h) = GUI_TABLE_ROW_SCREEN_RECT(tb, 1)
 PRINT "birne "; y
 TRY
-    (x, y, b, h) = GUI_TABLE_ROW_RECT(tb, 9)
+    (x, y, b, h) = GUI_TABLE_ROW_SCREEN_RECT(tb, 9)
 CATCH e
     PRINT e
 END TRY
@@ -52,7 +52,7 @@ DHRT_FRAMES=1
 absteigend apfel 72
 weggefiltert 0 0 0 0
 birne 32
-GUI_TABLE_ROW_RECT: Zeile 9 ausserhalb [0..2]
+GUI_TABLE_ROW_SCREEN_RECT: Zeile 9 ausserhalb [0..2]
 
 === ein doppelklick meldet und waehlt die zeile
 IMPORT "gui"

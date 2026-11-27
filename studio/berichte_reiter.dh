@@ -1739,7 +1739,7 @@ SUB berichtLagen(r AS Reiter)
         DIM y AS INTEGER
         DIM bb AS INTEGER
         DIM hh AS INTEGER
-        (x, y, bb, hh) = GUI_LISTBOX_ITEM_RECT(r.ber.lbSpalten, i)
+        (x, y, bb, hh) = GUI_LISTBOX_ITEM_SCREEN_RECT(r.ber.lbSpalten, i)
         protokoll("lage berspalte " + r.ber.spalten[i] + " " + STR$(x + bb \ 2) + " " + STR$(y + hh \ 2))
     NEXT
     FOR i = 0 TO LEN(r.ber.eigName) - 1

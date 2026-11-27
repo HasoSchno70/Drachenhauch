@@ -15,7 +15,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::io::{Read, Write};
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::TcpStream;
 use std::time::{Duration, Instant};
 
 const PKT_CONNECT: u8 = 1;
@@ -30,45 +30,7 @@ const PKT_PINGREQ: u8 = 12;
 const PKT_PINGRESP: u8 = 13;
 const PKT_DISCONNECT: u8 = 14;
 
-/// Klartext oder TLS -- der Rest des Codes soll den Unterschied nicht sehen
-/// (wie `Strom` in smtp.rs).
-enum Strom {
-    Klar(TcpStream),
-    Tls(Box<rustls::StreamOwned<rustls::ClientConnection, TcpStream>>),
-}
-
-impl Strom {
-    fn tcp(&self) -> &TcpStream {
-        match self {
-            Strom::Klar(s) => s,
-            Strom::Tls(s) => s.get_ref(),
-        }
-    }
-}
-
-impl Read for Strom {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        match self {
-            Strom::Klar(s) => s.read(buf),
-            Strom::Tls(s) => s.read(buf),
-        }
-    }
-}
-
-impl Write for Strom {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        match self {
-            Strom::Klar(s) => s.write(buf),
-            Strom::Tls(s) => s.write(buf),
-        }
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        match self {
-            Strom::Klar(s) => s.flush(),
-            Strom::Tls(s) => s.flush(),
-        }
-    }
-}
+use crate::tls::Strom;
 
 pub struct Client {
     stream: Strom,
@@ -289,45 +251,8 @@ fn ziel_lesen(host: &str) -> (String, bool) {
     (h.to_string(), false)
 }
 
-/// Die Wurzeln, denen TLS glaubt: ohne eigene CA die von webpki-roots (wie
-/// smtp), mit `ca` NUR die aus dieser PEM-Datei -- so verbindet man sich mit
-/// einem Mosquitto, dessen Zertifikat man selbst ausgestellt hat.
-fn tls_wurzeln(ca: Option<&str>) -> Result<rustls::RootCertStore, String> {
-    let mut wurzeln = rustls::RootCertStore::empty();
-    match ca {
-        None => wurzeln.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned()),
-        Some(pfad) => {
-            use rustls::pki_types::pem::PemObject;
-            let daten = std::fs::read(pfad).map_err(|e| format!("MQTT_CONNECT: CA-Datei {}: {}", pfad, e))?;
-            let mut n = 0;
-            for z in rustls::pki_types::CertificateDer::pem_slice_iter(&daten) {
-                let z = z.map_err(|e| format!("MQTT_CONNECT: CA-Datei {}: {:?}", pfad, e))?;
-                wurzeln.add(z).map_err(|e| format!("MQTT_CONNECT: CA-Datei {}: {}", pfad, e))?;
-                n += 1;
-            }
-            if n == 0 {
-                return Err(format!("MQTT_CONNECT: in der CA-Datei {} steht kein Zertifikat (erwartet PEM, -----BEGIN CERTIFICATE-----)", pfad));
-            }
-        }
-    }
-    Ok(wurzeln)
-}
-
 fn tls_strom(tcp: TcpStream, name: &str, ca: Option<&str>) -> Result<Strom, String> {
-    let wurzeln = tls_wurzeln(ca)?;
-    // Der Anbieter wird ausdruecklich genannt (wie smtp): waeren einmal zwei
-    // Krypto-Anbieter im Baum, liefe `ClientConfig::builder()` in einen Absturz.
-    let anbieter = std::sync::Arc::new(rustls::crypto::ring::default_provider());
-    let konfig = rustls::ClientConfig::builder_with_provider(anbieter)
-        .with_safe_default_protocol_versions()
-        .map_err(|e| format!("MQTT_CONNECT: TLS liess sich nicht einrichten: {}", e))?
-        .with_root_certificates(wurzeln)
-        .with_no_client_auth();
-    let sn = rustls::pki_types::ServerName::try_from(name.to_string())
-        .map_err(|_| format!("MQTT_CONNECT: {:?} ist kein gueltiger Servername fuer TLS", name))?;
-    let verbindung = rustls::ClientConnection::new(std::sync::Arc::new(konfig), sn)
-        .map_err(|e| format!("MQTT_CONNECT: TLS-Verbindung fehlgeschlagen: {}", e))?;
-    Ok(Strom::Tls(Box::new(rustls::StreamOwned::new(verbindung, tcp))))
+    crate::tls::strom(tcp, name, ca, "MQTT_CONNECT")
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -346,14 +271,9 @@ pub fn connect(
     }
     let (host, tls) = ziel_lesen(host);
     let host = host.as_str();
-    let addr_str = format!("{}:{}", host, port);
-    let sockaddr = addr_str
-        .to_socket_addrs()
-        .map_err(|e| format!("MQTT_CONNECT: {}", e))?
-        .next()
-        .ok_or_else(|| format!("MQTT_CONNECT: Adresse {} nicht aufloesbar", addr_str))?;
-    let tcp = TcpStream::connect_timeout(&sockaddr, Duration::from_secs(5))
-        .map_err(|e| format!("MQTT_CONNECT: {}", e))?;
+    // Alle Adressen des Namens (verbinden.rs) -- ein Mosquitto auf IPv4 war
+    // unter "localhost" sonst nicht zu erreichen.
+    let tcp = crate::verbinden::tcp(host, port as u16, Duration::from_secs(5), "MQTT_CONNECT")?;
     // Waehrend des Aufbaus (TLS-Handschlag, CONNACK) darf gewartet werden;
     // danach liest MQTT_UPDATE ohne Warten (siehe unten).
     tcp.set_read_timeout(Some(Duration::from_secs(5))).ok();
@@ -464,9 +384,9 @@ pub fn qos_pruefen(fn_: &str, qos: i64) -> Result<u8, String> {
 
 /// TRUE, wenn die Nachricht hinausging; FALSE, wenn die Verbindung weg ist.
 /// Mit QoS 1 zaehlt sie, bis der Broker sie bestaetigt (MQTT_PENDING).
-pub fn publish(c: &mut Client, topic: &str, payload: &str, retain: bool, qos: u8) -> bool {
+pub fn publish(c: &mut Client, topic: &str, payload: &[u8], retain: bool, qos: u8) -> bool {
     let id = if qos > 0 { naechste_nummer(c) } else { 0 };
-    let pkt = encode_publish(topic, payload.as_bytes(), retain, qos, id);
+    let pkt = encode_publish(topic, payload, retain, qos, id);
     let ok = senden(c, &pkt);
     if ok && qos > 0 {
         c.unbestaetigt.insert(id, Instant::now());
@@ -844,7 +764,7 @@ mod tests {
             .expect("TLS-Verbindung mit eigener CA");
         let _ = std::fs::remove_file(&ca);
         assert!(subscribe(&mut c, "a/b", 1));
-        assert!(publish(&mut c, "a/b", "hallo", false, 1));
+        assert!(publish(&mut c, "a/b", b"hallo", false, 1));
         assert_eq!(pending(&c), 1);
         assert!(flush(&mut c, 3000).unwrap(), "PUBACK kam nicht");
         assert_eq!(pending(&c), 0);

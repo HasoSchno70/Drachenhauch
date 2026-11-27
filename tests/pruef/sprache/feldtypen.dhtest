@@ -188,7 +188,7 @@ DIM h AS MAP OF Hund
 h = {"rex": NEW Hund()}
 h["mia"] = NEW Katze()
 --- fehler
-Map-Wert: Erwartet HUND (oder eine Unterklasse), erhalten KATZE
+Zuweisung in die MAP: Erwartet HUND (oder eine Unterklasse), erhalten KATZE
 
 === maps verschiedener werttypen
 DIM s AS MAP OF STRING
@@ -232,7 +232,7 @@ t = h
 PRINT LEN(t)
 t["mia"] = NEW Katze()
 --- fehler
-Map-Wert: Erwartet HUND (oder eine Unterklasse), erhalten KATZE
+Zuweisung in die MAP: Erwartet HUND (oder eine Unterklasse), erhalten KATZE
 
 === keine map an eine map
 DIM n AS MAP OF INTEGER

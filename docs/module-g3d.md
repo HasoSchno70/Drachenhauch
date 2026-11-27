@@ -23,7 +23,7 @@ Für die Mathematik dahinter (Vektoren, Quaternionen, Matrizen) gibt es das Modu
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|
 | `CAMERA3D(px, py, pz, tx, ty, tz, fovy)` | — | Kamera setzen: Standort, Blickziel, Öffnungswinkel in Grad (üblich 45). Oben ist +Y |
-| `CAMERA3D_UPDATE(mode)` | — | raylib die Kamera bewegen lassen: `1` frei, `2` umkreisend, `3` Ego, `4` Verfolger — liest selbst Maus und WASD |
+| `CAMERA3D_UPDATE(mode)` | — | raylib die Kamera bewegen lassen: `1`/`"free"` frei, `2`/`"orbital"` umkreisend, `3`/`"first_person"` Ego, `4`/`"third_person"` Verfolger (auch deutsch: `"frei"`, `"ego"` …) — liest selbst Maus und WASD |
 | `CAMERA3D_MOVE(forward, right, up, yaw, pitch[, zoom])` | — | die Kamera vom Programm aus bewegen (in Einheiten, vor/right auf der Bodenebene) und drehen (Grad: yaw nach right, pitch nach oben, höchstens 89 Grad); `zoom` ändert den Abstand zum Ziel (positiv = weiter weg). Für eigene Tastenbelegung, Gamepad oder Kamerafahrten; gilt ab der Lage, die `CAMERA3D` zuletzt gesetzt hat — `CAMERA3D` also nicht in jedem Bild neu aufrufen |
 | `CAMERA3D_X()` / `CAMERA3D_Y()` / `CAMERA3D_Z()` | FLOAT | wo steht die Kamera gerade? |
 | `CAMERA3D_TARGET_X()` / `CAMERA3D_TARGET_Y()` / `CAMERA3D_TARGET_Z()` | FLOAT | worauf blickt sie? |

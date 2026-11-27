@@ -47,7 +47,7 @@ module.exports = (H) => [
 
   H.h3("Drehen 3"),
 
-  H.p("Das Programm bricht nach einem Augenblick ab, mit der Meldung „RGB-Werte muessen 0..255 sein“. Der erste Stern, der an uns vorbeifliegt, bekommt ein negatives z, damit wird naehe = 1 - z / TIEFE größer als 1 und die Helligkeit größer als 255. Die eine Zeile schützt also drei Dinge zugleich: die Division vor der 0, das Bild vor gespiegelten Sternen und die Farbe vor Werten über 255. Wer eine solche Schutzzeile herausnimmt, sollte vorher überlegen, wer sich auf sie verlässt."),
+  H.p("Das Programm bricht nach einem Augenblick ab, mit der Meldung „RGB: die Werte muessen 0..255 sein“. Der erste Stern, der an uns vorbeifliegt, bekommt ein negatives z, damit wird naehe = 1 - z / TIEFE größer als 1 und die Helligkeit größer als 255. Die eine Zeile schützt also drei Dinge zugleich: die Division vor der 0, das Bild vor gespiegelten Sternen und die Farbe vor Werten über 255. Wer eine solche Schutzzeile herausnimmt, sollte vorher überlegen, wer sich auf sie verlässt."),
 
   H.h3("Erweitern 1: blaue Ferne"),
 

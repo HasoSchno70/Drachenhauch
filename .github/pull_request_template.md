@@ -12,7 +12,7 @@
      der neue Test gegen den alten Stand wirklich fehl? -->
 
 - [ ] die Pruefsammlungen wie in der CI: `dhrt test tests/pruef`
-      (mit `DH_OHNE_AUDIO=1`, wenn der Rechner keine Soundkarte hat)
+      (mit `DHRT_OHNE_AUDIO=1`, wenn der Rechner keine Soundkarte hat)
 - [ ] `rust/build_runtime.py` (bei Aenderungen an `rust/`)
 - [ ] Doku-Pruefer, wenn `docs/`, `CLAUDE.md` oder ein Buch betroffen ist:
       `dhrt pruef`, `dhrt doku prosa --pruefen`, `tools/pruef_meldungen.js`

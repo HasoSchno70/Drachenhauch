@@ -34,7 +34,7 @@ FUNCTION prMitte(win AS GUI_WINDOW, w AS GUI_WIDGET, oben AS INTEGER) AS STRING
     RETURN STR$(GUI_WINDOW_GET_X(win) + GUI_GET_X(w) + GUI_GET_W(w) \ 2) + " " + STR$(GUI_WINDOW_GET_Y(win) + oben + GUI_GET_Y(w) + GUI_GET_H(w) \ 2)
 END FUNCTION
 FUNCTION prNav(i AS INTEGER) AS STRING
-    DIM r AS TUPLE : r = GUI_LISTBOX_ITEM_RECT(nav, i)
+    DIM r AS TUPLE : r = GUI_LISTBOX_ITEM_SCREEN_RECT(nav, i)
     RETURN STR$(r[0] + r[2] \ 2) + " " + STR$(r[1] + r[3] \ 2)
 END FUNCTION
 SUB prKlick(f AS INTEGER, lage AS STRING)
@@ -97,7 +97,7 @@ FUNCTION prMitte(win AS GUI_WINDOW, w AS GUI_WIDGET, oben AS INTEGER) AS STRING
     RETURN STR$(GUI_WINDOW_GET_X(win) + GUI_GET_X(w) + GUI_GET_W(w) \ 2) + " " + STR$(GUI_WINDOW_GET_Y(win) + oben + GUI_GET_Y(w) + GUI_GET_H(w) \ 2)
 END FUNCTION
 FUNCTION prNav(i AS INTEGER) AS STRING
-    DIM r AS TUPLE : r = GUI_LISTBOX_ITEM_RECT(nav, i)
+    DIM r AS TUPLE : r = GUI_LISTBOX_ITEM_SCREEN_RECT(nav, i)
     RETURN STR$(r[0] + r[2] \ 2) + " " + STR$(r[1] + r[3] \ 2)
 END FUNCTION
 SUB prKlick(f AS INTEGER, lage AS STRING)
@@ -175,7 +175,7 @@ FUNCTION prMitte(win AS GUI_WINDOW, w AS GUI_WIDGET, oben AS INTEGER) AS STRING
     RETURN STR$(GUI_WINDOW_GET_X(win) + GUI_GET_X(w) + GUI_GET_W(w) \ 2) + " " + STR$(GUI_WINDOW_GET_Y(win) + oben + GUI_GET_Y(w) + GUI_GET_H(w) \ 2)
 END FUNCTION
 FUNCTION prNav(i AS INTEGER) AS STRING
-    DIM r AS TUPLE : r = GUI_LISTBOX_ITEM_RECT(nav, i)
+    DIM r AS TUPLE : r = GUI_LISTBOX_ITEM_SCREEN_RECT(nav, i)
     RETURN STR$(r[0] + r[2] \ 2) + " " + STR$(r[1] + r[3] \ 2)
 END FUNCTION
 SUB prKlick(f AS INTEGER, lage AS STRING)

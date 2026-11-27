@@ -52,6 +52,7 @@ ang = PHYS2D_BODY_ANGLE(world, box)       ' Radiant -> Sprite rotieren
 | `PHYS2D_STEP(w, dt)` | einen Zeitschritt simulieren (dt in s, intern auf 0.0001..0.05 geklemmt) |
 | `PHYS2D_BODY_X/Y(w, idx)` | Position |
 | `PHYS2D_BODY_ANGLE(w, idx) AS FLOAT` | Drehwinkel in Radiant (für Sprite-Rotation) |
+| `PHYS2D_BODY_ANGLE_DEG(w, idx) AS FLOAT` | derselbe Drehwinkel in Grad, wie ihn `DRAWIMAGEROT` nimmt |
 | `PHYS2D_BODY_VX/VY(w, idx)` | lineare Geschwindigkeit (z.B. „falle ich?") |
 | `PHYS2D_SET_VEL(w, idx, vx, vy)` | Geschwindigkeit setzen |
 | `PHYS2D_APPLY_IMPULSE(w, idx, ix, iy)` | Impuls (z.B. Sprung/Schuss) |

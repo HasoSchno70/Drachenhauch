@@ -33,7 +33,7 @@ IMPORT "controller"
 | Funktion | Wirkung |
 |---|---|
 | `CHAR_SET_INPUT(c, axis_x, jump_pressed, jump_held)` | Frame-Input setzen |
-| `CHAR_UPDATE(c, map, layer_idx)` | Frame ausfuehren: Velocity berechnen, kollidieren, Position updaten |
+| `CHAR_UPDATE(c, map, layer_idx [, dt])` | Frame ausfuehren: Velocity berechnen, kollidieren, Position updaten. Ohne `dt` ein Schritt je Bild; mit `dt` (Sekunden, wie `DELTA`) laeuft die Figur bei 30 wie bei 144 Bildern gleich schnell -- Geschwindigkeiten bleiben "Pixel je 1/60 s" |
 
 ### Konfiguration
 
@@ -45,6 +45,8 @@ IMPORT "controller"
 | `CHAR_SET_MAX_FALL(c, max_vy)` | 7.0 | hoechste Fallgeschwindigkeit -- ohne die faellt eine Figur durch duenne Boeden |
 | `CHAR_SET_COYOTE_TIME(c, frames)` | 6 | so viele Frames nach dem Verlassen der Kante zaehlt ein Sprung noch |
 | `CHAR_SET_JUMP_BUFFER(c, frames)` | 6 | so viele Frames vor der Landung gedrueckt zaehlt der Sprung schon |
+| `CHAR_SET_COYOTE_MS(c, ms)` | 100 | die Coyote-Zeit in Millisekunden (passt zu `CHAR_UPDATE` mit `dt`) |
+| `CHAR_SET_JUMP_BUFFER_MS(c, ms)` | 100 | der Sprung-Puffer in Millisekunden |
 | `CHAR_SET_VARIABLE_JUMP(c, enabled)` | TRUE | kuerzerer Sprung bei kurzem Tastendruck |
 | `CHAR_SET_VARIABLE_JUMP_CUT(c, factor)` | 0.5 (= Mario) | auf welchen Anteil die Steiggeschwindigkeit beim Loslassen faellt |
 

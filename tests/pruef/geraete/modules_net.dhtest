@@ -14,7 +14,7 @@ IMPORT "net"
 DIM l AS NET_LISTENER
 l = NET_TCP_LISTEN(99999)
 --- fehler
-NET_TCP_LISTEN: port out of range: 99999
+NET_TCP_LISTEN: Port 99999 liegt ausserhalb 0..65535
 
 === tcp accept non blocking returns nil
 IMPORT "net"
@@ -56,6 +56,36 @@ NET_CLOSE_LISTENER(l)
 FALSE
 5
 hallo
+
+=== localhost findet einen dienst nur auf ipv4
+' "localhost" liefert unter Windows zuerst ::1. NET_TCP_LISTEN(0) und
+' NET_UDP_BIND(0) lauschen auf IPv4 -- bis 2026.53 nahm NET_TCP_CONNECT nur
+' die erste Adresse und fand den Dienst nicht ("Es konnte keine Verbindung
+' hergestellt werden"), NET_UDP_SEND sendete ins Leere. Jetzt alle Adressen
+' der Reihe nach (verbinden.rs), UDP an eine derselben Art wie der Socket.
+IMPORT "net"
+DIM l AS NET_LISTENER : l = NET_TCP_LISTEN(0)
+DIM client AS NET_SOCKET : client = NET_TCP_CONNECT("localhost", NET_LISTENER_PORT(l))
+PRINT "tcp "; NET_IS_CONNECTED(client)
+NET_CLOSE(client)
+NET_CLOSE_LISTENER(l)
+DIM srv AS NET_UDP : srv = NET_UDP_BIND(0)
+DIM cl AS NET_UDP : cl = NET_UDP_OPEN()
+PRINT "udp "; NET_UDP_SEND(cl, "localhost", NET_UDP_PORT(srv), "ping")
+DIM got AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 50
+    got = NET_UDP_RECV(srv, 1024)
+    IF got <> "" THEN BREAK
+    SLEEP(2)
+NEXT
+PRINT got
+NET_UDP_CLOSE(cl)
+NET_UDP_CLOSE(srv)
+--- erwartet
+tcp TRUE
+udp 4
+ping
 
 === tcp peer info
 IMPORT "net"
@@ -241,7 +271,7 @@ IMPORT "net"
 DIM s AS NET_UDP
 s = NET_UDP_BIND(70000)
 --- fehler
-NET_UDP_BIND: port out of range: 70000
+NET_UDP_BIND: Port 70000 liegt ausserhalb 0..65535
 
 === udp send validates socket
 IMPORT "net"

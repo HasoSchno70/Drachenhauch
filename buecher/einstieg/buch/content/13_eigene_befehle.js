@@ -177,7 +177,7 @@ module.exports = (H) => [
   H.h2("Wenn etwas nicht geht"),
 
   H.table([
-    [{ text: "Unbekanntes Builtin 'BAUM'", mono: true }, "Der Befehl ist nicht definiert — meist ein Tippfehler im Namen, oder das END SUB fehlt und alles darunter gehört noch dazu."],
+    [{ text: "Unbekannter Befehl 'BAUM'", mono: true }, "Der Befehl ist nicht definiert — meist ein Tippfehler im Namen, oder das END SUB fehlt und alles darunter gehört noch dazu."],
     [{ text: "Erwartet AS nach Parametername", mono: true }, "Bei Parametern ist die Typangabe Pflicht: (x AS INTEGER), nicht (x)."],
     ["Der Befehl malt nichts", "Er wird nie aufgerufen. Ein SUB, das nur dasteht, tut nichts — es muss beim Namen genannt werden."],
     ["Die Änderung im SUB wirkt nicht", "Es gibt ihn zweimal, mit demselben Namen. Der zweite gewinnt."],

@@ -1,6 +1,6 @@
 ' Bedienung aufnehmen und als Fall speichern (aufnahme.rs, gui_zustand.rs):
-' GUI_STATE$ ist der Zustand der gui als Text; DHRT_ABSPIELEN spielt eine
-' Aufnahme nach SCREEN ab, DHRT_GUI_ZUSTAND=1 gibt am Ende den Zustand aus;
+' GUI_STATE$ ist der Zustand der gui als Text; DHRT_PLAYBACK spielt eine
+' Aufnahme nach SCREEN ab, DHRT_GUI_STATE=1 gibt am Ende den Zustand aus;
 ' `dhrt aufnehmen` setzt beides zu einem Fall zusammen.
 ' Format: docs/werkzeuge.md, dhrt test.
 
@@ -84,9 +84,9 @@ e 14 5 0 0 0 0
 
 --- umgebung
 DHRT_FRAMES=30
-DHRT_ABSPIELEN=ev.txt
-DHRT_GUI_ZUSTAND=1
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=ev.txt
+DHRT_GUI_STATE=1
+DHRT_OFFSCREEN=1
 --- erwartet
 gui-zustand
 fenster "Zaehler"
@@ -129,7 +129,7 @@ END FUNCTION
 DIM a AS STRING : a = lauf$(PROCESS_START("dhrt", "aufnehmen", "prog.dh", "faelle.dhtest", "die probe", "--bilder", "20"))
 DIM fall AS STRING : fall = READALL$("faelle.dhtest")
 PRINT "programm "; INSTR(fall, "--- programm prog.dh") >= 0; " beilage "; INSTR(fall, "--- datei aufnahme.txt") >= 0; _
-    " abspielen "; INSTR(fall, "DHRT_ABSPIELEN=aufnahme.txt") >= 0; " zustand "; INSTR(fall, "  label(1) " + CHR$(34) + "bereit" + CHR$(34)) >= 0
+    " abspielen "; INSTR(fall, "DHRT_PLAYBACK=aufnahme.txt") >= 0; " zustand "; INSTR(fall, "  label(1) " + CHR$(34) + "bereit" + CHR$(34)) >= 0
 DIM t AS STRING : t = lauf$(PROCESS_START("dhrt", "test", "faelle.dhtest"))
 PRINT "abgespielt "; INSTR(t, "1 Faelle, 1 ok") >= 0
 --- erwartet

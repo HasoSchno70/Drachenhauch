@@ -55,12 +55,14 @@ pub enum Op {
     Vieleck { punkte: Vec<(f64, f64)>, fuellen: bool, breite_mm: f64, farbe: (f64, f64, f64), deck: f64, strichel: (f64, f64) },
     /// PDF_IMAGE: ein Bild, RGBA Zeile fuer Zeile, `pw` x `ph` Punkte, in das
     /// Rechteck x/y/b/h (mm) gestreckt.
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     Bild { x: f64, y: f64, b: f64, h: f64, rgba: Arc<Vec<u8>>, pw: u32, ph: u32, deck: f64 },
 }
 
 /// Eine Farbe so weit gegen Weiss gemischt, wie die Deckkraft sagt -- fuer
 /// Ziele, die keine Durchsicht kennen (GDI, die Vorschau). Auf weissem Papier
 /// ist das dasselbe Bild, ueber anderem Inhalt eine Naeherung.
+#[cfg_attr(not(any(windows, feature = "graphics")), allow(dead_code))]
 pub fn gegen_weiss(f: (f64, f64, f64), deck: f64) -> (f64, f64, f64) {
     let d = deck.clamp(0.0, 1.0);
     (f.0 * d + (1.0 - d), f.1 * d + (1.0 - d), f.2 * d + (1.0 - d))
@@ -96,8 +98,10 @@ pub struct Dokument {
 use crate::schriften::{normalisieren, EINGEBAUT};
 
 /// Die Bytes einer Schrift ohne Kopie: eingebaut (statisch) oder geladen.
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub enum SchriftDaten { Fest(&'static [u8]), Geladen(Arc<Vec<u8>>) }
 impl SchriftDaten {
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     pub fn bytes(&self) -> &[u8] {
         match self { SchriftDaten::Fest(b) => b, SchriftDaten::Geladen(d) => d }
     }
@@ -182,8 +186,6 @@ impl Dokument {
         self.seiten.last_mut().unwrap()
     }
 
-    pub fn schrift_index(&self) -> usize { self.schrift }
-
     /// Alle Namen, unter denen PDF_FONT eine Schrift findet.
     fn schriftliste(&self) -> String {
         let mut n: Vec<String> = EINGEBAUT.iter().map(|(s, _)| s.to_string()).collect();
@@ -198,7 +200,7 @@ impl Dokument {
         if k == "symbol" || k == "zapfdingbats" {
             return Err(format!(
                 "die Schrift '{}' gibt es nicht mehr -- seit die Schriften eingebettet werden, \
-                 hat 'sans' griechische Buchstaben und Zeichen wie \u{2713} \u{2717} \u{2605} selbst", name));
+                 hat 'sans' griechische Buchstaben und Zeichen wie ✓ ✗ ★ selbst", name));
         }
         Err(format!("Schrift '{}' gibt es nicht. Eingebaut sind {} (helvetica, times und courier \
                      meinen sans, serif und mono); eine eigene laedt PDF_FONT_LOAD", name, self.schriftliste()))
@@ -287,7 +289,6 @@ impl Dokument {
         Ok(())
     }
 
-    pub fn strichelung(&self) -> (f64, f64) { self.strichel }
 
     pub fn text(&mut self, x: f64, y: f64, text: &str, winkel: f64) -> Result<(), String> {
         let (schrift, groesse_pt, farbe, deck) = (self.schrift, self.groesse_pt, self.farbe, self.deck);
@@ -335,6 +336,7 @@ impl Dokument {
 
     /// Ein Bild (RGBA) in das Rechteck x/y/b/h setzen; `h` <= 0 = nach dem
     /// Seitenverhaeltnis des Bildes.
+    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
     pub fn bild(&mut self, x: f64, y: f64, b: f64, h: f64, rgba: Vec<u8>, pw: u32, ph: u32) -> Result<(), String> {
         if pw == 0 || ph == 0 || rgba.len() != pw as usize * ph as usize * 4 {
             return Err("das Bild ist leer".into());

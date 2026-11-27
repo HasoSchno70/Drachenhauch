@@ -214,9 +214,9 @@ DIM img AS IMAGE
 img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
 DIM s AS SPRITE
 s = SPRITE_NEW(img, 16, 16)
-SPRITE_TINT(s, 16777217)
+SPRITE_TINT(s, -1)
 --- fehler
-SPRITE_TINT: Farbe muss 0..0xFFFFFF sein
+SPRITE_TINT: Farbe muss 0..&HFFFFFFFF sein
 
 === scale does not affect get width
 ' Scale ist rein visuell - GET_WIDTH/HEIGHT bleiben in Frame-Groesse.
@@ -357,3 +357,35 @@ PRINT SPRITE_HIT_POINT(s, 26, 26)
 TRUE
 FALSE
 
+=== die treffer rechnen mit der skala
+' SPRITE_DRAW zeichnet ab (x, y) mit Bildgroesse mal Skala; die Treffer
+' rechneten bis 2026.53 ohne sie (Bericht A6.6).
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM a AS SPRITE
+a = SPRITE_NEW(img, 10, 10)
+DIM b AS SPRITE
+b = SPRITE_NEW(img, 10, 10)
+SPRITE_SET_POS(a, 0.0, 0.0)
+SPRITE_SET_SCALE(a, 3.0, 3.0)
+SPRITE_SET_POS(b, 15.0, 15.0)
+PRINT SPRITE_COLLIDES(a, b); " "; SPRITE_HIT_POINT(a, 25.0, 25.0); " "; SPRITE_HIT_BOX(a, 20.0, 20.0, 2.0, 2.0)
+--- erwartet
+TRUE TRUE TRUE
+
+=== tint und partikelfarbe nehmen eine deckkraft
+' Wie jede Farbe (oberstes Byte = Deckkraft); bis 2026.53 lehnten
+' SPRITE_TINT und PARTICLE_SET_COLOR/_END sie ab.
+IMPORT "sprite"
+IMPORT "particles"
+DIM img AS IMAGE
+img = GENTEX_COLOR(16, 16, RGB(255, 0, 0))
+DIM s AS SPRITE : s = SPRITE_NEW(img, 16, 16)
+SPRITE_TINT(s, RGBA(255, 0, 0, 128))
+DIM p AS PARTICLE_SYSTEM : p = PARTICLE_SYSTEM_NEW(0, 0)
+PARTICLE_SET_COLOR(p, RGBA(0, 255, 0, 64))
+PARTICLE_SET_COLOR_END(p, RGBA(0, 0, 255, 200))
+PRINT "geht"
+--- erwartet
+geht

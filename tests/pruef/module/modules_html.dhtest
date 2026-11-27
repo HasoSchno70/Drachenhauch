@@ -443,9 +443,14 @@ DIM t0 AS INTEGER : t0 = MILLIS()
 DIM a AS INTEGER : a = HTTP_GET_START(basis + "/a")
 DIM b AS INTEGER : b = HTTP_GET_START(basis + "/b")
 PRINT HTTP_PENDING()
+' Abgeholt heisst -1: eine abgeholte Nummer ist bei HTTP_READY ein Fehler.
 WHILE HTTP_PENDING() > 0
-    IF HTTP_READY(a) THEN PRINT "a: " + HTTP_RESULT(a)
-    IF HTTP_READY(b) THEN PRINT "b: " + HTTP_RESULT(b)
+    IF a >= 0 THEN
+        IF HTTP_READY(a) THEN PRINT "a: " + HTTP_RESULT(a) : a = -1
+    END IF
+    IF b >= 0 THEN
+        IF HTTP_READY(b) THEN PRINT "b: " + HTTP_RESULT(b) : b = -1
+    END IF
 WEND
 PRINT MILLIS() - t0 < 550
 PRINT HTTP_PENDING()
@@ -492,7 +497,7 @@ PROCESS_KILL(VAL(srv[1]))
 --- argumente
 {sammlung}/../_hilfen/gegenserver.dh
 --- erwartet
-fehler: HTTP_RESULT: Abruf 0 ist nicht fertig (oder schon abgeholt) -- erst HTTP_READY(0) abfragen
+fehler: HTTP_RESULT: Abruf 0 ist noch nicht fertig -- erst HTTP_READY(0) abfragen
 
 === http cancel gibt platz frei
 ' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
@@ -521,7 +526,12 @@ DIM h AS INTEGER : h = HTTP_GET_START(basis + "/x")
 PRINT HTTP_URL$(h) = basis + "/x"
 HTTP_CANCEL(h)
 PRINT HTTP_PENDING()
-PRINT HTTP_READY(h)
+PRINT HTTP_URL$(h) = ""
+TRY
+    PRINT HTTP_READY(h)
+CATCH e
+    PRINT e
+END TRY
 HTTP_CANCEL(h)
 PRINT "ende"
 PROCESS_KILL(VAL(srv[1]))
@@ -530,7 +540,8 @@ PROCESS_KILL(VAL(srv[1]))
 --- erwartet
 TRUE
 0
-FALSE
+TRUE
+HTTP_READY: einen Auftrag 0 gibt es nicht -- nie gestartet, schon abgeholt oder abgebrochen
 ende
 
 === nummern werden nicht neu vergeben

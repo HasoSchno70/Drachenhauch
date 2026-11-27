@@ -15,8 +15,8 @@ pub enum Tt {
     Number, Str, Ident,
     Dim, As, Integer, Float, StringType, Boolean, Print, Input, If, Then, Else,
     Elseif, End, While, Wend, For, To, Step, Next, Sub, Function, Return, Class,
-    New, Extends, True, False, Nil, And, Or, Not, Mod, Const, Break, Continue, Image,
-    Sound, Array, Of, Struct, File, Map, Try, Catch, Throw, Import, Select, Case,
+    New, Extends, True, False, Nil, And, Or, Not, Mod, Const, Break, Continue,
+    Array, Of, Struct, Map, Try, Catch, Throw, Import, Select, Case,
     Is, Repeat, Until, Data, Read, Restore, Byref, Private, Enum, Band, Bor, Bxor, Bnot,
     Shl, Shr, Tuple, With, Static, Funcref, In, Ellipsis, Where, Property,
     Operator, Yield, Coroutine, Finally,
@@ -40,9 +40,9 @@ impl Tt {
             New => "NEW", Extends => "EXTENDS", True => "TRUE", False => "FALSE",
             Nil => "NIL",
             And => "AND", Or => "OR", Not => "NOT", Mod => "MOD", Const => "CONST",
-            Break => "BREAK", Continue => "CONTINUE", Image => "IMAGE",
-            Sound => "SOUND", Array => "ARRAY", Of => "OF", Struct => "STRUCT",
-            File => "FILE", Map => "MAP", Try => "TRY", Catch => "CATCH",
+            Break => "BREAK", Continue => "CONTINUE",
+            Array => "ARRAY", Of => "OF", Struct => "STRUCT",
+            Map => "MAP", Try => "TRY", Catch => "CATCH",
             Throw => "THROW", Finally => "FINALLY", Import => "IMPORT", Select => "SELECT",
             Case => "CASE", Is => "IS", Repeat => "REPEAT", Until => "UNTIL",
             Data => "DATA", Read => "READ", Restore => "RESTORE", Byref => "BYREF",
@@ -71,8 +71,8 @@ pub(crate) const KEYWORDS: &[&str] = &[
     "dim", "as", "integer", "float", "string", "boolean", "print", "input", "if", "then",
     "else", "elseif", "elif", "end", "while", "wend", "for", "to", "step", "next", "sub",
     "function", "return", "class", "new", "extends", "true", "false", "nil", "and", "or",
-    "not", "mod", "const", "break", "continue", "image", "sound", "array", "of", "struct",
-    "file", "map", "try", "catch", "throw", "finally", "import", "select", "case", "is",
+    "not", "mod", "const", "break", "continue", "array", "of", "struct",
+    "map", "try", "catch", "throw", "finally", "import", "select", "case", "is",
     "repeat", "until", "data", "read", "restore", "byref", "enum", "private", "band", "bor",
     "bxor", "bnot", "shl", "shr", "tuple", "with", "static", "funcref", "in", "where",
     "property", "operator", "yield", "coroutine",
@@ -86,11 +86,11 @@ mod keyword_tests {
         // Jedes Wort des Lookups steht in der Liste: alle Buchstabenfolgen bis
         // Laenge 9 durchzuprobieren waere zu viel -- stattdessen die Liste
         // gegen die Anzahl der Zweige halten, die `keyword()` kennt.
-        assert_eq!(super::KEYWORDS.len(), 75);
+        assert_eq!(super::KEYWORDS.len(), 72);
     }
 }
 
-/// Das Wort zu einem Schluesselwort-Token (`Tt::Image` -> "image"); `None`
+/// Das Wort zu einem Schluesselwort-Token (`Tt::Integer` -> "integer"); `None`
 /// fuer alles andere. Fuer benannte Argumente, deren Name ein
 /// Schluesselwort ist.
 pub(crate) fn keyword_text(t: Tt) -> Option<&'static str> {
@@ -110,9 +110,12 @@ pub(crate) fn keyword(text: &str) -> Option<Tt> {
         "new" => New, "extends" => Extends, "true" => True, "false" => False,
         "nil" => Nil,
         "and" => And, "or" => Or, "not" => Not, "mod" => Mod, "const" => Const,
-        "break" => Break, "continue" => Continue, "image" => Image,
-        "sound" => Sound, "array" => Array, "of" => Of, "struct" => Struct,
-        "file" => File, "map" => Map, "try" => Try, "catch" => Catch,
+        // IMAGE, SOUND und FILE sind Typnamen, keine Schluesselwoerter
+        // mehr (Bericht C4.4): ein Parameter `file` oder eine Variable
+        // `sound` ging bis 2026.53 nicht ("Erwartet Parametername").
+        "break" => Break, "continue" => Continue,
+        "array" => Array, "of" => Of, "struct" => Struct,
+        "map" => Map, "try" => Try, "catch" => Catch,
         "throw" => Throw, "finally" => Finally, "import" => Import,
         "select" => Select, "case" => Case,
         "is" => Is, "repeat" => Repeat, "until" => Until, "data" => Data,
@@ -634,7 +637,7 @@ impl Lexer {
             '%' => return Err(self.err(
                 "Den Rest einer Division liefert MOD: 7 MOD 3 (ein %-Zeichen gibt es nicht)", line, col)),
             '#' => return Err(self.err(
-                "'#' kommt in Drachenhauch nicht vor -- Kommentare beginnen mit ' (Hochkomma), und Dateien haben keine Nummern (f = OPENFILE(\"name.txt\", \"w\"))",
+                "'#' kommt in Drachenhauch nicht vor -- Kommentare beginnen mit ' (Hochkomma), und Dateien haben keine Nummern (f = FILE_OPEN(\"name.txt\", \"w\"))",
                 line, col)),
             _ => return Err(self.err(&format!("Unbekanntes Zeichen: {:?}", ch), line, col)),
         }

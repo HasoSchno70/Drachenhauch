@@ -1,4 +1,4 @@
-' Ein- und Ausstecken (HOTPLUG_*, src/hotplug.rs). Mit DHRT_GERAETE liest
+' Ein- und Ausstecken (HOTPLUG_*, src/hotplug.rs). Mit DHRT_DEVICES liest
 ' der Waechter die Listen aus einer Textdatei (art:name je Zeile) statt vom
 ' System -- der Fall aendert die Datei und sieht die Meldungen. Ein Fall
 ' vergleicht ohne Simulation mit den Listen, die SERIAL_PORTS und
@@ -33,7 +33,7 @@ SLEEP(400)
 melden()
 PRINT "danach "; HOTPLUG_NEXT(); " ["; HOTPLUG_KIND$(); "]"
 --- umgebung
-DHRT_GERAETE={fall}/geraete.txt
+DHRT_DEVICES={fall}/geraete.txt
 --- datei geraete.txt
 serial:COM3
 midi_out:Synth
@@ -64,7 +64,7 @@ CATCH e
     PRINT e
 END TRY
 --- umgebung
-DHRT_GERAETE={fall}/leer.txt
+DHRT_DEVICES={fall}/leer.txt
 --- datei leer.txt
 
 --- erwartet
@@ -93,6 +93,14 @@ DIM s AS ARRAY OF STRING : s = []
 IF SERIAL_PORTS() <> "" THEN s = SPLIT$(SERIAL_PORTS(), ", ")
 SORT(s)
 PRINT "serial gleich "; JOIN$(s, "|") = JOIN$(HOTPLUG_LIST("serial"), "|")
+' Dieselben Listen als Feld (Bericht A16: Geraetelisten sind ARRAY OF STRING).
+DIM sd AS ARRAY OF STRING : sd = SERIAL_DEVICES()
+SORT(sd)
+PRINT "serial_devices gleich "; JOIN$(sd, "|") = JOIN$(s, "|")
+DIM md AS ARRAY OF STRING : md = MIDI_IN_DEVICES()
+PRINT "midi_in_devices gleich "; LEN(md) = MIDI_IN_COUNT()
 --- erwartet
 midi_in gleich TRUE
 serial gleich TRUE
+serial_devices gleich TRUE
+midi_in_devices gleich TRUE

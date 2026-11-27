@@ -77,7 +77,7 @@ ARRAY_PUSH(w, w)
 PRINT LEN(w), LEN(w[0])
 PRINT ARRAY_PUSH(a, 2.5)
 --- fehler
-ARRAY_PUSH: FLOAT 2.5 kann nicht ohne Verlust nach INTEGER (nutze INT())
+ARRAY_PUSH: FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
 --- erwartet
 1 2 INTEGER
 3.0 FLOAT
@@ -507,4 +507,15 @@ DIM b AS ARRAY OF K : b = [NEW K(), NEW K()]
 PRINT JOIN$(b, ",")
 --- fehler
 JOIN$: Feld aus Texten, Zahlen oder Wahrheitswerten noetig
+
+=== isnumeric und tryval lesen wie val
+' Dieselben Schreibweisen wie VAL (&H, &O, &B, 0x, 0b), aber kein "inf" und
+' kein "NaN" -- Rusts Zahlenleser nahm beide bis 2026.53 an (Bericht A9.2).
+PRINT ISNUMERIC("&HFF"); " "; TRYVAL("&HFF", -1); " "; TRYVAL("0b101", -1)
+PRINT ISNUMERIC("inf"); " "; ISNUMERIC("NaN"); " "; TRYVAL("infinity", -1)
+PRINT ISNUMERIC(" 12 "); " "; ISNUMERIC("1.5e3"); " "; ISNUMERIC("12abc")
+--- erwartet
+TRUE 255 5
+FALSE FALSE -1
+TRUE TRUE FALSE
 

@@ -24,7 +24,7 @@
 '  rechts zeigt die Bilder je Sekunde fallen).
 '
 '  Strg+Umschalt+P: Befehlspalette   Strg+Umschalt+I: Inspektor (mit
-'  DHRT_INSPEKTOR=1, aus der IDE gestartet von selbst)
+'  DHRT_INSPECTOR=1, aus der IDE gestartet von selbst)
 '  Argument: die Station, mit der die Schau beginnt (0..9).
 ' ============================================================
 IMPORT "gui"

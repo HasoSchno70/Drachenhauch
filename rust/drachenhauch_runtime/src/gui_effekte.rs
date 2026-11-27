@@ -26,8 +26,8 @@ pub(super) fn klang_lesen(wert: &str, zeile: usize) -> Result<(String, i32), Str
     let mut laut = 100;
     for t in wert.split_whitespace() {
         if let Some(p) = t.strip_suffix('%') {
-            laut = p.parse::<i32>().ok().filter(|v| (0..=200).contains(v))
-                .ok_or_else(|| format!("Zeile {}: klang -- Lautstaerke '{}' muss 0%..200% sein", zeile, t))?;
+            laut = p.parse::<i32>().ok().filter(|v| (0..=100).contains(v))
+                .ok_or_else(|| format!("Zeile {}: klang -- Lautstaerke '{}' muss 0%..100% sein", zeile, t))?;
         } else if name.is_empty() {
             name = t.trim_matches('"').trim_matches('\'').to_string();
         } else {
@@ -121,7 +121,9 @@ impl Gui {
     pub fn sound(&mut self, name: &str, laut: i64) -> Result<(), String> {
         let (n, _) = klang_lesen(name, 0).map_err(|e| format!("GUI_SOUND: {}", e.trim_start_matches("Zeile 0: ")))?;
         if n.is_empty() { return Ok(()); }
-        if !(0..=200).contains(&laut) { return Err(format!("GUI_SOUND: Lautstaerke {} muss 0..200 sein", laut)); }
+        // 0..100 % wie die Lautstaerke 0..1 aller Ton-Befehle (bis 2026.53 0..200,
+        // ueber 100 ohne Wirkung).
+        if !(0..=100).contains(&laut) { return Err(format!("GUI_SOUND: Lautstaerke {} muss 0..100 sein", laut)); }
         self.klang_wuenschen(n, laut as i32);
         Ok(())
     }

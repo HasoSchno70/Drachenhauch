@@ -1,12 +1,10 @@
-//! Befehle der Daten- und Netzdienste: db, net, geld, smtp, xlsx, pdf, httpd, mqtt, html (HTTP) und cloud.
+//! Befehle der Daten- und Netzdienste: db (samt DB_QUERY_* im Hintergrund), net, geld, smtp, xlsx, pdf, httpd, mqtt, html (HTTP), cloud, websocket, osc, mdns.
 //!
-//! Teil von `vm.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `vm.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
 impl<'p> Vm<'p> {
-    /// Modul `scene` (globaler Stack-State, kein Grafik-Bezug).
     // ===================================================================
     // Modul db (SQLite, Feature `db`)
     // ===================================================================
@@ -23,17 +21,17 @@ impl<'p> Vm<'p> {
         Self::handle_get_mut(&mut self.db_conns, idx, &fn_.to_uppercase(), "ungueltiges/geschlossenes DB_CONN-Handle")
     }
     #[cfg(feature = "db")]
-    pub(super) fn db_res(&self, idx: i64) -> R<&crate::db::DbResult> {
+    pub(super) fn db_res(&self, idx: i64, fn_: &str) -> R<&crate::db::DbResult> {
         let r = self.db_results.get(idx as usize)
-            .ok_or_else(|| format!("DB: ungueltiges DB_RESULT-Handle {}", idx))?;
-        if r.closed { return Err("DB: Result wurde bereits geschlossen".into()); }
+            .ok_or_else(|| format!("{}: ungueltiges DB_RESULT-Handle {}", fn_.to_uppercase(), idx))?;
+        if r.closed { return Err(format!("{}: das Ergebnis wurde mit DB_CLOSE_RESULT geschlossen", fn_.to_uppercase())); }
         Ok(r)
     }
     #[cfg(feature = "db")]
-    pub(super) fn db_res_mut(&mut self, idx: i64) -> R<&mut crate::db::DbResult> {
+    pub(super) fn db_res_mut(&mut self, idx: i64, fn_: &str) -> R<&mut crate::db::DbResult> {
         let r = self.db_results.get_mut(idx as usize)
-            .ok_or_else(|| format!("DB: ungueltiges DB_RESULT-Handle {}", idx))?;
-        if r.closed { return Err("DB: Result wurde bereits geschlossen".into()); }
+            .ok_or_else(|| format!("{}: ungueltiges DB_RESULT-Handle {}", fn_.to_uppercase(), idx))?;
+        if r.closed { return Err(format!("{}: das Ergebnis wurde mit DB_CLOSE_RESULT geschlossen", fn_.to_uppercase())); }
         Ok(r)
     }
 
@@ -67,17 +65,17 @@ impl<'p> Vm<'p> {
                 Value::Int((self.db_results.len() - 1) as i64)
             }
             "db_next" => {
-                let r = self.db_res_mut(bi_int(a, 0, "DB_NEXT")?)?;
+                let r = self.db_res_mut(bi_int(a, 0, "DB_NEXT")?, name)?;
                 r.pos += 1;
                 Value::Bool((r.pos as usize) < r.rows.len())
             }
-            "db_col_count" => Value::Int(self.db_res(bi_int(a, 0, "DB_COL_COUNT")?)?.columns.len() as i64),
-            "db_col_name" => { let i1 = bi_int(a, 1, "DB_COL_NAME")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_COL_NAME")?)?.col_name(i1)?) }
+            "db_col_count" => Value::Int(self.db_res(bi_int(a, 0, "DB_COL_COUNT")?, name)?.columns.len() as i64),
+            "db_col_name" => { let i1 = bi_int(a, 1, "DB_COL_NAME")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_COL_NAME")?, name)?.col_name(i1)?) }
             "db_close_result" => {
                 let k = bi_int(a, 0, "DB_CLOSE_RESULT")?;
                 // Doppelt schliessen ist still (bis 2026.53 ein Fehler).
                 if k >= 0 && self.db_results.get(k as usize).is_some_and(|r| r.closed) { return Ok(Some(Value::Nil)); }
-                let r = self.db_res_mut(k)?;
+                let r = self.db_res_mut(k, name)?;
                 r.closed = true;
                 // rows leert sich NICHT von selbst durch das closed-Flag -- ohne
                 // das hier bleiben eager geladene Zeilen bis Programmende im
@@ -85,12 +83,12 @@ impl<'p> Vm<'p> {
                 r.rows = Vec::new();
                 Value::Nil
             }
-            "db_is_null" => { let i1 = bi_int(a, 1, "DB_IS_NULL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_IS_NULL")?)?.is_null(i1)?) }
-            "db_get_buffer" => { let i1 = bi_int(a, 1, "DB_GET_BUFFER")?; Value::Buffer(Rc::new(RefCell::new(self.db_res(bi_int(a, 0, "DB_GET_BUFFER")?)?.get_buffer(i1)?))) }
-            "db_get_string" => { let i1 = bi_int(a, 1, "DB_GET_STRING")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_GET_STRING")?)?.get_string(i1)?) }
-            "db_get_int" => { let i1 = bi_int(a, 1, "DB_GET_INT")?; Value::Int(self.db_res(bi_int(a, 0, "DB_GET_INT")?)?.get_int(i1)?) }
-            "db_get_float" => { let i1 = bi_int(a, 1, "DB_GET_FLOAT")?; Value::Float(self.db_res(bi_int(a, 0, "DB_GET_FLOAT")?)?.get_float(i1)?) }
-            "db_get_bool" => { let i1 = bi_int(a, 1, "DB_GET_BOOL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_GET_BOOL")?)?.get_bool(i1)?) }
+            "db_is_null" => { let i1 = bi_int(a, 1, "DB_IS_NULL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_IS_NULL")?, name)?.is_null(i1)?) }
+            "db_get_buffer" => { let i1 = bi_int(a, 1, "DB_GET_BUFFER")?; Value::Buffer(Rc::new(RefCell::new(self.db_res(bi_int(a, 0, "DB_GET_BUFFER")?, name)?.get_buffer(i1)?))) }
+            "db_get_string" => { let i1 = bi_int(a, 1, "DB_GET_STRING")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_GET_STRING")?, name)?.get_string(i1)?) }
+            "db_get_int" => { let i1 = bi_int(a, 1, "DB_GET_INT")?; Value::Int(self.db_res(bi_int(a, 0, "DB_GET_INT")?, name)?.get_int(i1)?) }
+            "db_get_float" => { let i1 = bi_int(a, 1, "DB_GET_FLOAT")?; Value::Float(self.db_res(bi_int(a, 0, "DB_GET_FLOAT")?, name)?.get_float(i1)?) }
+            "db_get_bool" => { let i1 = bi_int(a, 1, "DB_GET_BOOL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_GET_BOOL")?, name)?.get_bool(i1)?) }
             "db_begin" => { self.db_conn(bi_int(a, 0, "DB_BEGIN")?, name)?.befehl("BEGIN", "DB_BEGIN")?; Value::Nil }
             "db_commit" => { self.db_conn(bi_int(a, 0, "DB_COMMIT")?, name)?.befehl("COMMIT", "DB_COMMIT")?; Value::Nil }
             "db_rollback" => { self.db_conn(bi_int(a, 0, "DB_ROLLBACK")?, name)?.befehl("ROLLBACK", "DB_ROLLBACK")?; Value::Nil }
@@ -204,7 +202,7 @@ impl<'p> Vm<'p> {
             }
             // Absender getrennt: "::1:5000" laesst sich nur zerlegen, wenn man
             // weiss, dass am LETZTEN Doppelpunkt geschnitten werden muss.
-            "net_udp_last_host$" | "net_udp_last_host" => Value::str_rc(&self.net_udp(bi_int(a, 0, "NET_UDP_LAST_HOST$")?, name)?.last_from.0),
+            "net_udp_last_host$" => Value::str_rc(&self.net_udp(bi_int(a, 0, "NET_UDP_LAST_HOST$")?, name)?.last_from.0),
             "net_udp_last_port" => Value::Int(self.net_udp(bi_int(a, 0, "NET_UDP_LAST_PORT")?, name)?.last_from.1),
             "net_udp_recv" => { let i = bi_int(a, 0, "NET_UDP_RECV")?; let n = bi_int(a, 1, "NET_UDP_RECV")?; Value::str_rc(net::udp_recv(self.net_udp_mut(i, name)?, n)?) }
             "net_udp_last_from" => {
@@ -218,9 +216,6 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
-    // ===================================================================
-    // Modul mqtt (baut auf std::net auf, Feature `net`)
-    // ===================================================================
     /// Modul `geld` -- ein Betrag als eigener Wert (Weg C des Entwurfs).
     pub(super) fn try_geld(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("geld_") { return Ok(None); }
@@ -231,7 +226,7 @@ impl<'p> Vm<'p> {
         let wert = |i: usize, fn_: &str| -> R<i64> {
             match a.get(i) {
                 Some(Value::Geld(w)) => Ok(*w),
-                Some(other) => Err(format!("{}: erwartet GELD, erhalten {} -- mit GELD_NEU() \
+                Some(other) => Err(format!("{}: erwartet GELD, erhalten {} -- mit MONEY_NEW() \
                                       einen Betrag daraus machen", fn_, other.type_name())),
                 None => Err(crate::argument::fehlt(fn_, i + 1)),
             }
@@ -660,7 +655,7 @@ impl<'p> Vm<'p> {
             // senkrechte Achsenbeschriftungen (Glutfaden, 2026-10-16).
             "pdf_text" => {
                 if a.len() != 4 && a.len() != 5 {
-                    return Err(format!("PDF_TEXT: erwartet 4 oder 5 Argumente (pdf, x, y, text$ [, winkel]), nicht {}", a.len()));
+                    return Err(format!("PDF_TEXT: erwartet 4 bis 5 Argumente, erhalten {}", a.len()));
                 }
                 let i = bi_int(a, 0, "PDF_TEXT")?;
                 let (x, y) = (bi_num(a, 1, "PDF_TEXT")?, bi_num(a, 2, "PDF_TEXT")?);
@@ -684,7 +679,7 @@ impl<'p> Vm<'p> {
             // die Spruenge im Stickpfad).
             "pdf_dash" => {
                 if a.len() != 2 && a.len() != 3 {
-                    return Err(format!("PDF_DASH: erwartet 2 oder 3 Argumente (pdf, strich_mm [, luecke_mm]), nicht {}", a.len()));
+                    return Err(format!("PDF_DASH: erwartet 2 bis 3 Argumente, erhalten {}", a.len()));
                 }
                 let i = bi_int(a, 0, "PDF_DASH")?;
                 let an = bi_num(a, 1, "PDF_DASH")?;
@@ -740,7 +735,7 @@ impl<'p> Vm<'p> {
             // (Messdaten-Runde, 2026-10-13).
             "pdf_image" => {
                 if a.len() != 5 && a.len() != 6 {
-                    return Err(format!("PDF_IMAGE: erwartet 5 oder 6 Argumente (pdf, bild, x, y, b [, h]), nicht {}", a.len()));
+                    return Err(format!("PDF_IMAGE: erwartet 5 bis 6 Argumente, erhalten {}", a.len()));
                 }
                 let i = bi_int(a, 0, "PDF_IMAGE")?;
                 let bild = bi_int(a, 1, "PDF_IMAGE")?;
@@ -772,7 +767,7 @@ impl<'p> Vm<'p> {
                 let drucker = if a.len() > 1 { bi_str(a, 1, "PDF_PRINT")?.to_string() } else { String::new() };
                 let kopien = if a.len() > 2 { bi_int(a, 2, "PDF_PRINT")? } else { 1 };
                 let ziel = if a.len() > 3 { bi_str(a, 3, "PDF_PRINT")?.to_string() } else { String::new() };
-                if a.len() > 4 { return Err("PDF_PRINT: erwartet 1..4 Argumente (pdf[, drucker$[, kopien[, zieldatei$]]])".into()); }
+                if a.len() > 4 { return Err(format!("PDF_PRINT: erwartet 1 bis 4 Argumente, erhalten {}", a.len())); }
                 let doc = self.pdf_d(i, name)?;
                 crate::drucken::drucken(doc, &drucker, kopien, &ziel)?;
                 Value::Nil
@@ -871,20 +866,27 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "HTTPD_ACCEPT")?;
                 Value::Bool(httpd::annehmen(self.httpd_srv(i, name)?)?)
             }
-            "httpd_method$" | "httpd_method" => {
+            "httpd_method$" => {
                 let i = bi_int(a, 0, "HTTPD_METHOD$")?;
                 Value::str_rc(&Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_METHOD$")?.methode.clone())
             }
-            "httpd_path$" | "httpd_path" => {
+            "httpd_path$" => {
                 let i = bi_int(a, 0, "HTTPD_PATH$")?;
                 Value::str_rc(&Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_PATH$")?.pfad.clone())
             }
-            "httpd_body$" | "httpd_body" => {
+            // Der Rumpf, wie er kam (HTTPD_BODY$ dekodiert UTF-8 und ersetzt
+            // Unlesbares).
+            "httpd_body_bytes" => {
+                let i = bi_int(a, 0, "HTTPD_BODY_BYTES")?;
+                let r = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_BODY_BYTES")?;
+                crate::argument::buffer_wert(r.rumpf.clone())
+            }
+            "httpd_body$" => {
                 let i = bi_int(a, 0, "HTTPD_BODY$")?;
                 let r = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_BODY$")?;
                 Value::str_rc(String::from_utf8_lossy(&r.rumpf).into_owned())
             }
-            "httpd_query$" | "httpd_query" => {
+            "httpd_query$" => {
                 let i = bi_int(a, 0, "HTTPD_QUERY$")?;
                 let k = bi_str(a, 1, "HTTPD_QUERY$")?.to_lowercase();
                 let r = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_QUERY$")?;
@@ -893,7 +895,7 @@ impl<'p> Vm<'p> {
                 Value::str_rc(r.abfrage.iter().find(|(n, _)| n.to_lowercase() == k)
                                .map(|(_, v)| v.as_str()).unwrap_or(""))
             }
-            "httpd_header$" | "httpd_header" => {
+            "httpd_header$" => {
                 let i = bi_int(a, 0, "HTTPD_HEADER$")?;
                 let k = bi_str(a, 1, "HTTPD_HEADER$")?.to_lowercase();
                 let r = Self::httpd_anfrage(self.httpd_srv(i, name)?, "HTTPD_HEADER$")?;
@@ -904,8 +906,13 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "HTTPD_SEND")?;
                 let code = bi_int(a, 1, "HTTPD_SEND")?;
                 let typ = bi_str(a, 2, "HTTPD_SEND")?.to_string();
-                let inhalt = bi_str(a, 3, "HTTPD_SEND")?.to_string();
-                httpd::antworten(self.httpd_srv(i, name)?, code, &typ, inhalt.as_bytes())?;
+                // Der Rumpf als Text oder BUFFER (Bilder, Downloads; bis 2026.53
+                // nur Text).
+                let inhalt: Vec<u8> = match a.get(3) {
+                    Some(Value::Buffer(b)) => b.borrow().clone(),
+                    _ => bi_str(a, 3, "HTTPD_SEND")?.as_bytes().to_vec(),
+                };
+                httpd::antworten(self.httpd_srv(i, name)?, code, &typ, &inhalt)?;
                 Value::Nil
             }
             "httpd_send_file" => {
@@ -966,6 +973,9 @@ impl<'p> Vm<'p> {
             .ok_or_else(|| format!("{}: es liegt keine Anfrage an -- erst HTTPD_ACCEPT abfragen", fn_))
     }
 
+    // ===================================================================
+    // Modul mqtt (baut auf std::net auf, Feature `net`)
+    // ===================================================================
     pub(super) fn try_mqtt(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("mqtt_")) { return Ok(None); }
         #[cfg(feature = "net")]
@@ -1028,9 +1038,23 @@ impl<'p> Vm<'p> {
                 }
                 Value::Nil
             }
-            "mqtt_is_connected" => { let i = bi_int(a, 0, "MQTT_IS_CONNECTED")?; Value::Bool(self.mqtt_clients.get(i as usize).and_then(|o| o.as_ref()).map(mqtt::is_connected).unwrap_or(false)) }
+            // Geschlossen heisst nicht verbunden (FALSE); eine Nummer, die es
+            // nie gab, ist ein Fehler (Handle-Regel; bis 2026.53 FALSE).
+            "mqtt_is_connected" => {
+                let i = bi_int(a, 0, "MQTT_IS_CONNECTED")?;
+                match usize::try_from(i).ok().and_then(|k| self.mqtt_clients.get(k)) {
+                    Some(o) => Value::Bool(o.as_ref().map(mqtt::is_connected).unwrap_or(false)),
+                    None => return Err(format!("MQTT_IS_CONNECTED: ungueltiges MQTT_HANDLE {}", i)),
+                }
+            }
             "mqtt_publish" => {
-                let i = bi_int(a, 0, "MQTT_PUBLISH")?; let topic = bi_str(a, 1, "MQTT_PUBLISH")?.to_string(); let payload = bi_str(a, 2, "MQTT_PUBLISH")?.to_string();
+                // Die Nutzlast als Text (UTF-8) oder als BUFFER, wie sie ist
+                // (Bericht A13; bis 2026.53 nur Text).
+                let i = bi_int(a, 0, "MQTT_PUBLISH")?; let topic = bi_str(a, 1, "MQTT_PUBLISH")?.to_string();
+                let payload: Vec<u8> = match a.get(2) {
+                    Some(Value::Buffer(b)) => b.borrow().clone(),
+                    _ => bi_str(a, 2, "MQTT_PUBLISH")?.as_bytes().to_vec(),
+                };
                 let retain = if a.len() >= 4 { bi_bool(a, 3, "MQTT_PUBLISH")? } else { false };
                 let qos = mqtt::qos_pruefen("MQTT_PUBLISH", if a.len() >= 5 { bi_int(a, 4, "MQTT_PUBLISH")? } else { 0 })?;
                 Value::Bool(mqtt::publish(self.mqtt_client(i, name)?, &topic, &payload, retain, qos))
@@ -1075,6 +1099,13 @@ impl<'p> Vm<'p> {
     /// Frueher stand dieser Block viermal wortgleich in `try_html_impl`. Mit
     /// `HTTP_BYTES` (WP C) kam eine fuenfte Sache dazu, die JEDER Pfad tun
     /// muss -- und genau so vergisst man sie in einem davon.
+    /// Eine Anfrage im Hintergrund starten (`HTTP_*_START`), Nummer zurueck.
+    #[cfg(feature = "http")]
+    pub(super) fn http_abruf_starten(&mut self, anfrage: crate::html::Anfrage) -> i64 {
+        let url = anfrage.url.clone();
+        self.http_abrufe.start(&url, move || crate::html::http_request(&anfrage))
+    }
+
     #[cfg(feature = "http")]
     pub(super) fn http_antwort(&mut self, r: Result<crate::html::HttpResult, crate::html::HttpErr>) -> R<Value> {
         match r {
@@ -1106,7 +1137,7 @@ impl<'p> Vm<'p> {
     pub(super) fn http_anfrage(&self, fn_: &str, a: &[Value]) -> R<crate::html::Anfrage> {
         if a.len() < 2 || a.len() > 4 {
             return Err(format!(
-                "{}: erwartet 2..4 Argumente (methode, url [, rumpf [, kopfzeilen]]), erhalten {}",
+                "{}: erwartet 2 bis 4 Argumente, erhalten {}",
                 fn_, a.len()));
         }
         let mut anfrage = crate::html::Anfrage::neu(bi_str(a, 0, fn_)?, bi_str(a, 1, fn_)?);
@@ -1169,7 +1200,7 @@ impl<'p> Vm<'p> {
             }
             "http_request_start" => {
                 let anfrage = self.http_anfrage("HTTP_REQUEST_START", a)?;
-                Value::Int(self.http_abrufe.start(anfrage))
+                Value::Int(self.http_abruf_starten(anfrage))
             }
             "http_bytes" => {
                 if !a.is_empty() { return Err(format!("HTTP_BYTES: erwartet 0 Argumente, erhalten {}", a.len())); }
@@ -1182,7 +1213,18 @@ impl<'p> Vm<'p> {
                 if !(1..=600).contains(&s) {
                     return Err(format!("HTTP_TIMEOUT: {} Sekunden liegen ausserhalb 1..600", s));
                 }
-                self.http_timeout = s as u64;
+                self.http_timeout = s as u64 * 1000;
+                Value::Nil
+            }
+            // HTTP_SET_TIMEOUT(ms): dieselbe Frist in Millisekunden -- wie jede
+            // Frist in Drachenhauch (Leitlinie in docs/builtins-namen.md).
+            // HTTP_TIMEOUT zaehlt Sekunden und bleibt dabei.
+            "http_set_timeout" => {
+                let ms = bi_int(a, 0, "HTTP_SET_TIMEOUT")?;
+                if !(1..=600_000).contains(&ms) {
+                    return Err(format!("HTTP_SET_TIMEOUT: {} ms liegen ausserhalb 1..600000", ms));
+                }
+                self.http_timeout = ms as u64;
                 Value::Nil
             }
             "http_set_header" => {
@@ -1221,23 +1263,22 @@ impl<'p> Vm<'p> {
                 let mut anfrage = html::Anfrage::neu("GET", bi_str(a, 0, "HTTP_GET_START")?);
                 anfrage.timeout = self.http_timeout;
                 anfrage.header = self.http_default_header.clone();
-                Value::Int(self.http_abrufe.start(anfrage))
+                Value::Int(self.http_abruf_starten(anfrage))
             }
-            "http_ready" => Value::Bool(self.http_abrufe.fertig(bi_int(a, 0, "HTTP_READY")?)),
+            "http_ready" => Value::Bool(self.http_abrufe.fertig(bi_int(a, 0, "HTTP_READY")?, "HTTP_READY")?),
             "http_result" => {
                 let id = bi_int(a, 0, "HTTP_RESULT")?;
-                match self.http_abrufe.abholen(id) {
+                match self.http_abrufe.abholen(id, "HTTP_RESULT")? {
                     Some(r) => self.http_antwort(r)?,
                     // Abholen ohne vorheriges HTTP_READY ist der haeufigste
                     // Anfaengerfehler -- deshalb sagt die Meldung, was fehlt.
                     None => return Err(format!(
-                        "HTTP_RESULT: Abruf {} ist nicht fertig (oder schon abgeholt) \
-                         -- erst HTTP_READY({}) abfragen", id, id)),
+                        "HTTP_RESULT: Abruf {} ist noch nicht fertig -- erst HTTP_READY({}) abfragen", id, id)),
                 }
             }
             "http_cancel" => { self.http_abrufe.abbrechen(bi_int(a, 0, "HTTP_CANCEL")?); Value::Nil }
             "http_pending" => Value::Int(self.http_abrufe.offen()),
-            "http_url$" | "http_url" => Value::str_rc(&self.http_abrufe.url(bi_int(a, 0, "HTTP_URL$")?)),
+            "http_url$" => Value::str_rc(&self.http_abrufe.was(bi_int(a, 0, "HTTP_URL$")?)),
 
             "http_status" => Value::Int(self.http_status),
             "http_header" => {
@@ -1298,7 +1339,7 @@ impl<'p> Vm<'p> {
                     Err(e) => { self.cloud_last_error = e.msg; Value::Bool(false) }
                 }
             }
-            "cloud_load" | "cloud_load$" => {
+            "cloud_load" => {
                 self.cloud_require_configured("CLOUD_LOAD")?;
                 let player_id = bi_str(a, 0, "CLOUD_LOAD")?.to_string();
                 self.cloud_last_error.clear();
@@ -1308,7 +1349,7 @@ impl<'p> Vm<'p> {
                     Err(e) => { self.cloud_last_error = e.msg; Value::str_rc("") }
                 }
             }
-            "cloud_last_error$" | "cloud_last_error" => Value::str_rc(&self.cloud_last_error),
+            "cloud_last_error$" => Value::str_rc(&self.cloud_last_error),
             "leaderboard_submit" => {
                 self.cloud_require_configured("LEADERBOARD_SUBMIT")?;
                 let board = bi_str(a, 0, "LEADERBOARD_SUBMIT")?.to_string();
@@ -1339,6 +1380,280 @@ impl<'p> Vm<'p> {
                 for (i, v) in items.into_iter().enumerate() { arr.cells.set(i, v); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    // ===================================================================
+    // WebSocket (WS_*), OSC (OSC_*), mDNS (MDNS_*): src/websocket.rs,
+    // src/osc.rs, src/mdns.rs
+    // ===================================================================
+    pub(super) fn try_netzdienste(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if name.starts_with("ws_") {
+            #[cfg(feature = "net")]
+            { return self.try_websocket(name, a); }
+            #[allow(unreachable_code)]
+            { return Ok(None); }
+        }
+        if name.starts_with("osc_") { return self.try_osc(name, a); }
+        if name.starts_with("mdns_") { return self.try_mdns(name, a); }
+        Ok(None)
+    }
+
+    #[cfg(feature = "net")]
+    pub(super) fn try_websocket(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::websocket as ws;
+        fn puffer(v: Vec<u8>) -> Value { Value::Buffer(Rc::new(RefCell::new(v))) }
+        macro_rules! vb { ($f:expr) => {
+            Self::handle_get_mut(&mut self.ws_verbindungen, bi_int(a, 0, $f)?, $f, "ungueltiges/geschlossenes WEBSOCKET")?
+        }; }
+        macro_rules! srv { ($f:expr) => {
+            Self::handle_get_mut(&mut self.ws_server, bi_int(a, 0, $f)?, $f, "ungueltiger/geschlossener WS_SERVER")?
+        }; }
+        let v = match name {
+            "ws_connect" => {
+                let url = bi_str(a, 0, "WS_CONNECT")?.to_string();
+                self.ws_verbindungen.push(Some(ws::verbinden(&url)?));
+                Value::Int((self.ws_verbindungen.len() - 1) as i64)
+            }
+            "ws_listen" => {
+                let port = bi_int(a, 0, "WS_LISTEN")?;
+                let bind = if a.len() >= 2 { bi_str(a, 1, "WS_LISTEN")?.to_string() } else { "0.0.0.0".to_string() };
+                self.ws_server.push(Some(ws::lauschen(port, &bind)?));
+                Value::Int((self.ws_server.len() - 1) as i64)
+            }
+            "ws_port" => Value::Int(srv!("WS_PORT").port as i64),
+            "ws_accept" => {
+                match srv!("WS_ACCEPT").annehmen() {
+                    Some(v) => { self.ws_verbindungen.push(Some(v)); Value::Int((self.ws_verbindungen.len() - 1) as i64) }
+                    None => Value::Int(-1),
+                }
+            }
+            "ws_stop" => { let i = bi_int(a, 0, "WS_STOP")? as usize; if let Some(x) = self.ws_server.get_mut(i) { *x = None; } Value::Nil }
+            "ws_send" => {
+                const F: &str = "WS_SEND";
+                let (daten, binaer) = match a.get(1) {
+                    Some(Value::Str(t)) => (t.as_bytes().to_vec(), false),
+                    Some(Value::Buffer(b)) => (b.borrow().clone(), true),
+                    Some(v) => return Err(format!("{}: erwartet einen Text oder einen BUFFER, nicht {}", F, v.type_name())),
+                    None => return Err(format!("{}: fehlendes Argument 2", F)),
+                };
+                if daten.len() > ws::MAX_NACHRICHT { return Err(format!("{}: hoechstens {} Bytes je Nachricht", F, ws::MAX_NACHRICHT)); }
+                Value::Bool(vb!(F).senden(&daten, binaer)?)
+            }
+            "ws_next" => Value::Bool(vb!("WS_NEXT").naechste()),
+            "ws_message$" => {
+                let n = vb!("WS_MESSAGE$").aktuell().map(|n| String::from_utf8_lossy(&n.daten).into_owned()).unwrap_or_default();
+                Value::str_rc(n)
+            }
+            "ws_message_bytes" => puffer(vb!("WS_MESSAGE_BYTES").aktuell().map(|n| n.daten.clone()).unwrap_or_default()),
+            "ws_is_binary" => Value::Bool(vb!("WS_IS_BINARY").aktuell().map_or(false, |n| n.binaer)),
+            "ws_pending" => Value::Int(vb!("WS_PENDING").wartend() as i64),
+            "ws_connected" => Value::Bool(vb!("WS_CONNECTED").offen()),
+            "ws_ping" => Value::Bool(vb!("WS_PING").ping()),
+            "ws_path$" => Value::str_rc(vb!("WS_PATH$").pfad.clone()),
+            "ws_peer$" => Value::str_rc(vb!("WS_PEER$").gegenstelle.clone()),
+            "ws_close_code" => Value::Int(vb!("WS_CLOSE_CODE").schliess_code),
+            "ws_close_reason$" => Value::str_rc(vb!("WS_CLOSE_REASON$").schliess_grund.clone()),
+            "ws_close" => {
+                const F: &str = "WS_CLOSE";
+                let code = if a.len() >= 2 { bi_int(a, 1, F)? } else { 1000 };
+                if !(1000..=4999).contains(&code) || matches!(code, 1004..=1006 | 1015) {
+                    return Err(format!("{}: Code {} ist nicht erlaubt (1000 normal, 1001 weg, 4000..4999 eigene)", F, code));
+                }
+                let grund = if a.len() >= 3 { bi_str(a, 2, F)?.to_string() } else { String::new() };
+                let i = bi_int(a, 0, F)?;
+                vb!(F).schliessen(code as u16, &grund);
+                let _ = i;
+                Value::Nil
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    pub(super) fn try_osc(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::osc;
+        macro_rules! anschluss { ($f:expr) => {
+            Self::handle_get_mut(&mut self.osc_anschluesse, bi_int(a, 0, $f)?, $f, "ungueltiger/geschlossener OSC")?
+        }; }
+        let v = match name {
+            "osc_open" => {
+                let port = if a.is_empty() { 0 } else { bi_int(a, 0, "OSC_OPEN")? };
+                let bind = if a.len() >= 2 { bi_str(a, 1, "OSC_OPEN")?.to_string() } else { "0.0.0.0".to_string() };
+                self.osc_anschluesse.push(Some(osc::oeffnen(port, &bind)?));
+                Value::Int((self.osc_anschluesse.len() - 1) as i64)
+            }
+            "osc_close" => { let i = bi_int(a, 0, "OSC_CLOSE")? as usize; if let Some(x) = self.osc_anschluesse.get_mut(i) { *x = None; } Value::Nil }
+            "osc_port" => Value::Int(anschluss!("OSC_PORT").port as i64),
+            "osc_send" => {
+                const F: &str = "OSC_SEND";
+                if a.len() < 4 { return Err(crate::vm::falsche_argumente(F, a.len())); }
+                let host = bi_str(a, 1, F)?.to_string();
+                let port = bi_int(a, 2, F)?;
+                if !(1..=65535).contains(&port) { return Err(format!("{}: Port {} ausserhalb 1..65535", F, port)); }
+                let adresse = bi_str(a, 3, F)?.to_string();
+                if !adresse.starts_with('/') { return Err(format!("{}: eine OSC-Adresse beginnt mit /, nicht {:?}", F, adresse)); }
+                let mut werte = Vec::new();
+                for (k, w) in a[4..].iter().enumerate() {
+                    werte.push(match w {
+                        Value::Int(n) => if let Ok(x) = i32::try_from(*n) { osc::Wert::Int(x) } else { osc::Wert::Long(*n) },
+                        Value::Float(f) => osc::Wert::Float(*f as f32),
+                        Value::Str(t) => osc::Wert::Text(t.to_string()),
+                        Value::Bool(b) => if *b { osc::Wert::Wahr } else { osc::Wert::Falsch },
+                        Value::Buffer(b) => osc::Wert::Blob(b.borrow().clone()),
+                        Value::Nil => osc::Wert::Nichts,
+                        v => return Err(format!("{}: Wert {} ist {} -- OSC kennt Zahlen, Texte, Wahrheitswerte und BUFFER", F, k + 1, v.type_name())),
+                    });
+                }
+                let n = osc::Nachricht { adresse, werte };
+                anschluss!(F).senden(&host, port as u16, &n)?;
+                Value::Nil
+            }
+            "osc_next" => Value::Bool(anschluss!("OSC_NEXT").naechste()),
+            "osc_address$" => Value::str_rc(anschluss!("OSC_ADDRESS$").aktuell().map(|(n, _)| n.adresse.clone()).unwrap_or_default()),
+            "osc_types$" => Value::str_rc(anschluss!("OSC_TYPES$").aktuell().map(|(n, _)| n.werte.iter().map(|w| w.kennung()).collect::<String>()).unwrap_or_default()),
+            "osc_count" => Value::Int(anschluss!("OSC_COUNT").aktuell().map_or(0, |(n, _)| n.werte.len() as i64)),
+            "osc_arg" => {
+                const F: &str = "OSC_ARG";
+                let i = bi_int(a, 1, F)?;
+                let werte = anschluss!(F).aktuell().map(|(n, _)| n.werte.clone()).unwrap_or_default();
+                let w = usize::try_from(i).ok().and_then(|i| werte.get(i))
+                    .ok_or_else(|| format!("{}: Wert {} gibt es nicht -- die Nachricht hat {} (gezaehlt ab 0)", F, i, werte.len()))?;
+                match w {
+                    osc::Wert::Int(x) => Value::Int(*x as i64),
+                    osc::Wert::Long(x) => Value::Int(*x),
+                    osc::Wert::Float(x) => Value::Float(*x as f64),
+                    osc::Wert::Double(x) => Value::Float(*x),
+                    osc::Wert::Text(t) => Value::str_rc(t.clone()),
+                    osc::Wert::Blob(d) => Value::Buffer(Rc::new(RefCell::new(d.clone()))),
+                    osc::Wert::Wahr => Value::Bool(true),
+                    osc::Wert::Falsch => Value::Bool(false),
+                    osc::Wert::Nichts => Value::Nil,
+                    osc::Wert::Unendlich => Value::Float(f64::INFINITY),
+                    osc::Wert::Zeit(t) => Value::Int(*t as i64),
+                    osc::Wert::Zeichen(c) => Value::str_rc(c.to_string()),
+                    osc::Wert::Farbe(c) => Value::Int(*c as i64),
+                    osc::Wert::Midi(m) => Value::Int(u32::from_be_bytes(*m) as i64),
+                }
+            }
+            "osc_sender$" => Value::str_rc(anschluss!("OSC_SENDER$").aktuell().map(|(_, s)| s.ip().to_string()).unwrap_or_default()),
+            "osc_sender_port" => Value::Int(anschluss!("OSC_SENDER_PORT").aktuell().map_or(0, |(_, s)| s.port() as i64)),
+            "osc_match" => {
+                let m = bi_str(a, 0, "OSC_MATCH")?.to_string();
+                let ad = bi_str(a, 1, "OSC_MATCH")?.to_string();
+                Value::Bool(osc::passt(&m, &ad))
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    pub(super) fn try_mdns(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::mdns;
+        fn frist(a: &[Value], i: usize, f: &str, vorgabe: i64) -> R<u64> {
+            let ms = if a.len() > i { bi_int(a, i, f)? } else { vorgabe };
+            if !(50..=30000).contains(&ms) { return Err(format!("{}: Wartezeit {} ms ausserhalb 50..30000", f, ms)); }
+            Ok(ms as u64)
+        }
+        macro_rules! dienst { ($f:expr) => {{
+            let i = bi_int(a, 0, $f)?;
+            let n = self.mdns_dienste.len();
+            usize::try_from(i).ok().and_then(|i| self.mdns_dienste.get(i))
+                .ok_or_else(|| format!("{}: Dienst {} gibt es nicht -- die letzte Suche fand {} (gezaehlt ab 0)", $f, i, n))?
+        }}; }
+        let v = match name {
+            "mdns_resolve$" => {
+                let n = bi_str(a, 0, "MDNS_RESOLVE$")?.to_string();
+                let ms = frist(a, 1, "MDNS_RESOLVE$", 1500)?;
+                Value::str_rc(mdns::aufloesen(&n, ms)?)
+            }
+            "mdns_browse" => {
+                let d = bi_str(a, 0, "MDNS_BROWSE")?.to_string();
+                if !d.starts_with('_') { return Err(format!("MDNS_BROWSE: ein Diensttyp sieht aus wie \"_http._tcp\", nicht {:?}", d)); }
+                let ms = frist(a, 1, "MDNS_BROWSE", 2000)?;
+                self.mdns_typ = mdns::lokal(&d);
+                self.mdns_dienste = mdns::suchen(&d, ms)?;
+                Value::Int(self.mdns_dienste.len() as i64)
+            }
+            "mdns_service_name$" => { let t = self.mdns_typ.clone(); let d = dienst!("MDNS_SERVICE_NAME$"); Value::str_rc(mdns::kurzname(&d.name, &t)) }
+            "mdns_service_host$" => Value::str_rc(dienst!("MDNS_SERVICE_HOST$").host.clone()),
+            "mdns_service_address$" => Value::str_rc(dienst!("MDNS_SERVICE_ADDRESS$").adresse.clone()),
+            "mdns_service_port" => Value::Int(dienst!("MDNS_SERVICE_PORT").port as i64),
+            "mdns_service_txt$" => {
+                let k = bi_str(a, 1, "MDNS_SERVICE_TXT$")?.to_string();
+                let d = dienst!("MDNS_SERVICE_TXT$");
+                Value::str_rc(d.txt.iter().find(|(n, _)| n.eq_ignore_ascii_case(&k)).map(|(_, w)| w.clone()).unwrap_or_default())
+            }
+            "mdns_announce" => {
+                const F: &str = "MDNS_ANNOUNCE";
+                let n = bi_str(a, 0, F)?.to_string();
+                let d = bi_str(a, 1, F)?.to_string();
+                let port = bi_int(a, 2, F)?;
+                if !(1..=65535).contains(&port) { return Err(format!("{}: Port {} ausserhalb 1..65535", F, port)); }
+                if n.is_empty() || n.contains('.') { return Err(format!("{}: der Name darf nicht leer sein und keinen Punkt enthalten, nicht {:?}", F, n)); }
+                if !d.starts_with('_') { return Err(format!("{}: ein Diensttyp sieht aus wie \"_http._tcp\", nicht {:?}", F, d)); }
+                let txt = if a.len() >= 4 { mdns::txt_aus_text(bi_str(a, 3, F)?) } else { Vec::new() };
+                let host: String = n.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' { c.to_ascii_lowercase() } else { '-' }).collect();
+                let ank = mdns::Ankuendigung { name: n, dienst: mdns::lokal(&d), host: mdns::lokal(&host), port: port as u16, txt };
+                if self.mdns_antworter.is_none() { self.mdns_antworter = Some(mdns::antworter_starten()?); }
+                let liste = self.mdns_antworter.as_ref().unwrap().liste.clone();
+                {
+                    let mut l = liste.lock().unwrap_or_else(|e| e.into_inner());
+                    l.retain(|x| x.instanz() != ank.instanz());
+                    l.push(ank.clone());
+                }
+                mdns::melden(&ank);
+                Value::str_rc(ank.host)
+            }
+            "mdns_stop" => { self.mdns_antworter = None; Value::Nil }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    #[cfg(not(feature = "db"))]
+    pub(super) fn try_hintergrund_db(&mut self, _name: &str, _a: &[Value]) -> R<Option<Value>> { Ok(None) }
+
+    /// Abfragen im Hintergrund (WP H).
+    ///
+    /// Der Auftrag oeffnet eine EIGENE Verbindung zur Datei, statt die des
+    /// Programms mitzunehmen: eine `rusqlite::Connection` ist `Send`, aber
+    /// nicht `Sync` -- sie mitzugeben hiesse, sie dem Hauptthread wegzunehmen,
+    /// und der soll ja weiterarbeiten koennen. Preis dafuer: der Auftrag sieht
+    /// nur, was schon festgeschrieben ist, nicht die offene Transaktion des
+    /// Programms. Steht so in der Doku.
+    #[cfg(feature = "db")]
+    pub(super) fn try_hintergrund_db(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        let v = match name {
+            "db_query_start" => {
+                let datei = bi_str(a, 0, "DB_QUERY_START")?.to_string();
+                let sql = bi_str(a, 1, "DB_QUERY_START")?.to_string();
+                let params = db_params(a.get(2..).unwrap_or(&[]), "DB_QUERY_START")?;
+                let kurz = sql.chars().take(40).collect::<String>();
+                Value::Int(self.db_auftraege.start(&kurz, move || {
+                    // Eine eigene Verbindung -- zur Datei oder zum Server.
+                    let mut conn = crate::db::open(&datei)
+                        .map_err(|e| e.replacen("DB_OPEN", "DB_QUERY_START", 1))?;
+                    conn.query(&sql, &params, "DB_QUERY_START")
+                }))
+            }
+            "db_query_ready" => Value::Bool(self.db_auftraege.fertig(bi_int(a, 0, "DB_QUERY_READY")?, "DB_QUERY_READY")?),
+            "db_query_result" => {
+                let id = bi_int(a, 0, "DB_QUERY_RESULT")?;
+                match self.db_auftraege.abholen(id, "DB_QUERY_RESULT")? {
+                    Some(Ok(res)) => {
+                        self.db_results.push(res);
+                        Value::Int((self.db_results.len() - 1) as i64)
+                    }
+                    Some(Err(msg)) => return Err(msg),
+                    None => return Err(format!(
+                        "DB_QUERY_RESULT: Auftrag {} ist noch nicht fertig -- erst DB_QUERY_READY({}) abfragen", id, id)),
+                }
+            }
+            "db_query_cancel" => { self.db_auftraege.abbrechen(bi_int(a, 0, "DB_QUERY_CANCEL")?); Value::Nil }
+            "db_query_pending" => Value::Int(self.db_auftraege.offen()),
             _ => return Ok(None),
         };
         Ok(Some(v))

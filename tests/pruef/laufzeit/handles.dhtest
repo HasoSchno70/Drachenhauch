@@ -1,0 +1,94 @@
+' Getaggte Handles (Bericht A4.1, `handle.rs`): eine Handle-Nummer traegt
+' ihre Art. TYPEOF und IS stimmen, ein Handle einer anderen Art an einem
+' Befehl ist ein Fehler, eine INTEGER-Variable haelt weiter die Nummer.
+' Format: docs/werkzeuge.md.
+
+=== typeof und is kennen die art
+IMPORT "pdf"
+IMPORT "xlsx"
+DIM p AS PDF = PDF_NEW()
+DIM x AS XLSX = XLSX_NEW("B")
+PRINT TYPEOF(p); " "; TYPEOF(x)
+PRINT p IS PDF; " "; x IS PDF; " "; p IS INTEGER
+--- erwartet
+PDF XLSX
+TRUE FALSE FALSE
+
+=== ein handle rechnet und vergleicht wie seine nummer
+IMPORT "pdf"
+DIM p AS PDF = PDF_NEW()
+DIM q AS PDF = PDF_NEW()
+PRINT p; " "; q; " "; p = 0; " "; q > p; " "; p < 0; " "; p = q
+PRINT "nr " + STR$(p)
+--- erwartet
+0 1 TRUE TRUE FALSE FALSE
+nr 0
+
+=== verwechslung ist ein fehler
+' Bis 2026.53 traf das PDF-Handle 0 still die Mappe 0.
+IMPORT "pdf"
+IMPORT "xlsx"
+DIM p AS PDF = PDF_NEW()
+DIM x AS XLSX = XLSX_NEW("B")
+PRINT XLSX_SHEET_COUNT(x)
+PRINT XLSX_SHEET_COUNT(p)
+--- fehler
+XLSX_SHEET_COUNT: Argument 1 erwartet ein XLSX-Handle, erhalten ein PDF-Handle
+
+=== eine nackte zahl geht weiter durch
+' Programme halten Handles seit jeher in INTEGER-Variablen und -Feldern.
+IMPORT "xlsx"
+DIM n AS INTEGER = XLSX_NEW("B")
+DIM alle AS ARRAY OF INTEGER : ARRAY_PUSH(alle, XLSX_NEW("C"))
+PRINT TYPEOF(n); " "; TYPEOF(alle[0]); " "; XLSX_SHEET_COUNT(n); " "; XLSX_SHEET_COUNT(alle[0])
+--- erwartet
+INTEGER INTEGER 1 1
+
+=== eine zahl an einem handle-typ wird zum handle
+IMPORT "xlsx"
+DIM n AS INTEGER = XLSX_NEW("B")
+DIM x AS XLSX = n
+PRINT TYPEOF(x); " "; x
+--- erwartet
+XLSX 0
+
+=== ein feld ohne typ behaelt das tag
+IMPORT "pdf"
+DIM l AS ARRAY OF ANY
+ARRAY_PUSH(l, PDF_NEW())
+DIM m AS MAP OF ANY
+m["a"] = PDF_NEW()
+PRINT TYPEOF(l[0]); " "; TYPEOF(m["a"])
+--- erwartet
+PDF PDF
+
+=== an einen handle-typ geht nur seine art
+IMPORT "pdf"
+IMPORT "xlsx"
+TRY
+    DIM d AS PDF = TRUE
+CATCH e
+    PRINT e
+END TRY
+DIM x AS XLSX = XLSX_NEW("B")
+DIM p AS PDF = x
+--- erwartet
+Zuweisung an 'd': Erwartet PDF, erhalten BOOLEAN
+--- fehler
+Zuweisung an 'p': Erwartet PDF, erhalten XLSX
+
+=== check meldet die verwechslung vorher
+' Kennt der Compiler die Art der Variablen, sagt `dhrt --check` es, bevor
+' die Zeile laeuft.
+IMPORT "helfer.dh"
+dlStarten(["--check", "prog.dh"])
+PRINT INSTR(dlAus, "XLSX_SHEET_COUNT: Argument 1 erwartet ein XLSX-Handle, erhalten ein PDF-Handle") >= 0
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
+--- datei prog.dh
+IMPORT "pdf"
+IMPORT "xlsx"
+DIM p AS PDF = PDF_NEW()
+PRINT XLSX_SHEET_COUNT(p)
+--- erwartet
+TRUE

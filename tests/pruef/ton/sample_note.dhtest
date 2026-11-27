@@ -384,7 +384,7 @@ DIM k AS SOUND : k = AUDIO_TONE(440, 100)
 UNLOADSOUND(k)
 DIM s AS SAMPLE : s = SAMPLE_FROM_SOUND(k)
 --- fehler
-SAMPLE_FROM_SOUND: dieser Klang wurde bereits mit UNLOADSOUND freigegeben
+SAMPLE_FROM_SOUND: dieser Klang wurde bereits mit SOUND_FREE freigegeben
 
 === ein ungueltiges handle ist ein fehler
 IMPORT "audio"
@@ -414,3 +414,28 @@ END TRY
 doppelt still
 SAMPLE_LEN: dieses Sample wurde mit SAMPLE_FREE freigegeben
 SAMPLE_FREE: ungueltiges SAMPLE-Handle 77
+
+=== die loop-region in sekunden
+' SAMPLE_SET_LOOP_TIME nimmt Sekunden wie SAMPLE_LEN und rechnet mit der
+' Abtastrate in Frames: 0,5 s und 0,50001 s sind derselbe Frame (leer, ein
+' Fehler), 0,5 s bis 0,501 s sind 22 Frames.
+IMPORT "audio"
+DIM s AS SAMPLE : s = SAMPLE_FROM_BUFFER(BUFFER_NEW(44100), 22050)
+SAMPLE_SET_LOOP_TIME(s, 0.5, 0.501)
+PRINT "geht"
+TRY
+    SAMPLE_SET_LOOP_TIME(s, 0.5, 0.50001)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_AUTOPAN_MS(99, 500)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_OHNE_AUDIO=1
+--- erwartet
+geht
+SAMPLE_SET_LOOP_TIME: end muss > start sein
+AUDIO_AUTOPAN_MS: ungueltiges Handle 99

@@ -117,8 +117,8 @@ END TRY
 --- enthaelt
 log erfolg,toene/tusch.wav danach ''
 GUI_SOUND: klang 'quietsch' unbekannt -- klick, tick, ping, plopp, fehler, erfolg oder eine Datei
-GUI_SOUND: Lautstaerke 300 muss 0..200 sein
-Zeile 1: klang -- Lautstaerke '250%' muss 0%..200% sein
+GUI_SOUND: Lautstaerke 300 muss 0..100 sein
+Zeile 1: klang -- Lautstaerke '250%' muss 0%..100% sein
 Zeile 1: effekt 'feuerwerk' unbekannt -- funken, konfetti, sterne
 GUI_BURST: effekt 'feuerwerk' unbekannt
 GUI_BURST: anzahl 9999 muss 1..500 sein

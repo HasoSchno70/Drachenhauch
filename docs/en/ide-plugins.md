@@ -77,7 +77,7 @@ go there -- a bundled plugin may live in a folder it must not write to.
 ## Writing a plugin
 
 The library `dh_plugin.dh` lives next to the IDE; the IDE puts its folder
-into `DH_PATH`, so a plugin simply writes `IMPORT "dh_plugin.dh"`. The
+into `DHRT_PATH`, so a plugin simply writes `IMPORT "dh_plugin.dh"`. The
 program registers what it can do and then waits for events:
 
 ```basic
@@ -180,7 +180,7 @@ PROBE_ENDE()
 
 The bundled plugins are tested this way (`tests/pruef/werkzeugkette/plugin_probe.dhtest`).
 A plugin from the template already brings its test: `test.dhtest` next to
-the `plugin.dh`, with `DH_PATH` pointing to the IDE's folder (where
+the `plugin.dh`, with `DHRT_PATH` pointing to the IDE's folder (where
 `dh_plugin.dh` and the probe live). Run it with Ctrl+Alt+F5 while it is in
 front, or with `dhrt test <plugin-folder>`.
 

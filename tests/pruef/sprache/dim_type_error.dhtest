@@ -33,3 +33,27 @@ PRINT VEC2_LENGTH(v)
 --- erwartet
 5.0
 
+=== ein werttyp eines moduls nimmt nur seinesgleichen
+' VEC2, JSON_HANDLE, SPRITE & Co. sind echte Werte. Bis 2026.53 nahm
+' `DIM j AS JSON_HANDLE = 5` die Zahl, und erst der naechste JSON-Befehl
+' scheiterte. Typen mit Handle-Nummer (IMAGE, PDF ...) bleiben bei INTEGER.
+IMPORT "json"
+IMPORT "vec2"
+TRY
+    DIM j AS JSON_HANDLE = 5
+CATCH e
+    PRINT e
+END TRY
+TRY
+    DIM v AS VEC2
+    v = "x"
+CATCH e
+    PRINT e
+END TRY
+DIM k AS JSON_HANDLE = JSON_PARSE("[1]")
+PRINT JSON_LEN(k, "")
+--- erwartet
+Zuweisung an 'j': Erwartet JSON_HANDLE, erhalten INTEGER
+Zuweisung an 'v': Erwartet VEC2, erhalten STRING
+1
+

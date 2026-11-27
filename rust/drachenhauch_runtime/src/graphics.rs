@@ -140,7 +140,7 @@ enum Cmd {
     /// Eine Schicht: was bis SchichtEnde kommt, in ein Renderziel, das dann
     /// mit Deckkraft und Farbton aufgelegt wird (Ablaeufe der gui) -- nur
     /// auf der Hauptflaeche ohne POSTFX (`SCHICHT_ZIEL`), sonst wie ohne.
-    SchichtAnfang(u8, Color),
+    SchichtAnfang(Color),
     SchichtEnde,
     VerformungEnde,
     // 2D-Extras (Batch 1): dicke Linien, runde Rechtecke, Gradienten, Splines.
@@ -483,7 +483,7 @@ const MAX_LIGHTS: usize = 4;
 ///
 /// Diese 711 ms sind die Obergrenze, und sie faellt nur dort an, wo es ohne
 /// die Schleife STILL schiefgegangen waere.
-/// Eine Zwischenablage nur fuer diesen Prozess (`DHRT_ZWISCHENABLAGE=privat`).
+/// Eine Zwischenablage nur fuer diesen Prozess (`DHRT_CLIPBOARD=privat`).
 ///
 /// `dhrt test` setzt das fuer jedes Programm, das es startet: die Pruefungen
 /// der IDE und der Werkzeuge "tippen" ueber CLIPBOARD_SET und Strg+V, weil
@@ -492,11 +492,11 @@ const MAX_LIGHTS: usize = 4;
 /// anderen ein; darum liefen diese Sammlungen nacheinander (`--- seriell`),
 /// 84 % der Zeit eines vollen Laufs. Mit einer eigenen Ablage je Prozess
 /// duerfen sie parallel laufen. Wer die echte Ablage prueft, setzt in
-/// `--- umgebung` `DHRT_ZWISCHENABLAGE=system`.
+/// `--- umgebung` `DHRT_CLIPBOARD=system`.
 fn private_ablage() -> Option<&'static std::sync::Mutex<String>> {
     static ABLAGE: std::sync::OnceLock<Option<std::sync::Mutex<String>>> = std::sync::OnceLock::new();
     ABLAGE.get_or_init(|| {
-        (std::env::var("DHRT_ZWISCHENABLAGE").as_deref() == Ok("privat")).then(|| std::sync::Mutex::new(String::new()))
+        (crate::umgebung::var("DHRT_CLIPBOARD").as_deref() == Ok("privat")).then(|| std::sync::Mutex::new(String::new()))
     }).as_ref()
 }
 
@@ -1247,7 +1247,7 @@ void main()
 #[derive(Clone)]
 struct GfxState {
     cam: (f64, f64, f64, f64),
-    shake: (f64, f64, Option<std::time::Instant>, f64, f64),
+    shake: (f64, f64, Option<f64>, f64, f64),
     active_layer: usize,
     clear_color: Color,
     light_ambient: [f32; 4],
@@ -1397,7 +1397,8 @@ pub struct Graphics {
     // ab. Pro Frame EIN Offset (in flip() fuer den naechsten Frame gewuerfelt).
     shake_amp: f64,
     shake_dur_ms: f64,
-    shake_start: Option<std::time::Instant>,
+    /// Beginn in ms der Spieluhr (spieluhr.rs).
+    shake_start: Option<f64>,
     shake_x: f64,
     shake_y: f64,
     // 3D (Modul `g3d`): Befehlsliste + Perspektiv-Kamera. cmds3d wird pro
@@ -2228,13 +2229,9 @@ fn instanz_farben(mats: &mut [[f32; 16]], farben: &[i64]) {
 }
 
 fn col(c: i64) -> Color {
-    let v = c as u32;
-    // Oberes Byte = Alpha. 0 bedeutet DECKEND (255) -- so bleiben die alten
-    // 24-bit-Farben `&Hrrggbb` / RGB(r,g,b) voll deckend, waehrend
-    // RGBA(r,g,b,a) bzw. `&Haarrggbb` mit a>0 echte Transparenz liefert.
-    let a = ((v >> 24) & 0xFF) as u8;
-    let a = if a == 0 { 255 } else { a };
-    Color::new(((v >> 16) & 0xFF) as u8, ((v >> 8) & 0xFF) as u8, (v & 0xFF) as u8, a)
+    // Oberes Byte = Alpha, 0 = deckend (farbraum::rgba, die eine Regel).
+    let [r, g, b, a] = crate::farbraum::rgba(c);
+    Color::new(r, g, b, a)
 }
 
 /// Warum kein Fenster aufgeht -- so genau, wie es sich von aussen sagen laesst.
@@ -2300,7 +2297,7 @@ impl Graphics {
     /// Panic-Hook ihn ausgibt) und in eine Meldung verwandelt, die die VM als
     /// gewoehnlichen Laufzeitfehler weitergibt -- mit Zeile, per TRY abfangbar.
     ///
-    /// `DHRT_KEIN_FENSTER` tut so, als ginge keins: auf einem Rechner mit
+    /// `DHRT_NO_WINDOW` tut so, als ginge keins: auf einem Rechner mit
     /// Bildschirm ist der Weg sonst nicht zu pruefen
     /// (tests/pruef/laufzeit/kein_fenster.dhtest). Der echte Weg laeuft im Paket-Lauf
     /// der CI (package.yml: Linux ohne xvfb, macOS ohne OpenGL).
@@ -2311,7 +2308,7 @@ impl Graphics {
         // sein NSApplication hochfaehrt -- das Start-Ereignis kommt dort an.
         crate::finder::einhaengen();
         crate::finder::vortaeuschen();
-        let vorgetaeuscht = std::env::var("DHRT_KEIN_FENSTER").is_ok();
+        let vorgetaeuscht = crate::umgebung::var("DHRT_NO_WINDOW").is_ok();
         let alter_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(|_| {}));
         let ergebnis = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
@@ -2365,11 +2362,11 @@ impl Graphics {
         }
         #[cfg(target_os = "emscripten")]
         let _ = hidden;
-        // `dhrt bild` setzt DHRT_ABSEITS: das Fenster wird aus dem Blick
+        // `dhrt bild` setzt DHRT_OFFSCREEN: das Fenster wird aus dem Blick
         // geschoben, statt fuer eine Sekunde aufzublitzen. Das BILD stimmt
         // trotzdem -- gesichert wird der Zeichenpuffer, nicht der Bildschirm
         // (nachgemessen: derselbe Punkt, dieselbe Farbe).
-        if std::env::var("DHRT_ABSEITS").is_ok() {
+        if crate::umgebung::var("DHRT_OFFSCREEN").is_ok() {
             rl.set_window_position(-3000, -3000);
         }
         rl.set_target_fps(60);
@@ -3216,8 +3213,6 @@ impl Graphics {
     /// Lage auf dem Bildschirm (Systempunkte).
     pub fn nativ_lage(&self, id: u32) -> Option<(i32, i32)> { self.nativ_platz(id).map(|p| p.f.lage()) }
     pub fn nativ_lage_setzen(&mut self, id: u32, x: i32, y: i32) { if let Some(p) = self.nativ_platz(id) { p.f.lage_setzen(x, y); } }
-    /// Das native Fenster als Zahl (fuer Tests mit Fensternachrichten).
-    pub fn nativ_handle(&self, id: u32) -> Option<usize> { self.nativ_platz(id).map(|p| p.f.handle()) }
     /// Wollte das System das Fenster schliessen (Kreuz)? Einmal je Wunsch.
     pub fn nativ_schliessen_gewuenscht(&mut self, id: u32) -> bool {
         match self.nativ_platz_mut(id) { Some(p) => std::mem::take(&mut p.schliessen), None => false }
@@ -3258,7 +3253,7 @@ impl Graphics {
     /// Schicht mit Deckkraft (0..255) und Farbton (0xRRGGBB, weiss = keiner).
     pub fn schicht_anfang(&mut self, deckkraft: u8, farbton: i64) {
         let c = Color::new(((farbton >> 16) & 0xFF) as u8, ((farbton >> 8) & 0xFF) as u8, (farbton & 0xFF) as u8, deckkraft);
-        self.emit(Cmd::SchichtAnfang(deckkraft, c));
+        self.emit(Cmd::SchichtAnfang(c));
     }
     pub fn schicht_ende(&mut self) { self.emit(Cmd::SchichtEnde); }
     pub fn unschaerfe(&mut self, x: i32, y: i32, w: i32, h: i32, radius: i32, ecke: i32) {
@@ -3511,13 +3506,13 @@ impl Graphics {
         }
         self.shake_amp = amp;
         self.shake_dur_ms = dur_ms;
-        self.shake_start = Some(std::time::Instant::now());
+        self.shake_start = Some(crate::spieluhr::jetzt_ms());
         self.update_shake();              // wirkt schon im aktuellen Frame
     }
     /// Pro Frame (flip-Ende) den Offset fuer den naechsten Frame wuerfeln.
     fn update_shake(&mut self) {
         if let Some(start) = self.shake_start {
-            let rem = shake_remaining(start.elapsed().as_secs_f64() * 1000.0, self.shake_dur_ms);
+            let rem = shake_remaining(crate::spieluhr::jetzt_ms() - start, self.shake_dur_ms);
             if rem <= 0.0 {
                 self.shake_start = None;
                 self.shake_x = 0.0;
@@ -5910,7 +5905,7 @@ impl Graphics {
                 x0 += w + 1;
             }
         }
-        let mut img = Image::gen_image_color(breite, gesamt_h, Color::new(0, 0, 0, 0));
+        let img = Image::gen_image_color(breite, gesamt_h, Color::new(0, 0, 0, 0));
         let bytes: Vec<u8> = px.into_iter().flatten().collect();
         unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), img.data as *mut u8, bytes.len()); }
         self.push_tex_from_image(img)
@@ -6487,6 +6482,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
 
     /// Wie viele Bilder schon gezeigt wurden (je FLIP eins mehr).
+    #[cfg_attr(not(feature = "video"), allow(dead_code))]
     pub fn bild_zaehler(&self) -> u64 { self.frame_count }
 
     /// Alle Texturen hochladen, deren Bild die Leinwand-Befehle seit dem
@@ -7010,7 +7006,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
 
     pub fn image_width(&self, idx: i64) -> Result<i64, String> {
-        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGEWIDTH")); }
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_WIDTH")); }
         Ok(self.textures[idx as usize].tex.width as i64)
     }
     pub fn image_height(&self, idx: i64) -> Result<i64, String> {
@@ -7230,8 +7226,33 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// Ist der durch den negativen Bind-Code bezeichnete Button/DPad an
     /// IRGENDEINEM verbundenen Pad gedrueckt? (wie Pythons _poll_joysticks_into)
     pub fn joy_button_down(&self, code: i64) -> bool {
+        let Some(btn) = Self::joy_code_knopf(code) else { return false };
+        let mut i = 0;
+        while pad_da(i) {
+            if self.rl.is_gamepad_button_down(i, btn) { return true; }
+            i += 1;
+        }
+        false
+    }
+    /// Flanke eines negativen Bind-Codes an IRGENDEINEM Pad: `los` = gerade
+    /// losgelassen, sonst gerade gedrueckt. Fuer KEYHIT/KEYRELEASED/KEYREPEAT
+    /// mit JOY_BUTTON_* -- bis 2026.53 lieferten die dort still FALSE
+    /// (Bericht A17), nur KEYPRESSED kannte sie.
+    fn joy_flanke(&self, code: i64, los: bool) -> bool {
+        let Some(btn) = Self::joy_code_knopf(code) else { return false };
+        let mut i = 0;
+        while pad_da(i) {
+            let ja = if los { self.rl.is_gamepad_button_released(i, btn) } else { self.rl.is_gamepad_button_pressed(i, btn) };
+            if ja { return true; }
+            i += 1;
+        }
+        false
+    }
+    /// JOY_BUTTON_*-Code (negativ, DEFAULT_KEYS joy_*) -> raylib-Knopf. EINE
+    /// Tafel fuer KEYPRESSED, die Flanken und JOYSTICK_BUTTON.
+    fn joy_code_knopf(code: i64) -> Option<raylib::consts::GamepadButton> {
         use raylib::consts::GamepadButton::*;
-        let btn = match code {
+        Some(match code {
             -100 => GAMEPAD_BUTTON_RIGHT_FACE_DOWN,
             -101 => GAMEPAD_BUTTON_RIGHT_FACE_RIGHT,
             -102 => GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
@@ -7246,14 +7267,8 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             -201 => GAMEPAD_BUTTON_LEFT_FACE_DOWN,
             -202 => GAMEPAD_BUTTON_LEFT_FACE_LEFT,
             -203 => GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
-            _ => return false,
-        };
-        let mut i = 0;
-        while pad_da(i) {
-            if self.rl.is_gamepad_button_down(i, btn) { return true; }
-            i += 1;
-        }
-        false
+            _ => return None,
+        })
     }
     // --- Core-Tastatur: INKEY$ / WAITKEY ---
     /// INKEY$: naechstes getipptes (druckbares) Zeichen oder leerer String.
@@ -7265,15 +7280,25 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         }
     }
     /// WAITKEY: blockiert bis eine Taste gedrueckt wird, liefert den raylib-
-    /// Keycode (INTEGER). -1 wenn das Fenster geschlossen wird. (Der Code-Wert
-    /// folgt raylibs KeyboardKey-Enum, nicht den SDL-Codes der KEY_*-
-    /// Konstanten -- historisch so gewachsen, dokumentiert.)
+    /// Keycode (INTEGER). -1 wenn das Fenster geschlossen wird. Sondertasten
+    /// als DH-Code (KEY_LEFT ...), Buchstaben und Ziffern als ASCII-Gross-
+    /// buchstabe.
     pub fn waitkey(&mut self) -> i64 {
         loop {
-            // window_should_close() ruft intern PollInputEvents -> fuellt die
-            // Key-Queue, ohne dass ein FLIP noetig ist.
+            // Die Fensternachrichten selbst abholen: seit raylib 6 tut es
+            // window_should_close() nicht mehr (nur EndDrawing) -- WAITKEY
+            // wartete bis 2026.53 ohne FLIP fuer immer (gefunden mit dem Fall
+            // in fenster/taste_nach_buchstabe.dhtest).
+            unsafe { raylib::ffi::PollInputEvents(); }
             if self.rl.window_should_close() { return -1; }
-            if let Some(k) = self.rl.get_key_pressed() { return k as i64; }
+            // Sondertasten als DH-Code wie KEY_LEFT & Co. (bis 2026.53 der
+            // rohe raylib-Code -- `WAITKEY() = KEY_LEFT` war nie wahr);
+            // Buchstaben und Ziffern wie bisher als ASCII-Grossbuchstabe.
+            if let Some(k) = self.rl.get_key_pressed() {
+                let v = k as u32 as i64;
+                if (65..=90).contains(&v) || (48..=57).contains(&v) { return v; }
+                return dh_key_code(k).unwrap_or(v);
+            }
             std::thread::sleep(std::time::Duration::from_millis(15));
         }
     }
@@ -7316,6 +7341,10 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// Flanken-Varianten JOYSTICK_HIT/RELEASED geteilt.
     fn joy_btn_enum(btn: i64) -> Option<raylib::consts::GamepadButton> {
         use raylib::consts::GamepadButton::*;
+        // Die Konstanten JOY_BUTTON_* (negativ) gelten hier wie in KEYPRESSED
+        // (docs/builtins-grafik.md bot sie fuer JOYSTICK_BUTTON an, bis
+        // 2026.53 lieferten sie FALSE).
+        if btn < 0 { return Self::joy_code_knopf(btn); }
         Some(match btn {
             0 => GAMEPAD_BUTTON_UNKNOWN,
             1 => GAMEPAD_BUTTON_LEFT_FACE_UP,
@@ -7449,6 +7478,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// bleibt "gehalten" -- der Name ist historisch, ihn umzudeuten wuerde
     /// bestehende Programme still kaputtmachen.
     pub fn key_hit(&self, code: i64) -> bool {
+        if code < 0 { return self.joy_flanke(code, false); }
         self.key_test(code, |k| self.t_neu(k))
     }
     /// Wurde in DIESEM Bild irgendeine Taste ausser Alt gedrueckt? Fuer
@@ -7467,11 +7497,13 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
     /// KEYRELEASED(code): in DIESEM Frame losgelassen.
     pub fn key_released_edge(&self, code: i64) -> bool {
+        if code < 0 { return self.joy_flanke(code, true); }
         self.key_test(code, |k| self.t_los(k))
     }
     /// KEYREPEAT(code): erster Druck ODER System-Auto-Repeat (Textcursor,
     /// Mengen-Eingabe) -- haelt man die Taste, feuert es wiederholt.
     pub fn key_repeat(&self, code: i64) -> bool {
+        if code < 0 { return self.joy_flanke(code, false); }
         self.key_test(code, |k| self.t_neu(k) || self.rl.is_key_pressed_repeat(k) || self.nativ_wiederholt(k as usize))
     }
 
@@ -8849,6 +8881,9 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         self.zeiger_anwenden();
         crate::stillfenster::zurueckgeben(fenster_handle(&mut self.rl));
         self.flips += 1;
+        // Mit fester Bildzahl laeuft die Spieluhr (TWEEN, SHAKE, timer) mit
+        // den Bildern -- wie DELTA (spieluhr.rs).
+        if self.max_frames.is_some() { crate::spieluhr::bild(self.uhr_jetzt()); }
         // Glyphen auf Zuruf: was dieses Bild ohne Glyphe aufzeichnete, wird
         // VOR dem Rendern gebacken -- das erste Bild ist dann schon richtig.
         self.ausweich_nachladen();
@@ -9141,7 +9176,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 // `dhrt bild`: das Bild ist gesichert, mehr war nicht verlangt.
                 // Ohne das liefe ein Programm, das nicht nach QUITREQUESTED
                 // fragt (`WHILE TRUE`), ueber das Bildlimit hinaus endlos weiter.
-                if std::env::var("DHRT_BILD_ENDE").is_ok() {
+                if crate::umgebung::var("DHRT_FRAME_END").is_ok() {
                     std::process::exit(0);
                 }
             }
@@ -10530,7 +10565,7 @@ fn render_scene<D: RaylibDraw>(
                         raylib::ffi::rlScalef(*sx, *sy, 1.0);
                         raylib::ffi::rlTranslatef(-mx, -my, 0.0);
                     },
-                    Cmd::SchichtAnfang(_, farbe) => {
+                    Cmd::SchichtAnfang(farbe) => {
                         if let (Some((tw, th, _)), None) = (SCHICHT_ZIEL.with(|z| z.get()), SCHICHT_LAEUFT.with(|z| z.get())) {
                             unsafe {
                                 raylib::ffi::rlDrawRenderBatchActive();
@@ -11095,6 +11130,12 @@ fn map_key(code: i64) -> Option<KeyboardKey> {
         1073741898 => KEY_HOME,
         1073741901 => KEY_END,
         1073741897 => KEY_INSERT,
+        // Num, Rollen, Druck, Pause: bis 2026.53 ohne Code, ihre Beschriftungen
+        // in `key_label` waren unerreichbar (Bericht C4.2).
+        1073741907 => KEY_NUM_LOCK,
+        1073741895 => KEY_SCROLL_LOCK,
+        1073741894 => KEY_PRINT_SCREEN,
+        1073741896 => KEY_PAUSE,
         1073741899 => KEY_PAGE_UP,
         1073741902 => KEY_PAGE_DOWN,
         1073741881 => KEY_CAPS_LOCK,
@@ -11128,8 +11169,8 @@ fn map_key(code: i64) -> Option<KeyboardKey> {
         // nicht reagierendes Kuerzel wie ein vergessener Aufruf aussieht,
         // sucht man den Fehler im eigenen Programm. Ein Bereich, der ohnehin
         // auf `None` lief, kann durch Annehmen niemand brechen.
-        97..=122 => return key_from_i32((code - 32) as i32),
-        65..=90 => return key_from_i32(code as i32),
+        97..=122 => return raylib::core::input::key_from_i32((code - 32) as i32),
+        65..=90 => return raylib::core::input::key_from_i32(code as i32),
         // Satzzeichen (SDL-Keycodes). Ohne sie lief `KEYHIT(ASC("-"))` ins
         // Leere: die Taste existierte fuer Drachenhauch schlicht nicht, ohne
         // Fehlermeldung. raylib benennt die Tasten nach ihrer PHYSISCHEN Lage
@@ -11150,31 +11191,13 @@ fn map_key(code: i64) -> Option<KeyboardKey> {
         93 => KEY_RIGHT_BRACKET,
         96 => KEY_GRAVE,
         // Ziffern: pygame 48..57 == raylib KEY_ZERO..KEY_NINE.
-        48..=57 => return key_from_i32(code as i32),
+        48..=57 => return raylib::core::input::key_from_i32(code as i32),
         // F1..F12: pygame 1073741882.. -> raylib KEY_F1=290..
-        1073741882..=1073741893 => return key_from_i32((290 + (code - 1073741882)) as i32),
+        1073741882..=1073741893 => return raylib::core::input::key_from_i32((290 + (code - 1073741882)) as i32),
         _ => return None,
     })
 }
 
-fn key_from_i32(v: i32) -> Option<KeyboardKey> {
-    // raylib-rs bietet kein from_i32 stabil ueber alle Versionen; wir mappen
-    // die hier benoetigten Bereiche (Buchstaben/Ziffern/F-Keys) explizit.
-    use KeyboardKey::*;
-    Some(match v {
-        65 => KEY_A, 66 => KEY_B, 67 => KEY_C, 68 => KEY_D, 69 => KEY_E, 70 => KEY_F,
-        71 => KEY_G, 72 => KEY_H, 73 => KEY_I, 74 => KEY_J, 75 => KEY_K, 76 => KEY_L,
-        77 => KEY_M, 78 => KEY_N, 79 => KEY_O, 80 => KEY_P, 81 => KEY_Q, 82 => KEY_R,
-        83 => KEY_S, 84 => KEY_T, 85 => KEY_U, 86 => KEY_V, 87 => KEY_W, 88 => KEY_X,
-        89 => KEY_Y, 90 => KEY_Z,
-        48 => KEY_ZERO, 49 => KEY_ONE, 50 => KEY_TWO, 51 => KEY_THREE, 52 => KEY_FOUR,
-        53 => KEY_FIVE, 54 => KEY_SIX, 55 => KEY_SEVEN, 56 => KEY_EIGHT, 57 => KEY_NINE,
-        290 => KEY_F1, 291 => KEY_F2, 292 => KEY_F3, 293 => KEY_F4, 294 => KEY_F5,
-        295 => KEY_F6, 296 => KEY_F7, 297 => KEY_F8, 298 => KEY_F9, 299 => KEY_F10,
-        300 => KEY_F11, 301 => KEY_F12,
-        _ => return None,
-    })
-}
 
 /// Umkehrung von `map_key`: raylib-Taste -> DH-Tastencode (SDL-Konvention).
 /// Buchstaben/Ziffern/F-Tasten rechnet die Nummerierung selbst um, alles
@@ -11197,6 +11220,8 @@ fn dh_key_code(k: KeyboardKey) -> Option<i64> {
         KEY_HOME => 1073741898, KEY_END => 1073741901,
         KEY_PAGE_UP => 1073741899, KEY_PAGE_DOWN => 1073741902,
         KEY_CAPS_LOCK => 1073741881,
+        KEY_NUM_LOCK => 1073741907, KEY_SCROLL_LOCK => 1073741895,
+        KEY_PRINT_SCREEN => 1073741894, KEY_PAUSE => 1073741896,
         KEY_LEFT_CONTROL => 1073742048, KEY_LEFT_SHIFT => 1073742049,
         KEY_LEFT_ALT => 1073742050, KEY_LEFT_SUPER => 1073742051,
         KEY_RIGHT_CONTROL => 1073742052, KEY_RIGHT_SHIFT => 1073742053,
@@ -11216,6 +11241,28 @@ fn dh_key_code(k: KeyboardKey) -> Option<i64> {
 /// Druckbare). Bewusst kurze, in Spielen uebliche Beschriftungen; leer, wenn
 /// auch hier nichts Sinnvolles steht (dann zeigt der Aufrufer den Code).
 fn key_label(k: KeyboardKey) -> &'static str {
+    use KeyboardKey::*;
+    // In der Sprache der Laufzeit (bis 2026.53 auch mit DHRT_LANG=en deutsch).
+    if crate::meldung::englisch() {
+        return match k {
+            KEY_SPACE => "SPACE", KEY_ENTER | KEY_KP_ENTER => "ENTER", KEY_ESCAPE => "ESC",
+            KEY_TAB => "TAB", KEY_BACKSPACE => "BACKSPACE", KEY_DELETE => "DEL",
+            KEY_INSERT => "INS", KEY_HOME => "HOME", KEY_END => "END",
+            KEY_PAGE_UP => "PAGE UP", KEY_PAGE_DOWN => "PAGE DOWN",
+            KEY_LEFT => "LEFT", KEY_RIGHT => "RIGHT", KEY_UP => "UP", KEY_DOWN => "DOWN",
+            KEY_LEFT_SHIFT | KEY_RIGHT_SHIFT => "SHIFT",
+            KEY_LEFT_CONTROL | KEY_RIGHT_CONTROL => "CTRL",
+            KEY_LEFT_ALT | KEY_RIGHT_ALT => "ALT",
+            KEY_LEFT_SUPER | KEY_RIGHT_SUPER => "SUPER",
+            KEY_CAPS_LOCK => "CAPS LOCK", KEY_NUM_LOCK => "NUM", KEY_SCROLL_LOCK => "SCROLL",
+            KEY_PRINT_SCREEN => "PRINT", KEY_PAUSE => "PAUSE",
+            _ => key_label_de(k),
+        };
+    }
+    key_label_de(k)
+}
+
+fn key_label_de(k: KeyboardKey) -> &'static str {
     use KeyboardKey::*;
     match k {
         KEY_SPACE => "LEER", KEY_ENTER | KEY_KP_ENTER => "ENTER", KEY_ESCAPE => "ESC",

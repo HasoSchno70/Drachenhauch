@@ -33,8 +33,11 @@ Signaturhilfe kennen beide.
    Das Wort `PRESSED` kommt in neuen Namen nicht vor: es hieß bei
    `KEYPRESSED` „gehalten“ und bei `INPUT_PRESSED` „gerade gedrückt“.
 4. **Wörter mit fester Bedeutung:** `_FREE` gibt frei, `_COUNT` ist eine
-   Anzahl (`MAP_COUNT`, `SET_COUNT`), `LEN` eine Länge (Text, Bytes, Feld),
-   `_LOAD`/`_SAVE` lesen und schreiben Dateien.
+   Anzahl (`MAP_COUNT`, `SET_COUNT`, `JSON_COUNT`), `LEN` eine Länge in
+   Zeichen, Bytes oder Elementen einer Dimension (`ARRAY_DIM_LEN`), eine Dauer
+   heißt `_DURATION` (Sekunden, `SAMPLE_DURATION`), `_DONE` ist „fertig“
+   (`TWEEN_DONE`, `SPRITE_DONE`), `_NEXT` holt das Nächste ab (`WS_NEXT`,
+   `MQTT_NEXT`), `_LOAD`/`_SAVE` lesen und schreiben Dateien.
 5. **Das `$`:** Ein Befehl, der Text liefert, darf mit und ohne `$`
    geschrieben werden — `ENV_GET$("HOME")` und `ENV_GET("HOME")` sind
    dasselbe, ebenso `CLIPBOARD_GET()` und `CLIPBOARD_GET$()`. Nur wo es beide
@@ -56,6 +59,51 @@ Signaturhilfe kennen beide.
    `path`, `text`, `width`, `count`, `encoding`. Dasselbe Ding heißt in jedem
    Befehl gleich. Die Befehlstabellen im Handbuch nennen dieselben Namen wie
    `daten/builtin_index.json`; `dhrt pruef parameter` hält beide zusammen.
+   Wo ältere Befehle abweichende Namen tragen, nimmt ein benanntes Argument
+   auch den Zweitnamen derselben Gruppe: `p`/`path`, `digits`/`decimals`,
+   `vol`/`volume`, `n`/`count`, `v`/`number`, `wf`/`waveform`, `alt`/`old`,
+   `fn`/`handler`, `flag`/`on`, `bind`/`bind_addr`, `wdg`/`widget`,
+   `x`/`x_mm`, `h`/`handle`, `c`/`conn`, `r`/`result` —
+   `FILE_EXISTS(path: "a.txt")` geht, obwohl der Parameter `p` heißt.
+9. **Zeit:** Zeitspannen und Fristen zählen **Millisekunden** (Parameter
+   `ms` oder `…_ms`): `TWEEN_NEW`, `TIMER_AFTER`, `SLEEP`, die Fades, jedes
+   `…_SET_TIMEOUT`. Der Schritt eines Bildes zählt **Sekunden** wie `DELTA()`:
+   `PHYS2D_STEP`, `PHYS3D_STEP` (ein Wert ab 1 ist dort ein Fehler — das
+   wären Millisekunden), ebenso `CHAR_UPDATE` mit `dt`. Lage und Länge in
+   einem Medium (Musik, Video, Sample, MIDI-Datei) zählen **Sekunden** als
+   FLOAT (`SAMPLE_LEN`, `VIDEO_SEEK`, `MIDI_FILE_DURATION`); Noten in einer
+   MIDI-Datei schreibt man in Vierteln, der Einheit der Musik. Alte Befehle,
+   die eine Zeitspanne in Sekunden oder Bildern nehmen, bleiben dabei; neben
+   ihnen gibt es die Fassung in ms: `HTTP_TIMEOUT` → `HTTP_SET_TIMEOUT`,
+   `SERIAL_TIMEOUT` → `SERIAL_SET_TIMEOUT`, `BT_SCAN` → `BT_SCAN_MS`,
+   `AUDIO_AUTOPAN` → `AUDIO_AUTOPAN_MS`, `CHAR_SET_COYOTE_TIME` →
+   `CHAR_SET_COYOTE_MS`, `CHAR_SET_JUMP_BUFFER` → `CHAR_SET_JUMP_BUFFER_MS`;
+   `SAMPLE_SET_LOOP` (Frames) → `SAMPLE_SET_LOOP_TIME` (Sekunden wie
+   `SAMPLE_LEN`).
+10. **Winkel:** Zeichnen zählt **Grad**, 0 = rechts, **im Uhrzeigersinn**
+    auf dem Schirm (`PIE`, `DRAWIMAGEROT`, `CAMERA_SET_ROTATION`, `ARC_DEG`);
+    Mathe zählt **Bogenmaß** (`SIN`, `ATAN2`, `VEC2_ANGLE`). Die Parameter
+    heißen `…_deg` bzw. `…_rad`. Zwei alte Befehle bleiben bei Bogenmaß und
+    haben eine Gradfassung: `ARC` (gegen den Uhrzeigersinn) → `ARC_DEG`,
+    `PHYS2D_BODY_ANGLE` → `PHYS2D_BODY_ANGLE_DEG`.
+11. **Rechtecke und Strahlen:** Gezeichnete Rechtecke nennen zwei Ecken
+    (`BOX`, `IMAGE_FILL_RECT`: x1, y1, x2, y2, beide Ecken gehören dazu);
+    Ausschnitte nennen Ecke und Größe (`IMAGE_DRAW_RECT`, `SCISSOR`, alle
+    gui-Lagen); Physik nennt die Mitte und die halbe Größe (`PHYS2D_ADD_BOX`,
+    `PHYS3D_ADD_BOX`), `RAY_HIT_BOX` die Mitte und die ganze Größe. Ein „Ray“
+    in 2D ist eine Strecke, das Ergebnis der Anteil t von 0 bis 1
+    (`PHYSICS_RAY_*`); in 3D ein Strahl, das Ergebnis die Entfernung
+    (`RAY_HIT_*`). Kein Treffer ist -1; nur `PHYSICS_LINES_X` liefert dann NaN.
+12. **Zählen:** Elemente zählen ab **0**, „keins“ ist **-1** (`INSTR`,
+    `GUI_LISTBOX_SELECTED`, Feld-Indizes). Antworten von Dialogen zählen ab
+    **1**, „keine“ ist **0** (`GUI_ANSWER`, `GUI_INFOBAR_ANSWER`, dort ist das Kreuz -1). Ausnahmen, die
+    bleiben: die Dimension bei `LBOUND`/`UBOUND` zählt ab 1 (bei `DIMSIZE`
+    ab 0), die Seiten von `PDF_PREVIEW` ab 1 wie im Druck, die Zeilen eines
+    Textbereichs ab 1 wie im Editor (`GUI_TEXTAREA_GOTO`, `_SCROLL`) --
+    nur `GUI_TEXTAREA_VIEW` liefert die erste Zeile ab 0 (`GUI_TEXTAREA_GET_VIEW`
+    ab 1). Wer „keinen Gast“ annimmt, bekommt je nach Modul NIL
+    (`NET_TCP_ACCEPT`), -1 (`WS_ACCEPT`) oder FALSE (`HTTPD_ACCEPT`); `INSTR`
+    nimmt einen negativen Start als 0, `INSTRREV` liefert dann -1.
 
 ## Der empfohlene Weg je Bereich
 
@@ -65,7 +113,7 @@ Für manches gibt es mehrere Wege, die gewachsen sind. Empfohlen ist:
 |---|---|---|
 | Ton | `AUDIO_*` (Busse, Effekte, räumlich, Musik mit `AUDIO_MUSIC_*`) | `SOUND_LOAD`/`SOUND_PLAY`, `MUSIC_PLAY` als Kurzform für ein schnelles Geräusch; `SAMPLE_*` für Instrumente |
 | Eingabe | `INPUT_BIND` und `INPUT_DOWN`/`INPUT_HIT` — Tastatur und Gamepad in einem | `KEY_*`, `MOUSE_*`, `JOYSTICK_*` für rohe Abfragen |
-| Uhr | `MILLIS()` für Abläufe im Programm, `TIME_NOW()` für Datum und Uhrzeit | `TIMER()` (dieselbe Uhr in Sekunden), `GET_TIME()`, `DATE$()`, `TIME$()` |
+| Uhr | `MILLIS()` für Abläufe im Programm, `TIME_NOW()` für Datum und Uhrzeit | `TIMER()` (dieselbe Uhr in Sekunden, beide zählen ab dem Start des Programms), `GET_TIME()` (zählt erst ab `SCREEN`), `DATE$()`, `TIME$()` |
 | Dateien | `FILE_READ$`, `FILE_WRITE`, `FILE_READ_LINES` mit Pfad | `FILE_OPEN`/`FILE_READ_LINE$`/`FILE_CLOSE` mit Handle für große Dateien |
 
 `TIMER()` ist eine Uhr; die Familie `TIMER_EVERY`, `TIMER_AFTER` … dagegen
@@ -77,7 +125,7 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 
 | Name | Was es tut |
 |---|---|
-| `KEY_DOWN(key: Code oder Buchstabe)` | TRUE solange die Taste mit SDL-Code code gehalten wird — jedes Frame erneut. Für Bewegen/Lenken — bisher `KEYPRESSED` |
+| `KEY_DOWN(key: Code oder Buchstabe)` | TRUE solange die Taste `key` (eine `KEY_*`-Konstante oder ein Buchstabe) gehalten wird — jedes Frame erneut. Für Bewegen/Lenken — bisher `KEYPRESSED` |
 | `KEY_HIT(key: Code oder Buchstabe)` | TRUE nur in dem einen Frame, in dem die Taste heruntergeht. Für Schießen, Springen, Umschalten — bisher `KEYHIT` |
 | `KEY_RELEASED(key: Code oder Buchstabe)` | TRUE in dem Frame, in dem die Taste losgelassen wird — etwa „aufladen und beim Loslassen feuern“ — bisher `KEYRELEASED` |
 | `KEY_REPEAT(key: Code oder Buchstabe)` | wie KEYHIT, feuert beim Halten aber zusätzlich mit der System-Tastenwiederholung. Für Textcursor und … — bisher `KEYREPEAT` |
@@ -160,6 +208,11 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `POLYGON_OUTLINE(points[, color[, width]])` | Polygon nur als Kontur — bisher `POLYGONOUTLINE` |
 | `NGON_OUTLINE(x, y, corners, r, angle[, color[, width]])` | regelmäßiges Vieleck nur als Kontur; width wie bei LINEW — bisher `NGONOUTLINE` |
 | `PIE_OUTLINE(x, y, r, from_deg, to_deg[, color])` | Kreisstück nur als Kontur, mit beiden Radien — bisher `PIEOUTLINE` |
+| `DRAW_GRADIENT_H(x1, y1, x2, y2, color1: INTEGER, color2: INTEGER)` | Rechteck mit horizontalem Farbverlauf (links→rechts) — bisher `GRADIENTH` |
+| `DRAW_GRADIENT_V(x1, y1, x2, y2, color1: INTEGER, color2: INTEGER)` | Rechteck mit vertikalem Farbverlauf (oben→unten) — bisher `GRADIENTV` |
+| `DRAW_TEXT_ROT(x, y, s, angle[, scale = 1.0[, color]])` | Text zentriert auf (x, y), um das Zentrum gedreht (Grad, wie DRAWIMAGEROT) und skaliert — für Score-Popups, … — bisher `TEXTROT` |
+| `DRAW_BOX_ROT(x, y, width, height, angle[, color])` | gefülltes Rechteck zentriert auf (x, y), um seine Mitte gedreht (Grad, im Uhrzeigersinn wie DRAWIMAGEROT) — bisher `BOXROT` |
+| `DRAW_LINE_DASHED(x1, y1, x2, y2, dash, gap[, color])` | gestrichelte Linie, Strich- und Lückenlänge in Punkten — bisher `LINEDASHED` |
 
 ### Bilder, Schrift, Ton, Modelle: `BEREICH_VERB`
 
@@ -170,18 +223,20 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `IMAGE_GET_ALPHA(image, x, y)` | Deckkraft an (x, y), 0..255; -1 bei Index außerhalb. Nötig, weil GETPIXEL eine Farbe liefert und dort … — bisher `GETALPHA` |
 | `FONT_LOAD(path$, size[, chars$])` | TTF/OTF/TTC laden → FONT-Handle (INTEGER); chars$ = Schriftblöcke ("kyrillisch, griechisch", … — bisher `LOADFONT` |
 | `FONT_LOAD_IMAGE(image: IMAGE, separator_color: Zahl, first_char: Zahl)` | Lädt eine Pixelschrift aus einem PNG, in dem die Zeichen durch eine Trennfarbe voneinander abgesetzt sind — bisher `LOADFONT_IMAGE` |
-| `FONT_SET(handle: INTEGER [, size: INTEGER])` | aktive Schrift setzen; SETFONT(-1) = Default-Font. Ohne size gilt danach die Größe, mit der die Schrift … — bisher `SETFONT` |
+| `FONT_SET(font: INTEGER [, size: INTEGER])` | aktive Schrift setzen; SETFONT(-1) = Default-Font. Ohne size gilt danach die Größe, mit der die Schrift … — bisher `SETFONT` |
 | `SOUND_LOAD(path: STRING)` | Sample laden (kurze Effekte: WAV, OGG) — bisher `LOADSOUND` |
 | `SOUND_PLAY(s[, loops[, volume]])` | abspielen, default loops=0, volume=1.0 — bisher `PLAYSOUND` |
 | `SOUND_STOP(s)` | Sound stoppen — bisher `STOPSOUND` |
 | `SOUND_FREE(s)` | Sound stoppen und seinen Puffer freigeben — gegen Puffer-Akkumulation bei vielen … — bisher `UNLOADSOUND` |
-| `MUSIC_PLAY(path$[, loops[, volume]])` | längere Datei streamen (.ogg/.mp3/.qoa + Tracker-Module .mod/.xm — echter Amiga-Sound), default loops=-1 … — bisher `PLAYMUSIC` |
+| `MUSIC_PLAY(path$[, loops[, volume]])` | längere Datei streamen (.ogg/.mp3/.flac + Tracker-Module .mod/.xm — echter Amiga-Sound), default loops=-1 … — bisher `PLAYMUSIC` |
 | `MUSIC_STOP()` | ein Stream gleichzeitig. Nachgefüllt wird auf dem Audio-Thread, nicht im Game-Loop: einen … — bisher `STOPMUSIC` |
 | `MODEL_LOAD(path$: STRING)` | INTEGER — Modell aus einer Datei laden (OBJ, GLTF, IQM …) — bisher `LOADMODEL` |
 | `IMAGE_WIDTH(image)` | Breite eines Bildes in Pixeln — bisher `IMAGEWIDTH` |
 | `IMAGE_HEIGHT(image)` | Höhe eines Bildes in Pixeln — bisher `IMAGEHEIGHT` |
-| `AUDIO_SET_VOLUME(ch, v)` | Lautstärke eines Kanals 0..1 — bisher `AUDIO_VOLUME` |
-| `AUDIO_MUSIC_SET_VOLUME(v)` | Lautstärke der Musik 0..1 — bisher `AUDIO_MUSIC_VOLUME` |
+| `AUDIO_SET_VOLUME(ch, volume)` | Lautstärke eines Kanals 0..1 — bisher `AUDIO_VOLUME` |
+| `AUDIO_MUSIC_SET_VOLUME(volume)` | Lautstärke der Musik 0..1 — bisher `AUDIO_MUSIC_VOLUME` |
+| `FONT_LOAD_SDF(path$, size[, chars$]) AS INTEGER` | eine Schrift, die bei jeder Größe scharf bleibt (Abstandsfeld) — bisher `LOADFONT_SDF` |
+| `MIC_PEAK() AS FLOAT` | höchster Ausschlag am Eingang seit dem letzten Aufruf (wie AUDIO_PEAK am Ausgang) — bisher `MIC_LEVEL` |
 
 ### Dateien (mit Pfad), Dateien (mit Handle), Ordner, Pfade
 
@@ -217,6 +272,18 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `ENV_SET(name, value)` | Umgebungsvariable setzen (dieses Programm + seine Kinder) — bisher `SETENV` |
 | `URL_OPEN(address: STRING)` | Öffnet eine Adresse im Standardbrowser – etwa die Anleitung oder die Seite des Spiels — bisher `OPENURL` |
 | `DOC_OPEN(path$)` | Öffnet eine lokale Datei mit ihrem Standardprogramm – die geschriebene PDF im Betrachter, die Tabelle in … — bisher `OPENDOC` |
+| `FILE_RENAME(old, new)` | umbenennen oder verschieben — bisher `RENAME` |
+| `FILE_TEMP$([prefix$ = "dh" [, extension$]]) AS STRING` | freier Name im Temp-Verzeichnis, leer angelegt — bisher `TEMPFILE$` |
+| `FILE_SEEK(file, position)` | Position setzen (0 = Anfang) — bisher `SEEK` |
+| `FILE_TELL(file) AS INTEGER` | aktuelle Position — bisher `TELL` |
+| `FILE_WRITE_TEXT(f, text)` | schreibt ohne \n — bisher `WRITE` |
+| `FILE_READ_BLOCK(file, count) AS BUFFER` | bis zu count Bytes vom Handle — bisher `READ_BYTES` |
+| `FILE_WRITE_BLOCK(file, buffer)` | Bytes ans Handle — bisher `WRITE_BYTES` |
+| `DIR_TEMP$() AS STRING` | das Temp-Verzeichnis des Systems — bisher `TEMPDIR$` |
+| `DIR_CURRENT$() AS STRING` | aktuelles Arbeitsverzeichnis — bisher `CWD$` |
+| `DIR_CHANGE(path)` | Arbeitsverzeichnis wechseln — bisher `CHDIR` |
+| `DIR_CREATE(path)` | Verzeichnis anlegen (inkl. Eltern) — bisher `MKDIR` |
+| `DIR_DELETE(path$ [, with_content])` | Verzeichnis löschen (leer; mit TRUE samt Inhalt) — bisher `RMDIR` |
 
 ### MAP wie ARRAY_ und SET_: mit Unterstrich, Anzahl heißt COUNT
 
@@ -234,6 +301,7 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `MAP_COUNT(m)` | Anzahl der Schlüssel-Wert-Paare — bisher `MAPSIZE` |
 | `ARRAY_DIM_COUNT(arr)` | Anzahl Dimensionen — bisher `DIMCOUNT` |
 | `ARRAY_DIM_SIZE(arr, n)` | Größe der n-ten Dimension (0-basiert) — bisher `DIMSIZE` |
+| `MQTT_UNACKED_COUNT(handle)` | wie viele QoS-1-Nachrichten der Broker noch nicht bestätigt hat — bisher `MQTT_PENDING` |
 | `MOVE_TOWARD(cur, target, maxdelta)` | cur um max. maxd Richtung target bewegen — bisher `MOVETOWARD` |
 
 ### Englisch statt Deutsch (Module zeit und geld, FFI-Zeiger)
@@ -264,3 +332,107 @@ sind Rückruf-Zeitgeber aus dem Modul `timer`.
 | `MONEY_VALUE(g: GELD)` | bewusst herausgehen (Anzeige in Diagrammen o. Ä.) — bisher `GELD_ZAHL` |
 | `BUFFER_FROM_POINTER(pointer, length)` | kopiert laenge Bytes hinter einem Zeiger in einen neuen BUFFER; 0 Bytes ergeben einen leeren, ein … — bisher `BUFFER_AUS_ZEIGER` |
 | `TEXT_FROM_POINTER$(pointer [, wide])` | kopiert den Text hinter einem Zeiger bis zum Nullzeichen (UTF-8; mit breit = TRUE wchar_t, also UTF-16 … — bisher `TEXT_AUS_ZEIGER$` |
+| `NUMBER_TEXT$(number [, digits]) AS STRING` | Zahl deutsch mit Tausenderpunkten und Dezimalkomma (400.000, 1.234.567,89); mit digits kaufmännisch gerundet — bisher `ZAHL$` |
+| `BUFFER_POINTER(buffer) AS INTEGER` | die Adresse der Bytes eines BUFFER, für ein Struct-Feld, das auf einen anderen Puffer zeigt; ein leerer … — bisher `BUFFER_ZEIGER` |
+
+### Der Bereich vorn: Text, Typen, System, Cloud
+
+| Name | Was es tut |
+|---|---|
+| `TEXT_STARTS_WITH(s, prefix) AS BOOLEAN` | beginnt der Text so? — bisher `STARTSWITH` |
+| `TEXT_ENDS_WITH(s, suffix) AS BOOLEAN` | endet der Text so? — bisher `ENDSWITH` |
+| `TEXT_CONTAINS(s, part) AS BOOLEAN` | Teilstring enthalten? (Funktionsform von part IN s) — bisher `CONTAINS` |
+| `TEXT_COUNT(text$, part$)` | Anzahl nicht-überlappender Vorkommen von part — bisher `COUNT` |
+| `TEXT_REMOVE_SPACES$(s$)` | jeden Leerraum entfernen (Leerzeichen, Tabulator, Umbruch) — für Eingaben wie "DE89 3704 0044" — bisher `NOSPACES$` |
+| `IS_NUM(x)` | eine Zahl? (BOOLEAN ist keine) — bisher `ISNUM` |
+| `IS_INT(x)` | eine Ganzzahl? — bisher `ISINT` |
+| `IS_STR(x)` | ein Text? — bisher `ISSTR` |
+| `IS_BOOL(x)` | ein BOOLEAN? — bisher `ISBOOL` |
+| `IS_NUMERIC(s) AS BOOLEAN` | als Zahl parsebar? — bisher `ISNUMERIC` |
+| `SYSTEM_EXE_PATH$() AS STRING` | Pfad der laufenden Programmdatei — bisher `EXEPATH$` |
+| `CLOUD_LEADERBOARD_SUBMIT(board$, name$, score[, best_low])` | Punkte einreichen; best_low = TRUE für „kleiner ist besser“ — bisher `LEADERBOARD_SUBMIT` |
+| `CLOUD_LEADERBOARD_FETCH(board$, n[, ascending]) AS ARRAY OF TUPLE` | Die besten n Einträge als (name$, score)-Tupel, sortiert (Standard absteigend) — bisher `LEADERBOARD_FETCH` |
+
+### Setzen heißt SET, Lesen heißt GET
+
+| Name | Was es tut |
+|---|---|
+| `MODBUS_SET_UNIT(m: MODBUS, unit)` | Geräteadresse für die folgenden Anfragen (0..255; bei RTU heißt 0 „an alle“, dann kommt keine Antwort) — bisher `MODBUS_UNIT` |
+| `SPI_SET_SPEED(spi: SPI_DEVICE, clock_hz: INTEGER)` | Ändert den Takt — bisher `SPI_SPEED` |
+| `SPI_SET_MODE(spi: SPI_DEVICE, mode: INTEGER)` | Ändert den Modus (0–3, Taktpolarität und -phase) — bisher `SPI_MODE` |
+| `HOTPLUG_SET_INTERVAL(ms)` | wie oft nachgesehen wird (100..10000, Vorgabe 500) — bisher `HOTPLUG_INTERVAL` |
+| `VIDEO_SET_LOOP(video: VIDEO, on)` | am Ende von vorn beginnen statt stehenzubleiben — bisher `VIDEO_LOOP` |
+| `TRAY_SET_TOOLTIP(hint$)` | den Hinweis ändern (etwa einen Fortschritt) — bisher `TRAY_TOOLTIP` |
+| `TRAY_SET_MENU(entries$)` | das Menü der rechten Maustaste (macOS auch Ctrl+Klick); die Einträge stehen durch senkrechte Striche getrennt … — bisher `TRAY_MENU` |
+| `FIRMATA_STEPPER_SET_SPEED(handle: FIRMATA_HANDLE, motor: INTEGER, steps_per_s: FLOAT)` | Hoechstgeschwindigkeit — bisher `FIRMATA_STEPPER_SPEED` |
+| `FIRMATA_STEPPER_SET_ACCEL(handle: FIRMATA_HANDLE, motor: INTEGER, steps_per_s2: FLOAT)` | Beschleunigung, 0 = ohne — bisher `FIRMATA_STEPPER_ACCEL` |
+| `AUDIO_SET_PITCH(ch, factor)` | Tonhoehe/Geschwindigkeit: 1.0 = normal, 2.0 = Oktave hoeher, 0.5 = tiefer — bisher `AUDIO_PITCH` |
+| `AUDIO_SET_PAN_POS(ch, p)` | Position direkt setzen, 0 = links .. 1 = rechts (beendet eine laufende Animation) — bisher `AUDIO_PAN_POS` |
+| `AUDIO_BUS_SET_VOLUME(bus$, vol)` | Master-Lautstaerke eines Busses (0..1) — bisher `AUDIO_BUS_VOLUME` |
+| `AUDIO_BUS_SET_PAN(bus: STRING, pos: Zahl)` | Verschiebt einen ganzen Bus im Stereobild (-1 = links, 0 = Mitte, +1 = rechts). — bisher `AUDIO_BUS_PAN` |
+| `SPEAK_SET_RATE(factor)` | Tempo 0.5 (halb so schnell) .. 2.0 (doppelt), Vorgabe 1.0 — bisher `SPEAK_RATE` |
+| `SPRITE_SET_TINT(sp: ?, color: INTEGER)` | Farb-Tint (RGB-Multi) — bisher `SPRITE_TINT` |
+| `MODEL_SET_TEXTURE(model, image: IMAGE)` | ein Bild als Oberfläche auflegen — bisher `MODEL_TEXTURE` |
+| `TEXT_SET_SIZE(size: Zahl)` | Schriftgröße für folgende TEXT-Aufrufe (4–400) — bisher `TEXT_SIZE` |
+| `MOUSE_SET_LOCK(on: BOOLEAN)` | Cursor fangen: verstecken + im Fenster einsperren (relative Bewegung) — für … — bisher `MOUSE_LOCK` |
+| `BLEND_SET_MODE(name: STRING)` | Mischmodus für folgende Draws: "alpha" (Standard), "add" (additiv – Glow/Licht), "mult" (multiplikativ – … — bisher `BLEND_MODE` |
+| `GUI_WINDOW_SET_TITLE(win: GUI_WINDOW, title$)` | Titelleiste nachträglich beschriften (Name des Dokuments, „Befehle" / „Datei öffnen") — bisher `GUI_WINDOW_TITLE` |
+| `GUI_WINDOW_SET_MOVABLE(win: GUI_WINDOW, flag)` | per Titelleiste verschiebbar (Default: an) — bisher `GUI_WINDOW_MOVABLE` |
+| `GUI_WINDOW_SET_VISIBLE(win: GUI_WINDOW, flag)` | Sichtbarkeit setzen — bisher `GUI_WINDOW_VISIBLE` |
+| `GUI_MENU_SET_ENABLED(item, on)` | Eintrag sperren (grau, kein Klick, kein Kürzel) oder freigeben — bisher `GUI_MENU_ENABLE` |
+| `GUI_LISTBOX_SET_ENABLED(lb: GUI_WIDGET, i, on)` | Eintrag sperren: sichtbar, aber weder anklickbar noch mit Pfeilen erreichbar — bisher `GUI_LISTBOX_ENABLE` |
+| `GUI_MENU_SET_CHECKED(item, on)` | macht den Eintrag zum Häkchen-Eintrag und setzt ihn; ein Klick kippt ihn danach selbst — bisher `GUI_MENU_CHECK` |
+| `GUI_STATUSBAR_SET_TEXT(sb: GUI_WIDGET, field, text$)` | Text eines Feldes (GUI_SET_TEXT meint Feld 0) — bisher `GUI_STATUSBAR_SET` |
+| `GUI_BREADCRUMB_SET_ITEMS(bc: GUI_WIDGET, parts)` | alle Teile auf einmal (ARRAY OF STRING); derselbe Pfad noch einmal ändert nichts — bisher `GUI_BREADCRUMB_SET` |
+| `CAMERA_GET_ROTATION()` | aktuelle Werte lesen — bisher `CAMERA_ROTATION` |
+| `AUDIO_MUSIC_GET_POSITION()` | Sekunden seit Start (von Position 0) — bisher `AUDIO_MUSIC_POSITION` |
+| `AUDIO_CHANNEL_COUNT()` | aktuelle Channel-Anzahl — bisher `AUDIO_NUM_CHANNELS` |
+| `CHAR_GET_X(c)` | FLOAT — aktuelle Position — bisher `CHAR_X` |
+| `CHAR_GET_Y(c)` | FLOAT — aktuelle Position — bisher `CHAR_Y` |
+| `CHAR_GET_VX(c)` | FLOAT — aktuelle Geschwindigkeit je Achse — bisher `CHAR_VX` |
+| `CHAR_GET_VY(c)` | FLOAT — aktuelle Geschwindigkeit je Achse — bisher `CHAR_VY` |
+| `CHAR_GET_W(c)` | FLOAT — Groesse der Kollisionsbox — bisher `CHAR_W` |
+| `CHAR_GET_H(c)` | FLOAT — Groesse der Kollisionsbox — bisher `CHAR_H` |
+| `CHAR_GET_FACING(c)` | INTEGER (-1 = links, +1 = rechts) Blickrichtung -- fuer das Spiegeln des Sprites — bisher `CHAR_FACING` |
+| `GUI_PALETTE_IS_OPEN() AS BOOLEAN` | ist die Befehlspalette offen? (GUI_PALETTE ohne Argument) — bisher `GUI_PALETTE` |
+| `GUI_PALETTE_SET_OPEN(on)` | die Befehlspalette öffnen (TRUE) oder schließen — bisher `GUI_PALETTE` |
+| `GUI_WINDOW_IS_CLOSED(win: GUI_WINDOW)` | ist das Fenster geschlossen? (ein Zustand, kein Ereignis eines Bildes) — bisher `GUI_WINDOW_CLOSED` |
+| `WINDOW_GET_WAIT_EVENTS() AS FLOAT` | wie lange das Fenster ohne Ereignis schläft (Sekunden) — bisher `WINDOW_WAIT_EVENTS` |
+| `WINDOW_SET_WAIT_EVENTS(seconds)` | im Leerlauf bis zu so viele Sekunden auf ein Ereignis warten — bisher `WINDOW_WAIT_EVENTS` |
+
+### Zählen, fertig, empfangen: `_COUNT`, `_LEN`, `_DONE`, `_NEXT`
+
+| Name | Was es tut |
+|---|---|
+| `JSON_COUNT(h: ?, path: STRING)` | Anzahl der Elemente einer Liste bzw. der Felder eines Objekts — bisher `JSON_LEN` |
+| `ASTAR_PATH_COUNT(g)` | Anzahl der Punkte des gefundenen Weges — bisher `ASTAR_PATH_LEN` |
+| `SAMPLE_DURATION(sample: SAMPLE)` | Länge des Samples in Sekunden — bisher `SAMPLE_LEN` |
+| `ARRAY_DIM_LEN(arr, n)` | Länge der n-ten Dimension (0-basiert) — bisher `ARRAY_DIM_SIZE` |
+| `XML_NAME_COUNT(k: XML_HANDLE, path$) AS INTEGER` | wie viele Kinder dieses Namens (neben XML_CHILD_COUNT, das alle zählt) — bisher `XML_COUNT` |
+| `TILED_GID_COUNT(m: ?, layer_idx: INTEGER, gid: INTEGER)` | wie oft eine Kachel (GID) in einer Ebene vorkommt — bisher `TILED_COUNT_GID` |
+| `SPRITE_DONE(sp)` | ist die Animation durchgelaufen? (wie TWEEN_DONE, VIDEO_DONE) — bisher `SPRITE_IS_FINISHED` |
+| `MQTT_NEXT(handle: MQTT_HANDLE) AS BOOLEAN` | die nächste Nachricht holen (wie WS_NEXT, OSC_NEXT) — bisher `MQTT_NEXT_MESSAGE` |
+| `MQTT_MESSAGE$(handle: MQTT_HANDLE) AS STRING` | der Inhalt der geholten Nachricht (wie WS_MESSAGE$) — bisher `MQTT_MESSAGE_PAYLOAD` |
+| `MQTT_TOPIC$(handle: MQTT_HANDLE) AS STRING` | das Thema der geholten Nachricht — bisher `MQTT_MESSAGE_TOPIC` |
+
+### Fristen: `_SET_TIMEOUT` in Millisekunden
+
+| Name | Was es tut |
+|---|---|
+| `SMTP_SET_TIMEOUT(m: SMTP, ms)` | Frist je Schritt beim Versand — bisher `SMTP_TIMEOUT` |
+| `MODBUS_SET_TIMEOUT(m, ms)` | wie lange auf eine Antwort gewartet wird — bisher `MODBUS_TIMEOUT` |
+
+### Freigeben heißt `_FREE`, eine Verbindung schließen `_CLOSE`
+
+| Name | Was es tut |
+|---|---|
+| `AUDIO_CLOCK_FREE(clock)` | eine Uhr freigeben — bisher `AUDIO_CLOCK_REMOVE` |
+| `AUDIO_EMITTER_FREE(emitter)` | eine Schallquelle freigeben — bisher `AUDIO_EMITTER_REMOVE` |
+| `AUDIO_LISTENER_FREE(listener)` | einen Zuhörer freigeben — bisher `AUDIO_LISTENER_REMOVE` |
+| `AUDIO_MOD_FREE(mod: AUDIO_MOD)` | einen Modulator freigeben — bisher `AUDIO_MOD_REMOVE` |
+| `GUI_WIDGET_FREE(widget)` | ein Widget entfernen (das Handle wird ungültig) — bisher `GUI_DESTROY` |
+| `GUI_WINDOW_FREE(win)` | ein Fenster samt Widgets entfernen — bisher `GUI_WINDOW_DESTROY` |
+| `PHYS2D_BODY_FREE(w, idx)` | einen Körper aus der Welt nehmen — bisher `PHYS2D_REMOVE` |
+| `PHYS3D_BODY_FREE(w, idx)` | einen Körper aus der Welt nehmen — bisher `PHYS3D_REMOVE` |
+| `BT_CLOSE(handle)` | die Verbindung schließen (wie DB_CLOSE, NET_CLOSE) — bisher `BT_DISCONNECT` |
+| `MQTT_CLOSE(handle)` | die Verbindung schließen (wie DB_CLOSE, NET_CLOSE) — bisher `MQTT_DISCONNECT` |

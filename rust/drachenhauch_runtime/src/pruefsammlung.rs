@@ -622,6 +622,7 @@ fn sekunden_lesen(arg: &str, nr: usize) -> Result<u64, String> {
 }
 
 /// Die Faelle einer Sammlung lesen (ohne den Kopf; siehe `sammlung_parsen`).
+#[cfg(test)]
 pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
     sammlung_parsen(text).map(|s| s.faelle)
 }
@@ -953,7 +954,7 @@ fn unterschied(erwartet: &str, ist: &str) -> String {
     "Ausgabe weicht ab".into()
 }
 
-/// Einen abgeschlossenen Lauf bewerten. `ohne_grafik`: ist `DHRT_OHNE_GRAFIK`
+/// Einen abgeschlossenen Lauf bewerten. `ohne_grafik`: ist `DHRT_NO_GRAPHICS`
 /// gesetzt, ist ein fehlender Grafik-Builtin kein Fehlschlag (Build ohne raylib).
 /// Darunter dasselbe Netz: **was an einer fehlenden Anzeige scheitert, ist
 /// nicht falsch, sondern hier nicht pruefbar.**
@@ -1002,12 +1003,11 @@ fn bewerten_roh(fall: &Fall, code: i32, stdout: &str, stderr: &str, ohne_grafik:
     // Ein Bau ohne Grafik/Audio meldet den fehlenden Befehl im Klartext -- auch
     // dann, wenn das Programm die Meldung selbst faengt und AUSGIBT (`TRY ...
     // CATCH e : PRINT e`) und mit 0 endet. Die Zeile ist unverwechselbar.
-    // Englisch heisst sie "... is not available in this build" (DHRT_LANG=en).
+    // Englisch heisst sie "... does not exist in this runtime" (DHRT_LANG=en).
     // Seit 2026.54 "NAME: gibt es in dieser Laufzeit nicht (ohne grafik
-    // gebaut)" (bau.rs) -- fuer jedes fehlende Feature, wie vorher "... im
-    // Rust-Kern noch nicht verfuegbar"; der alte Satz eine Fassung lang mit.
-    let fehlt = |t: &str| t.contains("gibt es in dieser Laufzeit nicht (ohne") || t.contains("does not exist in this runtime (built without")
-        || t.contains("im Rust-Kern noch nicht verfuegbar") || t.contains("is not available in this build");
+    // gebaut)" (bau.rs) -- fuer jedes fehlende Feature, vorher "... im
+    // Rust-Kern noch nicht verfuegbar".
+    let fehlt = |t: &str| t.contains("gibt es in dieser Laufzeit nicht (ohne") || t.contains("does not exist in this runtime (built without");
     if ohne_grafik && (fehlt(stderr) || fehlt(stdout)) {
         return Ergebnis::Uebersprungen("Build ohne Grafik".into());
     }
@@ -1451,11 +1451,9 @@ PRINT 1
     fn kein_fenster_und_ohne_grafik_werden_uebersprungen() {
         let f = &parsen("=== a\nSCREEN(1,1,\"t\",1)\n").unwrap()[0];
         assert!(matches!(bewerten(f, 1, "", "Attempting to create window failed", false), Ergebnis::Uebersprungen(_)));
-        assert!(matches!(bewerten(f, 1, "", "SCREEN im Rust-Kern noch nicht verfuegbar", true), Ergebnis::Uebersprungen(_)));
-        assert!(matches!(bewerten(f, 1, "", "SCREEN im Rust-Kern noch nicht verfuegbar", false), Ergebnis::Fehl(_)));
+        assert!(matches!(bewerten(f, 1, "", "SCREEN: gibt es in dieser Laufzeit nicht (ohne Grafik gebaut)", true), Ergebnis::Uebersprungen(_)));
+        assert!(matches!(bewerten(f, 1, "", "SCREEN: gibt es in dieser Laufzeit nicht (ohne Grafik gebaut)", false), Ergebnis::Fehl(_)));
         // dieselben Meldungen auf Englisch (DHRT_LANG=en), auch auf stdout
-        assert!(matches!(bewerten(f, 0, "Runtime error in x.dh:3: Graphics builtin 'SCREEN' is not available in this build", "", true), Ergebnis::Uebersprungen(_)));
-        assert!(matches!(bewerten(f, 1, "", "Graphics builtin 'SCREEN' is not available in this build", false), Ergebnis::Fehl(_)));
         assert!(matches!(bewerten(f, 1, "", "SCREEN: No window possible -- there is no display", false), Ergebnis::Uebersprungen(_)));
         // der Satz seit 2026.54 (bau.rs), deutsch und englisch
         assert!(matches!(bewerten(f, 1, "", "SCREEN: gibt es in dieser Laufzeit nicht (ohne grafik gebaut)", true), Ergebnis::Uebersprungen(_)));

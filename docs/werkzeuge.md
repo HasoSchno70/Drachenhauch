@@ -169,7 +169,7 @@ oder für einen Fall, der eine Datei des Projekts liest.
 
 **Fenster ohne echte Eingabe:** jedes Programm, das `dhrt test` startet
 (Fall, Hilfsprogramm, Prüfprogramm, und was diese wiederum starten), bekommt
-`DHRT_OHNE_EINGABE=1`. Ein Fenster geht dann ohne Fokus auf, lässt die Maus
+`DHRT_NO_INPUT=1`. Ein Fenster geht dann ohne Fokus auf, lässt die Maus
 auf das Fenster darunter durch und gibt den Vordergrund zurück, wenn es ihn
 doch bekommt (Maximieren, `WINDOW_FOCUS`). Aufnahmen (`AUTOMATION_PLAY`) und
 nachgeschickte Fensternachrichten (`_hilfen/fenstersender.ps1`) kommen
@@ -179,16 +179,16 @@ Falls, und eine Maus über dem Fenster nahm einem Fall seinen Tooltip.
 Dasselbe gilt für echte Fenster (`GUI_WINDOW_NATIVE`, abgerissene Leisten,
 Popup-Fenster) -- sonst meldete Windows den echten Zeiger, sobald er über
 ihnen stand, und ein Klick-Fall traf daneben.
-`DHRT_OHNE_EINGABE=0` in `--- umgebung` schaltet es für einen Fall ab.
+`DHRT_NO_INPUT=0` in `--- umgebung` schaltet es für einen Fall ab.
 
 **Eine Zwischenablage je Prozess:** dieselben Programme bekommen
-`DHRT_ZWISCHENABLAGE=privat`. `CLIPBOARD_SET`, `CLIPBOARD_GET` und Kopieren
+`DHRT_CLIPBOARD=privat`. `CLIPBOARD_SET`, `CLIPBOARD_GET` und Kopieren
 und Einfügen in der gui benutzen dann eine Ablage nur dieses Prozesses statt
 der des Systems. Die Prüfungen der IDE und der Werkzeuge „tippen“ über
 `CLIPBOARD_SET` und Strg+V (eine Aufnahme speist keine Zeichen ein), und die
 Zwischenablage des Systems gibt es nur einmal -- zwei Fälle zugleich fügten
 den Text des anderen ein. Wer die echte Ablage prüft, setzt
-`DHRT_ZWISCHENABLAGE=system` in `--- umgebung` (so `zwischenablage.dhtest`).
+`DHRT_CLIPBOARD=system` in `--- umgebung` (so `zwischenablage.dhtest`).
 
 **Werkzeuge ohne Python prüfen** (seit Stufe 32): so laufen die Tests des
 Anim-FSM-Editors in `tests/pruef/werkzeuge/werkzeug_animfsm.dhtest`. Zwei Wege
@@ -307,8 +307,8 @@ Datei, innerhalb eines Falls nur für ihn (der Fall gewinnt);
 sie ab. Prüfprogramme (`*_pruefung.dh`) haben dieselbe Vorgabe. Ein Fall, der an einer Maschine
 ohne Bildschirm oder Soundkarte scheitert, gilt als übersprungen, nicht als
 falsch (erkannt an der Meldung „Kein Fenster moeglich“, die `dhrt` dann
-statt eines Absturzes ausgibt; `DHRT_KEIN_FENSTER=1` täuscht genau diesen
-Fehler vor, zum Prüfen auf einem Rechner mit Bildschirm); mit `DHRT_OHNE_GRAFIK=1` auch einer, dem im Bau ohne raylib ein
+statt eines Absturzes ausgibt; `DHRT_NO_WINDOW=1` täuscht genau diesen
+Fehler vor, zum Prüfen auf einem Rechner mit Bildschirm); mit `DHRT_NO_GRAPHICS=1` auch einer, dem im Bau ohne raylib ein
 Grafik-Befehl fehlt. **Das gilt auch, wenn der Fall selbst mit 0 endet** und
 nur sein KIND kein Fenster bekam — ein Fall, der ein Programm startet, fängt
 dessen Scheitern ja ab und gibt es als Text aus. Entschieden wird deshalb am
@@ -353,9 +353,9 @@ e 0 7 120 80 0 0
 ...
 --- umgebung
 DHRT_FRAMES=412
-DHRT_ABSPIELEN=aufnahme.txt
-DHRT_GUI_ZUSTAND=1
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=aufnahme.txt
+DHRT_GUI_STATE=1
+DHRT_OFFSCREEN=1
 --- enthaelt
 gui-zustand
 fenster "Notizbuch"
@@ -370,9 +370,9 @@ eine Zeile, benannt nach `GUI_SET_NAME` oder nach der Nummer unter den
 Widgets derselben Art. Was nicht stimmen soll, löscht man aus dem Block;
 was dazu soll, schreibt man dazu. Das Programm braucht dafür keine Zeile:
 die Laufzeit spielt die Aufnahme nach `SCREEN` ab, wenn
-`DHRT_ABSPIELEN=datei` gesetzt ist (relativ zum Ort des Aufrufers, also
+`DHRT_PLAYBACK=datei` gesetzt ist (relativ zum Ort des Aufrufers, also
 zum Fallordner), und gibt am Ende den Zustand aus, wenn
-`DHRT_GUI_ZUSTAND=1` gesetzt ist. Die Aufnahme bekommt ein Ereignis in
+`DHRT_GUI_STATE=1` gesetzt ist. Die Aufnahme bekommt ein Ereignis in
 Bild 0 vorangestellt, damit die Bilder der Wiedergabe stimmen; `--bilder N`
 beendet das Programm nach N Bildern (für Skripte).
 
@@ -496,7 +496,7 @@ rechnet, kann das teurer sein, als es spart -- dort gehören nur Zahlen hin.
 ```bash
 dhrt --jit datei.dh               # je Funktion: uebersetzt, oder warum nicht
 DHRT_JIT=aus dhrt run datei.dh    # nur die VM -- zum Vergleichen
-DHRT_JIT_BILANZ=1 dhrt run datei.dh   # am Ende: Schleifen, Laeufe, Ausstiege
+DHRT_JIT_STATS=1 dhrt run datei.dh   # am Ende: Schleifen, Laeufe, Ausstiege
 ```
 
 `dhrt --jit` sagt etwa `mitzahlen: uebersetzt` oder `mitvec2: VM: Platz 0
@@ -505,3 +505,45 @@ sie liefen und wie oft der Maschinencode mitten drin an die VM abgeben
 musste. Wo die Zeit hingeht, misst `dhrt profile datei.dh` je Zeile.
 Eingeschaltet ist der Maschinencode immer; `DHRT_JIT=aus` ist nur zum
 Messen da.
+
+## Umgebungsvariablen
+
+Die Laufzeit liest ihre Umgebungsvariablen unter Namen mit der Vorsilbe
+`DHRT_`, englisch. Bis 2026.53 hießen einige deutsch oder mit `DH_`; die
+alten Namen gelten weiter (Skripte und CI müssen nichts ändern), neue Texte
+nehmen die neuen.
+
+| Name | bisher |
+|---|---|
+| `DHRT_PATH` | `DH_PATH` |
+| `DHRT_NO_AUDIO` | `DHRT_OHNE_AUDIO`, `DH_OHNE_AUDIO` |
+| `DHRT_LOG` | `DH_LOG` |
+| `DHRT_FONT_DIR` | `DHRT_SCHRIFT_ORDNER` |
+| `DHRT_NATIVE_SCALE` | `DHRT_NATIV_MASSSTAB` |
+| `DHRT_FRAME_END` | `DHRT_BILD_ENDE` |
+| `DHRT_NO_WINDOW` | `DHRT_KEIN_FENSTER` |
+| `DHRT_NO_GRAPHICS` | `DHRT_OHNE_GRAFIK` |
+| `DHRT_NO_INPUT` | `DHRT_OHNE_EINGABE` |
+| `DHRT_NO_POPUP_WINDOWS` | `DHRT_OHNE_POPUP_FENSTER` |
+| `DHRT_NO_NATIVE_WINDOWS` | `DHRT_OHNE_NATIVE_FENSTER` |
+| `DHRT_NO_FUSION` | `DHRT_OHNE_VERSCHMELZEN` |
+| `DHRT_SYSTEM_DARK` | `DHRT_SYSTEM_DUNKEL` |
+| `DHRT_SYSTEM_ACCENT` | `DHRT_SYSTEM_AKZENT` |
+| `DHRT_SYSTEM_HIGH_CONTRAST` | `DHRT_SYSTEM_HOHER_KONTRAST` |
+| `DHRT_SYSTEM_REDUCED_MOTION` | `DHRT_SYSTEM_WENIGER_BEWEGUNG` |
+| `DHRT_CLIPBOARD` | `DHRT_ZWISCHENABLAGE` |
+| `DHRT_DICTIONARIES` | `DHRT_WOERTERBUECHER` |
+| `DHRT_CHECK_TYPES` | `DHRT_TYPEN_PRUEFEN` |
+| `DHRT_TYPES_LIST` | `DHRT_TYPEN_LISTE` |
+| `DHRT_OPEN_LOG` | `DHRT_OEFFNEN_PROTOKOLL` |
+| `DHRT_MICROPHONE` | `DHRT_MIKROFON` |
+| `DHRT_DEVICES` | `DHRT_GERAETE` |
+| `DHRT_INSPECTOR` | `DHRT_INSPEKTOR` |
+| `DHRT_GUI_STATE` | `DHRT_GUI_ZUSTAND` |
+| `DHRT_GUI_STATE_FILE` | `DHRT_GUI_ZUSTAND_DATEI` |
+| `DHRT_PLAY_VERSION` | `DHRT_FASSUNG_SPIELEN` |
+| `DHRT_RECORD` | `DHRT_AUFNEHMEN` |
+| `DHRT_PLAYBACK` | `DHRT_ABSPIELEN` |
+| `DHRT_OFFSCREEN` | `DHRT_ABSEITS` |
+| `DHRT_DROP` | `DHRT_ABLEGEN` |
+| `DHRT_JIT_STATS` | `DHRT_JIT_BILANZ` |

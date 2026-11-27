@@ -21,9 +21,10 @@ IMPORT "save"
 | `SAVE_GET_INT/FLOAT/STRING/BOOL(s, key$)` | strikt — fehlender Schluessel ist ein Fehler |
 | `SAVE_GET_INT_OR/FLOAT_OR/STRING_OR/BOOL_OR(s, key$, default)` | mit Fallback — liefert `default`, wenn der Schluessel fehlt oder den falschen Typ hat |
 | `SAVE_HAS(s, key$)` | BOOLEAN — ist der Schluessel belegt? |
-| `SAVE_DELETE(s, key$)` | idempotent |
+| `SAVE_DELETE(s, key$)` | BOOLEAN — TRUE, wenn es den Schlüssel gab; idempotent |
 | `SAVE_CLEAR(s)` | alle Keys weg, Version bleibt |
 | `SAVE_KEYS(s)` | STRING — sortierte Liste |
+| `SAVE_GET_KEYS(s)` | ARRAY OF STRING — die Schlüssel sortiert, wie `MAP_KEYS` |
 
 ## Konzept
 

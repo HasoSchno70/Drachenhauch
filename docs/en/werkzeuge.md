@@ -173,7 +173,7 @@ case that reads a file of the project.
 
 **Windows without real input:** every program `dhrt test` starts (case,
 helper program, test program, and whatever these start in turn) gets
-`DHRT_OHNE_EINGABE=1`. A window then opens without focus, lets the mouse pass
+`DHRT_NO_INPUT=1`. A window then opens without focus, lets the mouse pass
 through to the window below and gives the foreground back if it gets it after
 all (maximizing, `WINDOW_FOCUS`). Recordings (`AUTOMATION_PLAY`) and posted
 window messages (`_hilfen/fenstersender.ps1`) still arrive -- so you can keep
@@ -182,16 +182,16 @@ appeared instead of "SCREEN" in a case's IDE, and a mouse over the window
 took a case's tooltip away. The same holds for real windows (`GUI_WINDOW_NATIVE`, torn-off panels,
 popup windows) -- otherwise Windows reported the real pointer as soon as it
 was over them, and a click case missed.
-`DHRT_OHNE_EINGABE=0` in `--- umgebung` switches
+`DHRT_NO_INPUT=0` in `--- umgebung` switches
 it off for one case.
 
 **One clipboard per process:** the same programs get
-`DHRT_ZWISCHENABLAGE=privat`. `CLIPBOARD_SET`, `CLIPBOARD_GET` and copy and
+`DHRT_CLIPBOARD=privat`. `CLIPBOARD_SET`, `CLIPBOARD_GET` and copy and
 paste in the gui then use a clipboard of this process only instead of the
 system's. The tests of the IDE and the tools "type" through `CLIPBOARD_SET`
 and Ctrl+V (a recording feeds no characters), and the system clipboard
 exists only once -- two cases at the same time pasted each other's text.
-Whoever tests the real clipboard sets `DHRT_ZWISCHENABLAGE=system` in
+Whoever tests the real clipboard sets `DHRT_CLIPBOARD=system` in
 `--- umgebung` (as `zwischenablage.dhtest` does).
 
 **Testing tools without Python** (since stage 32): this is how the animation
@@ -314,8 +314,8 @@ of the file, inside a case only for that case (the case wins);
 off. Check programs (`*_pruefung.dh`) have the same default. A case that fails on a machine without
 a display or sound card counts as skipped, not as failed (recognized by the
 message "Kein Fenster moeglich" (no window possible), which `dhrt` prints
-instead of crashing; `DHRT_KEIN_FENSTER=1` fakes exactly this error, for
-checking on a computer with a display); with `DHRT_OHNE_GRAFIK=1` also one
+instead of crashing; `DHRT_NO_WINDOW=1` fakes exactly this error, for
+checking on a computer with a display); with `DHRT_NO_GRAPHICS=1` also one
 that is missing a graphics command in the build without raylib. **This also
 holds when the case itself ends with 0** and only its CHILD got no window — a
 case that starts a program catches its failure, after all, and prints it as
@@ -360,9 +360,9 @@ e 0 7 120 80 0 0
 ...
 --- umgebung
 DHRT_FRAMES=412
-DHRT_ABSPIELEN=aufnahme.txt
-DHRT_GUI_ZUSTAND=1
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=aufnahme.txt
+DHRT_GUI_STATE=1
+DHRT_OFFSCREEN=1
 --- enthaelt
 gui-zustand
 fenster "Notizbuch"
@@ -376,9 +376,9 @@ number of rows, the selected one (in full) and the first column -- one line per
 visible widget, named after `GUI_SET_NAME` or after its number among the
 widgets of the same kind. Delete from the block what need not match; add
 what should. The program needs no line for it: the runtime plays the
-recording after `SCREEN` when `DHRT_ABSPIELEN=file` is set (relative to the
+recording after `SCREEN` when `DHRT_PLAYBACK=file` is set (relative to the
 caller's location, i.e. the case folder) and prints the state at the end
-when `DHRT_GUI_ZUSTAND=1` is set. The recording gets an event in frame 0
+when `DHRT_GUI_STATE=1` is set. The recording gets an event in frame 0
 put in front so that the frames of the replay match; `--bilder N` ends the
 program after N frames (for scripts).
 
@@ -503,7 +503,7 @@ there.
 ```bash
 dhrt --jit datei.dh               # je Funktion: uebersetzt, oder warum nicht
 DHRT_JIT=aus dhrt run datei.dh    # nur die VM -- zum Vergleichen
-DHRT_JIT_BILANZ=1 dhrt run datei.dh   # am Ende: Schleifen, Laeufe, Ausstiege
+DHRT_JIT_STATS=1 dhrt run datei.dh   # am Ende: Schleifen, Laeufe, Ausstiege
 ```
 
 (The comments are the German ones of the tool.) `dhrt --jit` says for example `mitzahlen: uebersetzt` or `mitvec2: VM:
@@ -512,3 +512,45 @@ counts the translated loops, how often they ran and how often the machine
 code had to hand over to the VM in the middle. Where the time goes is
 measured per line by `dhrt profile datei.dh`. Machine code is always on;
 `DHRT_JIT=aus` is only there for measuring.
+
+## Environment variables
+
+The runtime reads its environment variables under names with the prefix
+`DHRT_`, in English. Up to 2026.53 some were German or used `DH_`; the old
+names keep working (scripts and CI need no change), new texts use the new
+ones.
+
+| Name | formerly |
+|---|---|
+| `DHRT_PATH` | `DH_PATH` |
+| `DHRT_NO_AUDIO` | `DHRT_OHNE_AUDIO`, `DH_OHNE_AUDIO` |
+| `DHRT_LOG` | `DH_LOG` |
+| `DHRT_FONT_DIR` | `DHRT_SCHRIFT_ORDNER` |
+| `DHRT_NATIVE_SCALE` | `DHRT_NATIV_MASSSTAB` |
+| `DHRT_FRAME_END` | `DHRT_BILD_ENDE` |
+| `DHRT_NO_WINDOW` | `DHRT_KEIN_FENSTER` |
+| `DHRT_NO_GRAPHICS` | `DHRT_OHNE_GRAFIK` |
+| `DHRT_NO_INPUT` | `DHRT_OHNE_EINGABE` |
+| `DHRT_NO_POPUP_WINDOWS` | `DHRT_OHNE_POPUP_FENSTER` |
+| `DHRT_NO_NATIVE_WINDOWS` | `DHRT_OHNE_NATIVE_FENSTER` |
+| `DHRT_NO_FUSION` | `DHRT_OHNE_VERSCHMELZEN` |
+| `DHRT_SYSTEM_DARK` | `DHRT_SYSTEM_DUNKEL` |
+| `DHRT_SYSTEM_ACCENT` | `DHRT_SYSTEM_AKZENT` |
+| `DHRT_SYSTEM_HIGH_CONTRAST` | `DHRT_SYSTEM_HOHER_KONTRAST` |
+| `DHRT_SYSTEM_REDUCED_MOTION` | `DHRT_SYSTEM_WENIGER_BEWEGUNG` |
+| `DHRT_CLIPBOARD` | `DHRT_ZWISCHENABLAGE` |
+| `DHRT_DICTIONARIES` | `DHRT_WOERTERBUECHER` |
+| `DHRT_CHECK_TYPES` | `DHRT_TYPEN_PRUEFEN` |
+| `DHRT_TYPES_LIST` | `DHRT_TYPEN_LISTE` |
+| `DHRT_OPEN_LOG` | `DHRT_OEFFNEN_PROTOKOLL` |
+| `DHRT_MICROPHONE` | `DHRT_MIKROFON` |
+| `DHRT_DEVICES` | `DHRT_GERAETE` |
+| `DHRT_INSPECTOR` | `DHRT_INSPEKTOR` |
+| `DHRT_GUI_STATE` | `DHRT_GUI_ZUSTAND` |
+| `DHRT_GUI_STATE_FILE` | `DHRT_GUI_ZUSTAND_DATEI` |
+| `DHRT_PLAY_VERSION` | `DHRT_FASSUNG_SPIELEN` |
+| `DHRT_RECORD` | `DHRT_AUFNEHMEN` |
+| `DHRT_PLAYBACK` | `DHRT_ABSPIELEN` |
+| `DHRT_OFFSCREEN` | `DHRT_ABSEITS` |
+| `DHRT_DROP` | `DHRT_ABLEGEN` |
+| `DHRT_JIT_STATS` | `DHRT_JIT_BILANZ` |

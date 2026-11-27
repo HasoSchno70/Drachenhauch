@@ -13,6 +13,7 @@
 //!
 //! Winkel durchgehend in Grad, 0 = rechts, wachsend im Uhrzeigersinn (raylib,
 //! Bildschirm-y nach unten).
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
 
 use std::collections::HashMap;
 
@@ -368,12 +369,7 @@ pub fn apply_theme(s: &mut Style, name: &str) -> bool {
 
 /// Alpha-Anteil einer DH-Farbe als 0..255 (0 im obersten Byte = deckend).
 fn alpha_of(c: i64) -> u32 {
-    let a = ((c as u32) >> 24) & 0xFF;
-    if a == 0 {
-        255
-    } else {
-        a
-    }
+    crate::farbraum::rgba(c)[3] as u32
 }
 
 /// Deckkraft mit `f` (0..1) multiplizieren. `f >= 1` laesst die Farbe in Ruhe,
@@ -2620,13 +2616,62 @@ pub fn skala_zahlen_passen(lr: f64, spanne_grad: f64, haupt: i32,
     sehne >= breiteste as f64
 }
 
+/// Englische Zweitnamen der Schluessel (CHART_SET & Co.): Eingang
+/// zweisprachig, englisch zuerst (Bericht A14; bis 2026.53 nur deutsch).
+/// Die deutschen bleiben, wie sie sind.
+const SCHLUESSEL_EN: &[(&str, &str)] = &[
+    ("title", "titel"), ("unit", "einheit"), ("axis_x", "achse_x"), ("axis_y", "achse_y"),
+    ("legend", "legende"), ("values", "werte"), ("orientation", "ausrichtung"),
+    ("needle_shape", "zeigerform"), ("dial", "zifferblatt"), ("value_display", "wertanzeige"),
+    ("point_shape", "punktform"), ("inner_radius", "innenradius"), ("gap", "abstand"),
+    ("corners", "ecken"), ("border_width", "rahmen_dicke"), ("padding", "polster"),
+    ("grid", "gitter"), ("decimals", "nachkomma"), ("title_size", "titel_groesse"),
+    ("text_size", "text_groesse"), ("font", "schrift"), ("start_angle", "start_winkel"),
+    ("end_angle", "end_winkel"), ("ticks", "striche"), ("minor_ticks", "unterstriche"),
+    ("line_width", "linien_dicke"), ("point_radius", "punkt_radius"), ("window", "fenster"),
+    ("shadow", "schatten"), ("shadow_soft", "schatten_weich"), ("opacity", "deckkraft"),
+    ("area_opacity", "flaeche_deckkraft"), ("hover_speed", "hover_tempo"),
+    ("hover_spread", "hover_weite"), ("hover_gloss", "hover_glanz"), ("gloss", "glanz"),
+    ("segments", "blatt_teile"), ("segment_gap", "blatt_luecke"), ("segment_width", "blatt_dicke"),
+    ("bezel", "fassung"), ("stroke", "strich"), ("gap_from", "luecke_ab"),
+    ("background", "hintergrund"), ("border", "rahmen"), ("axis", "achse"), ("needle", "zeiger"),
+    ("area", "flaeche"), ("gradient", "verlauf"), ("gradient_end", "verlauf_ende"),
+    ("scale_from", "skala_von"), ("scale_mid", "skala_mitte"), ("scale_to", "skala_bis"),
+    ("grid_x", "gitter_x"), ("grid_y", "gitter_y"), ("percent", "prozent"), ("points", "punkte"),
+    ("smooth", "glatt"), ("zero_line", "null_linie"), ("stacked", "stapel"),
+    ("gradient_data", "verlauf_daten"), ("shadow_data", "schatten_daten"), ("short", "kurz"),
+    ("decimal_comma", "komma"), ("step", "treppe"), ("crosshair", "fadenkreuz"),
+];
+
+/// Die Wort-Werte (legende, werte, ausrichtung, zeigerform ...) ebenso:
+/// englisch geht, gespeichert wird das deutsche Wort.
+const WOERTER_EN: &[(&str, &str)] = &[
+    ("off", "aus"), ("top", "oben"), ("bottom", "unten"), ("left", "links"), ("right", "rechts"),
+    ("inside", "innen"), ("outside", "aussen"), ("vertical", "senkrecht"), ("horizontal", "waagerecht"),
+    ("needle", "nadel"), ("bar", "balken"), ("arrow", "pfeil"), ("segments", "segmente"),
+    ("ticks", "striche"), ("bands", "baender"), ("pill", "pille"), ("bubble", "blase"),
+    ("at_needle", "am_zeiger"), ("circle", "kreis"), ("square", "quadrat"), ("diamond", "raute"),
+    ("triangle", "dreieck"),
+];
+
+fn wert_wort(v: &str) -> String {
+    let w = v.to_lowercase();
+    WOERTER_EN.iter().find(|(en, _)| *en == w).map(|(_, de)| de.to_string()).unwrap_or(w)
+}
+
+/// Ein Schluessel, klein und auf den deutschen Namen gebracht.
+fn schluessel(key: &str) -> String {
+    let k = key.to_lowercase();
+    SCHLUESSEL_EN.iter().find(|(en, _)| *en == k).map(|(_, de)| de.to_string()).unwrap_or(k)
+}
+
 fn unbekannt(fn_: &str, key: &str, gueltig: &[&str]) -> String {
     format!("{}: unbekannte Eigenschaft '{}' (gueltig: {})", fn_, key, gueltig.join(", "))
 }
 
 impl ChartObj {
     pub fn set_str(&mut self, key: &str, v: &str) -> Result<(), String> {
-        let k = key.to_lowercase();
+        let k = schluessel(key);
         let s = &mut self.style;
         match k.as_str() {
             "titel" => s.titel = v.to_string(),
@@ -2634,7 +2679,7 @@ impl ChartObj {
             "achse_x" => s.achse_x = v.to_string(),
             "achse_y" => s.achse_y = v.to_string(),
             "legende" => {
-                let vv = v.to_lowercase();
+                let vv = wert_wort(v);
                 if !["aus", "oben", "unten", "links", "rechts"].contains(&vv.as_str()) {
                     return Err(format!(
                         "CHART_SET: legende erwartet aus/oben/unten/links/rechts, nicht '{}'",
@@ -2644,14 +2689,14 @@ impl ChartObj {
                 s.legende = vv;
             }
             "werte" => {
-                let vv = v.to_lowercase();
+                let vv = wert_wort(v);
                 if !["aus", "innen", "aussen"].contains(&vv.as_str()) {
                     return Err(format!("CHART_SET: werte erwartet aus/innen/aussen, nicht '{}'", v));
                 }
                 s.werte = vv;
             }
             "ausrichtung" => {
-                let vv = v.to_lowercase();
+                let vv = wert_wort(v);
                 if !["senkrecht", "waagerecht"].contains(&vv.as_str()) {
                     return Err(format!(
                         "CHART_SET: ausrichtung erwartet senkrecht/waagerecht, nicht '{}'",
@@ -2661,7 +2706,7 @@ impl ChartObj {
                 s.ausrichtung = vv;
             }
             "zeigerform" => {
-                let vv = v.to_lowercase();
+                let vv = wert_wort(v);
                 if !["nadel", "balken", "pfeil"].contains(&vv.as_str()) {
                     return Err(format!(
                         "CHART_SET: zeigerform erwartet nadel/balken/pfeil, nicht '{}'",
@@ -2671,7 +2716,7 @@ impl ChartObj {
                 s.zeigerform = vv;
             }
             "zifferblatt" => {
-                let vv = v.to_lowercase();
+                let vv = wert_wort(v);
                 if !["ring", "segmente", "striche", "baender"].contains(&vv.as_str()) {
                     return Err(format!(
                         "CHART_SET: zifferblatt erwartet ring/segmente/striche/baender, nicht '{}'", v));
@@ -2679,7 +2724,7 @@ impl ChartObj {
                 s.zifferblatt = vv;
             }
             "wertanzeige" => {
-                let vv = v.to_lowercase();
+                let vv = wert_wort(v);
                 if !["aus", "innen", "pille", "blase", "am_zeiger"].contains(&vv.as_str()) {
                     return Err(format!(
                         "CHART_SET: wertanzeige erwartet aus/innen/pille/blase/am_zeiger, nicht '{}'", v));
@@ -2687,7 +2732,7 @@ impl ChartObj {
                 s.wertanzeige = vv;
             }
             "punktform" => {
-                let vv = v.to_lowercase();
+                let vv = wert_wort(v);
                 if !["kreis", "quadrat", "raute", "dreieck"].contains(&vv.as_str()) {
                     return Err(format!(
                         "CHART_SET: punktform erwartet kreis/quadrat/raute/dreieck, nicht '{}'", v));
@@ -2700,7 +2745,7 @@ impl ChartObj {
     }
 
     pub fn set_num(&mut self, key: &str, v: f64) -> Result<(), String> {
-        let k = key.to_lowercase();
+        let k = schluessel(key);
         let s = &mut self.style;
         match k.as_str() {
             "min" => s.min = v,
@@ -2743,7 +2788,7 @@ impl ChartObj {
     }
 
     pub fn set_color(&mut self, key: &str, v: i64) -> Result<(), String> {
-        let k = key.to_lowercase();
+        let k = schluessel(key);
         let s = &mut self.style;
         match k.as_str() {
             "hintergrund" => s.c_hintergrund = v,
@@ -2766,7 +2811,7 @@ impl ChartObj {
     }
 
     pub fn set_flag(&mut self, key: &str, v: bool) -> Result<(), String> {
-        let k = key.to_lowercase();
+        let k = schluessel(key);
         let s = &mut self.style;
         match k.as_str() {
             "rahmen" => s.f_rahmen = v,
@@ -3403,4 +3448,16 @@ mod tests {
         c.set_data(0, &[1.0, 2.0, 3.0]).unwrap();
         assert!(c.xwerte.is_empty(), "andere Punktzahl hebt CHART_X auf");
     }
+
+    #[test]
+    fn englische_schluessel_und_woerter() {
+        let mut c = ChartObj::new(Kind::Bar, 0, 0, 100, 100);
+        c.set_str("title", "Umsatz").unwrap();
+        c.set_str("legend", "bottom").unwrap();
+        c.set_flag("stacked", true).unwrap();
+        assert_eq!(c.style.titel, "Umsatz");
+        assert_eq!(c.style.legende, "unten");
+        assert!(c.style.f_stapel);
+    }
+
 }

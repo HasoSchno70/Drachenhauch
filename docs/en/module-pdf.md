@@ -46,7 +46,7 @@ PDF_SAVE(p, "rechnung.pdf")
 | `PDF_IMAGE(pdf, image, x, y, width[, height])` | place an image (`IMAGE`) in the rectangle, sizes in mm; without `h` by the aspect ratio |
 | `PDF_SAVE(p, path$)` | write |
 | `PDF_PRINT(p[, printer$[, copies[, target_file$]]])` | **print** — Windows via GDI, macOS/Linux via CUPS; see [Printing](#printing-and-preview) |
-| `PDF_PREVIEW(p, page[, width_px])` → IMAGE | the page as an image, for a preview in a window |
+| `PDF_PREVIEW(p, page[, width_px])` → IMAGE | the page as an image, for a preview in a window; pages count from 1 as in print |
 | `PDF_CLOSE(p)` | free the memory |
 
 Font, size, colour, stroke width and opacity are settings of the

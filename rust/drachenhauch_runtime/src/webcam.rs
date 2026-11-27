@@ -17,7 +17,7 @@
 //! **Pruefen ohne Kamera:** `DHRT_WEBCAM=test` ersetzt alle Geraete durch
 //! eine "Testbild"-Kamera: Farbbalken und ein Quadrat, das je Bild 8 Punkte
 //! weiterwandert, 30 Bilder je Sekunde.
-#![allow(dead_code)]
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
 
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread::JoinHandle;
@@ -193,9 +193,11 @@ fn testbild_laufen(ab: Ablage, stop: mpsc::Receiver<()>, bereit: Bereit, b: u32,
 
 // --- Umwandeln (rein) ---------------------------------------------------------
 
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn klemmen(v: i32) -> u8 { v.clamp(0, 255) as u8 }
 
 /// YUV (BT.601, begrenzter Bereich 16..235) -> RGB.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn yuv_zu_rgb(y: u8, u: u8, v: u8) -> [u8; 3] {
     let c = (y as i32 - 16).max(0) * 298;
     let d = u as i32 - 128;
@@ -206,6 +208,7 @@ pub fn yuv_zu_rgb(y: u8, u: u8, v: u8) -> [u8; 3] {
 }
 
 /// YUYV 4:2:2 (zwei Punkte teilen sich U und V) -> RGBA.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn yuyv_zu_rgba(src: &[u8], b: usize, h: usize, zeile: usize) -> Vec<u8> {
     let mut out = vec![255u8; b * h * 4];
     for y in 0..h {
@@ -223,6 +226,7 @@ pub fn yuyv_zu_rgba(src: &[u8], b: usize, h: usize, zeile: usize) -> Vec<u8> {
 }
 
 /// Drei Bytes je Punkt (RGB oder BGR) -> RGBA.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn rgb24_zu_rgba(src: &[u8], b: usize, h: usize, zeile: usize, bgr: bool) -> Vec<u8> {
     let mut out = vec![255u8; b * h * 4];
     for y in 0..h {
@@ -255,6 +259,7 @@ pub fn bgrx_zu_rgba(src: &[u8], b: usize, h: usize, zeile: usize, unten_zuerst: 
 }
 
 /// Hat das JPEG vor seinem Scan eine Huffman-Tafel (DHT)?
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn hat_huffman_tafel(src: &[u8]) -> bool {
     let mut i = 2;
     while i + 4 <= src.len() {
@@ -273,6 +278,7 @@ pub fn hat_huffman_tafel(src: &[u8]) -> bool {
 /// Standardtafeln des JPEG-Normtexts (Anhang K). zune-jpeg setzt sie nur bei
 /// der Kennung "AVI1" ein, und die schicken nicht alle Kameras: fehlt die
 /// Tafel, kommt die Kennung hinter den Anfang.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn mjpeg_vorbereiten(src: &[u8]) -> std::borrow::Cow<'_, [u8]> {
     if src.len() < 4 || src[0] != 0xFF || src[1] != 0xD8 || hat_huffman_tafel(src) {
         return std::borrow::Cow::Borrowed(src);
@@ -285,6 +291,7 @@ pub fn mjpeg_vorbereiten(src: &[u8]) -> std::borrow::Cow<'_, [u8]> {
 }
 
 /// Ein MJPEG-Bild -> (Breite, Hoehe, RGBA).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn mjpeg_zu_rgba(src: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
     use zune_jpeg::zune_core::colorspace::ColorSpace;
     use zune_jpeg::zune_core::options::DecoderOptions;

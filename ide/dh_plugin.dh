@@ -4,7 +4,7 @@
 ' mit ihm (PARENT_SEND / PARENT_RECV$), eine JSON-Zeile je Nachricht. Ein
 ' Plugin, das abstuerzt oder haengt, reisst die IDE nicht mit.
 '
-'     IMPORT "dh_plugin.dh"            ' die IDE legt ihren Ordner in DH_PATH
+'     IMPORT "dh_plugin.dh"            ' die IDE legt ihren Ordner in DHRT_PATH
 '     PLUGIN_BEFEHL("todo.neu", "Todo anlegen", "Strg+Alt+T")
 '     PLUGIN_LEISTE("todo", "Todos", "leiste.dhform", "rechts")
 '     PLUGIN_HOERE("gesichert")

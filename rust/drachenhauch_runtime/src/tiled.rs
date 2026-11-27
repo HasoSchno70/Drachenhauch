@@ -1,4 +1,4 @@
-//! Tiled-Map-Loader (JSON) -- nativer Port von `drachenhauch/modules/tiled.py`.
+//! Tiled-Map-Loader (JSON).
 //!
 //! Liest `.json`-Maps (Tiled "JSON Map"). Structs + Loader hier; die TILED_*-
 //! Builtins liegen in `builtins.rs` (pur -- sie operieren auf dem

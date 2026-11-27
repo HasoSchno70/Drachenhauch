@@ -1,7 +1,6 @@
 //! Baeume und Behaelter: Tree, Dateibaum, Reiter, Akkordeon, Assistent, Baum mit Spalten, Uhrzeit.
 //!
-//! Teil von `gui.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `gui.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
@@ -9,12 +8,12 @@ impl Gui {
     // --- Tree (Baum-Ansicht) ------------------------------------------------
     pub(super) fn tree_mut(&mut self, h: i64, fn_: &str) -> Result<&mut TreeState, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::Tree { return Err(format!("{}: Widget ist kein Baum", fn_)); }
+        if w.kind != Kind::Tree { return Err(format!("{}: das Widget ist kein GUI_TREE", fn_)); }
         Ok(w.tree.as_mut().unwrap())
     }
     pub(super) fn tree_ref(&self, h: i64, fn_: &str) -> Result<&TreeState, String> {
         let w = self.wdg(h, fn_)?;
-        if w.kind != Kind::Tree { return Err(format!("{}: Widget ist kein Baum", fn_)); }
+        if w.kind != Kind::Tree { return Err(format!("{}: das Widget ist kein GUI_TREE", fn_)); }
         Ok(w.tree.as_ref().unwrap())
     }
     pub fn tree(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
@@ -61,8 +60,8 @@ impl Gui {
     /// Einstellungen am Baum (GUI_TREE_SET). Bisher nur `mehrfachauswahl`.
     pub fn tree_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let t = self.tree_mut(h, "GUI_TREE_SET")?;
-        match key.to_lowercase().as_str() {
-            "mehrfachauswahl" | "multi" => {
+        match super::einstellungen::schluessel("GUI_TREE_SET", key, super::einstellungen::TREE)? {
+            "mehrfachauswahl" => {
                 t.multi = wert != 0.0;
                 t.sync();
                 // Beim Einschalten zaehlt die bisherige Auswahl mit, sonst
@@ -72,10 +71,9 @@ impl Gui {
                     if k < t.sel.len() { t.sel[k] = true; t.anker = t.selected; }
                 }
             }
-            "kaestchen" | "checkboxes" => { t.kaestchen = wert != 0.0; t.sync(); }
-            "bearbeitbar" | "editable" => { t.bearbeitbar = wert != 0.0; if !t.bearbeitbar { t.edit = None; } }
-            _ => return Err(format!(
-                "GUI_TREE_SET: unbekannte Einstellung '{}' (gueltig: mehrfachauswahl, kaestchen, bearbeitbar)", key)),
+            "kaestchen" => { t.kaestchen = wert != 0.0; t.sync(); }
+            "bearbeitbar" => { t.bearbeitbar = wert != 0.0; if !t.bearbeitbar { t.edit = None; } }
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -118,6 +116,75 @@ impl Gui {
             return Err(format!("GUI_TREE_LABEL: ungueltige Knoten-id {}", node));
         }
         Ok(t.nodes[node as usize].label.clone())
+    }
+    /// GUI_TREE_COUNT: wie viele Knoten der Baum hat (auch zugeklappte).
+    pub fn tree_count(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tree_ref(h, "GUI_TREE_COUNT")?.nodes.len() as i64)
+    }
+    /// GUI_TREE_SET_LABEL: einen Knoten umbenennen (wie F2 mit "bearbeitbar").
+    pub fn tree_set_label(&mut self, h: i64, node: i64, label: String) -> Result<(), String> {
+        let t = self.tree_mut(h, "GUI_TREE_SET_LABEL")?;
+        if t.datei.is_some() { return Err("GUI_TREE_SET_LABEL: beim Dateibaum heissen die Knoten wie ihre Dateien".into()); }
+        if node < 0 || node >= t.nodes.len() as i64 {
+            return Err(format!("GUI_TREE_SET_LABEL: ungueltige Knoten-id {}", node));
+        }
+        t.nodes[node as usize].label = label;
+        Ok(())
+    }
+    /// GUI_TREE_EXPANDED: ist der Knoten aufgeklappt?
+    pub fn tree_expanded(&self, h: i64, node: i64) -> Result<bool, String> {
+        let t = self.tree_ref(h, "GUI_TREE_EXPANDED")?;
+        if node < 0 || node >= t.nodes.len() as i64 {
+            return Err(format!("GUI_TREE_EXPANDED: ungueltige Knoten-id {}", node));
+        }
+        Ok(t.nodes[node as usize].expanded)
+    }
+    /// GUI_TREE_REMOVE: einen Knoten samt allem darunter entfernen. Die
+    /// Nummern dahinter ruecken auf (wie GUI_LISTBOX_REMOVE); Auswahl, Haken
+    /// und Aufklappen wandern mit, eine Auswahl im Entfernten faellt weg.
+    pub fn tree_remove(&mut self, h: i64, node: i64) -> Result<(), String> {
+        let t = self.tree_mut(h, "GUI_TREE_REMOVE")?;
+        if t.datei.is_some() { return Err("GUI_TREE_REMOVE: der Dateibaum liest seine Knoten selbst -- GUI_FILETREE_REFRESH".into()); }
+        let n = t.nodes.len();
+        if node < 0 || node as usize >= n {
+            return Err(format!("GUI_TREE_REMOVE: ungueltige Knoten-id {}", node));
+        }
+        // Weg: der Knoten und alles, dessen Elternkette ihn trifft. Eltern
+        // stehen immer vor ihren Kindern (GUI_TREE_ADD), ein Durchgang reicht.
+        let mut weg = vec![false; n];
+        weg[node as usize] = true;
+        for i in 0..n {
+            let p = t.nodes[i].parent;
+            if p >= 0 && weg[p as usize] { weg[i] = true; }
+        }
+        let mut neu_nr = vec![-1i32; n];
+        let mut k = 0i32;
+        for i in 0..n { if !weg[i] { neu_nr[i] = k; k += 1; } }
+        let um = |x: i32| if x >= 0 && (x as usize) < n { neu_nr[x as usize] } else { -1 };
+        let alt = std::mem::take(&mut t.nodes);
+        for (i, mut nd) in alt.into_iter().enumerate() {
+            if weg[i] { continue; }
+            nd.parent = um(nd.parent);
+            t.nodes.push(nd);
+        }
+        let behalte = |v: &mut Vec<bool>| { let a = std::mem::take(v); *v = a.into_iter().enumerate().filter(|(i, _)| *i < n && !weg[*i]).map(|(_, b)| b).collect(); };
+        behalte(&mut t.sel);
+        behalte(&mut t.checks);
+        let a = std::mem::take(&mut t.auf_t);
+        t.auf_t = a.into_iter().enumerate().filter(|(i, _)| *i < n && !weg[*i]).map(|(_, b)| b).collect();
+        t.selected = um(t.selected);
+        t.hover = um(t.hover);
+        t.anker = um(t.anker);
+        t.edit = None;
+        t.bearbeitet = None;
+        // Hat der Elternknoten noch Kinder?
+        for i in 0..t.nodes.len() { t.nodes[i].has_children = false; }
+        for i in 0..t.nodes.len() {
+            let p = t.nodes[i].parent;
+            if p >= 0 { t.nodes[p as usize].has_children = true; }
+        }
+        t.sync();
+        Ok(())
     }
     pub fn tree_expand(&mut self, h: i64, node: i64, flag: bool) -> Result<(), String> {
         let t = self.tree_mut(h, "GUI_TREE_EXPAND")?;
@@ -171,14 +238,14 @@ impl Gui {
     }
     pub(super) fn ft_mut(&mut self, h: i64, fn_: &str) -> Result<&mut TreeState, String> {
         let t = self.tree_mut(h, fn_)?;
-        if t.datei.is_none() { return Err(format!("{}: Widget ist kein Dateibaum (GUI_FILETREE)", fn_)); }
+        if t.datei.is_none() { return Err(format!("{}: das Widget ist kein GUI_FILETREE", fn_)); }
         Ok(t)
     }
     pub(super) fn ft_ref(&self, h: i64, fn_: &str) -> Result<(&TreeState, &DateiBaum), String> {
         let t = self.tree_ref(h, fn_)?;
         match t.datei.as_deref() {
             Some(d) => Ok((t, d)),
-            None => Err(format!("{}: Widget ist kein Dateibaum (GUI_FILETREE)", fn_)),
+            None => Err(format!("{}: das Widget ist kein GUI_FILETREE", fn_)),
         }
     }
     /// Rueckstriche zu Schraegstrichen, kein Trennzeichen am Ende -- in EINER
@@ -227,25 +294,24 @@ impl Gui {
     pub fn filetree_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let t = self.ft_mut(h, "GUI_FILETREE_SET")?;
         let an = wert != 0.0;
-        match key.to_lowercase().as_str() {
-            "ordner_zuerst" | "dirs_first" => t.datei.as_mut().unwrap().ordner_zuerst = an,
-            "verborgene" | "hidden" => t.datei.as_mut().unwrap().verborgene = an,
-            "nur_ordner" | "dirs_only" => t.datei.as_mut().unwrap().nur_ordner = an,
+        match super::einstellungen::schluessel("GUI_FILETREE_SET", key, super::einstellungen::FILETREE)? {
+            "ordner_zuerst" => t.datei.as_mut().unwrap().ordner_zuerst = an,
+            "verborgene" => t.datei.as_mut().unwrap().verborgene = an,
+            "nur_ordner" => t.datei.as_mut().unwrap().nur_ordner = an,
             // Wie im Datei-Bereich einer Entwicklungsumgebung: ein Klick auf
             // einen Ordner klappt ihn um. Ohne das tut ein Klick auf eine
             // Ordnerzeile scheinbar nichts -- nur das schmale Dreieck wirkt.
-            "klick_klappt" | "click_expands" => t.datei.as_mut().unwrap().klick_klappt = an,
-            "nach_art" | "by_type" => t.datei.as_mut().unwrap().nach_art = an,
-            "mehrfachauswahl" | "multi" => { t.multi = an; t.sync(); }
-            "kaestchen" | "checkboxes" => t.kaestchen = an,
+            "klick_klappt" => t.datei.as_mut().unwrap().klick_klappt = an,
+            "nach_art" => t.datei.as_mut().unwrap().nach_art = an,
+            "mehrfachauswahl" => { t.multi = an; t.sync(); }
+            "kaestchen" => t.kaestchen = an,
             // In MILLISEKUNDEN, wie ueberall sonst -- innen in Sekunden, weil
             // die Uhr der Grafik so zaehlt.
-            "auffrischen" | "refresh" => {
+            "auffrischen" => {
                 t.datei.as_mut().unwrap().auffrischen = (wert.max(0.0)) / 1000.0;
                 t.datei.as_mut().unwrap().naechste = 0.0;
             }
-            _ => return Err(format!("GUI_FILETREE_SET: unbekannte Einstellung '{}' (gueltig: \
-                ordner_zuerst, verborgene, nur_ordner, nach_art, klick_klappt, mehrfachauswahl, kaestchen, auffrischen)", key)),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         dateibaum_neu(t);
         Ok(())
@@ -461,12 +527,12 @@ impl Gui {
     }
     pub(super) fn tc_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::TabControl { return Err(format!("{}: Widget ist kein Reiterwerk (GUI_TABCONTROL)", fn_)); }
+        if w.kind != Kind::TabControl { return Err(format!("{}: das Widget ist kein GUI_TABCONTROL", fn_)); }
         Ok(w)
     }
     pub(super) fn tc_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
         let w = self.wdg(h, fn_)?;
-        if w.kind != Kind::TabControl { return Err(format!("{}: Widget ist kein Reiterwerk (GUI_TABCONTROL)", fn_)); }
+        if w.kind != Kind::TabControl { return Err(format!("{}: das Widget ist kein GUI_TABCONTROL", fn_)); }
         Ok(w)
     }
     /// Eine Seite anhaengen -- liefert ihre Nummer.
@@ -546,12 +612,12 @@ impl Gui {
     }
     pub(super) fn akk_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::Accordion { return Err(format!("{}: Widget ist kein Akkordeon (GUI_ACCORDION)", fn_)); }
+        if w.kind != Kind::Accordion { return Err(format!("{}: das Widget ist kein GUI_ACCORDION", fn_)); }
         Ok(w)
     }
     pub(super) fn akk_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
         let w = self.wdg(h, fn_)?;
-        if w.kind != Kind::Accordion { return Err(format!("{}: Widget ist kein Akkordeon (GUI_ACCORDION)", fn_)); }
+        if w.kind != Kind::Accordion { return Err(format!("{}: das Widget ist kein GUI_ACCORDION", fn_)); }
         Ok(w)
     }
     pub(super) fn akk_nr(w: &Widget, i: i64, fn_: &str) -> Result<usize, String> {
@@ -625,8 +691,8 @@ impl Gui {
     pub fn accordion_set(&mut self, h: i64, key: &str, v: i64) -> Result<(), String> {
         let w = self.akk_mut(h, "GUI_ACCORDION_SET")?;
         let a = w.akk.get_or_insert_with(Default::default);
-        match key {
-            "mehrere" | "multiple" => {
+        match super::einstellungen::schluessel("GUI_ACCORDION_SET", key, super::einstellungen::ACCORDION)? {
+            "mehrere" => {
                 a.mehrere = v != 0;
                 // Aus "mehrere" zurueck zu einem: nur der erste offene bleibt.
                 if !a.mehrere {
@@ -634,7 +700,7 @@ impl Gui {
                     for o in a.offen.iter_mut() { if *o { if gesehen { *o = false; } gesehen = true; } }
                 }
             }
-            _ => return Err(format!("GUI_ACCORDION_SET: unbekannter Schluessel '{}' (erlaubt: mehrere)", key)),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -767,12 +833,12 @@ impl Gui {
     }
     pub(super) fn wz_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::Wizard { return Err(format!("{}: Widget ist kein Assistent (GUI_WIZARD)", fn_)); }
+        if w.kind != Kind::Wizard { return Err(format!("{}: das Widget ist kein GUI_WIZARD", fn_)); }
         Ok(w)
     }
     pub(super) fn wz_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
         let w = self.wdg(h, fn_)?;
-        if w.kind != Kind::Wizard { return Err(format!("{}: Widget ist kein Assistent (GUI_WIZARD)", fn_)); }
+        if w.kind != Kind::Wizard { return Err(format!("{}: das Widget ist kein GUI_WIZARD", fn_)); }
         Ok(w)
     }
     pub fn wizard_add(&mut self, h: i64, titel: String) -> Result<i64, String> {
@@ -820,9 +886,9 @@ impl Gui {
     pub fn wizard_set(&mut self, h: i64, key: &str, v: i64) -> Result<(), String> {
         let w = self.wz_mut(h, "GUI_WIZARD_SET")?;
         let z = w.wz.get_or_insert_with(Default::default);
-        match key {
-            "pruefen" | "validate" => z.pruefen = v != 0,
-            _ => return Err(format!("GUI_WIZARD_SET: unbekannter Schluessel '{}' (erlaubt: pruefen)", key)),
+        match super::einstellungen::schluessel("GUI_WIZARD_SET", key, super::einstellungen::WIZARD)? {
+            "pruefen" => z.pruefen = v != 0,
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -1036,9 +1102,10 @@ impl Gui {
     /// Vor der ersten Messung gilt eine Schaetzung an der Zeichenzahl; die war
     /// frueher die einzige und zu knapp: bei "Lagerorte" lief der Text in den
     /// naechsten Kopf (gefunden mit der Kuehlschrank-App).
-    /// Die Koepfe eines Reiterwerks (Seite, x0, x1). Passen sie nicht in
-    /// `breite`, werden die breitesten zuerst schmaler (ihr Titel endet dann
-    /// mit "…", `tc_titel`) -- vorher lagen Koepfe jenseits des Rands, eine
+    ///
+    /// Passen die Koepfe nicht in `breite`, werden die breitesten zuerst
+    /// schmaler (ihr Titel endet dann mit "...", `text_kuerzen` beim
+    /// Zeichnen) -- vorher lagen Koepfe jenseits des Rands, eine
     /// Seite war mit der Maus nicht zu erreichen (Kuehlschrank-App,
     /// Einstellungen mit sechs Reitern).
     pub(super) fn tc_koepfe(&self, ax: i32, breite: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
@@ -1122,9 +1189,9 @@ impl Gui {
     pub fn tabcontrol_set(&mut self, h: i64, schluessel: &str, wert: bool) -> Result<(), String> {
         let w = self.tc_mut(h, "GUI_TABCONTROL_SET")?;
         let st = w.tabctl.get_or_insert_with(Default::default);
-        match schluessel.to_lowercase().as_str() {
-            "schliessbar" | "closable" => { st.schliessbar = wert; Ok(()) }
-            _ => Err(format!("GUI_TABCONTROL_SET: unbekannter Schluessel '{}' (bekannt: schliessbar)", schluessel)),
+        match super::einstellungen::schluessel("GUI_TABCONTROL_SET", schluessel, super::einstellungen::TABCONTROL)? {
+            "schliessbar" => { st.schliessbar = wert; Ok(()) }
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
     }
     /// GUI_TABCONTROL_CLOSED(tc): welche Seite in diesem Bild zu soll
@@ -1223,13 +1290,13 @@ impl Gui {
     /// `tc_koepfe`, derselben Rechnung wie Zeichnen und Klick. Gebraucht fuer
     /// Pruefungen mit echten Klicks (das Studio protokolliert damit seine
     /// Reiter).
-    pub fn tabcontrol_item_rect(&self, h: i64, seite: i64) -> Result<(i32, i32, i32, i32), String> {
-        let w = self.wdg(h, "GUI_TABCONTROL_ITEM_RECT")?;
+    pub fn tabcontrol_item_rect(&self, h: i64, seite: i64, fn_: &str) -> Result<(i32, i32, i32, i32), String> {
+        let w = self.wdg(h, fn_)?;
         if w.kind != Kind::TabControl {
-            return Err("GUI_TABCONTROL_ITEM_RECT: Widget ist kein Reiterwerk".into());
+            return Err(format!("{}: das Widget ist kein GUI_TABCONTROL", fn_));
         }
         if seite < 0 || seite as usize >= w.items.len() {
-            return Err(format!("GUI_TABCONTROL_ITEM_RECT: Seite {} ausserhalb [0..{}]", seite, w.items.len() as i64 - 1));
+            return Err(format!("{}: Seite {} ausserhalb [0..{}]", fn_, seite, w.items.len() as i64 - 1));
         }
         let (wi, _) = Self::dec_widget(h);
         let (ax, ay, bw, _) = self.abs_rect(wi, w);
@@ -1242,11 +1309,11 @@ impl Gui {
     /// Beschriftung (hinter Einzug und Dreieck). Aus derselben Rechnung wie
     /// der Klick (`tree_press`). Ein Knoten unter einem zugeklappten liefert
     /// (0, 0, 0, 0). Gebraucht fuer Pruefungen mit echten Klicks.
-    pub fn tree_item_rect(&self, h: i64, node: i64) -> Result<(i32, i32, i32, i32), String> {
-        let w = self.wdg(h, "GUI_TREE_ITEM_RECT")?;
-        let t = match w.tree.as_ref() { Some(t) if w.kind == Kind::Tree => t, _ => return Err("GUI_TREE_ITEM_RECT: Widget ist kein Baum".into()) };
+    pub fn tree_item_rect(&self, h: i64, node: i64, fn_: &str) -> Result<(i32, i32, i32, i32), String> {
+        let w = self.wdg(h, fn_)?;
+        let t = match w.tree.as_ref() { Some(t) if w.kind == Kind::Tree => t, _ => return Err(format!("{}: das Widget ist kein GUI_TREE", fn_)) };
         if node < 0 || node as usize >= t.nodes.len() {
-            return Err(format!("GUI_TREE_ITEM_RECT: Knoten {} ausserhalb [0..{}]", node, t.nodes.len() as i64 - 1));
+            return Err(format!("{}: Knoten {} ausserhalb [0..{}]", fn_, node, t.nodes.len() as i64 - 1));
         }
         let (wi, _) = Self::dec_widget(h);
         let vis = Self::tree_visible(t);
@@ -1383,12 +1450,12 @@ impl Gui {
     }
     pub(super) fn tp_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
         let w = self.wdg_mut(h, fn_)?;
-        if w.kind != Kind::TimePicker { return Err(format!("{}: Widget ist kein Uhrzeitwaehler (GUI_TIMEPICKER)", fn_)); }
+        if w.kind != Kind::TimePicker { return Err(format!("{}: das Widget ist kein GUI_TIMEPICKER", fn_)); }
         Ok(w)
     }
     pub fn time_get(&self, h: i64) -> Result<String, String> {
         let w = self.wdg(h, "GUI_TIME")?;
-        if w.kind != Kind::TimePicker { return Err("GUI_TIME: Widget ist kein Uhrzeitwaehler (GUI_TIMEPICKER)".into()); }
+        if w.kind != Kind::TimePicker { return Err("GUI_TIME: das Widget ist kein GUI_TIMEPICKER".into()); }
         Ok(format!("{:02}:{:02}:{:02}", w.zeit[0], w.zeit[1], w.zeit[2]))
     }
     pub fn set_time(&mut self, h: i64, t: &str) -> Result<(), String> {
@@ -1411,8 +1478,8 @@ impl Gui {
         let breite_vorgabe = self.tp_breite(0, false);
         let breite_sek = self.tp_breite(0, true);
         let w = self.tp_mut(h, "GUI_TIMEPICKER_SET")?;
-        match key.to_lowercase().as_str() {
-            "sekunden" | "seconds" => {
+        match super::einstellungen::schluessel("GUI_TIMEPICKER_SET", key, super::einstellungen::TIMEPICKER)? {
+            "sekunden" => {
                 let an = wert != 0.0;
                 // Die Breite wandert mit, solange sie die Vorgabe ist -- wer
                 // sie selbst gesetzt hat, behaelt seine.
@@ -1423,9 +1490,8 @@ impl Gui {
                 w.zeit_sek = an;
             }
             // Schrittweite der MINUTE (5 heisst: in Fuenferschritten).
-            "schritt" | "step" => w.step = wert.max(1.0),
-            _ => return Err(format!(
-                "GUI_TIMEPICKER_SET: unbekannte Einstellung '{}' (gueltig: sekunden, schritt)", key)),
+            "schritt" => w.step = wert.max(1.0),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
         Ok(())
     }
@@ -1457,5 +1523,45 @@ impl Gui {
         // Obere Haelfte hoch, untere runter -- dieselbe Geste wie am Zahlenfeld.
         let hoch = my < ay + h / 2;
         self.tp_dreh(wi, i, teil, if hoch { 1 } else { -1 });
+    }
+
+    /// Dateibaeume mit eingestelltem Takt neu von der Platte lesen. Ohne das
+    /// zeigt ein Baum eine frisch angelegte Datei erst, wenn ihn jemand von
+    /// Hand auffrischt -- und darauf zu kommen ist niemandes Aufgabe.
+    pub(super) fn dateibaeume_auffrischen(&mut self, jetzt: f64) {
+        let mut bedarf = f64::INFINITY;
+        for win in self.windows.iter_mut() {
+            if !win.alive || !win.visible { continue; }
+            for wdg in win.widgets.iter_mut() {
+                let Some(t) = wdg.tree.as_mut() else { continue };
+                let takt = match t.datei.as_ref() {
+                    Some(d) if d.auffrischen > 0.0 && jetzt >= d.naechste => d.auffrischen,
+                    Some(d) if d.auffrischen > 0.0 => { bedarf = bedarf.min(d.naechste - jetzt); continue; }
+                    _ => continue,
+                };
+                t.datei.as_mut().unwrap().naechste = jetzt + takt;
+                bedarf = bedarf.min(takt);
+                dateibaum_neu(t);
+            }
+        }
+        self.bild_in(bedarf);
+    }
+
+    /// Lage und Groesse des Kaestchens in einer Baumzeile -- EINE Quelle fuer
+    /// Zeichnen und Treffertest; laufen sie auseinander, kippt der Haken neben
+    /// dem, was man anklickt.
+    pub(super) fn tree_kast(&self, ax: i32, level: i32) -> (i32, i32) {
+        (ax + 2 + level * self.sk(TREE_INDENT), (self.sk(TREE_ROW_H) - 6).max(8))
+    }
+
+    /// Wie viel Platz die Kaestchen-Spalte wegnimmt (0, wenn es keine gibt).
+    ///
+    /// Sie steht GANZ LINKS, vor dem Auf-/Zuklapp-Dreieck. Zwischen Dreieck
+    /// und Namen lag sie genau dort, wo man eine Zeile anklickt, um sie zu
+    /// oeffnen -- ein Klick auf den Namen setzte dann einen Haken statt die
+    /// Datei aufzumachen. Aufgefallen ist es an einem Test aus Stand 24, der
+    /// eine Datei im Unterordner oeffnet.
+    pub(super) fn tree_kast_w(&self, t: &TreeState) -> i32 {
+        if t.kaestchen { (self.sk(TREE_ROW_H) - 6).max(8) + 4 } else { 0 }
     }
 }

@@ -103,7 +103,7 @@ SPELL_LOAD: 'gibtsnicht.dic' laesst sich nicht
 SPELL_SUGGEST: hoechstens 0 Vorschlaege -- erwartet 1 oder mehr
 
 === die sprachen kommen aus dem ordner
-' DHRT_WOERTERBUECHER geht vor -- auch unter Windows, dann ohne die
+' DHRT_DICTIONARIES geht vor -- auch unter Windows, dann ohne die
 ' Systempruefung.
 DIM n AS ARRAY OF STRING
 n = SPELL_LANGUAGES()
@@ -138,7 +138,7 @@ SET UTF-8
 x
 
 --- umgebung
-DHRT_WOERTERBUECHER={fall}/buecher
+DHRT_DICTIONARIES={fall}/buecher
 --- erwartet
 de-AT,en-US
 de-AT TRUE

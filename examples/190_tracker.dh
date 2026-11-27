@@ -1495,8 +1495,8 @@ END SUB
 
 ' ------------------------------------------------------------ Bearbeiten
 SUB cursorSichtbar()
-    DIM sichtR AS INTEGER : sichtR = (GUI_CANVAS_H(gitter) - HDR_H) \ ROW_H
-    DIM sichtC AS INTEGER : sichtC = (GUI_CANVAS_W(gitter) - RH_W) \ CELL_W
+    DIM sichtR AS INTEGER : sichtR = (GUI_CANVAS_SCREEN_H(gitter) - HDR_H) \ ROW_H
+    DIM sichtC AS INTEGER : sichtC = (GUI_CANVAS_SCREEN_W(gitter) - RH_W) \ CELL_W
     IF curR < rowOff THEN rowOff = curR
     IF curR >= rowOff + sichtR THEN rowOff = curR - sichtR + 1
     IF curC < chOff THEN chOff = curC
@@ -1899,10 +1899,10 @@ FUNCTION kanalNote(c AS INTEGER) AS INTEGER
 END FUNCTION
 
 SUB zeichneGitter()
-    DIM gx AS INTEGER : gx = GUI_CANVAS_X(gitter)
-    DIM gy AS INTEGER : gy = GUI_CANVAS_Y(gitter)
-    DIM gw AS INTEGER : gw = GUI_CANVAS_W(gitter)
-    DIM gh AS INTEGER : gh = GUI_CANVAS_H(gitter)
+    DIM gx AS INTEGER : gx = GUI_CANVAS_SCREEN_X(gitter)
+    DIM gy AS INTEGER : gy = GUI_CANVAS_SCREEN_Y(gitter)
+    DIM gw AS INTEGER : gw = GUI_CANVAS_SCREEN_W(gitter)
+    DIM gh AS INTEGER : gh = GUI_CANVAS_SCREEN_H(gitter)
     SCISSOR(gx, gy, gw, gh)
     BOX(gx, gy, gx + gw - 1, gy + gh - 1, &H0A0E14)
     ' Das Gitter in einer Schrift mit gleich breiten Zeichen: die Spalten
@@ -2019,19 +2019,19 @@ CONST KACHEL_B = 96
 DIM uebOff AS INTEGER : uebOff = 0
 
 FUNCTION uebersichtBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
-    DIM ux AS INTEGER : ux = GUI_CANVAS_X(uebersicht)
-    DIM uy AS INTEGER : uy = GUI_CANVAS_Y(uebersicht)
-    IF mx < ux OR my < uy OR mx >= ux + GUI_CANVAS_W(uebersicht) OR my >= uy + GUI_CANVAS_H(uebersicht) THEN RETURN -1
+    DIM ux AS INTEGER : ux = GUI_CANVAS_SCREEN_X(uebersicht)
+    DIM uy AS INTEGER : uy = GUI_CANVAS_SCREEN_Y(uebersicht)
+    IF mx < ux OR my < uy OR mx >= ux + GUI_CANVAS_SCREEN_W(uebersicht) OR my >= uy + GUI_CANVAS_SCREEN_H(uebersicht) THEN RETURN -1
     DIM i AS INTEGER : i = uebOff + (mx - ux - 4) \ (KACHEL_B + 6)
     IF i < 0 OR i >= orderAnz THEN RETURN -1
     RETURN i
 END FUNCTION
 
 SUB zeichneUebersicht()
-    DIM ux AS INTEGER : ux = GUI_CANVAS_X(uebersicht)
-    DIM uy AS INTEGER : uy = GUI_CANVAS_Y(uebersicht)
-    DIM uw AS INTEGER : uw = GUI_CANVAS_W(uebersicht)
-    DIM uh AS INTEGER : uh = GUI_CANVAS_H(uebersicht)
+    DIM ux AS INTEGER : ux = GUI_CANVAS_SCREEN_X(uebersicht)
+    DIM uy AS INTEGER : uy = GUI_CANVAS_SCREEN_Y(uebersicht)
+    DIM uw AS INTEGER : uw = GUI_CANVAS_SCREEN_W(uebersicht)
+    DIM uh AS INTEGER : uh = GUI_CANVAS_SCREEN_H(uebersicht)
     SCISSOR(ux, uy, uw, uh)
     BOX(ux, uy, ux + uw - 1, uy + uh - 1, &H0A0E14)
     DIM passen AS INTEGER : passen = MAX(1, (uw - 8) \ (KACHEL_B + 6))
@@ -2073,10 +2073,10 @@ END SUB
 ' Zwei Oktaven, ab C der gewaehlten Oktave. Weisse Tasten teilen die
 ' Breite, schwarze sitzen auf den Fugen.
 FUNCTION pianoTasteBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
-    DIM px AS INTEGER : px = GUI_CANVAS_X(piano)
-    DIM py AS INTEGER : py = GUI_CANVAS_Y(piano)
-    DIM pw AS INTEGER : pw = GUI_CANVAS_W(piano)
-    DIM ph AS INTEGER : ph = GUI_CANVAS_H(piano)
+    DIM px AS INTEGER : px = GUI_CANVAS_SCREEN_X(piano)
+    DIM py AS INTEGER : py = GUI_CANVAS_SCREEN_Y(piano)
+    DIM pw AS INTEGER : pw = GUI_CANVAS_SCREEN_W(piano)
+    DIM ph AS INTEGER : ph = GUI_CANVAS_SCREEN_H(piano)
     IF mx < px OR my < py OR mx >= px + pw OR my >= py + ph THEN RETURN -1
     DIM basis AS INTEGER : basis = INT(GUI_VALUE(spOkt)) * 12 + 12
     DIM wb AS FLOAT : wb = pw / 14.0
@@ -2101,10 +2101,10 @@ FUNCTION pianoTasteBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
 END FUNCTION
 
 SUB zeichnePiano()
-    DIM px AS INTEGER : px = GUI_CANVAS_X(piano)
-    DIM py AS INTEGER : py = GUI_CANVAS_Y(piano)
-    DIM pw AS INTEGER : pw = GUI_CANVAS_W(piano)
-    DIM ph AS INTEGER : ph = GUI_CANVAS_H(piano)
+    DIM px AS INTEGER : px = GUI_CANVAS_SCREEN_X(piano)
+    DIM py AS INTEGER : py = GUI_CANVAS_SCREEN_Y(piano)
+    DIM pw AS INTEGER : pw = GUI_CANVAS_SCREEN_W(piano)
+    DIM ph AS INTEGER : ph = GUI_CANVAS_SCREEN_H(piano)
     DIM wb AS FLOAT : wb = pw / 14.0
     DIM i AS INTEGER
     DIM basis AS INTEGER : basis = INT(GUI_VALUE(spOkt)) * 12 + 12
@@ -2235,7 +2235,7 @@ WHILE TRUE
         IF songModus AND kopfPat >= 0 AND kopfPat <> patAkt THEN patternWaehlen(kopfPat)
         ' Mitlaufen: die klingende Reihe bleibt im Bild.
         IF kopfPat = patAkt AND kopfRow >= 0 THEN
-            DIM sichtRk AS INTEGER : sichtRk = (GUI_CANVAS_H(gitter) - HDR_H) \ ROW_H
+            DIM sichtRk AS INTEGER : sichtRk = (GUI_CANVAS_SCREEN_H(gitter) - HDR_H) \ ROW_H
             IF kopfRow < rowOff OR kopfRow >= rowOff + sichtRk THEN rowOff = MAX(0, kopfRow - sichtRk \ 4)
         END IF
     END IF
@@ -2459,10 +2459,10 @@ WHILE TRUE
     END IF
 
     ' ---- Maus im Gitter
-    DIM gx AS INTEGER : gx = GUI_CANVAS_X(gitter)
-    DIM gy AS INTEGER : gy = GUI_CANVAS_Y(gitter)
-    DIM gw AS INTEGER : gw = GUI_CANVAS_W(gitter)
-    DIM gh AS INTEGER : gh = GUI_CANVAS_H(gitter)
+    DIM gx AS INTEGER : gx = GUI_CANVAS_SCREEN_X(gitter)
+    DIM gy AS INTEGER : gy = GUI_CANVAS_SCREEN_Y(gitter)
+    DIM gw AS INTEGER : gw = GUI_CANVAS_SCREEN_W(gitter)
+    DIM gh AS INTEGER : gh = GUI_CANVAS_SCREEN_H(gitter)
     DIM mx AS INTEGER : mx = MOUSEX()
     DIM my AS INTEGER : my = MOUSEY()
     DIM imGitter AS BOOLEAN

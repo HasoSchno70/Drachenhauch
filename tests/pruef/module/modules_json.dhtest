@@ -130,7 +130,7 @@ IMPORT "json"
 DIM h AS JSON_HANDLE
 h = JSON_PARSE("{not valid json")
 --- fehler
-JSON_PARSE: key must be a string at line 1 column 2
+JSON_PARSE: kein gueltiges JSON (Zeile 1, Spalte 2)
 
 === path into non container raises
 IMPORT "json"

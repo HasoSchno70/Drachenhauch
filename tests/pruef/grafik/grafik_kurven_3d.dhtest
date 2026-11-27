@@ -177,8 +177,6 @@ FUNCTION probe$(n AS INTEGER) AS STRING
             CASE 2
                 DIM c AS ARRAY OF INTEGER : c = [1, 2, 3]
                 SPLINE_BASIS(c, c)
-            CASE 3 : BEZIER(0, 0, 10, 10)
-            CASE 4 : CAPSULE(0, 0, 0, 1, 1, 1, 0.5)
             CASE 5 : DIM q AS TUPLE : q = MODEL_BBOX(99)
             CASE 6
                 DIM v AS IMAGE : v = GENTEX_COLOR(8, 8, RED)
@@ -199,7 +197,38 @@ DHRT_FRAMES=2
 --- enthaelt
 SPLINE_BEZIER: braucht 4, 7, 10 ... Punkte (Anfang, dann je zwei Kontrollpunkte und ein Ende), nicht 5
 SPLINE_BASIS: braucht mindestens 4 Punkte, nicht 3
-BEZIER: erwartet (x1, y1, kx, ky, x2, y2[, farbe[, breite]])
-CAPSULE: erwartet (x1, y1, z1, x2, y2, z2, r, farbe)
 MODEL_BBOX: ungueltiges MODEL-Handle 99
 BILLBOARD_PART: Breite und Hoehe des Ausschnitts muessen groesser als 0 sein
+
+=== eine falsche argumentzahl ist ein fehler beim uebersetzen
+' Seit 2026.54 haelt schon der Compiler an (vorher eine Warnung und der
+' Fehler erst, wenn die Zeile lief) -- mit der Aufrufform aus dem Index.
+BEZIER(0, 0, 10, 10)
+--- fehler
+BEZIER: erwartet 6 bis 8 Argumente, erhalten 4 -- Aufruf: BEZIER(
+
+=== camera3d_update nimmt den modus als wort, scroll sagt was stattdessen
+' CAMERA3D_UPDATE nahm nur Zahlen 0..4; jetzt auch das Wort, englisch oder
+' deutsch (Bericht B9.1). SCROLL tat still nichts und sagt jetzt, was
+' verschiebt (Bericht C4.1).
+IMPORT "g3d"
+SCREEN(160, 120, "t")
+CAMERA3D(6, 5, 8, 0, 0, 0, 45)
+CAMERA3D_UPDATE("orbital") : CAMERA3D_UPDATE("ego") : CAMERA3D_UPDATE("eigen") : CAMERA3D_UPDATE(1)
+PRINT "woerter ok"
+TRY
+    CAMERA3D_UPDATE("kreisel")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    SCROLL(4, 0)
+CATCH e
+    PRINT LEFT$(e, 55)
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+woerter ok
+CAMERA3D_UPDATE: unbekannter Modus 'kreisel' -- free/frei, orbital/umkreisend, first_person/ego, third_person/verfolger, custom/eigen
+SCROLL: verschiebt in Drachenhauch nichts -- jedes Bild

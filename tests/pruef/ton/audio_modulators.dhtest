@@ -87,7 +87,7 @@ ok
 IMPORT "audio"
 AUDIO_LFO_NEW("wobbel", 1.0)
 --- fehler
-AUDIO_LFO: unbekannte Wellenform 'wobbel' -- erwartet sine/triangle/saw/pulse
+AUDIO_LFO_NEW: unbekannte Wellenform 'wobbel' (erlaubt: sine, square/pulse, saw, triangle, noise
 
 === negative frequency is rejected before touching the device
 IMPORT "audio"
@@ -281,3 +281,15 @@ PRINT AUDIO_BUS_GET_VOLUME("sfx")
 pegel 50 300 < 0.12
 pegel 550 750 > 0.7
 
+=== eine tafel fuer die wellenformen
+' AUDIO_TONE/NOTE/SFX und AUDIO_LFO_NEW lesen dieselbe Tafel: englisch und
+' deutsch, "pulse" wie "square" (Bericht A14.1; bis 2026.53 drei Leser).
+IMPORT "audio"
+DIM s AS SOUND : s = AUDIO_TONE(440, 50, "rechteck", 0.5)
+DIM n AS SOUND : n = AUDIO_NOTE("saege", 220, 100, 0, 0, 1.0, 0, 0.5)
+DIM m AS AUDIO_MOD : m = AUDIO_LFO_NEW("pulse", 2.0)
+PRINT "geht"
+--- umgebung
+DHRT_OHNE_AUDIO=1
+--- erwartet
+geht

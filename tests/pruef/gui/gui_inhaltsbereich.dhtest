@@ -51,4 +51,4 @@ CATCH e
     PRINT e
 END TRY
 --- erwartet
-GUI_WINDOW_CONTENT_*: ungueltiges GUI_WINDOW-Handle
+GUI_WINDOW_CONTENT_H: ungueltiges GUI_WINDOW-Handle 99

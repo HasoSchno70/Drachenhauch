@@ -30,6 +30,7 @@ Datenblätter zählen ab 1 oder schreiben die Bereichsziffer davor
 | `MODBUS_RTU(port$ [, baud [, format$ [, unit]]])` → MODBUS | Modbus RTU über RS-485: `"COM4"`/`"/dev/ttyUSB0"` (Feature `serial`), Baud Vorgabe 9600, Format Vorgabe `"8N1"` (`"8E1"`, `"8O1"`, `"8N2"`, ...); oder `"tcp:host:port"` für einen RTU-Umsetzer im Netz |
 | `MODBUS_UNIT(m, unit)` | Geräteadresse für die folgenden Anfragen (0..255; bei RTU heißt 0 „an alle“, dann kommt keine Antwort) |
 | `MODBUS_TIMEOUT(m, ms)` | wie lange auf eine Antwort gewartet wird (10..60000, Vorgabe 1000) |
+| `MODBUS_SET_TIMEOUT(m, ms)` | neuer Name für `MODBUS_TIMEOUT` (Fristen heißen `_SET_TIMEOUT` und zählen ms) |
 | `MODBUS_CLOSE(m)` | schließen |
 
 Mehrere Geräte an einem RS-485-Bus teilen sich eine Verbindung — vor jeder

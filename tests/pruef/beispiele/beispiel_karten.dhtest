@@ -330,8 +330,8 @@ DIM prZieht AS BOOLEAN
 DIM prX0 AS FLOAT
 DIM prY0 AS FLOAT
 FUNCTION prUnter(mx AS INTEGER, my AS INTEGER, lat AS BOOLEAN) AS FLOAT
-    DIM dx AS FLOAT : dx = mx - GUI_CANVAS_X(cvKarte) - karteB() / 2
-    DIM dy AS FLOAT : dy = my - GUI_CANVAS_Y(cvKarte) - karteH() / 2
+    DIM dx AS FLOAT : dx = mx - GUI_CANVAS_SCREEN_X(cvKarte) - karteB() / 2
+    DIM dy AS FLOAT : dy = my - GUI_CANVAS_SCREEN_Y(cvKarte) - karteH() / 2
     IF lat THEN RETURN latAus(mitteY + dy, zoom)
     RETURN lonAus(mitteX + dx, zoom)
 END FUNCTION

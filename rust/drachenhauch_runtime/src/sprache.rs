@@ -236,7 +236,7 @@ fn stille_kuerzen(s: &mut Vec<f64>, rate: u32) {
 
 /// Woerter je Minute fuer `say`/`espeak-ng`: beide sprechen bei etwa 175
 /// normal; der Faktor skaliert das.
-#[allow(dead_code)]
+#[cfg_attr(windows, allow(dead_code))]
 fn woerter_je_minute(tempo: f64) -> u32 { (175.0 * tempo).round().clamp(80.0, 450.0) as u32 }
 
 // ---------------------------------------------------------------------------

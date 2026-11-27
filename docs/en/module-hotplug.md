@@ -17,8 +17,10 @@ What is watched is what this build knows (`HOTPLUG_KINDS`):
 | `"midi_in"`, `"midi_out"` | MIDI inputs and outputs | feature `midi` |
 | `"hid"` | USB HID devices, as `"VID:PID Produkt"` | feature `usb` |
 
-The names are the same ones `SERIAL_PORTS`, `MIDI_IN_NAME$` and `USB_LIST`
-return — whoever is told that `COM5` has appeared opens `COM5`.
+For `serial` and MIDI the names are the same ones `SERIAL_PORTS` and
+`MIDI_IN_NAME$` return — whoever is told that `COM5` has appeared opens
+`COM5`. For `hid` the `VID:PID` id from the first column of `USB_LIST` (the
+one `USB_OPEN` takes) comes first, followed by the product name.
 
 ## Commands
 
@@ -62,7 +64,7 @@ its own looks at the same lists every 500 ms and compares them with the state
 before — a report therefore comes up to half a second after plugging in. An
 HID device with several interfaces counts once.
 
-For testing without a device: `DHRT_GERAETE=datei` reads the lists from a text
+For testing without a device: `DHRT_DEVICES=datei` reads the lists from a text
 file instead of the system, one line per device as `art:name`. Changing the
 file produces the reports (`tests/pruef/geraete/hotplug.dhtest`).
 

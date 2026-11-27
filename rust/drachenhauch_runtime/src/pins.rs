@@ -219,15 +219,6 @@ fn bereich(f: &str, was: &str, v: i64, lo: i64, hi: i64) -> Result<(), String> {
     if v < lo || v > hi { Err(format!("{f}: {was} {v} ausserhalb {lo}..{hi}")) } else { Ok(()) }
 }
 
-pub fn bytes_pruefen(f: &str, d: &[i64]) -> Result<Vec<u8>, String> {
-    let mut out = Vec::with_capacity(d.len());
-    for (k, &x) in d.iter().enumerate() {
-        if !(0..=255).contains(&x) { return Err(format!("{f}: Byte {x} an Stelle {k} ausserhalb 0..255")); }
-        out.push(x as u8);
-    }
-    Ok(out)
-}
-
 pub fn i2c_adresse_pruefen(f: &str, adr: i64) -> Result<(), String> { bereich(f, "Adresse", adr, 0, 1023) }
 
 // ---------------------------------------------------------------------------
@@ -866,6 +857,5 @@ mod tests {
         assert_eq!(i2c_bus_pfad("/dev/i2c-3"), "/dev/i2c-3");
         assert_eq!(gpio_chip_pfad("4"), "/dev/gpiochip4");
         assert_eq!(gpio_chip_pfad("gpiochip0"), "/dev/gpiochip0");
-        assert!(bytes_pruefen("I2C_WRITE", &[1, 256]).unwrap_err().contains("Stelle 1"));
     }
 }

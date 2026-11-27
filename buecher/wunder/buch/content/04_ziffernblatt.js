@@ -108,14 +108,14 @@ module.exports = (H) => [
 
   H.p("Dieser Fehler kommt vor dem Start. Er ist in Kapitel 1 schon einmal fast passiert: Die Warp-Taste braucht ein veränderliches Tempo neben dem festen TEMPO, und es heißt darum flug."),
 
-  H.h3("Die Teile einer Zeit heißen deutsch"),
+  H.h3("Ein Teil, den es nicht gibt"),
 
   H.code(zeilen("kap04/fehler_teil.dh")),
-  H.code(["Laufzeitfehler in fehler_teil.dh:3: TIME_PART: 'hour' ist kein Feld",
-          "-- moeglich sind jahr, monat, tag, stunde, minute, sekunde,",
-          "wochentag"], { out: true }),
+  H.code(["Laufzeitfehler in fehler_teil.dh:3: TIME_PART: 'stunden' ist kein Feld",
+          "-- moeglich sind year/jahr, month/monat, day/tag, hour/stunde,",
+          "minute, second/sekunde, weekday/wochentag"], { out: true }),
 
-  H.p("Die Befehle des Moduls heißen englisch (TIME_PART), die Namen der Teile aber deutsch: \"stunde\", \"minute\", \"sekunde\". Die Meldung nennt den Befehl so, wie er im Programm steht, und zählt alle erlaubten Teile auf."),
+  H.p("Jeder Teil einer Zeit hat zwei Namen, einen englischen und einen deutschen: \"hour\" oder \"stunde\", \"minute\", \"second\" oder \"sekunde\". Ein Teil, den es nicht gibt — hier die Mehrzahl —, ist ein Laufzeitfehler. Die Meldung nennt den Befehl so, wie er im Programm steht, und zählt alle erlaubten Teile auf."),
 
   H.h2("Übungen"),
 

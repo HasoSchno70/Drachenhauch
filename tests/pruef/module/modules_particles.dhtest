@@ -105,9 +105,9 @@ PARTICLE_SET_VELOCITY: max muss >= min sein
 IMPORT "particles"
 DIM s AS PARTICLE_SYSTEM
 s = PARTICLE_SYSTEM_NEW(0.0, 0.0)
-PARTICLE_SET_COLOR(s, 16777217)
+PARTICLE_SET_COLOR(s, -1)
 --- fehler
-PARTICLE_SET_COLOR: Farbe muss 0..0xFFFFFF sein
+PARTICLE_SET_COLOR: Farbe muss 0..&HFFFFFFFF sein
 
 === set size invalid raises
 IMPORT "particles"

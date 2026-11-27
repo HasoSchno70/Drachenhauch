@@ -30,7 +30,8 @@ lies beneath it.
 | `HTTPD_QUERY$(s, name$)` → STRING | a value from `?a=1&b=2` (decoded) |
 | `HTTPD_HEADER$(s, name$)` → STRING | a header (case does not matter) |
 | `HTTPD_BODY$(s)` → STRING | the body (with `POST`) |
-| `HTTPD_SEND(s, code, type$, content$)` | reply and close |
+| `HTTPD_BODY_BYTES(s)` → BUFFER | the body as it came (images, files) |
+| `HTTPD_SEND(s, code, type$, content$)` | reply and close; `content$` may be a BUFFER (images, downloads) |
 | `HTTPD_SET_HEADER(s, name$, value$)` | a header for **all** following replies; an empty value removes it |
 | `HTTPD_SEND_FILE(s, code, path$)` | serve a specific file |
 | `HTTPD_SEND_DIR(s, folder$[, start$])` → BOOLEAN | resolve the requested path **safely** inside the folder |

@@ -366,7 +366,7 @@ END TRY
 --- umgebung
 DHRT_FRAMES=1
 --- enthaelt
-ist kein Dateibaum
+ist kein GUI_FILETREE
 
 === select rollt die gewaehlte zeile ins bild
 ' 60 Dateien in einem niedrigen Baum: nach GUI_FILETREE_SELECT auf eine

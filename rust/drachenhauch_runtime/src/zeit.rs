@@ -103,17 +103,12 @@ pub fn wochentag(t: i64) -> i64 {
     (t.div_euclid(SEK_PRO_TAG) + 3).rem_euclid(7) + 1
 }
 
-fn ist_schaltjahr(jahr: i64) -> bool {
-    (jahr % 4 == 0 && jahr % 100 != 0) || jahr % 400 == 0
-}
-
+/// Tage im Monat -- die Rechnung steht EINMAL, in `kalender.rs` (bis
+/// 2026.53 hier eine Kopie samt eigenem Schaltjahr). Das Jahr ist hier i64;
+/// der Kalender rechnet nur das Schaltjahr, dafuer reicht der Rest zu 400.
 fn tage_im_monat(jahr: i64, monat: i64) -> i64 {
-    match monat {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 => if ist_schaltjahr(jahr) { 29 } else { 28 },
-        _ => 0,
-    }
+    // Der gregorianische Kalender wiederholt sich alle 400 Jahre.
+    crate::kalender::tage_im_monat(2000 + jahr.rem_euclid(400) as i32, monat as i32) as i64
 }
 
 /// Liest einen Zeitpunkt aus Text.
@@ -348,20 +343,22 @@ pub fn dauer(sekunden: i64) -> String {
 /// Einzelnes Feld eines Zeitpunkts. `None` = unbekannter Name.
 pub fn teil(t: i64, was: &str) -> Option<i64> {
     let (j, mo, d, h, mi, s) = in_teile(t);
+    // Eingang zweisprachig, englisch zuerst (Bericht A14; bis 2026.53 nur
+    // deutsch -- TIME_PART(t, "year") scheiterte am englischen Namen).
     match was.to_lowercase().as_str() {
-        "jahr" => Some(j),
-        "monat" => Some(mo),
-        "tag" => Some(d),
-        "stunde" => Some(h),
+        "year" | "jahr" => Some(j),
+        "month" | "monat" => Some(mo),
+        "day" | "tag" => Some(d),
+        "hour" | "stunde" => Some(h),
         "minute" => Some(mi),
-        "sekunde" => Some(s),
-        "wochentag" => Some(wochentag(t)),
+        "second" | "sekunde" => Some(s),
+        "weekday" | "wochentag" => Some(wochentag(t)),
         _ => None,
     }
 }
 
 /// Die Namen, die `teil` versteht -- fuer die Fehlermeldung.
-pub const TEILE: &str = "jahr, monat, tag, stunde, minute, sekunde, wochentag";
+pub const TEILE: &str = "year/jahr, month/monat, day/tag, hour/stunde, minute, second/sekunde, weekday/wochentag";
 
 #[cfg(test)]
 mod tests {
@@ -493,6 +490,7 @@ mod tests {
     fn teile_lesen() {
         let t = aus_teilen(2026, 8, 28, 20, 30, 5);
         assert_eq!(teil(t, "jahr"), Some(2026));
+        assert_eq!(teil(t, "year"), Some(2026));
         assert_eq!(teil(t, "monat"), Some(8));
         assert_eq!(teil(t, "STUNDE"), Some(20));
         assert_eq!(teil(t, "quartal"), None);

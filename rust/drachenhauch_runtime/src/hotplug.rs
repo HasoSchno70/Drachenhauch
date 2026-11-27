@@ -9,7 +9,7 @@
 //! vergleicht mit dem Stand davor. Was beim ersten Blick schon da ist, gilt
 //! als Ausgangslage und wird nicht gemeldet -- dafuer ist `HOTPLUG_LIST`.
 //!
-//! **Pruefbar ohne Geraet:** `DHRT_GERAETE=datei` liest die Listen statt vom
+//! **Pruefbar ohne Geraet:** `DHRT_DEVICES=datei` liest die Listen statt vom
 //! System aus einer Textdatei (`art:name` je Zeile) -- eine Pruefung aendert
 //! die Datei und sieht die Meldungen.
 
@@ -35,7 +35,7 @@ struct Waechter {
 static W: OnceLock<Mutex<Waechter>> = OnceLock::new();
 
 fn simuliert() -> Option<String> {
-    std::env::var("DHRT_GERAETE").ok().filter(|s| !s.is_empty())
+    crate::umgebung::var("DHRT_DEVICES").ok().filter(|s| !s.is_empty())
 }
 
 /// Die Arten, die dieser Bau beobachten kann.

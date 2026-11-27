@@ -1,7 +1,6 @@
 //! Barrierefreiheit: der Baum fuer den Bildschirmleser und seine Aktionen (a11y.rs).
 //!
-//! Teil von `gui.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `gui.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
@@ -70,7 +69,7 @@ impl Gui {
         }
         for &wi in &self.z_order {
             if let Some(win) = self.windows.get(wi) {
-                if win.alive && win.visible && win.nativ == f { kinder.push(self.a11y_fenster(g, wi, &mut nodes)); }
+                if win.alive && win.visible && self.flaeche_von(wi) == f { kinder.push(self.a11y_fenster(g, wi, &mut nodes)); }
             }
         }
         let mut root = Node::new(Role::Window);
@@ -80,7 +79,7 @@ impl Gui {
         // Fokus: das Widget mit Fokus, sonst das Fenster mit Fokus, sonst die Wurzel.
         let mut focus = NodeId(ids::ROOT);
         if let Some(fw) = self.focus_window {
-            if self.windows.get(fw).map_or(false, |w| w.alive && w.visible && w.nativ == f) {
+            if self.windows.get(fw).map_or(false, |w| w.alive && w.visible) && self.flaeche_von(fw) == f {
                 focus = NodeId(ids::fenster(fw));
                 if let Some((wi, i)) = self.focus_widget {
                     if wi == fw {
@@ -180,14 +179,14 @@ impl Gui {
         use accesskit::{Action, Node, NodeId, Role};
         use crate::a11y::ids;
         let win = &self.windows[wi];
-        let by = win.y + (if win.chrome { self.m("title_h") } else { 0 }) + self.menubar_h(wi);
+        let by = self.tabbar_y(wi);
         let mut liste = Node::new(Role::TabList);
-        liste.set_bounds(Self::a11y_rect(win.x, by, win.w, TABBAR_H));
+        liste.set_bounds(Self::a11y_rect(win.x, by, win.w, self.sk(TABBAR_H)));
         let mut kinder = Vec::new();
         for (ti, x0, x1) in self.tab_slots(g, wi) {
             let mut t = Node::new(Role::Tab);
             t.set_label(win.tabs[ti].clone());
-            t.set_bounds(Self::a11y_rect(x0, by, x1 - x0, TABBAR_H));
+            t.set_bounds(Self::a11y_rect(x0, by, x1 - x0, self.sk(TABBAR_H)));
             t.set_selected(win.active_tab == ti as i32);
             t.add_action(Action::Click);
             let id = NodeId(ids::reiter(wi, ti));
@@ -783,7 +782,7 @@ impl Gui {
     /// Text aus dem Hilfsprogramm in ein Textfeld schreiben -- durch
     /// dieselben Grenzen wie beim Tippen (Hoechstlaenge, Zahlenfilter).
     pub(super) fn a11y_text_setzen(&mut self, wi: usize, i: usize, mut neu: String, g: &Graphics) {
-        let jetzt = g.get_time();
+        let jetzt = g.uhr_jetzt();
         let w = &mut self.windows[wi].widgets[i];
         if w.nur_lesen { return; }
         if w.kind == Kind::TextInput {

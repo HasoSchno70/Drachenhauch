@@ -705,7 +705,7 @@ CATCH e
 END TRY
 --- umgebung
 DHRT_JIT=immer
-DHRT_JIT_BILANZ=1
+DHRT_JIT_STATS=1
 --- erwartet
 1001000
 -19.0 23.0
@@ -734,7 +734,7 @@ CATCH e
 END TRY
 --- umgebung
 DHRT_JIT=immer
-DHRT_JIT_BILANZ=1
+DHRT_JIT_STATS=1
 --- erwartet
 2 26
 Index 0 ausserhalb [1..5] in Dimension 1

@@ -1,9 +1,16 @@
 //! Befehle des gui-Moduls (Retained-Mode) und der Immediate-Mode-Tabelle `ui`.
 //!
-//! Teil von `vm.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `vm.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
+
+/// Ein Feld aus ganzen Zahlen (Spannen, Marken, Farben der gui) -- ueber den
+/// gemeinsamen Leser `argument::a_zahlenfeld` (bis 2026.53 vier gleiche
+/// Kopien in dieser Datei, Bericht C8).
+#[cfg(feature = "graphics")]
+fn ganze(v: &Value, fn_: &str) -> R<Vec<i64>> {
+    crate::argument::a_zahlenfeld(std::slice::from_ref(v), 0, fn_)
+}
 
 impl<'p> Vm<'p> {
     #[cfg(not(feature = "graphics"))]
@@ -131,23 +138,17 @@ impl<'p> Vm<'p> {
         fn gnum(a: &[Value], i: usize, f: &str) -> R<f64> {
             crate::argument::a_num(a, i, f)
         }
-        // Ein ARRAY OF INTEGER als Vec -- Marken, Faltbereiche, Spans.
-        fn ganze(v: &Value, fn_: &str) -> R<Vec<i64>> {
-            match v {
-                Value::Array(a) => {
-                    let a = a.borrow();
-                    let mut o = Vec::with_capacity(a.cells.len());
-                    for x in a.cells.iter() {
-                        match x {
-                            Value::Int(i) => o.push(i),
-                            Value::Float(f) => o.push(f as i64),
-                            _ => return Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
-                        }
-                    }
-                    Ok(o)
-                }
-                _ => Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
+        // Der Wert eines GUI_<W>_SET: eine Zahl oder ein BOOLEAN (Bericht A18;
+        // bis 2026.53 nahm jede Art etwas anderes).
+        fn gwert(a: &[Value], i: usize, f: &str) -> R<f64> {
+            match a.get(i) {
+                Some(Value::Bool(b)) => Ok(if *b { 1.0 } else { 0.0 }),
+                _ => crate::argument::a_num(a, i, f),
             }
+        }
+        // Eine Einstellung als Zahl: ganz als INTEGER, sonst FLOAT.
+        fn zahl_wert(x: f64) -> Value {
+            if x.fract() == 0.0 && x.abs() < 9.0e15 { Value::Int(x as i64) } else { Value::Float(x) }
         }
         // FUNCREF-Arg -> Option<Name>; NIL entfernt den Callback.
         fn gfunc(a: &[Value], i: usize, f: &str) -> R<Option<crate::value::Rueckruf>> {
@@ -220,11 +221,11 @@ impl<'p> Vm<'p> {
             "gui_window_movable" => { self.gui.window_movable(gi(a,0,"GUI_WINDOW_MOVABLE")?, gbool(a,1,"GUI_WINDOW_MOVABLE")?)?; Value::Nil }
             "gui_window_title" => { self.gui.window_title(gi(a,0,"GUI_WINDOW_TITLE")?, &gs(a,1,"GUI_WINDOW_TITLE")?)?; Value::Nil }
             "gui_window_set_name" => { self.gui.window_set_name(gi(a,0,"GUI_WINDOW_SET_NAME")?, &gs(a,1,"GUI_WINDOW_SET_NAME")?)?; Value::Nil }
-            "gui_window_get_name$" | "gui_window_get_name" => Value::str_rc(&self.gui.window_get_name(gi(a,0,"GUI_WINDOW_GET_NAME$")?)?),
+            "gui_window_get_name$" => Value::str_rc(&self.gui.window_get_name(gi(a,0,"GUI_WINDOW_GET_NAME$")?)?),
             // Lichtstreif ueber ein Fenster (docs/module-gui.md, Abschnitt Glanz).
             "gui_window_glow" => {
                 let n = "GUI_WINDOW_GLOW";
-                if a.is_empty() || a.len() > 3 { return Err(format!("{}: erwartet (win [, farbe [, dauer_ms]])", n)); }
+                if a.is_empty() || a.len() > 3 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let farbe = if a.len() > 1 { Some(gi(a, 1, n)?) } else { None };
                 let dauer = if a.len() > 2 { Some(gnum(a, 2, n)?) } else { None };
                 self.gui.window_glow(gi(a, 0, n)?, farbe, dauer)?;
@@ -232,7 +233,7 @@ impl<'p> Vm<'p> {
             }
             "gui_window_glow_set" => {
                 let n = "GUI_WINDOW_GLOW_SET";
-                if a.len() != 3 { return Err(format!("{}: erwartet (win, schluessel$, wert)", n)); }
+                if a.len() != 3 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let (zahl, text) = match &a[2] {
                     Value::Int(i) => (Some(*i as f64), i.to_string()),
                     Value::Float(f) => (Some(*f), f.to_string()),
@@ -246,14 +247,14 @@ impl<'p> Vm<'p> {
             "gui_window_glowing" => Value::Bool(self.gui.window_glowing(gi(a, 0, "GUI_WINDOW_GLOWING")?)?),
             "gui_window_closable" => { self.gui.window_closable(gi(a,0,"GUI_WINDOW_CLOSABLE")?, gbool(a,1,"GUI_WINDOW_CLOSABLE")?)?; Value::Nil }
             "gui_window_native" => { let n = "GUI_WINDOW_NATIVE";
-                if a.len() != 2 { return Err(format!("{}: erwartet (win, an)", n)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let (h, an) = (gi(a,0,n)?, gbool(a,1,n)?);
                 Value::Bool(self.gui.window_native(self.gfx.as_mut(), h, an)?) }
             "gui_window_is_native" => { let n = "GUI_WINDOW_IS_NATIVE";
-                if a.len() != 1 { return Err(format!("{}: erwartet (win)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Bool(self.gui.window_is_native(gi(a,0,n)?)?) }
             "gui_window_native_scale" => { let n = "GUI_WINDOW_NATIVE_SCALE";
-                if a.len() != 1 { return Err(format!("{}: erwartet (win)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Float(self.gui.window_native_scale(self.gfx.as_ref(), gi(a,0,n)?)?) }
             "gui_popup_windows" => {
                 if !a.is_empty() { return Err("GUI_POPUP_WINDOWS: erwartet keine Argumente".into()); }
@@ -354,19 +355,19 @@ impl<'p> Vm<'p> {
             "gui_dropdown" => Value::Int(self.gui.dropdown(gi(a,0,"GUI_DROPDOWN")?, gi(a,1,"GUI_DROPDOWN")? as i32,
                 gi(a,2,"GUI_DROPDOWN")? as i32, gi(a,3,"GUI_DROPDOWN")? as i32, gi(a,4,"GUI_DROPDOWN")? as i32,
                 gstrs(a,5,"GUI_DROPDOWN")?)?),
-            "gui_dropdown_selected" => Value::Int(self.gui.dropdown_selected(gi(a,0,"GUI_DROPDOWN_SELECTED")?)?),
-            "gui_dropdown_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_DROPDOWN_TEXT")?)?),
+            "gui_dropdown_selected" => Value::Int(self.gui.dropdown_selected(gi(a,0,"GUI_DROPDOWN_SELECTED")?, "GUI_DROPDOWN_SELECTED")?),
+            "gui_dropdown_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_DROPDOWN_TEXT")?, "GUI_DROPDOWN_TEXT")?),
             "gui_dropdown_count" => Value::Int(self.gui.dropdown_count(gi(a,0,"GUI_DROPDOWN_COUNT")?)?),
             "gui_dropdown_item" => Value::str_rc(&self.gui.dropdown_item(gi(a,0,"GUI_DROPDOWN_ITEM")?, gi(a,1,"GUI_DROPDOWN_ITEM")?)?),
-            "gui_dropdown_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_DROPDOWN_SET_SELECTED")?, gi(a,1,"GUI_DROPDOWN_SET_SELECTED")?)?; Value::Nil }
+            "gui_dropdown_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_DROPDOWN_SET_SELECTED")?, gi(a,1,"GUI_DROPDOWN_SET_SELECTED")?, "GUI_DROPDOWN_SET_SELECTED")?; Value::Nil }
             "gui_set_dropdown" => { self.gui.set_dropdown_items(gi(a,0,"GUI_SET_DROPDOWN")?, gstrs(a,1,"GUI_SET_DROPDOWN")?)?; Value::Nil }
             // --- ListBox (teilt die item-Logik mit Dropdown) ---
             "gui_listbox" => Value::Int(self.gui.listbox(gi(a,0,"GUI_LISTBOX")?, gi(a,1,"GUI_LISTBOX")? as i32,
                 gi(a,2,"GUI_LISTBOX")? as i32, gi(a,3,"GUI_LISTBOX")? as i32, gi(a,4,"GUI_LISTBOX")? as i32,
                 gstrs(a,5,"GUI_LISTBOX")?)?),
-            "gui_listbox_selected" => Value::Int(self.gui.dropdown_selected(gi(a,0,"GUI_LISTBOX_SELECTED")?)?),
-            "gui_listbox_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_LISTBOX_TEXT")?)?),
-            "gui_listbox_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_LISTBOX_SET_SELECTED")?, gi(a,1,"GUI_LISTBOX_SET_SELECTED")?)?; Value::Nil }
+            "gui_listbox_selected" => Value::Int(self.gui.dropdown_selected(gi(a,0,"GUI_LISTBOX_SELECTED")?, "GUI_LISTBOX_SELECTED")?),
+            "gui_listbox_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_LISTBOX_TEXT")?, "GUI_LISTBOX_TEXT")?),
+            "gui_listbox_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_LISTBOX_SET_SELECTED")?, gi(a,1,"GUI_LISTBOX_SET_SELECTED")?, "GUI_LISTBOX_SET_SELECTED")?; Value::Nil }
             "gui_set_listbox" => { self.gui.set_dropdown_items(gi(a,0,"GUI_SET_LISTBOX")?, gstrs(a,1,"GUI_SET_LISTBOX")?)?; Value::Nil }
             "gui_listbox_add" => {
                 let pos = if a.len() > 2 { gi(a,2,"GUI_LISTBOX_ADD")? } else { -1 };
@@ -378,7 +379,7 @@ impl<'p> Vm<'p> {
             "gui_listbox_item" => Value::str_rc(&self.gui.list_item(gi(a,0,"GUI_LISTBOX_ITEM")?, gi(a,1,"GUI_LISTBOX_ITEM")?)?),
             "gui_listbox_set_item" => { self.gui.list_set_item(gi(a,0,"GUI_LISTBOX_SET_ITEM")?, gi(a,1,"GUI_LISTBOX_SET_ITEM")?, gs(a,2,"GUI_LISTBOX_SET_ITEM")?.to_string())?; Value::Nil }
             "gui_listbox_move" => { self.gui.list_move(gi(a,0,"GUI_LISTBOX_MOVE")?, gi(a,1,"GUI_LISTBOX_MOVE")?, gi(a,2,"GUI_LISTBOX_MOVE")?)?; Value::Nil }
-            "gui_listbox_set" => { self.gui.list_set(gi(a,0,"GUI_LISTBOX_SET")?, &gs(a,1,"GUI_LISTBOX_SET")?, gnum(a,2,"GUI_LISTBOX_SET")?)?; Value::Nil }
+            "gui_listbox_set" => { self.gui.list_set(gi(a,0,"GUI_LISTBOX_SET")?, &gs(a,1,"GUI_LISTBOX_SET")?, gwert(a,2,"GUI_LISTBOX_SET")?)?; Value::Nil }
             "gui_listbox_icon" => { self.gui.list_icon(gi(a,0,"GUI_LISTBOX_ICON")?, gi(a,1,"GUI_LISTBOX_ICON")?, gi(a,2,"GUI_LISTBOX_ICON")?)?; Value::Nil }
             "gui_listbox_color" => { self.gui.list_color(gi(a,0,"GUI_LISTBOX_COLOR")?, gi(a,1,"GUI_LISTBOX_COLOR")?, gi(a,2,"GUI_LISTBOX_COLOR")?)?; Value::Nil }
             "gui_listbox_checked" => Value::Bool(self.gui.list_checked(gi(a,0,"GUI_LISTBOX_CHECKED")?, gi(a,1,"GUI_LISTBOX_CHECKED")?)?),
@@ -390,35 +391,22 @@ impl<'p> Vm<'p> {
             "gui_listbox_clear_selection" => { self.gui.list_clear_selection(gi(a,0,"GUI_LISTBOX_CLEAR_SELECTION")?)?; Value::Nil }
             // --- Stufe 27: Listen komfortabel, Knopfarten ---
             "gui_listbox_set_data" => { self.gui.list_set_data(gi(a,0,"GUI_LISTBOX_SET_DATA")?, gi(a,1,"GUI_LISTBOX_SET_DATA")?, gs(a,2,"GUI_LISTBOX_SET_DATA")?)?; Value::Nil }
-            "gui_listbox_data$" | "gui_listbox_data" => Value::str_rc(&self.gui.list_data(gi(a,0,"GUI_LISTBOX_DATA")?, gi(a,1,"GUI_LISTBOX_DATA")?)?),
+            "gui_listbox_data$" => Value::str_rc(&self.gui.list_data(gi(a,0,"GUI_LISTBOX_DATA")?, gi(a,1,"GUI_LISTBOX_DATA")?)?),
             "gui_listbox_find_data" => Value::Int(self.gui.list_find_data(gi(a,0,"GUI_LISTBOX_FIND_DATA")?, &gs(a,1,"GUI_LISTBOX_FIND_DATA")?)?),
             "gui_listbox_spans" => {
                 // GUI_LISTBOX_SPANS(lb, eintrag, starts, laengen, farben)
-                fn ganze(v: &Value, fn_: &str) -> R<Vec<i64>> {
-                    match v {
-                        Value::Array(a) => {
-                            let a = a.borrow();
-                            let mut o = Vec::with_capacity(a.cells.len());
-                            for x in a.cells.iter() {
-                                match x {
-                                    Value::Int(i) => o.push(i),
-                                    Value::Float(f) => o.push(f as i64),
-                                    _ => return Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
-                                }
-                            }
-                            Ok(o)
-                        }
-                        _ => Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
-                    }
-                }
                 let n = "GUI_LISTBOX_SPANS";
-                if a.len() != 5 { return Err(format!("{}: erwartet (lb, eintrag, starts, laengen, farben)", n)); }
+                if a.len() != 5 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.list_spans(gi(a, 0, n)?, gi(a, 1, n)?, ganze(&a[2], n)?, ganze(&a[3], n)?, ganze(&a[4], n)?)?;
                 Value::Nil
             }
             "gui_listbox_detail" => { self.gui.list_detail(gi(a,0,"GUI_LISTBOX_DETAIL")?, gi(a,1,"GUI_LISTBOX_DETAIL")?, gs(a,2,"GUI_LISTBOX_DETAIL")?)?; Value::Nil }
-            "gui_listbox_item_rect" => {
-                let (x, y, w, h) = self.gui.list_item_rect(gi(a,0,"GUI_LISTBOX_ITEM_RECT")?, gi(a,1,"GUI_LISTBOX_ITEM_RECT")?)?;
+            // Logisch wie alle Lagen nach aussen; in Bildschirmpixeln (wie
+            // GUI_HIT_TEST, fuer echte Klicks) unter dem _SCREEN_-Namen.
+            // Bis 2026.53 lieferte der alte Name Pixel.
+            "gui_listbox_item_rect" | "gui_listbox_item_screen_rect" => {
+                let r = self.gui.list_item_rect(gi(a,0,name)?, gi(a,1,name)?, &name.to_uppercase())?;
+                let (x, y, w, h) = if name.contains("_screen_") { r } else { self.gui.rect_logisch(r) };
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
             }
             "gui_listbox_tip" => { self.gui.list_tip(gi(a,0,"GUI_LISTBOX_TIP")?, gi(a,1,"GUI_LISTBOX_TIP")?, gs(a,2,"GUI_LISTBOX_TIP")?)?; Value::Nil }
@@ -426,10 +414,9 @@ impl<'p> Vm<'p> {
             "gui_listbox_enabled" => Value::Bool(self.gui.list_enabled(gi(a,0,"GUI_LISTBOX_ENABLED")?, gi(a,1,"GUI_LISTBOX_ENABLED")?)?),
             "gui_listbox_header" => { self.gui.list_header(gi(a,0,"GUI_LISTBOX_HEADER")?, gi(a,1,"GUI_LISTBOX_HEADER")?, gbool(a,2,"GUI_LISTBOX_HEADER")?)?; Value::Nil }
             "gui_listbox_filter" => { self.gui.list_filter(gi(a,0,"GUI_LISTBOX_FILTER")?, gs(a,1,"GUI_LISTBOX_FILTER")?)?; Value::Nil }
-            "gui_listbox_get_filter$" | "gui_listbox_get_filter" => Value::str_rc(&self.gui.list_get_filter(gi(a,0,"GUI_LISTBOX_GET_FILTER")?)?),
+            "gui_listbox_get_filter$" => Value::str_rc(&self.gui.list_get_filter(gi(a,0,"GUI_LISTBOX_GET_FILTER")?)?),
             "gui_listbox_view_count" => Value::Int(self.gui.list_view_count(gi(a,0,"GUI_LISTBOX_VIEW_COUNT")?)?),
             "gui_listbox_view_row" => Value::Int(self.gui.list_view_row(gi(a,0,"GUI_LISTBOX_VIEW_ROW")?, gi(a,1,"GUI_LISTBOX_VIEW_ROW")?)?),
-            "gui_listbox_placeholder" => { self.gui.list_placeholder(gi(a,0,"GUI_LISTBOX_PLACEHOLDER")?, gs(a,1,"GUI_LISTBOX_PLACEHOLDER")?)?; Value::Nil }
             "gui_listbox_sort" => {
                 let ab = if a.len() > 1 { gbool(a,1,"GUI_LISTBOX_SORT")? } else { false };
                 self.gui.list_sort(gi(a,0,"GUI_LISTBOX_SORT")?, ab)?; Value::Nil
@@ -439,33 +426,43 @@ impl<'p> Vm<'p> {
                 Value::Int(self.gui.list_find(gi(a,0,"GUI_LISTBOX_FIND")?, &gs(a,1,"GUI_LISTBOX_FIND")?, ab)?)
             }
             "gui_listbox_scroll_to" => { self.gui.list_scroll_to(gi(a,0,"GUI_LISTBOX_SCROLL_TO")?, gi(a,1,"GUI_LISTBOX_SCROLL_TO")?)?; Value::Nil }
-            "gui_dropdown_set" => { self.gui.dropdown_set(gi(a,0,"GUI_DROPDOWN_SET")?, &gs(a,1,"GUI_DROPDOWN_SET")?, gnum(a,2,"GUI_DROPDOWN_SET")?)?; Value::Nil }
-            "gui_dropdown_placeholder" => { self.gui.dropdown_placeholder(gi(a,0,"GUI_DROPDOWN_PLACEHOLDER")?, gs(a,1,"GUI_DROPDOWN_PLACEHOLDER")?.to_string())?; Value::Nil }
-            "gui_tabcontrol_item_rect" => {
-                let (x, y, w, h) = self.gui.tabcontrol_item_rect(gi(a,0,"GUI_TABCONTROL_ITEM_RECT")?, gi(a,1,"GUI_TABCONTROL_ITEM_RECT")?)?;
+            "gui_dropdown_set" => { self.gui.dropdown_set(gi(a,0,"GUI_DROPDOWN_SET")?, &gs(a,1,"GUI_DROPDOWN_SET")?, gwert(a,2,"GUI_DROPDOWN_SET")?)?; Value::Nil }
+            // Logisch wie alle Lagen nach aussen; in Bildschirmpixeln (wie
+            // GUI_HIT_TEST, fuer echte Klicks) unter dem _SCREEN_-Namen.
+            // Bis 2026.53 lieferte der alte Name Pixel.
+            "gui_tabcontrol_item_rect" | "gui_tabcontrol_item_screen_rect" => {
+                let r = self.gui.tabcontrol_item_rect(gi(a,0,name)?, gi(a,1,name)?, &name.to_uppercase())?;
+                let (x, y, w, h) = if name.contains("_screen_") { r } else { self.gui.rect_logisch(r) };
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
             }
-            "gui_table_row_rect" => {
-                let (x, y, w, h) = self.gui.table_row_rect(gi(a,0,"GUI_TABLE_ROW_RECT")?, gi(a,1,"GUI_TABLE_ROW_RECT")?)?;
+            // Logisch wie alle Lagen nach aussen; in Bildschirmpixeln (wie
+            // GUI_HIT_TEST, fuer echte Klicks) unter dem _SCREEN_-Namen.
+            // Bis 2026.53 lieferte der alte Name Pixel.
+            "gui_table_row_rect" | "gui_table_row_screen_rect" => {
+                let r = self.gui.table_row_rect(gi(a,0,name)?, gi(a,1,name)?, &name.to_uppercase())?;
+                let (x, y, w, h) = if name.contains("_screen_") { r } else { self.gui.rect_logisch(r) };
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
             }
-            "gui_tree_item_rect" => {
-                let (x, y, w, h) = self.gui.tree_item_rect(gi(a,0,"GUI_TREE_ITEM_RECT")?, gi(a,1,"GUI_TREE_ITEM_RECT")?)?;
+            // Logisch wie alle Lagen nach aussen; in Bildschirmpixeln (wie
+            // GUI_HIT_TEST, fuer echte Klicks) unter dem _SCREEN_-Namen.
+            // Bis 2026.53 lieferte der alte Name Pixel.
+            "gui_tree_item_rect" | "gui_tree_item_screen_rect" => {
+                let r = self.gui.tree_item_rect(gi(a,0,name)?, gi(a,1,name)?, &name.to_uppercase())?;
+                let (x, y, w, h) = if name.contains("_screen_") { r } else { self.gui.rect_logisch(r) };
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
             }
             "gui_tree_edit" => { self.gui.tree_edit(gi(a,0,"GUI_TREE_EDIT")?, gi(a,1,"GUI_TREE_EDIT")?)?; Value::Nil }
             "gui_tree_edited" => Value::Int(self.gui.tree_edited(gi(a,0,"GUI_TREE_EDITED")?)?),
             "gui_tree_editing" => Value::Int(self.gui.tree_editing(gi(a,0,"GUI_TREE_EDITING")?)?),
-            "gui_tree_placeholder" => { self.gui.tree_placeholder(gi(a,0,"GUI_TREE_PLACEHOLDER")?, gs(a,1,"GUI_TREE_PLACEHOLDER")?.to_string())?; Value::Nil }
             "gui_listbox_edit" => { self.gui.list_edit(gi(a,0,"GUI_LISTBOX_EDIT")?, gi(a,1,"GUI_LISTBOX_EDIT")?)?; Value::Nil }
             "gui_listbox_edited" => Value::Int(self.gui.list_edited(gi(a,0,"GUI_LISTBOX_EDITED")?)?),
             "gui_listbox_editing" => Value::Int(self.gui.list_editing(gi(a,0,"GUI_LISTBOX_EDITING")?)?),
             // --- Stufe 29: gesetzter Text -- Auswahl und Suche ---
-            "gui_richtext_selection$" | "gui_richtext_selection" => Value::str_rc(&self.gui.richtext_selection(gi(a,0,"GUI_RICHTEXT_SELECTION")?)?),
+            "gui_richtext_selection$" => Value::str_rc(&self.gui.richtext_selection(gi(a,0,"GUI_RICHTEXT_SELECTION")?)?),
             "gui_richtext_select_all" => { self.gui.richtext_select_all(gi(a,0,"GUI_RICHTEXT_SELECT_ALL")?)?; Value::Nil }
             "gui_richtext_clear_selection" => { self.gui.richtext_clear_selection(gi(a,0,"GUI_RICHTEXT_CLEAR_SELECTION")?)?; Value::Nil }
-            "gui_richtext_find_next" => Value::Int(self.gui.richtext_find_step(gi(a,0,"GUI_RICHTEXT_FIND_NEXT")?, &gs(a,1,"GUI_RICHTEXT_FIND_NEXT")?, true)?),
-            "gui_richtext_find_prev" => Value::Int(self.gui.richtext_find_step(gi(a,0,"GUI_RICHTEXT_FIND_PREV")?, &gs(a,1,"GUI_RICHTEXT_FIND_PREV")?, false)?),
+            "gui_richtext_find_next" => { let y = self.gui.richtext_find_step(gi(a,0,"GUI_RICHTEXT_FIND_NEXT")?, &gs(a,1,"GUI_RICHTEXT_FIND_NEXT")?, true)?; Value::Int(self.gui.logisch(y)) }
+            "gui_richtext_find_prev" => { let y = self.gui.richtext_find_step(gi(a,0,"GUI_RICHTEXT_FIND_PREV")?, &gs(a,1,"GUI_RICHTEXT_FIND_PREV")?, false)?; Value::Int(self.gui.logisch(y)) }
             "gui_richtext_mark_all" => Value::Int(self.gui.richtext_mark_all(gi(a,0,"GUI_RICHTEXT_MARK_ALL")?, &gs(a,1,"GUI_RICHTEXT_MARK_ALL")?)?),
             // --- Stufe 28: Statusleiste, Pfadleiste, Ueberlauf ---
             "gui_statusbar" => {
@@ -478,10 +475,10 @@ impl<'p> Vm<'p> {
                 Value::Int(self.gui.statusbar_add(gi(a,0,"GUI_STATUSBAR_ADD")?, gs(a,1,"GUI_STATUSBAR_ADD")?, gi(a,2,"GUI_STATUSBAR_ADD")?, &ausr)?)
             }
             "gui_statusbar_set" => { self.gui.statusbar_set(gi(a,0,"GUI_STATUSBAR_SET")?, gi(a,1,"GUI_STATUSBAR_SET")?, gs(a,2,"GUI_STATUSBAR_SET")?)?; Value::Nil }
-            "gui_statusbar_text$" | "gui_statusbar_text" => Value::str_rc(&self.gui.statusbar_text(gi(a,0,"GUI_STATUSBAR_TEXT")?, gi(a,1,"GUI_STATUSBAR_TEXT")?)?),
+            "gui_statusbar_text$" => Value::str_rc(&self.gui.statusbar_text(gi(a,0,"GUI_STATUSBAR_TEXT")?, gi(a,1,"GUI_STATUSBAR_TEXT")?)?),
             "gui_statusbar_tip" => { self.gui.statusbar_tip(gi(a,0,"GUI_STATUSBAR_TIP")?, gi(a,1,"GUI_STATUSBAR_TIP")?, gs(a,2,"GUI_STATUSBAR_TIP")?)?; Value::Nil }
             "gui_statusbar_tip$" => { let n = "GUI_STATUSBAR_TIP$";
-                if a.len() != 2 { return Err(format!("{}: erwartet (sb, feld)", n)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::str_rc(&self.gui.statusbar_tip_text(gi(a,0,n)?, gi(a,1,n)?)?) }
             "gui_statusbar_clickable" => { self.gui.statusbar_clickable(gi(a,0,"GUI_STATUSBAR_CLICKABLE")?, gi(a,1,"GUI_STATUSBAR_CLICKABLE")?, gbool(a,2,"GUI_STATUSBAR_CLICKABLE")?)?; Value::Nil }
             "gui_statusbar_clicked" => Value::Int(self.gui.statusbar_clicked(gi(a,0,"GUI_STATUSBAR_CLICKED")?)?),
@@ -498,12 +495,12 @@ impl<'p> Vm<'p> {
             "gui_breadcrumb_clear" => { self.gui.breadcrumb_clear(gi(a,0,"GUI_BREADCRUMB_CLEAR")?)?; Value::Nil }
             "gui_breadcrumb_count" => Value::Int(self.gui.breadcrumb_count(gi(a,0,"GUI_BREADCRUMB_COUNT")?)?),
             "gui_breadcrumb_clicked" => Value::Int(self.gui.breadcrumb_clicked(gi(a,0,"GUI_BREADCRUMB_CLICKED")?)?),
-            "gui_breadcrumb_text$" | "gui_breadcrumb_text" => Value::str_rc(&self.gui.breadcrumb_text(gi(a,0,"GUI_BREADCRUMB_TEXT")?, gi(a,1,"GUI_BREADCRUMB_TEXT")?)?),
-            "gui_breadcrumb_data$" | "gui_breadcrumb_data" => Value::str_rc(&self.gui.breadcrumb_data(gi(a,0,"GUI_BREADCRUMB_DATA")?, gi(a,1,"GUI_BREADCRUMB_DATA")?)?),
+            "gui_breadcrumb_text$" => Value::str_rc(&self.gui.breadcrumb_text(gi(a,0,"GUI_BREADCRUMB_TEXT")?, gi(a,1,"GUI_BREADCRUMB_TEXT")?)?),
+            "gui_breadcrumb_data$" => Value::str_rc(&self.gui.breadcrumb_data(gi(a,0,"GUI_BREADCRUMB_DATA")?, gi(a,1,"GUI_BREADCRUMB_DATA")?)?),
             "gui_breadcrumb_first_visible" => Value::Int(self.gui.breadcrumb_first_visible(gi(a,0,"GUI_BREADCRUMB_FIRST_VISIBLE")?)?),
             "gui_toolbar_overflow" => Value::Int(self.gui.toolbar_overflow(gi(a,0,"GUI_TOOLBAR_OVERFLOW")?)?),
             "gui_button_variant" => { self.gui.set_button_variant(gi(a,0,"GUI_BUTTON_VARIANT")?, &gs(a,1,"GUI_BUTTON_VARIANT")?)?; Value::Nil }
-            "gui_button_get_variant$" | "gui_button_get_variant" => Value::str_rc(&self.gui.button_variant(gi(a,0,"GUI_BUTTON_GET_VARIANT")?)?),
+            "gui_button_get_variant$" => Value::str_rc(&self.gui.button_variant(gi(a,0,"GUI_BUTTON_GET_VARIANT")?)?),
             "gui_double_clicked" => Value::Bool(self.gui.double_clicked(gi(a,0,"GUI_DOUBLE_CLICKED")?)?),
             "gui_layout" => Value::Int(self.gui.layout_new(gi(a,0,"GUI_LAYOUT")?, &gs(a,1,"GUI_LAYOUT")?,
                 gi(a,2,"GUI_LAYOUT")? as i32, gi(a,3,"GUI_LAYOUT")? as i32, gi(a,4,"GUI_LAYOUT")? as i32, gi(a,5,"GUI_LAYOUT")? as i32)?),
@@ -516,7 +513,7 @@ impl<'p> Vm<'p> {
                 self.gui.layout_spacer(gi(a,0,"GUI_LAYOUT_SPACER")?, gew)?; Value::Nil
             }
             "gui_layout_remove" => { self.gui.layout_remove(gi(a,0,"GUI_LAYOUT_REMOVE")?, gi(a,1,"GUI_LAYOUT_REMOVE")?)?; Value::Nil }
-            "gui_layout_set" => { self.gui.layout_set(gi(a,0,"GUI_LAYOUT_SET")?, &gs(a,1,"GUI_LAYOUT_SET")?, gnum(a,2,"GUI_LAYOUT_SET")?)?; Value::Nil }
+            "gui_layout_set" => { self.gui.layout_set(gi(a,0,"GUI_LAYOUT_SET")?, &gs(a,1,"GUI_LAYOUT_SET")?, gwert(a,2,"GUI_LAYOUT_SET")?)?; Value::Nil }
             "gui_autosize" => { let g = self.gfx.as_ref(); self.gui.autosize(g, gi(a,0,"GUI_AUTOSIZE")?)?; Value::Nil }
             // --- Datenbindung ---
             "gui_bind" => {
@@ -557,7 +554,7 @@ impl<'p> Vm<'p> {
                 self.gui.form_version_setzen(gi(a,0,"GUI_FORM_VERSION")?, &form, &gs(a,1,"GUI_FORM_VERSION")?)?;
                 Value::Nil
             }
-            "gui_form_conflict$" | "gui_form_conflict" => {
+            "gui_form_conflict$" => {
                 let form = if a.len() > 1 { gs(a,1,"GUI_FORM_CONFLICT$")? } else { String::new() };
                 Value::str_rc(self.gui.form_konflikt(gi(a,0,"GUI_FORM_CONFLICT$")?, &form)?)
             }
@@ -687,7 +684,7 @@ impl<'p> Vm<'p> {
             // --- Mindestmasse + Formularpruefung ---
             "gui_set_min_size" => { self.gui.set_min_size(gi(a,0,"GUI_SET_MIN_SIZE")?, gi(a,1,"GUI_SET_MIN_SIZE")? as i32, gi(a,2,"GUI_SET_MIN_SIZE")? as i32)?; Value::Nil }
             "gui_get_min_w" | "gui_get_min_h" => { let n = if name == "gui_get_min_w" { "GUI_GET_MIN_W" } else { "GUI_GET_MIN_H" };
-                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let (mw, mh) = self.gui.get_min_size(gi(a,0,n)?, n)?;
                 Value::Int(if name == "gui_get_min_w" { mw } else { mh }) }
             "gui_text_width" => {
@@ -731,12 +728,12 @@ impl<'p> Vm<'p> {
             "gui_vslider" => Value::Int(self.gui.vslider(gi(a,0,"GUI_VSLIDER")?, gi(a,1,"GUI_VSLIDER")? as i32,
                 gi(a,2,"GUI_VSLIDER")? as i32, gi(a,3,"GUI_VSLIDER")? as i32,
                 gnum(a,4,"GUI_VSLIDER")?, gnum(a,5,"GUI_VSLIDER")?, gnum(a,6,"GUI_VSLIDER")?)?),
-            "gui_progress_set" => { self.gui.progress_set(gi(a,0,"GUI_PROGRESS_SET")?, &gs(a,1,"GUI_PROGRESS_SET")?, gnum(a,2,"GUI_PROGRESS_SET")?)?; Value::Nil }
+            "gui_progress_set" => { self.gui.progress_set(gi(a,0,"GUI_PROGRESS_SET")?, &gs(a,1,"GUI_PROGRESS_SET")?, gwert(a,2,"GUI_PROGRESS_SET")?)?; Value::Nil }
             "gui_image_mode" => { self.gui.image_mode(gi(a,0,"GUI_IMAGE_MODE")?, &gs(a,1,"GUI_IMAGE_MODE")?)?; Value::Nil }
             "gui_image_mode_get" => Value::Str(Rc::from(self.gui.image_mode_get(gi(a,0,"GUI_IMAGE_MODE_GET")?)?)),
             "gui_cursors" => { self.gui.cursors(gbool(a,0,"GUI_CURSORS")?); Value::Nil }
             "gui_set_cursor" => { self.gui.set_cursor(gi(a,0,"GUI_SET_CURSOR")?, &gs(a,1,"GUI_SET_CURSOR")?)?; Value::Nil }
-            "gui_get_cursor$" | "gui_get_cursor" => Value::str_rc(self.gui.get_cursor(gi(a,0,"GUI_GET_CURSOR$")?)?),
+            "gui_get_cursor$" => Value::str_rc(self.gui.get_cursor(gi(a,0,"GUI_GET_CURSOR$")?)?),
             "gui_tree_icon" => {
                 // Ein Bild (Handle) oder der Name eines eingebauten Sinnbilds.
                 if let Some(Value::Str(n)) = a.get(2) {
@@ -773,7 +770,7 @@ impl<'p> Vm<'p> {
                     gi(a,3,f)? as i32, gi(a,4,f)? as i32, gi(a,5,f)?, titel, text)?)
             }
             "gui_card_set_text" => { self.gui.card_set_text(gi(a,0,"GUI_CARD_SET_TEXT")?, gs(a,1,"GUI_CARD_SET_TEXT")?)?; Value::Nil }
-            "gui_card_text$" | "gui_card_text" => Value::str_rc(&self.gui.card_text(gi(a,0,"GUI_CARD_TEXT$")?)?),
+            "gui_card_text$" => Value::str_rc(&self.gui.card_text(gi(a,0,"GUI_CARD_TEXT$")?)?),
             "gui_window_at" => Value::Int(self.gui.window_at(gi(a,0,"GUI_WINDOW_AT")? as i32, gi(a,1,"GUI_WINDOW_AT")? as i32)),
             "gui_icon_button" => {
                 let text = if a.len() >= 7 { gs(a,6,"GUI_ICON_BUTTON")? } else { String::new() };
@@ -785,10 +782,10 @@ impl<'p> Vm<'p> {
                 Value::Int(h)
             }
             "gui_get_icon$" => { let n = "GUI_GET_ICON$";
-                if a.len() != 1 { return Err(format!("{}: erwartet (knopf)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::str_rc(&self.gui.get_icon_symbol(gi(a,0,n)?)?) }
             "gui_get_icon" => { let n = "GUI_GET_ICON";
-                if a.len() != 1 { return Err(format!("{}: erwartet (knopf)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Int(self.gui.get_icon(gi(a,0,n)?)?) }
             "gui_set_icon" => {
                 match gsym(a,1,"GUI_SET_ICON")? {
@@ -820,20 +817,25 @@ impl<'p> Vm<'p> {
             }
             "gui_toolbar_set_tip" => { self.gui.toolbar_set_tip(gi(a,0,"GUI_TOOLBAR_SET_TIP")?, gi(a,1,"GUI_TOOLBAR_SET_TIP")?, gs(a,2,"GUI_TOOLBAR_SET_TIP")?)?; Value::Nil }
             "gui_toolbar_set_text" => { self.gui.toolbar_set_text(gi(a,0,"GUI_TOOLBAR_SET_TEXT")?, gi(a,1,"GUI_TOOLBAR_SET_TEXT")?, gs(a,2,"GUI_TOOLBAR_SET_TEXT")?)?; Value::Nil }
-            "gui_toolbar_set" => { self.gui.toolbar_set(gi(a,0,"GUI_TOOLBAR_SET")?, &gs(a,1,"GUI_TOOLBAR_SET")?, gnum(a,2,"GUI_TOOLBAR_SET")?)?; Value::Nil }
+            "gui_toolbar_set" => { self.gui.toolbar_set(gi(a,0,"GUI_TOOLBAR_SET")?, &gs(a,1,"GUI_TOOLBAR_SET")?, gwert(a,2,"GUI_TOOLBAR_SET")?)?; Value::Nil }
             "gui_toolbar_get" => { let n = "GUI_TOOLBAR_GET";
-                if a.len() != 2 { return Err(format!("{}: erwartet (tb, key$)", n)); }
-                Value::Int(self.gui.toolbar_get(gi(a,0,n)?, &gs(a,1,n)?)? as i64) }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
+                zahl_wert(self.gui.toolbar_get(gi(a,0,n)?, &gs(a,1,n)?)?) }
             "gui_toolbar_item_x" => Value::Int(self.gui.toolbar_item_rect(gi(a,0,"GUI_TOOLBAR_ITEM_X")?, gi(a,1,"GUI_TOOLBAR_ITEM_X")?)?.0),
             "gui_toolbar_item_w" => Value::Int(self.gui.toolbar_item_rect(gi(a,0,"GUI_TOOLBAR_ITEM_W")?, gi(a,1,"GUI_TOOLBAR_ITEM_W")?)?.1),
             "gui_toolbar" => Value::Int(self.gui.toolbar(gi(a,0,"GUI_TOOLBAR")?, gi(a,1,"GUI_TOOLBAR")? as i32,
                 gi(a,2,"GUI_TOOLBAR")? as i32, gi(a,3,"GUI_TOOLBAR")? as i32, gi(a,4,"GUI_TOOLBAR")? as i32)?),
             "gui_canvas" => Value::Int(self.gui.canvas(gi(a,0,"GUI_CANVAS")?, gi(a,1,"GUI_CANVAS")? as i32,
                 gi(a,2,"GUI_CANVAS")? as i32, gi(a,3,"GUI_CANVAS")? as i32, gi(a,4,"GUI_CANVAS")? as i32)?),
-            "gui_canvas_x" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_X")?)?.0 as i64),
-            "gui_canvas_y" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_Y")?)?.1 as i64),
-            "gui_canvas_w" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_W")?)?.2 as i64),
-            "gui_canvas_h" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_H")?)?.3 as i64),
+            // Die Zeichenflaeche: logisch unter dem alten Namen, in
+            // Bildschirmpixeln (fuer die Zeichenbefehle) als GUI_CANVAS_SCREEN_*.
+            // Bis 2026.53 lieferte der alte Name Pixel.
+            "gui_canvas_x" | "gui_canvas_y" | "gui_canvas_w" | "gui_canvas_h"
+            | "gui_canvas_screen_x" | "gui_canvas_screen_y" | "gui_canvas_screen_w" | "gui_canvas_screen_h" => {
+                let r = self.gui.canvas_rect(gi(a,0,name)?, &name.to_uppercase())?;
+                let r = if name.contains("_screen_") { r } else { self.gui.rect_logisch(r) };
+                Value::Int(match name.as_bytes()[name.len() - 1] { b'x' => r.0, b'y' => r.1, b'w' => r.2, _ => r.3 } as i64)
+            }
             "gui_clicked" => Value::Bool(self.gui.clicked(gi(a,0,"GUI_CLICKED")?)?),
             "gui_menu" => Value::Int(self.gui.add_menu(gi(a,0,"GUI_MENU")?, gs(a,1,"GUI_MENU")?.to_string())?),
             "gui_context" => Value::Int(self.gui.add_context(gi(a,0,"GUI_CONTEXT")?)?),
@@ -871,7 +873,7 @@ impl<'p> Vm<'p> {
             "gui_set_text" => { self.gui.set_text(gi(a,0,"GUI_SET_TEXT")?, gs(a,1,"GUI_SET_TEXT")?)?; Value::Nil }
             "gui_tooltip" => { self.gui.set_tooltip(gi(a,0,"GUI_TOOLTIP")?, gs(a,1,"GUI_TOOLTIP")?)?; Value::Nil }
             "gui_tooltip$" => { let n = "GUI_TOOLTIP$";
-                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::str_rc(&self.gui.tooltip_text(gi(a,0,n)?)?) }
             "gui_set_checked" => { self.gui.set_checked(gi(a,0,"GUI_SET_CHECKED")?, gbool(a,1,"GUI_SET_CHECKED")?)?; Value::Nil }
             "gui_set_value" => { self.gui.set_value(gi(a,0,"GUI_SET_VALUE")?, gnum(a,1,"GUI_SET_VALUE")?)?; Value::Nil }
@@ -882,38 +884,45 @@ impl<'p> Vm<'p> {
             "gui_set_align" => { self.gui.set_align(gi(a,0,"GUI_SET_ALIGN")?, &gs(a,1,"GUI_SET_ALIGN")?)?; Value::Nil }
             "gui_set_wrap" => { self.gui.set_wrap(gi(a,0,"GUI_SET_WRAP")?, gi(a,1,"GUI_SET_WRAP")? as i32)?; Value::Nil }
             "gui_get_align$" => { let n = "GUI_GET_ALIGN$";
-                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::str_rc(&self.gui.get_align(gi(a,0,n)?)?) }
             "gui_get_wrap" => { let n = "GUI_GET_WRAP";
-                if a.len() != 1 { return Err(format!("{}: erwartet (label)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Int(self.gui.get_wrap(gi(a,0,n)?)?) }
             "gui_undo" | "gui_redo" => { let wieder = name == "gui_redo";
                 let n = if wieder { "GUI_REDO" } else { "GUI_UNDO" };
-                if a.len() != 1 { return Err(format!("{}: erwartet (tf)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Bool(self.gui.undo(gi(a,0,n)?, wieder)?) }
             "gui_can_undo" | "gui_can_redo" => { let wieder = name == "gui_can_redo";
                 let n = if wieder { "GUI_CAN_REDO" } else { "GUI_CAN_UNDO" };
-                if a.len() != 1 { return Err(format!("{}: erwartet (tf)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Bool(self.gui.can_undo(gi(a,0,n)?, wieder)?) }
             "gui_undo_clear" => { let n = "GUI_UNDO_CLEAR";
-                if a.len() != 1 { return Err(format!("{}: erwartet (tf)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.undo_clear(gi(a,0,n)?)?; Value::Nil }
             "gui_textinput_get" => { let n = "GUI_TEXTINPUT_GET";
-                if a.len() != 2 { return Err(format!("{}: erwartet (tf, key$)", n)); }
-                Value::Int(self.gui.textinput_get(gi(a,0,n)?, &gs(a,1,n)?)? as i64) }
-            "gui_listbox_placeholder$" => { let n = "GUI_LISTBOX_PLACEHOLDER$";
-                if a.len() != 1 { return Err(format!("{}: erwartet (lb)", n)); }
-                Value::str_rc(&self.gui.list_placeholder_get(gi(a,0,n)?)?) }
-            "gui_textinput_placeholder$" => { let n = "GUI_TEXTINPUT_PLACEHOLDER$";
-                if a.len() != 1 { return Err(format!("{}: erwartet (tf)", n)); }
-                Value::str_rc(&self.gui.textinput_placeholder(gi(a,0,n)?)?) }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
+                zahl_wert(self.gui.textinput_get(gi(a,0,n)?, &gs(a,1,n)?)?) }
+            // Platzhalter: jede Art mit Setzen und Lesen (gui_einstellungen.rs).
+            "gui_textinput_placeholder" | "gui_textarea_placeholder" | "gui_listbox_placeholder"
+            | "gui_dropdown_placeholder" | "gui_tree_placeholder" | "gui_table_placeholder" => {
+                let art = name.trim_start_matches("gui_").trim_end_matches("_placeholder");
+                let f = name.to_uppercase();
+                self.gui.platzhalter_set(art, gi(a,0,&f)?, gs(a,1,&f)?.to_string())?; Value::Nil
+            }
+            "gui_textinput_placeholder$" | "gui_textarea_placeholder$" | "gui_listbox_placeholder$"
+            | "gui_dropdown_placeholder$" | "gui_tree_placeholder$" | "gui_table_placeholder$" => {
+                let art = name.trim_start_matches("gui_").trim_end_matches("_placeholder$");
+                let f = name.to_uppercase();
+                Value::str_rc(&self.gui.platzhalter_get(art, gi(a,0,&f)?)?)
+            }
             "gui_textinput_set" => {
                 self.gui.textinput_set(gi(a,0,"GUI_TEXTINPUT_SET")?, &gs(a,1,"GUI_TEXTINPUT_SET")?,
-                                       gnum(a,2,"GUI_TEXTINPUT_SET")?)?; Value::Nil
+                                       gwert(a,2,"GUI_TEXTINPUT_SET")?)?; Value::Nil
             }
             // Ueberlagerungen und Rueckmeldung (gui_ueber.rs).
             "gui_textinput_icon" => { let n = "GUI_TEXTINPUT_ICON";
-                if a.len() != 3 { return Err(format!("{}: erwartet (tf, links$, rechts$)", n)); }
+                if a.len() != 3 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.textinput_icon(gi(a,0,n)?, &gs(a,1,n)?, &gs(a,2,n)?)?; Value::Nil }
             "gui_icon_clicked" => Value::Int(self.gui.icon_clicked(gi(a,0,"GUI_ICON_CLICKED")?)?),
             "gui_search_changed" => Value::Bool(self.gui.search_changed(gi(a,0,"GUI_SEARCH_CHANGED")?)?),
@@ -922,24 +931,24 @@ impl<'p> Vm<'p> {
             "gui_completion_chosen" => Value::Int(self.gui.completion_chosen(gi(a,0,"GUI_COMPLETION_CHOSEN")?)?),
             "gui_completion_open" => Value::Bool(self.gui.completion_open(gi(a,0,"GUI_COMPLETION_OPEN")?)?),
             "gui_popover" => { let n = "GUI_POPOVER";
-                if a.len() < 3 || a.len() > 4 { return Err(format!("{}: erwartet (anker, b, h [, seite$])", n)); }
+                if a.len() < 3 || a.len() > 4 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let seite = if a.len() == 4 { gs(a,3,n)? } else { String::new() };
                 Value::Int(self.gui.popover(gi(a,0,n)?, gi(a,1,n)? as i32, gi(a,2,n)? as i32, &seite)?) }
             "gui_popover_show" => { self.gui.popover_show(gi(a,0,"GUI_POPOVER_SHOW")?)?; Value::Nil }
             "gui_popover_hide" => { self.gui.popover_hide(gi(a,0,"GUI_POPOVER_HIDE")?)?; Value::Nil }
             "gui_popover_closed" => Value::Bool(self.gui.popover_closed(gi(a,0,"GUI_POPOVER_CLOSED")?)?),
             "gui_toast" => { let n = "GUI_TOAST";
-                if a.len() < 2 || a.len() > 4 { return Err(format!("{}: erwartet (win, text$ [, art$ [, ms]])", n)); }
+                if a.len() < 2 || a.len() > 4 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let art = if a.len() > 2 { gs(a,2,n)? } else { String::new() };
                 let ms = if a.len() > 3 { gnum(a,3,n)? } else { 3000.0 };
                 self.gui.toast(gi(a,0,n)?, gs(a,1,n)?, &art, ms)?; Value::Nil }
-            "gui_spell" => { if a.len() != 2 { return Err("GUI_SPELL: erwartet (feld, woerterbuch) -- woerterbuch -1 schaltet ab".into()); }
+            "gui_spell" => { if a.len() != 2 { return Err(crate::vm::falsche_argumente("GUI_SPELL", a.len())); }
                 self.gui.spell(gi(a,0,"GUI_SPELL")?, gi(a,1,"GUI_SPELL")?)?; Value::Nil }
             "gui_spell_count" => Value::Int(self.gui.spell_count(gi(a,0,"GUI_SPELL_COUNT")?)?),
             "gui_toast_count" => Value::Int(self.gui.toast_count(gi(a,0,"GUI_TOAST_COUNT")?)?),
             "gui_toast_clear" => { self.gui.toast_clear(gi(a,0,"GUI_TOAST_CLEAR")?)?; Value::Nil }
             "gui_infobar" => { let n = "GUI_INFOBAR";
-                if a.len() < 2 || a.len() > 4 { return Err(format!("{}: erwartet (win, text$ [, art$ [, knoepfe$]])", n)); }
+                if a.len() < 2 || a.len() > 4 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let art = if a.len() > 2 { gs(a,2,n)? } else { String::new() };
                 let kn = if a.len() > 3 { gs(a,3,n)? } else { String::new() };
                 self.gui.infobar(gi(a,0,n)?, gs(a,1,n)?, &art, &kn)?; Value::Nil }
@@ -952,17 +961,17 @@ impl<'p> Vm<'p> {
             // Stildatei, Name, Klassen (gui_stil.rs).
             "gui_stylesheet" => { self.gui.stylesheet(&gs(a,0,"GUI_STYLESHEET")?)?; Value::Nil }
             "gui_stylesheet_load" => { let n = "GUI_STYLESHEET_LOAD";
-                if a.is_empty() || a.len() > 2 { return Err(format!("{}: erwartet (pfad$ [, beobachten])", n)); }
+                if a.is_empty() || a.len() > 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let beob = if a.len() == 2 { gbool(a,1,n)? } else { false };
                 self.gui.stylesheet_load(&gs(a,0,n)?, beob)?; Value::Nil }
             "gui_stylesheet_clock" => { let n = "GUI_STYLESHEET_CLOCK";
-                if a.len() != 1 { return Err(format!("{}: erwartet (zeit$)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.stylesheet_clock(&gs(a,0,n)?)?; Value::Nil }
             "gui_stylesheet_error$" => { let n = "GUI_STYLESHEET_ERROR$";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::str_rc(&self.gui.stylesheet_error()) }
             "gui_set_name" => { self.gui.set_name(gi(a,0,"GUI_SET_NAME")?, &gs(a,1,"GUI_SET_NAME")?)?; Value::Nil }
-            "gui_get_name$" | "gui_get_name" => Value::str_rc(&self.gui.get_name(gi(a,0,"GUI_GET_NAME$")?)?),
+            "gui_get_name$" => Value::str_rc(&self.gui.get_name(gi(a,0,"GUI_GET_NAME$")?)?),
             "gui_add_class" => { self.gui.add_class(gi(a,0,"GUI_ADD_CLASS")?, &gs(a,1,"GUI_ADD_CLASS")?)?; Value::Nil }
             "gui_remove_class" => { self.gui.remove_class(gi(a,0,"GUI_REMOVE_CLASS")?, &gs(a,1,"GUI_REMOVE_CLASS")?)?; Value::Nil }
             "gui_get_color" => Value::Int(self.gui.get_color(gi(a,0,"GUI_GET_COLOR")?, &gs(a,1,"GUI_GET_COLOR")?)?),
@@ -974,9 +983,9 @@ impl<'p> Vm<'p> {
             "gui_label_set" => { let n = "GUI_LABEL_SET";
                 let wert = match a.get(2) { Some(Value::Str(s)) => s.to_string(), Some(Value::Int(i)) => i.to_string(),
                     Some(Value::Bool(b)) => (if *b { "1" } else { "0" }).to_string(), Some(Value::Float(f)) => f.to_string(),
-                    _ => return Err(format!("{}: erwartet (lbl, schluessel$, wert)", n)) };
+                    _ => return Err(crate::vm::falsche_argumente(n, a.len())) };
                 self.gui.label_set(gi(a,0,n)?, &gs(a,1,n)?, &wert)?; Value::Nil }
-            "gui_label_selection$" | "gui_label_selection" => Value::str_rc(&self.gui.label_selection(gi(a,0,"GUI_LABEL_SELECTION$")?)?),
+            "gui_label_selection$" => Value::str_rc(&self.gui.label_selection(gi(a,0,"GUI_LABEL_SELECTION$")?)?),
             "gui_slider_set" => { let n = "GUI_SLIDER_SET"; self.gui.slider_set(gi(a,0,n)?, &gs(a,1,n)?, gnum(a,2,n)?)?; Value::Nil }
             "gui_slider_mark" => { let n = "GUI_SLIDER_MARK";
                 let t = if a.len() > 2 { gs(a,2,n)? } else { String::new() };
@@ -997,7 +1006,7 @@ impl<'p> Vm<'p> {
                 let titel = gs(a,0,n)?;
                 let g = self.gfx.as_ref().ok_or("GUI_FONT_DIALOG: vor SCREEN aufgerufen")?;
                 Value::Int(self.gui.font_dialog(g, titel, gr)?) }
-            "gui_font_dialog_path$" | "gui_font_dialog_path" => Value::str_rc(&self.gui.font_dialog_path(gi(a,0,"GUI_FONT_DIALOG_PATH$")?)?),
+            "gui_font_dialog_path$" => Value::str_rc(&self.gui.font_dialog_path(gi(a,0,"GUI_FONT_DIALOG_PATH$")?)?),
             "gui_font_dialog_size" => Value::Int(self.gui.font_dialog_size(gi(a,0,"GUI_FONT_DIALOG_SIZE")?)?),
             "gui_window_default" => { self.gui.window_default(gi(a,0,"GUI_WINDOW_DEFAULT")?, gi(a,1,"GUI_WINDOW_DEFAULT")?, false)?; Value::Nil }
             "gui_window_cancel" => { self.gui.window_default(gi(a,0,"GUI_WINDOW_CANCEL")?, gi(a,1,"GUI_WINDOW_CANCEL")?, true)?; Value::Nil }
@@ -1017,7 +1026,7 @@ impl<'p> Vm<'p> {
             }
             "gui_set_round" => { self.gui.set_round(gi(a,0,"GUI_SET_ROUND")?, gbool(a,1,"GUI_SET_ROUND")?)?; Value::Nil }
             "gui_get_round" => { let n = "GUI_GET_ROUND";
-                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Bool(self.gui.get_round(gi(a,0,n)?)?) }
             "gui_set_color" => { self.gui.set_color(gi(a,0,"GUI_SET_COLOR")?, gs(a,1,"GUI_SET_COLOR")?, gi(a,2,"GUI_SET_COLOR")?)?; Value::Nil }
             "gui_theme_preset" => { self.gui.theme_preset(&gs(a,0,"GUI_THEME_PRESET")?)?; Value::Nil }
@@ -1029,12 +1038,12 @@ impl<'p> Vm<'p> {
             "gui_announce" => {
                 let text = gs(a,0,"GUI_ANNOUNCE")?;
                 let dringend = if a.len() > 1 { gbool(a,1,"GUI_ANNOUNCE")? } else { false };
-                if a.len() > 2 { return Err("GUI_ANNOUNCE: erwartet (text$[, dringend])".into()); }
+                if a.len() > 2 { return Err(crate::vm::falsche_argumente("GUI_ANNOUNCE", a.len())); }
                 self.gui.announce(text, dringend); Value::Nil
             }
             "gui_set_tab_index" => { self.gui.set_tab_index(gi(a,0,"GUI_SET_TAB_INDEX")?, gi(a,1,"GUI_SET_TAB_INDEX")?)?; Value::Nil }
             "gui_get_tab_index" => { let n = "GUI_GET_TAB_INDEX";
-                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Int(self.gui.get_tab_index(gi(a,0,n)?)?) }
             "gui_answer" => Value::Int(self.gui.answer(gi(a,0,"GUI_ANSWER")?)?),
             "gui_modal" => Value::Bool(self.gui.modal_offen()),
@@ -1074,13 +1083,13 @@ impl<'p> Vm<'p> {
             "gui_colorpicker_set" => {
                 self.gui.colorpicker_set(gi(a,0,"GUI_COLORPICKER_SET")?,
                                          &gs(a,1,"GUI_COLORPICKER_SET")?,
-                                         gnum(a,2,"GUI_COLORPICKER_SET")?)?;
+                                         gwert(a,2,"GUI_COLORPICKER_SET")?)?;
                 Value::Nil
             }
             "gui_datepicker_set" => {
                 self.gui.datepicker_set(gi(a,0,"GUI_DATEPICKER_SET")?,
                                         &gs(a,1,"GUI_DATEPICKER_SET")?,
-                                        gnum(a,2,"GUI_DATEPICKER_SET")?)?;
+                                        gwert(a,2,"GUI_DATEPICKER_SET")?)?;
                 Value::Nil
             }
             "gui_date_range" => {
@@ -1102,50 +1111,16 @@ impl<'p> Vm<'p> {
             "gui_textarea_set" => {
                 self.gui.textarea_set(gi(a, 0, "GUI_TEXTAREA_SET")?,
                                       &gs(a, 1, "GUI_TEXTAREA_SET")?,
-                                      gnum(a, 2, "GUI_TEXTAREA_SET")?)?;
+                                      gwert(a,2,"GUI_TEXTAREA_SET")?)?;
                 Value::Nil
             }
             "gui_textarea_spans" => {
-                fn ganze(v: &Value, fn_: &str) -> R<Vec<i64>> {
-                    match v {
-                        Value::Array(a) => {
-                            let a = a.borrow();
-                            let mut o = Vec::with_capacity(a.cells.len());
-                            for x in a.cells.iter() {
-                                match x {
-                                    Value::Int(i) => o.push(i),
-                                    Value::Float(f) => o.push(f as i64),
-                                    _ => return Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
-                                }
-                            }
-                            Ok(o)
-                        }
-                        _ => Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
-                    }
-                }
                 let n = "GUI_TEXTAREA_SPANS";
                 self.gui.textarea_spans(gi(a, 0, n)?, ganze(&a[1], n)?,
                                         ganze(&a[2], n)?, ganze(&a[3], n)?)?;
                 Value::Nil
             }
             "gui_textarea_squiggles" => {
-                fn ganze(v: &Value, fn_: &str) -> R<Vec<i64>> {
-                    match v {
-                        Value::Array(a) => {
-                            let a = a.borrow();
-                            let mut o = Vec::with_capacity(a.cells.len());
-                            for x in a.cells.iter() {
-                                match x {
-                                    Value::Int(i) => o.push(i),
-                                    Value::Float(f) => o.push(f as i64),
-                                    _ => return Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
-                                }
-                            }
-                            Ok(o)
-                        }
-                        _ => Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
-                    }
-                }
                 let n = "GUI_TEXTAREA_SQUIGGLES";
                 self.gui.textarea_squiggles(gi(a, 0, n)?, ganze(&a[1], n)?,
                                             ganze(&a[2], n)?, ganze(&a[3], n)?)?;
@@ -1155,28 +1130,28 @@ impl<'p> Vm<'p> {
             "gui_enabled" => Value::Bool(self.gui.enabled(gi(a,0,"GUI_ENABLED")?)?),
             "gui_set_font" => { self.gui.set_font(gi(a,0,"GUI_SET_FONT")?, gi(a,1,"GUI_SET_FONT")?)?; Value::Nil }
             "gui_set_font_style" => { self.gui.set_font_style(gi(a,0,"GUI_SET_FONT_STYLE")?, &gs(a,1,"GUI_SET_FONT_STYLE")?)?; Value::Nil }
-            "gui_get_font_style$" | "gui_get_font_style" => Value::Str(self.gui.font_style(gi(a,0,"GUI_GET_FONT_STYLE$")?)?.into()),
+            "gui_get_font_style$" => Value::Str(self.gui.font_style(gi(a,0,"GUI_GET_FONT_STYLE$")?)?.into()),
             "gui_set_font_size" => { self.gui.set_font_size(gi(a,0,"GUI_SET_FONT_SIZE")?, gi(a,1,"GUI_SET_FONT_SIZE")?)?; Value::Nil }
             "gui_set_anchor" => { self.gui.set_anchor(gi(a,0,"GUI_SET_ANCHOR")?, &gs(a,1,"GUI_SET_ANCHOR")?)?; Value::Nil }
             "gui_style_set" => { self.gui.style_set(gs(a,0,"GUI_STYLE_SET")?, gs(a,1,"GUI_STYLE_SET")?, gi(a,2,"GUI_STYLE_SET")?)?; Value::Nil }
             "gui_get_font_size" => { let n = "GUI_GET_FONT_SIZE";
-                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Int(self.gui.get_font_size(gi(a,0,n)?)?) }
             "gui_get_anchor$" => { let n = "GUI_GET_ANCHOR$";
-                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::str_rc(&self.gui.get_anchor(gi(a,0,n)?)?) }
             "gui_style_get" => { let n = "GUI_STYLE_GET";
-                if a.len() != 2 { return Err(format!("{}: erwartet (name$, prop$)", n)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Int(self.gui.style_get(&gs(a,0,n)?, &gs(a,1,n)?)?) }
             "gui_system_dark" => { let n = "GUI_SYSTEM_DARK";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::Bool(crate::systemaussehen::jetzt().dunkel == Some(true)) }
             "gui_sound" => { let n = "GUI_SOUND";
-                if a.is_empty() || a.len() > 2 { return Err(format!("{}: erwartet (name$ [, lautstaerke])", n)); }
+                if a.is_empty() || a.len() > 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let laut = if a.len() == 2 { gi(a,1,n)? } else { 100 };
                 self.gui.sound(&gs(a,0,n)?, laut)?; Value::Nil }
             "gui_set_sounds" => { let n = "GUI_SET_SOUNDS";
-                if a.len() != 1 { return Err(format!("{}: erwartet (an)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.set_sounds(gbool(a,0,n)?); Value::Nil }
             "gui_sounds" => { let n = "GUI_SOUNDS";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
@@ -1185,20 +1160,20 @@ impl<'p> Vm<'p> {
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::str_rc(&self.gui.sound_log()) }
             "gui_burst" => { let n = "GUI_BURST";
-                if a.len() < 2 || a.len() > 3 { return Err(format!("{}: erwartet (wdg, art$ [, anzahl])", n)); }
+                if a.len() < 2 || a.len() > 3 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let anzahl = if a.len() == 3 { Some(gi(a,2,n)?) } else { None };
                 self.gui.burst(gi(a,0,n)?, &gs(a,1,n)?, anzahl)?; Value::Nil }
             "gui_bursting" => { let n = "GUI_BURSTING";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::Int(self.gui.bursting()) }
             "gui_palette" => { let n = "GUI_PALETTE";
-                if a.len() > 1 { return Err(format!("{}: erwartet ([an])", n)); }
+                if a.len() > 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 if a.len() == 1 { self.gui.palette_oeffnen(gbool(a,0,n)?); Value::Nil } else { Value::Bool(self.gui.palette_offen()) } }
             "gui_palette_key" => { let n = "GUI_PALETTE_KEY";
-                if a.len() != 1 { return Err(format!("{}: erwartet (an)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.palette_taste(gbool(a,0,n)?); Value::Nil }
             "gui_palette_filter" => { let n = "GUI_PALETTE_FILTER";
-                if a.len() != 1 { return Err(format!("{}: erwartet (text$)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.palette_filter(&gs(a,0,n)?)?; Value::Nil }
             "gui_palette_items$" => { let n = "GUI_PALETTE_ITEMS$";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
@@ -1207,11 +1182,11 @@ impl<'p> Vm<'p> {
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::Bool(crate::systemaussehen::weniger_bewegung()) }
             "gui_a11y_check$" => { let n = "GUI_A11Y_CHECK$";
-                if a.len() > 1 { return Err(format!("{}: erwartet ([win])", n)); }
+                if a.len() > 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let nur = if a.len() == 1 { Some(gi(a,0,n)?) } else { None };
                 Value::str_rc(&self.gui.a11y_check(nur)?) }
             "gui_set_contrast" => { let n = "GUI_SET_CONTRAST";
-                if a.len() != 1 { return Err(format!("{}: erwartet (modus$)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.set_contrast(&gs(a,0,n)?)?; Value::Nil }
             "gui_high_contrast" => { let n = "GUI_HIGH_CONTRAST";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
@@ -1220,19 +1195,22 @@ impl<'p> Vm<'p> {
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::Bool(crate::systemaussehen::hoher_kontrast()) }
             "gui_set_motion" => { let n = "GUI_SET_MOTION";
-                if a.len() != 1 { return Err(format!("{}: erwartet (modus$)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.set_motion(&gs(a,0,n)?)?; Value::Nil }
+            "gui_get_motion_mode$" => { let n = "GUI_GET_MOTION_MODE$";
+                if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
+                Value::str_rc(self.gui.motion_mode()) }
             "gui_motion" => { let n = "GUI_MOTION";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::Bool(self.gui.bewegung_offen()) }
             "gui_inspector" => { let n = "GUI_INSPECTOR";
-                if a.len() > 1 { return Err(format!("{}: erwartet ([an])", n)); }
+                if a.len() > 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 if a.len() == 1 { self.gui.inspector(gbool(a,0,n)?); Value::Nil } else { Value::Bool(self.gui.inspector_on()) } }
             "gui_inspector_selected" => { let n = "GUI_INSPECTOR_SELECTED";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::Int(self.gui.inspector_selected()) }
             "gui_inspect$" => { let n = "GUI_INSPECT$";
-                if a.len() != 1 { return Err(format!("{}: erwartet (widget)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::str_rc(&self.gui.inspect(gi(a,0,n)?)?) }
             "gui_system_accent" => { let n = "GUI_SYSTEM_ACCENT";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
@@ -1240,12 +1218,12 @@ impl<'p> Vm<'p> {
             "gui_apply_style" => { self.gui.apply_style(gi(a,0,"GUI_APPLY_STYLE")?, &gs(a,1,"GUI_APPLY_STYLE")?)?; Value::Nil }
             "gui_hit_test" => Value::Int(self.gui.hit_test(gi(a,0,"GUI_HIT_TEST")? as i32, gi(a,1,"GUI_HIT_TEST")? as i32)),
             "gui_window_set_bounds" => { self.gui.window_set_bounds(gi(a,0,"GUI_WINDOW_SET_BOUNDS")?, gi(a,1,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,2,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,3,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,4,"GUI_WINDOW_SET_BOUNDS")? as i32)?; Value::Nil }
-            "gui_window_get_x" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_X")?)?.0 as i64),
-            "gui_window_get_y" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_Y")?)?.1 as i64),
-            "gui_window_get_w" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_W")?)?.2 as i64),
-            "gui_window_get_h" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_H")?)?.3 as i64),
-            "gui_window_content_w" => Value::Int(self.gui.window_inhalt(gi(a,0,"GUI_WINDOW_CONTENT_W")?)?.0 as i64),
-            "gui_window_content_h" => Value::Int(self.gui.window_inhalt(gi(a,0,"GUI_WINDOW_CONTENT_H")?)?.1 as i64),
+            "gui_window_get_x" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_X")?, "GUI_WINDOW_GET_X")?.0 as i64),
+            "gui_window_get_y" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_Y")?, "GUI_WINDOW_GET_Y")?.1 as i64),
+            "gui_window_get_w" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_W")?, "GUI_WINDOW_GET_W")?.2 as i64),
+            "gui_window_get_h" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_H")?, "GUI_WINDOW_GET_H")?.3 as i64),
+            "gui_window_content_w" => Value::Int(self.gui.window_inhalt(gi(a,0,"GUI_WINDOW_CONTENT_W")?, "GUI_WINDOW_CONTENT_W")?.0 as i64),
+            "gui_window_content_h" => Value::Int(self.gui.window_inhalt(gi(a,0,"GUI_WINDOW_CONTENT_H")?, "GUI_WINDOW_CONTENT_H")?.1 as i64),
             "gui_window_destroy" => { self.gui.window_destroy(gi(a,0,"GUI_WINDOW_DESTROY")?)?; Value::Nil }
             "gui_window_widget_count" => Value::Int(self.gui.window_widget_count(gi(a,0,"GUI_WINDOW_WIDGET_COUNT")?)?),
             "gui_window_widget" => Value::Int(self.gui.window_widget(gi(a,0,"GUI_WINDOW_WIDGET")?, gi(a,1,"GUI_WINDOW_WIDGET")?)?),
@@ -1287,7 +1265,7 @@ impl<'p> Vm<'p> {
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(ar), Value::Int(ac), Value::Int(r), Value::Int(c)]))
             }
             "gui_table_select_range" => { self.gui.table_select_range(gi(a,0,"GUI_TABLE_SELECT_RANGE")?, gi(a,1,"GUI_TABLE_SELECT_RANGE")?, gi(a,2,"GUI_TABLE_SELECT_RANGE")?, gi(a,3,"GUI_TABLE_SELECT_RANGE")?, gi(a,4,"GUI_TABLE_SELECT_RANGE")?)?; Value::Nil }
-            "gui_table_copy$" | "gui_table_copy" => Value::str_rc(&self.gui.table_copy(gi(a,0,"GUI_TABLE_COPY$")?)?),
+            "gui_table_copy$" => Value::str_rc(&self.gui.table_copy(gi(a,0,"GUI_TABLE_COPY$")?)?),
             "gui_table_paste" => Value::Int(self.gui.table_paste(gi(a,0,"GUI_TABLE_PASTE")?, &gs(a,1,"GUI_TABLE_PASTE")?)?),
             "gui_table_col_type" => { self.gui.table_col_type(gi(a,0,"GUI_TABLE_COL_TYPE")?, gi(a,1,"GUI_TABLE_COL_TYPE")?, &gs(a,2,"GUI_TABLE_COL_TYPE")?)?; Value::Nil }
             "gui_table_col_choices" => { self.gui.table_col_choices(gi(a,0,"GUI_TABLE_COL_CHOICES")?, gi(a,1,"GUI_TABLE_COL_CHOICES")?, gstrs(a,2,"GUI_TABLE_COL_CHOICES")?)?; Value::Nil }
@@ -1324,8 +1302,14 @@ impl<'p> Vm<'p> {
             "gui_table_remove_row" => { self.gui.table_remove_row(gi(a,0,"GUI_TABLE_REMOVE_ROW")?, gi(a,1,"GUI_TABLE_REMOVE_ROW")?)?; Value::Nil }
             "gui_table_clear" => { self.gui.table_clear(gi(a,0,"GUI_TABLE_CLEAR")?)?; Value::Nil }
             // --- tabellenweite Einstellungen ---
-            "gui_table_set" => { self.gui.table_set_opt(gi(a,0,"GUI_TABLE_SET")?, &gs(a,1,"GUI_TABLE_SET")?, gnum(a,2,"GUI_TABLE_SET")?)?; Value::Nil }
-            "gui_table_get" => Value::Float(self.gui.table_get_opt(gi(a,0,"GUI_TABLE_GET")?, &gs(a,1,"GUI_TABLE_GET")?)?),
+            "gui_table_set" => { self.gui.table_set_opt(gi(a,0,"GUI_TABLE_SET")?, &gs(a,1,"GUI_TABLE_SET")?, gwert(a,2,"GUI_TABLE_SET")?)?; Value::Nil }
+            // GUI_<W>_GET(w, key$) fuer jede Art mit Einstellungen (gui_einstellungen.rs).
+            "gui_listbox_get" | "gui_tree_get" | "gui_filetree_get" | "gui_accordion_get" | "gui_wizard_get" | "gui_tabcontrol_get" | "gui_timepicker_get" | "gui_slider_get" | "gui_dropdown_get" | "gui_progress_get" | "gui_layout_get" | "gui_colorpicker_get" | "gui_datepicker_get" | "gui_textarea_get" | "gui_richtext_get" | "gui_label_get" => {
+                let art = name.trim_start_matches("gui_").trim_end_matches("_get");
+                let f = name.to_uppercase();
+                zahl_wert(self.gui.einstellung_get(art, gi(a,0,&f)?, &gs(a,1,&f)?)?)
+            }
+            "gui_table_get" => zahl_wert(self.gui.table_get_opt(gi(a,0,"GUI_TABLE_GET")?, &gs(a,1,"GUI_TABLE_GET")?)?),
             // --- Spalten-Reihenfolge ---
             "gui_table_move_col" => { self.gui.table_move_col(gi(a,0,"GUI_TABLE_MOVE_COL")?, gi(a,1,"GUI_TABLE_MOVE_COL")?, gi(a,2,"GUI_TABLE_MOVE_COL")?)?; Value::Nil }
             "gui_table_col_at" => Value::Int(self.gui.table_col_at(gi(a,0,"GUI_TABLE_COL_AT")?, gi(a,1,"GUI_TABLE_COL_AT")?)?),
@@ -1345,22 +1329,21 @@ impl<'p> Vm<'p> {
             "gui_table_sort" => { self.gui.table_sort(gi(a,0,"GUI_TABLE_SORT")?, gi(a,1,"GUI_TABLE_SORT")?, gbool(a,2,"GUI_TABLE_SORT")?)?; Value::Nil }
             "gui_table_sort_col" => Value::Int(self.gui.table_sort_col(gi(a,0,"GUI_TABLE_SORT_COL")?)?),
             "gui_table_sort_desc" => Value::Bool(self.gui.table_sort_desc(gi(a,0,"GUI_TABLE_SORT_DESC")?)?),
-            "gui_table_placeholder" => { self.gui.table_placeholder(gi(a,0,"GUI_TABLE_PLACEHOLDER")?, gs(a,1,"GUI_TABLE_PLACEHOLDER")?.to_string())?; Value::Nil }
             "gui_table_filter" => { self.gui.table_filter(gi(a,0,"GUI_TABLE_FILTER")?, gi(a,1,"GUI_TABLE_FILTER")?, gs(a,2,"GUI_TABLE_FILTER")?.to_string())?; Value::Nil }
             "gui_table_get_filter" => Value::str_rc(&self.gui.table_get_filter(gi(a,0,"GUI_TABLE_GET_FILTER")?, gi(a,1,"GUI_TABLE_GET_FILTER")?)?),
             "gui_table_view_count" => Value::Int(self.gui.table_view_count(gi(a,0,"GUI_TABLE_VIEW_COUNT")?)?),
             "gui_table_view_row" => Value::Int(self.gui.table_view_row(gi(a,0,"GUI_TABLE_VIEW_ROW")?, gi(a,1,"GUI_TABLE_VIEW_ROW")?)?),
             "gui_table_virtual" => { let n = "GUI_TABLE_VIRTUAL";
-                if a.len() != 2 { return Err(format!("{}: erwartet (tbl, zeilen)", n)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.table_virtual(gi(a,0,n)?, gi(a,1,n)?)?; Value::Nil }
             "gui_table_need_from" => { let n = "GUI_TABLE_NEED_FROM";
-                if a.len() != 1 { return Err(format!("{}: erwartet (tbl)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Int(self.gui.table_need(gi(a,0,n)?)?.0) }
             "gui_table_need_count" => { let n = "GUI_TABLE_NEED_COUNT";
-                if a.len() != 1 { return Err(format!("{}: erwartet (tbl)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Int(self.gui.table_need(gi(a,0,n)?)?.1) }
             "gui_table_supply" => { let n = "GUI_TABLE_SUPPLY";
-                if a.len() != 3 { return Err(format!("{}: erwartet (tbl, ab, zellen)", n)); }
+                if a.len() != 3 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 // Ein 2D-Feld liefert mehrere Zeilen, ein einfaches eine.
                 let zeilen = match gstrs2(a,2,n) { Ok(z) => z, Err(_) => vec![gstrs(a,2,n)?] };
                 self.gui.table_supply(gi(a,0,n)?, gi(a,1,n)?, zeilen)?; Value::Nil }
@@ -1371,8 +1354,12 @@ impl<'p> Vm<'p> {
             "gui_tree_clear" => { self.gui.tree_clear(gi(a,0,"GUI_TREE_CLEAR")?)?; Value::Nil }
             "gui_tree_selected" => Value::Int(self.gui.tree_selected(gi(a,0,"GUI_TREE_SELECTED")?)?),
             "gui_tree_set_selected" => { self.gui.tree_set_selected(gi(a,0,"GUI_TREE_SET_SELECTED")?, gi(a,1,"GUI_TREE_SET_SELECTED")?)?; Value::Nil }
+            "gui_tree_count" => Value::Int(self.gui.tree_count(gi(a,0,"GUI_TREE_COUNT")?)?),
+            "gui_tree_set_label" => { self.gui.tree_set_label(gi(a,0,"GUI_TREE_SET_LABEL")?, gi(a,1,"GUI_TREE_SET_LABEL")?, gs(a,2,"GUI_TREE_SET_LABEL")?.to_string())?; Value::Nil }
+            "gui_tree_expanded" => Value::Bool(self.gui.tree_expanded(gi(a,0,"GUI_TREE_EXPANDED")?, gi(a,1,"GUI_TREE_EXPANDED")?)?),
+            "gui_tree_remove" => { self.gui.tree_remove(gi(a,0,"GUI_TREE_REMOVE")?, gi(a,1,"GUI_TREE_REMOVE")?)?; Value::Nil }
             "gui_tree_label" => Value::str_rc(&self.gui.tree_label(gi(a,0,"GUI_TREE_LABEL")?, gi(a,1,"GUI_TREE_LABEL")?)?),
-            "gui_tree_set" => { self.gui.tree_set(gi(a,0,"GUI_TREE_SET")?, &gs(a,1,"GUI_TREE_SET")?, gnum(a,2,"GUI_TREE_SET")?)?; Value::Nil }
+            "gui_tree_set" => { self.gui.tree_set(gi(a,0,"GUI_TREE_SET")?, &gs(a,1,"GUI_TREE_SET")?, gwert(a,2,"GUI_TREE_SET")?)?; Value::Nil }
             "gui_tree_sel_count" => Value::Int(self.gui.tree_sel_count(gi(a,0,"GUI_TREE_SEL_COUNT")?)?),
             "gui_tree_sel_node" => Value::Int(self.gui.tree_sel_node(gi(a,0,"GUI_TREE_SEL_NODE")?, gi(a,1,"GUI_TREE_SEL_NODE")?)?),
             "gui_tree_is_selected" => Value::Bool(self.gui.tree_is_selected(gi(a,0,"GUI_TREE_IS_SELECTED")?, gi(a,1,"GUI_TREE_IS_SELECTED")?)?),
@@ -1385,40 +1372,40 @@ impl<'p> Vm<'p> {
             "gui_filetree" => Value::Int(self.gui.filetree(gi(a,0,"GUI_FILETREE")?, gi(a,1,"GUI_FILETREE")? as i32,
                 gi(a,2,"GUI_FILETREE")? as i32, gi(a,3,"GUI_FILETREE")? as i32, gi(a,4,"GUI_FILETREE")? as i32,
                 if a.len() > 5 { gs(a,5,"GUI_FILETREE")? } else { ".".to_string() })?),
-            "gui_filetree_set" => { self.gui.filetree_set(gi(a,0,"GUI_FILETREE_SET")?, &gs(a,1,"GUI_FILETREE_SET")?, gnum(a,2,"GUI_FILETREE_SET")?)?; Value::Nil }
+            "gui_filetree_set" => { self.gui.filetree_set(gi(a,0,"GUI_FILETREE_SET")?, &gs(a,1,"GUI_FILETREE_SET")?, gwert(a,2,"GUI_FILETREE_SET")?)?; Value::Nil }
             "gui_filetree_filter" => { self.gui.filetree_filter(gi(a,0,"GUI_FILETREE_FILTER")?, &gs(a,1,"GUI_FILETREE_FILTER")?)?; Value::Nil }
             "gui_filetree_skip" => { self.gui.filetree_skip(gi(a,0,"GUI_FILETREE_SKIP")?, &gs(a,1,"GUI_FILETREE_SKIP")?)?; Value::Nil }
             "gui_filetree_set_root" => { self.gui.filetree_set_root(gi(a,0,"GUI_FILETREE_SET_ROOT")?, gs(a,1,"GUI_FILETREE_SET_ROOT")?)?; Value::Nil }
-            "gui_filetree_root$" | "gui_filetree_root" => Value::str_rc(&self.gui.filetree_root(gi(a,0,"GUI_FILETREE_ROOT")?)?),
+            "gui_filetree_root$" => Value::str_rc(&self.gui.filetree_root(gi(a,0,"GUI_FILETREE_ROOT")?)?),
             "gui_filetree_refresh" => { self.gui.filetree_refresh(gi(a,0,"GUI_FILETREE_REFRESH")?)?; Value::Nil }
-            "gui_filetree_selected$" | "gui_filetree_selected" => Value::str_rc(&self.gui.filetree_selected(gi(a,0,"GUI_FILETREE_SELECTED")?)?),
-            "gui_filetree_activated$" | "gui_filetree_activated" => Value::str_rc(&self.gui.filetree_activated(gi(a,0,"GUI_FILETREE_ACTIVATED")?)?),
+            "gui_filetree_selected$" => Value::str_rc(&self.gui.filetree_selected(gi(a,0,"GUI_FILETREE_SELECTED")?)?),
+            "gui_filetree_activated$" => Value::str_rc(&self.gui.filetree_activated(gi(a,0,"GUI_FILETREE_ACTIVATED")?)?),
             "gui_filetree_is_dir" => Value::Bool(self.gui.filetree_is_dir(gi(a,0,"GUI_FILETREE_IS_DIR")?,
                 &if a.len() > 1 { gs(a,1,"GUI_FILETREE_IS_DIR")? } else { String::new() })?),
             "gui_filetree_select" => { self.gui.filetree_select(gi(a,0,"GUI_FILETREE_SELECT")?, &gs(a,1,"GUI_FILETREE_SELECT")?)?; Value::Nil }
             "gui_filetree_expand" => { self.gui.filetree_expand(gi(a,0,"GUI_FILETREE_EXPAND")?, &gs(a,1,"GUI_FILETREE_EXPAND")?, gbool(a,2,"GUI_FILETREE_EXPAND")?)?; Value::Nil }
             "gui_filetree_count" => Value::Int(self.gui.filetree_count(gi(a,0,"GUI_FILETREE_COUNT")?)?),
-            "gui_filetree_path$" | "gui_filetree_path" => Value::str_rc(&self.gui.filetree_path(gi(a,0,"GUI_FILETREE_PATH")?, gi(a,1,"GUI_FILETREE_PATH")?)?),
+            "gui_filetree_path$" => Value::str_rc(&self.gui.filetree_path(gi(a,0,"GUI_FILETREE_PATH")?, gi(a,1,"GUI_FILETREE_PATH")?)?),
             "gui_filetree_sel_count" => Value::Int(self.gui.filetree_sel_count(gi(a,0,"GUI_FILETREE_SEL_COUNT")?)?),
-            "gui_filetree_sel_path$" | "gui_filetree_sel_path" => Value::str_rc(&self.gui.filetree_sel_path(gi(a,0,"GUI_FILETREE_SEL_PATH")?, gi(a,1,"GUI_FILETREE_SEL_PATH")?)?),
+            "gui_filetree_sel_path$" => Value::str_rc(&self.gui.filetree_sel_path(gi(a,0,"GUI_FILETREE_SEL_PATH")?, gi(a,1,"GUI_FILETREE_SEL_PATH")?)?),
             "gui_filetree_checked" => Value::Bool(self.gui.filetree_checked(gi(a,0,"GUI_FILETREE_CHECKED")?, &gs(a,1,"GUI_FILETREE_CHECKED")?)?),
             "gui_filetree_set_checked" => { self.gui.filetree_set_checked(gi(a,0,"GUI_FILETREE_SET_CHECKED")?, &gs(a,1,"GUI_FILETREE_SET_CHECKED")?, gbool(a,2,"GUI_FILETREE_SET_CHECKED")?)?; Value::Nil }
             "gui_filetree_checked_count" => Value::Int(self.gui.filetree_checked_count(gi(a,0,"GUI_FILETREE_CHECKED_COUNT")?)?),
-            "gui_filetree_checked_path$" | "gui_filetree_checked_path" => Value::str_rc(&self.gui.filetree_checked_path(gi(a,0,"GUI_FILETREE_CHECKED_PATH")?, gi(a,1,"GUI_FILETREE_CHECKED_PATH")?)?),
+            "gui_filetree_checked_path$" => Value::str_rc(&self.gui.filetree_checked_path(gi(a,0,"GUI_FILETREE_CHECKED_PATH")?, gi(a,1,"GUI_FILETREE_CHECKED_PATH")?)?),
             // --- Uhrzeit ---
             "gui_timepicker" => Value::Int(self.gui.timepicker(gi(a,0,"GUI_TIMEPICKER")?, gi(a,1,"GUI_TIMEPICKER")? as i32,
                 gi(a,2,"GUI_TIMEPICKER")? as i32,
                 if a.len() > 3 { gi(a,3,"GUI_TIMEPICKER")? as i32 } else { 0 },
                 if a.len() > 4 { gi(a,4,"GUI_TIMEPICKER")? as i32 } else { 0 })?),
-            "gui_time$" | "gui_time" => Value::str_rc(&self.gui.time_get(gi(a,0,"GUI_TIME")?)?),
+            "gui_time$" => Value::str_rc(&self.gui.time_get(gi(a,0,"GUI_TIME")?)?),
             "gui_set_time" => { self.gui.set_time(gi(a,0,"GUI_SET_TIME")?, &gs(a,1,"GUI_SET_TIME")?)?; Value::Nil }
-            "gui_timepicker_set" => { self.gui.timepicker_set(gi(a,0,"GUI_TIMEPICKER_SET")?, &gs(a,1,"GUI_TIMEPICKER_SET")?, gnum(a,2,"GUI_TIMEPICKER_SET")?)?; Value::Nil }
+            "gui_timepicker_set" => { self.gui.timepicker_set(gi(a,0,"GUI_TIMEPICKER_SET")?, &gs(a,1,"GUI_TIMEPICKER_SET")?, gwert(a,2,"GUI_TIMEPICKER_SET")?)?; Value::Nil }
             // --- Gesetzter Text ---
             "gui_richtext" => Value::Int(self.gui.richtext(gi(a,0,"GUI_RICHTEXT")?, gi(a,1,"GUI_RICHTEXT")? as i32,
                 gi(a,2,"GUI_RICHTEXT")? as i32, gi(a,3,"GUI_RICHTEXT")? as i32, gi(a,4,"GUI_RICHTEXT")? as i32,
                 if a.len() > 5 { gs(a,5,"GUI_RICHTEXT")? } else { String::new() })?),
             "gui_richtext_set_text" => { self.gui.richtext_set_text(gi(a,0,"GUI_RICHTEXT_SET_TEXT")?, gs(a,1,"GUI_RICHTEXT_SET_TEXT")?)?; Value::Nil }
-            "gui_richtext_set" => { self.gui.richtext_set(gi(a,0,"GUI_RICHTEXT_SET")?, &gs(a,1,"GUI_RICHTEXT_SET")?, gnum(a,2,"GUI_RICHTEXT_SET")?)?; Value::Nil }
+            "gui_richtext_set" => { self.gui.richtext_set(gi(a,0,"GUI_RICHTEXT_SET")?, &gs(a,1,"GUI_RICHTEXT_SET")?, gwert(a,2,"GUI_RICHTEXT_SET")?)?; Value::Nil }
             "gui_richtext_headings" => {
                 let ue = self.gui.richtext_headings(gi(a,0,"GUI_RICHTEXT_HEADINGS")?)?;
                 let mut arr = crate::value::DhArray::new("string".to_string(), vec![ue.len() as i64], || Value::str_rc(""));
@@ -1432,16 +1419,21 @@ impl<'p> Vm<'p> {
                 Value::Array(std::rc::Rc::new(std::cell::RefCell::new(arr)))
             }
             "gui_richtext_code_buttons" => { self.gui.richtext_code_buttons(gi(a,0,"GUI_RICHTEXT_CODE_BUTTONS")?, &gs(a,1,"GUI_RICHTEXT_CODE_BUTTONS")?)?; Value::Nil }
-            "gui_richtext_code_action$" | "gui_richtext_code_action" => Value::str_rc(self.gui.richtext_code_action(gi(a,0,"GUI_RICHTEXT_CODE_ACTION$")?)?),
-            "gui_richtext_code$" | "gui_richtext_code" => Value::str_rc(self.gui.richtext_code(gi(a,0,"GUI_RICHTEXT_CODE$")?)?),
+            "gui_richtext_code_action$" => Value::str_rc(self.gui.richtext_code_action(gi(a,0,"GUI_RICHTEXT_CODE_ACTION$")?)?),
+            "gui_richtext_code$" => Value::str_rc(self.gui.richtext_code(gi(a,0,"GUI_RICHTEXT_CODE$")?)?),
             "gui_richtext_goto_heading" => { self.gui.richtext_goto_heading(gi(a,0,"GUI_RICHTEXT_GOTO_HEADING")?, gi(a,1,"GUI_RICHTEXT_GOTO_HEADING")?)?; Value::Nil }
             "gui_richtext_heading_at" => Value::Int(self.gui.richtext_heading_at(gi(a,0,"GUI_RICHTEXT_HEADING_AT")?)?),
-            "gui_richtext_scroll" => { self.gui.richtext_scroll(gi(a,0,"GUI_RICHTEXT_SCROLL")?, gi(a,1,"GUI_RICHTEXT_SCROLL")?)?; Value::Nil }
-            "gui_richtext_scroll_get" => Value::Int(self.gui.richtext_scroll_get(gi(a,0,"GUI_RICHTEXT_SCROLL_GET")?)?),
-            "gui_richtext_height" => Value::Int(self.gui.richtext_height(gi(a,0,"GUI_RICHTEXT_HEIGHT")?)?),
-            "gui_richtext_link$" | "gui_richtext_link" => Value::str_rc(&self.gui.richtext_link(gi(a,0,"GUI_RICHTEXT_LINK")?)?),
-            "gui_richtext_find" => Value::Int(self.gui.richtext_find(gi(a,0,"GUI_RICHTEXT_FIND")?, &gs(a,1,"GUI_RICHTEXT_FIND")?,
-                if a.len() > 2 { gi(a,2,"GUI_RICHTEXT_FIND")? } else { -1 })?),
+            // Blickversatz, Inhaltshoehe und gefundene y sind logisch wie alle
+            // Lagen nach aussen (bis 2026.53 Pixel: bei GUI_SCALE(2) das Doppelte).
+            "gui_richtext_scroll" => { let y = self.gui.pixel(gi(a,1,"GUI_RICHTEXT_SCROLL")?); self.gui.richtext_scroll(gi(a,0,"GUI_RICHTEXT_SCROLL")?, y)?; Value::Nil }
+            "gui_richtext_scroll_get" => Value::Int(self.gui.logisch(self.gui.richtext_scroll_get(gi(a,0,"GUI_RICHTEXT_SCROLL_GET")?)?)),
+            "gui_richtext_height" => Value::Int(self.gui.logisch(self.gui.richtext_height(gi(a,0,"GUI_RICHTEXT_HEIGHT")?)?)),
+            "gui_richtext_link$" => Value::str_rc(&self.gui.richtext_link(gi(a,0,"GUI_RICHTEXT_LINK")?)?),
+            "gui_richtext_find" => {
+                let ab = if a.len() > 2 { self.gui.pixel(gi(a,2,"GUI_RICHTEXT_FIND")?) } else { -1 };
+                let y = self.gui.richtext_find(gi(a,0,"GUI_RICHTEXT_FIND")?, &gs(a,1,"GUI_RICHTEXT_FIND")?, ab)?;
+                Value::Int(self.gui.logisch(y))
+            }
             // --- Reiter im Fenster ---
             "gui_tabcontrol" => Value::Int(self.gui.tabcontrol(gi(a,0,"GUI_TABCONTROL")?, gi(a,1,"GUI_TABCONTROL")? as i32,
                 gi(a,2,"GUI_TABCONTROL")? as i32, gi(a,3,"GUI_TABCONTROL")? as i32, gi(a,4,"GUI_TABCONTROL")? as i32)?),
@@ -1449,12 +1441,12 @@ impl<'p> Vm<'p> {
             "gui_tabcontrol_count" => Value::Int(self.gui.tabcontrol_count(gi(a,0,"GUI_TABCONTROL_COUNT")?)?),
             "gui_tabcontrol_page" => Value::Int(self.gui.tabcontrol_page(gi(a,0,"GUI_TABCONTROL_PAGE")?)?),
             "gui_tabcontrol_set_page" => { self.gui.tabcontrol_set_page(gi(a,0,"GUI_TABCONTROL_SET_PAGE")?, gi(a,1,"GUI_TABCONTROL_SET_PAGE")?)?; Value::Nil }
-            "gui_tabcontrol_title$" | "gui_tabcontrol_title" => Value::str_rc(&self.gui.tabcontrol_title(gi(a,0,"GUI_TABCONTROL_TITLE")?, gi(a,1,"GUI_TABCONTROL_TITLE")?)?),
+            "gui_tabcontrol_title$" => Value::str_rc(&self.gui.tabcontrol_title(gi(a,0,"GUI_TABCONTROL_TITLE")?, gi(a,1,"GUI_TABCONTROL_TITLE")?)?),
             "gui_tabcontrol_set_title" => { self.gui.tabcontrol_set_title(gi(a,0,"GUI_TABCONTROL_SET_TITLE")?, gi(a,1,"GUI_TABCONTROL_SET_TITLE")?, gs(a,2,"GUI_TABCONTROL_SET_TITLE")?)?; Value::Nil }
             "gui_tabcontrol_add_widget" => { self.gui.tabcontrol_add_widget(gi(a,0,"GUI_TABCONTROL_ADD_WIDGET")?, gi(a,1,"GUI_TABCONTROL_ADD_WIDGET")?, gi(a,2,"GUI_TABCONTROL_ADD_WIDGET")?)?; Value::Nil }
             "gui_tabcontrol_set" => {
-                let schl = match a.get(1) { Some(Value::Str(s)) => s.to_string(), _ => return Err("GUI_TABCONTROL_SET: erwartet (reiterwerk, schluessel$, wert)".into()) };
-                let wert = match a.get(2) { Some(Value::Bool(b)) => *b, Some(Value::Int(n)) => *n != 0, _ => return Err("GUI_TABCONTROL_SET: erwartet (reiterwerk, schluessel$, wert)".into()) };
+                let schl = match a.get(1) { Some(Value::Str(s)) => s.to_string(), _ => return Err(crate::vm::falsche_argumente("GUI_TABCONTROL_SET", a.len())) };
+                let wert = gwert(a, 2, "GUI_TABCONTROL_SET")? != 0.0;
                 self.gui.tabcontrol_set(gi(a,0,"GUI_TABCONTROL_SET")?, &schl, wert)?; Value::Nil
             }
             "gui_tabcontrol_closed" => Value::Int(self.gui.tabcontrol_closed(gi(a,0,"GUI_TABCONTROL_CLOSED")?)?),
@@ -1467,10 +1459,10 @@ impl<'p> Vm<'p> {
             "gui_accordion_open" => { self.gui.accordion_open(gi(a,0,"GUI_ACCORDION_OPEN")?, gi(a,1,"GUI_ACCORDION_OPEN")?, gbool(a,2,"GUI_ACCORDION_OPEN")?)?; Value::Nil }
             "gui_accordion_is_open" => Value::Bool(self.gui.accordion_is_open(gi(a,0,"GUI_ACCORDION_IS_OPEN")?, gi(a,1,"GUI_ACCORDION_IS_OPEN")?)?),
             "gui_accordion_count" => Value::Int(self.gui.accordion_count(gi(a,0,"GUI_ACCORDION_COUNT")?)?),
-            "gui_accordion_title$" | "gui_accordion_title" => Value::str_rc(&self.gui.accordion_title(gi(a,0,"GUI_ACCORDION_TITLE$")?, gi(a,1,"GUI_ACCORDION_TITLE$")?)?),
+            "gui_accordion_title$" => Value::str_rc(&self.gui.accordion_title(gi(a,0,"GUI_ACCORDION_TITLE$")?, gi(a,1,"GUI_ACCORDION_TITLE$")?)?),
             "gui_accordion_set_title" => { self.gui.accordion_set_title(gi(a,0,"GUI_ACCORDION_SET_TITLE")?, gi(a,1,"GUI_ACCORDION_SET_TITLE")?, gs(a,2,"GUI_ACCORDION_SET_TITLE")?)?; Value::Nil }
             "gui_accordion_toggled" => Value::Int(self.gui.accordion_toggled(gi(a,0,"GUI_ACCORDION_TOGGLED")?)?),
-            "gui_accordion_set" => { self.gui.accordion_set(gi(a,0,"GUI_ACCORDION_SET")?, &gs(a,1,"GUI_ACCORDION_SET")?, gi(a,2,"GUI_ACCORDION_SET")?)?; Value::Nil }
+            "gui_accordion_set" => { self.gui.accordion_set(gi(a,0,"GUI_ACCORDION_SET")?, &gs(a,1,"GUI_ACCORDION_SET")?, gwert(a,2,"GUI_ACCORDION_SET")? as i64)?; Value::Nil }
             "gui_accordion_set_height" => { self.gui.accordion_set_height(gi(a,0,"GUI_ACCORDION_SET_HEIGHT")?, gi(a,1,"GUI_ACCORDION_SET_HEIGHT")?, gi(a,2,"GUI_ACCORDION_SET_HEIGHT")?)?; Value::Nil }
             // --- Dock (gui_dock.rs) ---
             "gui_dock" => { self.gui.dock(gi(a,0,"GUI_DOCK")?, gi(a,1,"GUI_DOCK")? as i32, gi(a,2,"GUI_DOCK")? as i32,
@@ -1494,7 +1486,7 @@ impl<'p> Vm<'p> {
             }
             "gui_dock_share" => {
                 let f = match a.get(2) { Some(Value::Int(i)) => *i as f64, Some(Value::Float(f)) => *f,
-                    _ => return Err("GUI_DOCK_SHARE: erwartet (win, name$, anteil)".into()) };
+                    _ => return Err(crate::vm::falsche_argumente("GUI_DOCK_SHARE", a.len())) };
                 self.gui.dock_share(gi(a,0,"GUI_DOCK_SHARE")?, &gs(a,1,"GUI_DOCK_SHARE")?, f)?; Value::Nil
             }
             "gui_dock_center" => {
@@ -1502,15 +1494,15 @@ impl<'p> Vm<'p> {
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(x as i64), Value::Int(y as i64), Value::Int(w as i64), Value::Int(h as i64)]))
             }
             "gui_dock_shown" => Value::Bool(self.gui.dock_shown(gi(a,0,"GUI_DOCK_SHOWN")?, &gs(a,1,"GUI_DOCK_SHOWN")?)?),
-            "gui_dock_where$" | "gui_dock_where" => Value::str_rc(self.gui.dock_where(gi(a,0,"GUI_DOCK_WHERE$")?, &gs(a,1,"GUI_DOCK_WHERE$")?)?),
+            "gui_dock_where$" => Value::str_rc(self.gui.dock_where(gi(a,0,"GUI_DOCK_WHERE$")?, &gs(a,1,"GUI_DOCK_WHERE$")?)?),
             "gui_dock_show" => { self.gui.dock_show(gi(a,0,"GUI_DOCK_SHOW")?, &gs(a,1,"GUI_DOCK_SHOW")?, gbool(a,2,"GUI_DOCK_SHOW")?)?; Value::Nil }
             "gui_dock_activate" => { self.gui.dock_activate(gi(a,0,"GUI_DOCK_ACTIVATE")?, &gs(a,1,"GUI_DOCK_ACTIVATE")?)?; Value::Nil }
             "gui_dock_title" => { self.gui.dock_title(gi(a,0,"GUI_DOCK_TITLE")?, &gs(a,1,"GUI_DOCK_TITLE")?, &gs(a,2,"GUI_DOCK_TITLE")?)?; Value::Nil }
             "gui_dock_title$" => { let n = "GUI_DOCK_TITLE$";
-                if a.len() != 2 { return Err(format!("{}: erwartet (win, name$)", n)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::str_rc(&self.gui.dock_title_text(gi(a,0,n)?, &gs(a,1,n)?)?) }
             "gui_dock_closable" => { self.gui.dock_closable(gi(a,0,"GUI_DOCK_CLOSABLE")?, &gs(a,1,"GUI_DOCK_CLOSABLE")?, gbool(a,2,"GUI_DOCK_CLOSABLE")?)?; Value::Nil }
-            "gui_dock_closed$" | "gui_dock_closed" => Value::str_rc(self.gui.dock_closed(gi(a,0,"GUI_DOCK_CLOSED$")?)?),
+            "gui_dock_closed$" => Value::str_rc(self.gui.dock_closed(gi(a,0,"GUI_DOCK_CLOSED$")?)?),
             "gui_dock_changed" => Value::Bool(self.gui.dock_changed(gi(a,0,"GUI_DOCK_CHANGED")?)?),
             "gui_dock_area" => { self.gui.dock_area(gi(a,0,"GUI_DOCK_AREA")?, &gs(a,1,"GUI_DOCK_AREA")?, gbool(a,2,"GUI_DOCK_AREA")?)?; Value::Nil }
             "gui_dock_area_shown" => Value::Bool(self.gui.dock_area_shown(gi(a,0,"GUI_DOCK_AREA_SHOWN")?, &gs(a,1,"GUI_DOCK_AREA_SHOWN")?)?),
@@ -1522,7 +1514,7 @@ impl<'p> Vm<'p> {
                 let neben = if a.len() > 3 { gs(a,3,"GUI_DOCK_MOVE")? } else { String::new() };
                 self.gui.dock_move(gi(a,0,"GUI_DOCK_MOVE")?, &gs(a,1,"GUI_DOCK_MOVE")?, &gs(a,2,"GUI_DOCK_MOVE")?, &neben)?; Value::Nil
             }
-            "gui_dock_state$" | "gui_dock_state" => Value::str_rc(self.gui.dock_state(gi(a,0,"GUI_DOCK_STATE$")?)?),
+            "gui_dock_state$" => Value::str_rc(self.gui.dock_state(gi(a,0,"GUI_DOCK_STATE$")?)?),
             "gui_dock_set_state" => { self.gui.dock_set_state(gi(a,0,"GUI_DOCK_SET_STATE")?, &gs(a,1,"GUI_DOCK_SET_STATE")?)?; Value::Nil }
             // --- Assistent ---
             "gui_wizard" => Value::Int(self.gui.wizard(gi(a,0,"GUI_WIZARD")?, gi(a,1,"GUI_WIZARD")? as i32,
@@ -1536,10 +1528,10 @@ impl<'p> Vm<'p> {
             "gui_wizard_finished" => Value::Bool(self.gui.wizard_finished(gi(a,0,"GUI_WIZARD_FINISHED")?)?),
             "gui_wizard_cancelled" => Value::Bool(self.gui.wizard_cancelled(gi(a,0,"GUI_WIZARD_CANCELLED")?)?),
             "gui_wizard_enable_next" => { self.gui.wizard_enable_next(gi(a,0,"GUI_WIZARD_ENABLE_NEXT")?, gbool(a,1,"GUI_WIZARD_ENABLE_NEXT")?)?; Value::Nil }
-            "gui_wizard_set" => { self.gui.wizard_set(gi(a,0,"GUI_WIZARD_SET")?, &gs(a,1,"GUI_WIZARD_SET")?, gi(a,2,"GUI_WIZARD_SET")?)?; Value::Nil }
+            "gui_wizard_set" => { self.gui.wizard_set(gi(a,0,"GUI_WIZARD_SET")?, &gs(a,1,"GUI_WIZARD_SET")?, gwert(a,2,"GUI_WIZARD_SET")? as i64)?; Value::Nil }
             "gui_wizard_labels" => {
                 let f = "GUI_WIZARD_LABELS";
-                if a.len() != 5 { return Err(format!("{}: erwartet (wz, zurueck$, weiter$, fertig$, abbrechen$)", f)); }
+                if a.len() != 5 { return Err(crate::vm::falsche_argumente(f, a.len())); }
                 self.gui.wizard_labels(gi(a,0,f)?, [gs(a,1,f)?, gs(a,2,f)?, gs(a,3,f)?, gs(a,4,f)?])?; Value::Nil
             }
             "gui_wizard_next" => Value::Bool(self.gui.wizard_next(gi(a,0,"GUI_WIZARD_NEXT")?)?),
@@ -1643,46 +1635,46 @@ impl<'p> Vm<'p> {
             // Maus relativ zu ihr.
             // Eigene Form und Animationen (gui_aussehen.rs).
             "gui_set_shape" => { let n = "GUI_SET_SHAPE";
-                if a.len() != 2 { return Err(format!("{}: erwartet (knopf, form$)", n)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.set_shape(gi(a,0,n)?, &gs(a,1,n)?)?; Value::Nil }
             "gui_get_shape$" => { let n = "GUI_GET_SHAPE$";
-                if a.len() != 1 { return Err(format!("{}: erwartet (knopf)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::str_rc(self.gui.get_shape(gi(a,0,n)?)?) }
             "gui_animate" => { let n = "GUI_ANIMATE";
-                if a.len() < 2 || a.len() > 4 { return Err(format!("{}: erwartet (wdg, art$ [, dauer_ms [, anzahl]])", n)); }
+                if a.len() < 2 || a.len() > 4 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let dauer = if a.len() >= 3 { Some(gi(a,2,n)?) } else { None };
                 let anzahl = if a.len() >= 4 { Some(gi(a,3,n)?) } else { None };
                 self.gui.animate(gi(a,0,n)?, &gs(a,1,n)?, dauer, anzahl)?; Value::Nil }
             "gui_custom" => { let n = "GUI_CUSTOM";
-                if a.len() < 5 || a.len() > 6 { return Err(format!("{}: erwartet (win, x, y, w, h [, rolle$])", n)); }
+                if a.len() < 5 || a.len() > 6 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let rolle = if a.len() == 6 { gs(a,5,n)?.to_string() } else { String::new() };
                 Value::Int(self.gui.custom(gi(a,0,n)?, gi(a,1,n)? as i32, gi(a,2,n)? as i32, gi(a,3,n)? as i32, gi(a,4,n)? as i32, &rolle)?) }
             "gui_custom_key" => { let n = "GUI_CUSTOM_KEY";
-                if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Int(self.gui.custom_key(gi(a,0,n)?)?) }
             "gui_custom_text$" => { let n = "GUI_CUSTOM_TEXT$";
-                if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::str_rc(&self.gui.custom_text(gi(a,0,n)?)?) }
             "gui_window_rtl" => { let n = "GUI_WINDOW_RTL";
-                if a.len() != 2 { return Err(format!("{}: erwartet (win, an)", n)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.window_rtl(gi(a,0,n)?, gbool(a,1,n)?)?; Value::Nil }
             "gui_window_background" => { let n = "GUI_WINDOW_BACKGROUND";
-                if a.len() != 2 { return Err(format!("{}: erwartet (win, an)", n)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.window_background(gi(a,0,n)?, gbool(a,1,n)?)?; Value::Nil }
             "gui_window_is_background" => { let n = "GUI_WINDOW_IS_BACKGROUND";
-                if a.len() != 1 { return Err(format!("{}: erwartet (win)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Bool(self.gui.window_is_background(gi(a,0,n)?)?) }
             "gui_window_is_rtl" => { let n = "GUI_WINDOW_IS_RTL";
-                if a.len() != 1 { return Err(format!("{}: erwartet (win)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Bool(self.gui.window_is_rtl(gi(a,0,n)?)?) }
             "gui_state$" => { let n = "GUI_STATE$";
                 if !a.is_empty() { return Err(format!("{}: erwartet keine Argumente", n)); }
                 Value::str_rc(&self.gui.state_text()) }
             "gui_gliding" => { let n = "GUI_GLIDING";
-                if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Bool(self.gui.gliding(gi(a,0,n)?)?) }
             "gui_animating" => { let n = "GUI_ANIMATING";
-                if a.len() != 1 { return Err(format!("{}: erwartet (wdg)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Bool(self.gui.animating(gi(a,0,n)?)?) }
             "gui_canvas_begin" => {
                 let h = gi(a, 0, "GUI_CANVAS_BEGIN")?;
@@ -1710,9 +1702,14 @@ impl<'p> Vm<'p> {
             }
             // Braucht die Zeilenhoehe (also die Schrift) -- darum hier bei
             // den Grafik-Builtins.
-            "gui_textarea_view" => {
-                let g = self.gfx.as_ref().ok_or("GUI_TEXTAREA_VIEW: vor SCREEN aufgerufen")?;
-                let (z0, n, von, len) = self.gui.textarea_view(g, gi(a, 0, "GUI_TEXTAREA_VIEW")?)?;
+            // GUI_TEXTAREA_GET_VIEW zaehlt die erste Zeile ab 1 wie der Rest des
+            // Textbereichs (GOTO, SCROLL); GUI_TEXTAREA_VIEW bleibt bei 0
+            // (Regel 12 in docs/builtins-namen.md).
+            "gui_textarea_view" | "gui_textarea_get_view" => {
+                let f = if name == "gui_textarea_view" { "GUI_TEXTAREA_VIEW" } else { "GUI_TEXTAREA_GET_VIEW" };
+                let g = self.gfx.as_ref().ok_or_else(|| format!("{}: vor SCREEN aufgerufen", f))?;
+                let (z0, n, von, len) = self.gui.textarea_view(g, gi(a, 0, f)?, f)?;
+                let z0 = if name == "gui_textarea_view" { z0 } else { z0 + 1 };
                 Value::Tuple(std::rc::Rc::new(vec![
                     Value::Int(z0), Value::Int(n), Value::Int(von), Value::Int(len),
                 ]))
@@ -1746,7 +1743,7 @@ impl<'p> Vm<'p> {
                 self.gui.textarea_scroll(g, gi(a, 0, "GUI_TEXTAREA_SCROLL")?, gi(a, 1, "GUI_TEXTAREA_SCROLL")?)?;
                 Value::Nil
             }
-            "gui_textarea_selection$" | "gui_textarea_selection" =>
+            "gui_textarea_selection$" =>
                 Value::str_rc(&self.gui.textarea_selection(gi(a, 0, "GUI_TEXTAREA_SELECTION$")?)?),
             "gui_textarea_selection_range" => {
                 let (z1, s1, z2, s2) = self.gui.textarea_selection_range(gi(a, 0, "GUI_TEXTAREA_SELECTION_RANGE")?)?;
@@ -1779,9 +1776,9 @@ impl<'p> Vm<'p> {
                 self.gui.textarea_style(gi(a, 0, "GUI_TEXTAREA_STYLE")?, bits, an, jetzt)?;
                 Value::Nil
             }
-            "gui_textarea_get_style$" | "gui_textarea_get_style" =>
+            "gui_textarea_get_style$" =>
                 Value::Str(self.gui.textarea_get_style(gi(a, 0, "GUI_TEXTAREA_GET_STYLE$")?)?.into()),
-            "gui_textarea_markdown$" | "gui_textarea_markdown" =>
+            "gui_textarea_markdown$" =>
                 Value::Str(self.gui.textarea_markdown(gi(a, 0, "GUI_TEXTAREA_MARKDOWN$")?)?.into()),
             "gui_textarea_set_markdown" => {
                 self.gui.textarea_set_markdown(gi(a, 0, "GUI_TEXTAREA_SET_MARKDOWN")?, &gs(a, 1, "GUI_TEXTAREA_SET_MARKDOWN")?)?;
@@ -1796,19 +1793,19 @@ impl<'p> Vm<'p> {
             }
             "gui_textarea_marks" => {
                 let n = "GUI_TEXTAREA_MARKS";
-                if a.len() != 3 { return Err(format!("{}: erwartet (ta, zeilen, farben)", n)); }
+                if a.len() != 3 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.textarea_marks(gi(a, 0, n)?, ganze(&a[1], n)?, ganze(&a[2], n)?)?;
                 Value::Nil
             }
             "gui_textarea_hint$" => { let n = "GUI_TEXTAREA_HINT$";
-                if a.len() != 2 { return Err(format!("{}: erwartet (ta, zeile)", n)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::str_rc(&self.gui.textarea_hint(gi(a,0,n)?, gi(a,1,n)?)?) }
             "gui_textarea_hint_count" => { let n = "GUI_TEXTAREA_HINT_COUNT";
-                if a.len() != 1 { return Err(format!("{}: erwartet (ta)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Int(self.gui.textarea_hint_count(gi(a,0,n)?)?) }
             "gui_textarea_hints" => {
                 let n = "GUI_TEXTAREA_HINTS";
-                if a.len() < 3 || a.len() > 4 { return Err(format!("{}: erwartet (ta, zeilen, texte [, farbe])", n)); }
+                if a.len() < 3 || a.len() > 4 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let texte: Vec<String> = match &a[2] {
                     Value::Array(arr) => {
                         let arr = arr.borrow();
@@ -1834,18 +1831,18 @@ impl<'p> Vm<'p> {
             }
             "gui_textarea_line_colors" => {
                 let n = "GUI_TEXTAREA_LINE_COLORS";
-                if a.len() != 3 { return Err(format!("{}: erwartet (ta, zeilen, farben)", n)); }
+                if a.len() != 3 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.textarea_line_colors(gi(a, 0, n)?, ganze(&a[1], n)?, ganze(&a[2], n)?)?;
                 Value::Nil
             }
             "gui_textarea_line_colors_get" => {
                 let n = "GUI_TEXTAREA_LINE_COLORS_GET";
-                if a.len() != 1 { return Err(format!("{}: erwartet (ta)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 crate::builtins::new_int_array(self.gui.textarea_line_colors_get(gi(a, 0, n)?)?)
             }
             "gui_textarea_marks_get" => {
                 let n = "GUI_TEXTAREA_MARKS_GET";
-                if a.len() != 1 { return Err(format!("{}: erwartet (ta)", n)); }
+                if a.len() != 1 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 crate::builtins::new_int_array(self.gui.textarea_marks_get(gi(a, 0, n)?)?)
             }
             // ===== Faltung (docs/module-gui.md, Abschnitt Faltung) =====
@@ -1853,30 +1850,31 @@ impl<'p> Vm<'p> {
             // Laufzeit kennt hier keine Sprache und zaehlt keine Einrueckung.
             "gui_textarea_foldable" => {
                 let n = "GUI_TEXTAREA_FOLDABLE";
-                if a.len() != 3 { return Err(format!("{}: erwartet (ta, von_zeilen, bis_zeilen)", n)); }
+                if a.len() != 3 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.textarea_foldable(gi(a, 0, n)?, ganze(&a[1], n)?, ganze(&a[2], n)?)?;
                 Value::Nil
             }
             "gui_textarea_fold" => {
                 let n = "GUI_TEXTAREA_FOLD";
-                let an = if a.len() > 2 { Some(a[2].truthy()) } else { None };
+                let an = if a.len() > 2 { Some(crate::argument::a_schalter(a, 2, n)?) } else { None };
                 Value::Bool(self.gui.textarea_fold(gi(a, 0, n)?, gi(a, 1, n)?, an)?)
             }
             "gui_textarea_fold_all" => {
                 let n = "GUI_TEXTAREA_FOLD_ALL";
-                Value::Int(self.gui.textarea_fold_all(gi(a, 0, n)?, a.len() < 2 || a[1].truthy())?)
+                let auf = crate::argument::a_schalter_oder(a, 1, true, n)?;
+                Value::Int(self.gui.textarea_fold_all(gi(a, 0, n)?, auf)?)
             }
             "gui_textarea_folded" => Value::Bool(self.gui.textarea_folded(
                 gi(a, 0, "GUI_TEXTAREA_FOLDED")?, gi(a, 1, "GUI_TEXTAREA_FOLDED")?)?),
             "gui_textarea_swatches" => {
                 let n = "GUI_TEXTAREA_SWATCHES";
-                if a.len() != 4 { return Err(format!("{}: erwartet (ta, starts, laengen, farben)", n)); }
+                if a.len() != 4 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 self.gui.textarea_swatches(gi(a, 0, n)?, ganze(&a[1], n)?, ganze(&a[2], n)?, ganze(&a[3], n)?)?;
                 Value::Nil
             }
             "gui_textarea_gutter_clicked" => {
                 if a.is_empty() || a.len() > 2 {
-                    return Err("GUI_TEXTAREA_GUTTER_CLICKED: erwartet (textarea [, taste])".into());
+                    return Err(crate::vm::falsche_argumente("GUI_TEXTAREA_GUTTER_CLICKED", a.len()));
                 }
                 let taste = if a.len() == 2 { gi(a, 1, "GUI_TEXTAREA_GUTTER_CLICKED")? } else { 0 };
                 if taste != 0 && taste != 1 {
@@ -1890,7 +1888,7 @@ impl<'p> Vm<'p> {
                 self.gui.textarea_swatch_clicked(gi(a, 0, "GUI_TEXTAREA_SWATCH_CLICKED")?)?),
             "gui_textarea_abbrev" => {
                 let n = "GUI_TEXTAREA_ABBREV";
-                if a.len() != 2 { return Err(format!("{}: erwartet (ta, woerter)", n)); }
+                if a.len() != 2 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 let mut woerter = Vec::new();
                 match &a[1] {
                     Value::Array(arr) => {
@@ -1908,7 +1906,7 @@ impl<'p> Vm<'p> {
             }
             "gui_textarea_select_columns" => {
                 let n = "GUI_TEXTAREA_SELECT_COLUMNS";
-                if a.len() != 5 { return Err(format!("{}: erwartet (ta, z1, s1, z2, s2)", n)); }
+                if a.len() != 5 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 Value::Int(self.gui.textarea_select_columns(gi(a,0,n)?, gi(a,1,n)?, gi(a,2,n)?,
                                                             gi(a,3,n)?, gi(a,4,n)?)?)
             }
@@ -1918,7 +1916,7 @@ impl<'p> Vm<'p> {
                 self.gui.textarea_tab_hit(gi(a, 0, "GUI_TEXTAREA_TAB_HIT")?)?),
             "gui_textarea_indent_words" => {
                 let n = "GUI_TEXTAREA_INDENT_WORDS";
-                if a.len() != 4 { return Err(format!("{}: erwartet (ta, anfang, ende, aus)", n)); }
+                if a.len() != 4 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 fn texte(v: &Value, fn_: &str) -> R<Vec<String>> {
                     match v {
                         Value::Array(arr) => {
@@ -1940,7 +1938,7 @@ impl<'p> Vm<'p> {
             }
             "gui_textarea_close_words" => {
                 let n = "GUI_TEXTAREA_CLOSE_WORDS";
-                if a.len() != 3 { return Err(format!("{}: erwartet (ta, oeffner, schluesse)", n)); }
+                if a.len() != 3 { return Err(crate::vm::falsche_argumente(n, a.len())); }
                 fn texte(v: &Value, fn_: &str) -> R<Vec<String>> {
                     match v {
                         Value::Array(arr) => {
@@ -2048,13 +2046,13 @@ impl<'p> Vm<'p> {
                 }
             };
             if slot >= 0 {
-                if let Some(au) = self.audio.as_mut() { let _ = au.play_sound(slot, laut as f64 / 100.0); }
+                if let Some(au) = self.audio.as_mut() { let _ = au.play_sound(slot, 0, laut as f64 / 100.0); }
             }
         }
     }
 
-    /// Nach dem ersten SCREEN: `DHRT_ABSPIELEN` spielt eine Aufnahme ab,
-    /// `DHRT_AUFNEHMEN` nimmt auf (aufnahme.rs). Ein relativer Pfad gilt vom
+    /// Nach dem ersten SCREEN: `DHRT_PLAYBACK` spielt eine Aufnahme ab,
+    /// `DHRT_RECORD` nimmt auf (aufnahme.rs). Ein relativer Pfad gilt vom
     /// Ort des Aufrufers aus (DHRT_START_DIR) -- in einem Fall mit
     /// `--- programm` laeuft das Programm als Kopie anderswo, die Beilage
     /// liegt im Fallordner.
@@ -2069,17 +2067,17 @@ impl<'p> Vm<'p> {
             }
         }
         let g = self.gfx.as_mut().unwrap();
-        if let Ok(v) = std::env::var("DHRT_ABSPIELEN") {
-            if !v.trim().is_empty() { g.automation_play(&pfad(v.trim())).map_err(|e| format!("DHRT_ABSPIELEN: {}", e))?; }
+        if let Ok(v) = crate::umgebung::var("DHRT_PLAYBACK") {
+            if !v.trim().is_empty() { g.automation_play(&pfad(v.trim())).map_err(|e| format!("DHRT_PLAYBACK: {}", e))?; }
         }
-        if let Ok(v) = std::env::var("DHRT_AUFNEHMEN") {
-            if !v.trim().is_empty() { g.automation_record(&pfad(v.trim())).map_err(|e| format!("DHRT_AUFNEHMEN: {}", e))?; }
+        if let Ok(v) = crate::umgebung::var("DHRT_RECORD") {
+            if !v.trim().is_empty() { g.automation_record(&pfad(v.trim())).map_err(|e| format!("DHRT_RECORD: {}", e))?; }
         }
         Ok(())
     }
     /// Am Ende des Programms: eine laufende Aufnahme schreiben; den Zustand
-    /// der gui ausgeben (`DHRT_GUI_ZUSTAND=1`) bzw. in eine Datei schreiben
-    /// (`DHRT_GUI_ZUSTAND_DATEI`).
+    /// der gui ausgeben (`DHRT_GUI_STATE=1`) bzw. in eine Datei schreiben
+    /// (`DHRT_GUI_STATE_FILE`).
     #[cfg(feature = "graphics")]
     pub(super) fn aufnahme_ende(&mut self) {
         if let Some(g) = self.gfx.as_mut() {
@@ -2088,20 +2086,29 @@ impl<'p> Vm<'p> {
             }
         }
         if self.gfx.is_none() { return; }
-        let ausgeben = std::env::var("DHRT_GUI_ZUSTAND").map(|v| v.trim() == "1").unwrap_or(false);
-        let datei = std::env::var("DHRT_GUI_ZUSTAND_DATEI").ok().filter(|v| !v.trim().is_empty());
+        let ausgeben = crate::umgebung::var("DHRT_GUI_STATE").map(|v| v.trim() == "1").unwrap_or(false);
+        let datei = crate::umgebung::var("DHRT_GUI_STATE_FILE").ok().filter(|v| !v.trim().is_empty());
         if !ausgeben && datei.is_none() { return; }
         let text = format!("gui-zustand\n{}\n", self.gui.state_text());
         if ausgeben { self.out.push_str(&text); self.flush_out(); }
-        if let Some(d) = datei { if let Err(e) = std::fs::write(d.trim(), &text) { eprintln!("DHRT_GUI_ZUSTAND_DATEI: {}", e); } }
+        if let Some(d) = datei { if let Err(e) = std::fs::write(d.trim(), &text) { eprintln!("DHRT_GUI_STATE_FILE: {}", e); } }
     }
 
     /// Audio-Geraet lazy initialisieren (bei erstem Sound-/Musik-Builtin).
     #[cfg(feature = "graphics")]
     pub(super) fn audio_mut(&mut self) -> R<&mut crate::audio::Audio> {
         if self.audio.is_none() {
-            self.audio = Some(crate::audio::Audio::new()?);
+            if let Some(e) = &self.audio_fehler { return Err(e.clone()); }
+            match crate::audio::Audio::new() {
+                Ok(a) => self.audio = Some(a),
+                Err(e) => { self.audio_fehler = Some(e.clone()); return Err(e); }
+            }
         }
+        // Endliche Loops, AUTOPAN und die Musik-Warteschlange laufen in
+        // `update()`. Das rief bis 2026.53 nur FLIP -- AUDIO_PLAY(k, 3) in
+        // einem Programm ohne Bildschleife spielte einmal. Jetzt auch jeder
+        // Ton-Befehl (und SLEEP, vm_system.rs).
+        if let Some(a) = self.audio.as_mut() { a.update(); }
         Ok(self.audio.as_mut().unwrap())
     }
 

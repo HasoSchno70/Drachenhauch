@@ -1455,10 +1455,10 @@ SUB blattNachziehen()
 END SUB
 
 SUB laufZeichnen()
-    DIM lx AS INTEGER : lx = GUI_CANVAS_X(laufFlaeche)
-    DIM ly AS INTEGER : ly = GUI_CANVAS_Y(laufFlaeche)
-    DIM lb AS INTEGER : lb = GUI_CANVAS_W(laufFlaeche)
-    DIM lh AS INTEGER : lh = GUI_CANVAS_H(laufFlaeche)
+    DIM lx AS INTEGER : lx = GUI_CANVAS_SCREEN_X(laufFlaeche)
+    DIM ly AS INTEGER : ly = GUI_CANVAS_SCREEN_Y(laufFlaeche)
+    DIM lb AS INTEGER : lb = GUI_CANVAS_SCREEN_W(laufFlaeche)
+    DIM lh AS INTEGER : lh = GUI_CANVAS_SCREEN_H(laufFlaeche)
     BOXROUND(lx, ly, lx + lb - 1, ly + lh - 1, 6, &H0E1620)
     ' Welcher Zustand: der gewaehlte, sonst der Start.
     DIM i AS INTEGER : i = -1

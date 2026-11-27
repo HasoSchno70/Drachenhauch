@@ -10,6 +10,7 @@
 //! echte fette Segoe UI sieht anders aus als eine zweimal gezeichnete. Wo
 //! kein Schnitt zu finden ist, faellt die Zeichenroutine auf den Ersatz
 //! zurueck (fett = zweiter Zug, kursiv = geneigte Glyphen).
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
 
 /// Bits eines Stils. Fett und kursiv waehlen einen Schnitt, unterstrichen
 /// und durchgestrichen sind Linien -- die gibt es in jeder Schrift.

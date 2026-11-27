@@ -341,7 +341,7 @@ GUI_STYLESHEET: Zeile 1: '{' ohne '}'
 GUI_STYLESHEET_LOAD: 'gibtsnicht.dhstil' laesst sich nicht
 GUI_SET_NAME: Name 'mit leer' -- erlaubt sind Buchstaben, Ziffern, _ und -
 GUI_ADD_CLASS: Klasse '' -- erlaubt sind Buchstaben, Ziffern, _ und -
-GUI_GET_COLOR: Rolle 'schatten' gibt es nicht -- bg, fg, border oder accent
+GUI_GET_COLOR: Rolle 'schatten' gibt es nicht -- bg, fg, border, accent, hover oder pressed
 
 === randbreite und schatten aus der stildatei
 ' Zweite Stufe: Form je Widget. Der Rand drei Punkte breit, ein Knopf ohne

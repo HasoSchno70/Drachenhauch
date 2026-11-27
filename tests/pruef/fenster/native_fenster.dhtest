@@ -15,7 +15,7 @@
 --- langsam
 === ohne bildschirm bleibt es ein gui-fenster
 ' Der Rueckfall: vor SCREEN (und im Browser, unter macOS, oder mit
-' DHRT_OHNE_NATIVE_FENSTER=1) liefert der Befehl FALSE, und das Fenster
+' DHRT_NO_NATIVE_WINDOWS=1) liefert der Befehl FALSE, und das Fenster
 ' bleibt eins im Hauptfenster.
 IMPORT "gui"
 DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 10, 10, 200, 100)
@@ -33,7 +33,7 @@ DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 10, 10, 200, 100)
 PRINT GUI_WINDOW_NATIVE(w, TRUE); " "; GUI_WINDOW_IS_NATIVE(w)
 --- umgebung
 DHRT_FRAMES=2
-DHRT_OHNE_NATIVE_FENSTER=1
+DHRT_NO_NATIVE_WINDOWS=1
 --- erwartet
 FALSE FALSE
 
@@ -258,7 +258,7 @@ WEND
 nativ TRUE
 
 === auf einem dichteren schirm ist das native fenster groesser
-' DHRT_NATIV_MASSSTAB=1.5 tut so, als stuende das native Fenster auf einem
+' DHRT_NATIVE_SCALE=1.5 tut so, als stuende das native Fenster auf einem
 ' Schirm mit 150 % neben einem Hauptfenster mit 100 % (ohne zweiten Schirm
 ' nicht anders pruefbar). Das Fenster hat dann 240 x 160 Punkte, aber
 ' 360 x 240 Pixel; der gruene Streifen (120..160 Punkte) liegt bei Pixel
@@ -298,7 +298,7 @@ WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
     CLS(&H202830) : GUI_DRAW() : FLIP()
 WEND
 --- umgebung
-DHRT_NATIV_MASSSTAB=1.5
+DHRT_NATIVE_SCALE=1.5
 --- system windows
 --- erwartet
 groesse 360x240
@@ -339,7 +339,7 @@ WEND
 PRINT "nativ "; nativ
 PRINT "klicks "; pkl
 --- umgebung
-DHRT_NATIV_MASSSTAB=1.5
+DHRT_NATIVE_SCALE=1.5
 --- system windows
 --- erwartet
 gesendet
@@ -1116,7 +1116,7 @@ nativ TRUE popup-fenster 1 danach 0
 gewaehlt 8
 
 === ohne popup-fenster weicht das menue am rand des nativen fensters aus
-' DHRT_OHNE_POPUP_FENSTER=1 (so auch unter Wayland): kein eigenes Fenster,
+' DHRT_NO_POPUP_WINDOWS=1 (so auch unter Wayland): kein eigenes Fenster,
 ' das Menue weicht am Rand des NATIVEN Fensters aus -- es passt weder
 ' darunter noch darueber und steht darum oben (y 0). Ein Klick auf (70, 62)
 ' trifft dort Eintrag 3. Bis 2026.48 wich es am Rand des Hauptfensters aus
@@ -1132,7 +1132,7 @@ IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
 END IF
 PRINT k;
 --- umgebung
-DHRT_OHNE_POPUP_FENSTER=1
+DHRT_NO_POPUP_WINDOWS=1
 --- datei helfer.dh
 IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
 FUNCTION hilfe$(name AS STRING) AS STRING
@@ -1173,7 +1173,7 @@ nativ TRUE popup-fenster 0
 gewaehlt 3
 
 === unter dhrt test laesst das native fenster die echte maus durch
-' Wie das Hauptfenster (stillfenster.rs): mit DHRT_OHNE_EINGABE geht die
+' Wie das Hauptfenster (stillfenster.rs): mit DHRT_NO_INPUT geht die
 ' echte Maus durch das native Fenster (WS_EX_TRANSPARENT), nur geschickte
 ' Nachrichten kommen an. Vorher meldete Windows den echten Zeiger, sobald er
 ' ueber dem Fenster stand -- die Klick-Faelle mit Massstab und Teilflaeche
@@ -1268,7 +1268,7 @@ WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 7000
     CLS(&H202830)
     GUI_DRAW()
     GUI_CANVAS_BEGIN(cv)
-    BOX(GUI_CANVAS_X(cv), GUI_CANVAS_Y(cv), GUI_CANVAS_X(cv) + 400, GUI_CANVAS_Y(cv) + 400, &HFF0000)
+    BOX(GUI_CANVAS_SCREEN_X(cv), GUI_CANVAS_SCREEN_Y(cv), GUI_CANVAS_SCREEN_X(cv) + 400, GUI_CANVAS_SCREEN_Y(cv) + 400, &HFF0000)
     GUI_CANVAS_END()
     FLIP()
 WEND
@@ -1280,3 +1280,42 @@ PRINT "druck auf der flaeche "; gedrueckt
 240,140 #18222E
 nativ TRUE
 druck auf der flaeche 49,29
+
+=== ein popover an einem widget im nativen fenster steht in ihm und nimmt klicks
+' Bis 2026.53 lag ein Popover immer auf dem Hauptfenster, auch wenn sein
+' Widget in einem nativen Fenster stand: gezeichnet an der Stelle, die er im
+' nativen gehabt haette, und kein Klick erreichte ihn (Bericht EF.1). Der
+' Knopf "Mehr" liegt bei (100..200, 20..50), der Popover (160 x 80) darunter
+' ab (70, 58), sein Knopf "Los" bei (20, 20) darin -- (140, 93) trifft ihn.
+' 6094988 = 93 * 65536 + 140.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "probe.dh", "roh:512:0:6094988;roh:513:1:6094988;roh:514:0:6094988", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei probe.dh
+IMPORT "gui"
+DIM kennung AS STRING : kennung = ARG$(0)
+SCREEN(200, 150, "Haupt-" + kennung, 1)
+DIM p AS GUI_WINDOW : p = GUI_WINDOW(kennung, 40, 40, 300, 200)
+DIM mehr AS GUI_WIDGET : mehr = GUI_BUTTON(p, "Mehr", 100, 20, 100, 30)
+DIM pop AS GUI_WINDOW : pop = GUI_POPOVER(mehr, 160, 80, "unten")
+DIM los AS GUI_WIDGET : los = GUI_BUTTON(pop, "Los", 20, 20, 100, 30)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(p, TRUE)
+GUI_POPOVER_SHOW(pop)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 6000
+    GUI_UPDATE()
+    IF GUI_CLICKED(los) THEN n = n + 1
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ
+PRINT "popover offen "; NOT GUI_POPOVER_CLOSED(pop); " los "; n
+--- system windows
+--- erwartet
+gesendet
+nativ TRUE
+popover offen TRUE los 1

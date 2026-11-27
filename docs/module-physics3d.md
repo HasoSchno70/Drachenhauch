@@ -8,7 +8,8 @@ Kollisions-Mathematik liefert: hier simulieren echte dynamische Körper.
 
 > **Nur native Runtime** (`dhrt` / F6 im Editor). Die `PHYS_WORLD` hält die
 > Simulations-Pipeline; einzelne Körper werden über einen **Integer-Index**
-> angesprochen (Rückgabe von `PHYS3D_ADD_*`).
+> angesprochen (Rückgabe von `PHYS3D_ADD_*`). Der Typ heißt auch
+> `PHYS3D_WORLD` (wie `PHYS2D_WORLD`); `DIM w AS PHYS3D_WORLD` ist dasselbe.
 
 ```basic
 IMPORT "physics3d"

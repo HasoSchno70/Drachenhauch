@@ -64,18 +64,18 @@ SUB prbSenden(j AS JSON_HANDLE)
 END SUB
 
 ' Das Plugin starten. `ide_ordner$` ist der Ordner mit dh_plugin.dh; leer:
-' aus DH_PATH oder neben der Laufzeit (ide/). Der Datenordner des Plugins
+' aus DHRT_PATH oder neben der Laufzeit (ide/). Der Datenordner des Plugins
 ' liegt in probe-daten/ im Arbeitsordner.
 FUNCTION PROBE_START(plugin AS STRING, ide_ordner AS STRING = "") AS BOOLEAN
     DIM ordner AS STRING : ordner = ide_ordner
-    IF ordner = "" AND GETENV$("DH_PATH") = "" THEN
+    IF ordner = "" AND GETENV$("DHRT_PATH") = "" THEN
         DIM neben AS STRING : neben = PATHJOIN(DIRNAME(EXEPATH$()), "ide")
         IF FILEEXISTS(PATHJOIN(neben, "dh_plugin.dh")) THEN ordner = neben
     END IF
     IF ordner <> "" THEN
-        DIM alt AS STRING : alt = GETENV$("DH_PATH")
+        DIM alt AS STRING : alt = GETENV$("DHRT_PATH")
         DIM trenner AS STRING : trenner = IIF(MID$(ordner, 1, 1) = ":", ";", ":")
-        SETENV("DH_PATH", IIF(alt = "", ordner, ordner + trenner + alt))
+        SETENV("DHRT_PATH", IIF(alt = "", ordner, ordner + trenner + alt))
     END IF
     DIM daten AS STRING : daten = PATHJOIN(CWD$(), "probe-daten")
     IF NOT DIREXISTS(daten) THEN MKDIR(daten)

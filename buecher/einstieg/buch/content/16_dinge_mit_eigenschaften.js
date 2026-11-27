@@ -173,7 +173,7 @@ module.exports = (H) => [
   H.h2("Wenn etwas nicht geht"),
 
   H.table([
-    [{ text: "INIT: erwartet 2..2 Argument(e), erhalten 0", mono: true }, "NEW ruft Init automatisch auf — die Angaben gehören in die Klammern hinter NEW, nicht in einen eigenen Aufruf."],
+    [{ text: "INIT: erwartet 2 Argument(e), erhalten 0", mono: true }, "NEW ruft Init automatisch auf — die Angaben gehören in die Klammern hinter NEW, nicht in einen eigenen Aufruf."],
     ["Alle Dinge sehen gleich aus", "Init setzt feste Werte statt der Parameter, oder die Parameter werden nicht zugewiesen."],
     ["Das Array bleibt leer", "DIM funken[500] AS Funke legt nur Platz an, keine Funken. Jedes Ding braucht sein eigenes NEW."],
     ["Eine Eigenschaft ändert sich nicht", "Der Parameter heißt genauso wie die Eigenschaft — dann überschreibt sich die Zuweisung selbst."],

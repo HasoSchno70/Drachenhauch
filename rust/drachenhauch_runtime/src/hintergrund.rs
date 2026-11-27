@@ -1,9 +1,8 @@
 //! Hintergrund-Auftraege (WP H).
 //!
 //! Ein Muster fuer alles, was laenger dauert als ein Bild: starten, pro Frame
-//! nachsehen, abholen. Dasselbe, was `html.rs` fuer HTTP schon tut -- hier
-//! einmal allgemein, damit die naechste blockierende Sache es nicht ein
-//! drittes Mal nachbaut.
+//! nachsehen, abholen. Auch die HTTP-Abrufe (`HTTP_*_START`) laufen hierueber;
+//! bis 2026.53 hatte `html.rs` eine eigene Kopie (`Abrufe`, Bericht A15).
 //!
 //! **Was hier NICHT laeuft: DH-Code.** Ein Auftrag ist eine Rust-Funktion, die
 //! ohne VM auskommt (eine SQL-Abfrage, ein Kindprozess). Der Grund steht in
@@ -101,6 +100,15 @@ impl<T: Send + 'static> Auftraege<T> {
     pub fn offen(&self) -> i64 {
         self.eintraege.iter().filter(|e| e.is_some()).count() as i64
     }
+
+    /// Die Kurzbeschreibung eines Auftrags (`HTTP_URL$`); leer, wenn es die
+    /// Nummer nicht (mehr) gibt.
+    #[cfg_attr(not(feature = "http"), allow(dead_code))]
+    pub fn was(&self, id: i64) -> String {
+        if id < 0 { return String::new(); }
+        self.eintraege.get(id as usize).and_then(|e| e.as_ref())
+            .map(|e| e.was.clone()).unwrap_or_default()
+    }
 }
 
 /// Was ein Kindprozess im Hintergrund zurueckbringt.
@@ -113,7 +121,7 @@ pub struct ShellErgebnis {
 /// Programm starten, auf sein Ende warten, Ausgabe einsammeln -- ohne VM,
 /// laeuft also auf einem Auftrags-Thread.
 pub fn shell_arbeit(prog: String, args: Vec<String>) -> Result<ShellErgebnis, String> {
-    let out = std::process::Command::new(&prog).args(&args).output()
+    let out = crate::prozess::befehl(&prog, &args, "SHELL_START")?.output()
         .map_err(|e| format!("SHELL_START: '{}' laesst sich nicht starten: {}", prog, e))?;
     Ok(ShellErgebnis {
         // Kein Rueckgabewert (Unix: durch ein Signal beendet) -> -1, wie bei
@@ -122,15 +130,6 @@ pub fn shell_arbeit(prog: String, args: Vec<String>) -> Result<ShellErgebnis, St
         stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
     })
-}
-
-/// Ergebnis eines Auftrags (`TASK_*`).
-pub struct TaskErgebnis {
-    /// Der Rueckgabewert der Funktion, als Text.
-    pub ergebnis: String,
-    /// Was die Funktion selbst gedruckt hat -- getrennt, damit der Aufrufer
-    /// nicht Ergebnis und Ausgabe auseinanderfieseln muss.
-    pub ausgabe: String,
 }
 
 /// Eine DH-Funktion in einem EIGENEN dhrt-Prozess ausfuehren.
@@ -143,7 +142,7 @@ pub struct TaskErgebnis {
 ///
 /// Laeuft ohne VM, also auf einem Auftrags-Thread wie `shell_arbeit`.
 pub fn task_arbeit(exe: std::path::PathBuf, datei: String, funktion: String,
-                   args: Vec<String>) -> Result<TaskErgebnis, String> {
+                   args: Vec<String>) -> Result<String, String> {
     // Die Argumente gehen ueber die STANDARDEINGABE, nicht ueber die
     // Befehlszeile: die ist unter Windows auf ~32 000 Zeichen begrenzt, und ein
     // Feed oder ein JSON-Dokument als Argument scheiterte mit "Der Dateiname
@@ -153,6 +152,7 @@ pub fn task_arbeit(exe: std::path::PathBuf, datei: String, funktion: String,
     use std::io::Write;
     use std::process::Stdio;
     let mut cmd = std::process::Command::new(&exe);
+    crate::prozess::test_variablen_entfernen(&mut cmd);
     cmd.arg("call").arg(&datei).arg(&funktion).arg("--args-stdin")
         .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut kind = cmd.spawn().map_err(|e| format!(
@@ -201,8 +201,7 @@ pub fn task_arbeit(exe: std::path::PathBuf, datei: String, funktion: String,
         Some(serde_json::Value::Null) | None => String::new(),
         Some(andere) => andere.to_string(),
     };
-    Ok(TaskErgebnis {
-        ergebnis,
-        ausgabe: v.get("ausgabe").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-    })
+    // Was die Funktion gedruckt hat (`ausgabe`), bleibt liegen: ein Auftrag
+    // rechnet, er redet nicht (TASK_RESULT$ im Handbuch).
+    Ok(ergebnis)
 }

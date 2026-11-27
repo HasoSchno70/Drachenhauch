@@ -194,11 +194,10 @@ pub(crate) fn version_zeilen() -> String {
 /// Die alten Wortlaute (bis 2026.53) werden eine Fassung lang mitgelesen:
 /// eine kleine Laufzeit kann aelter sein als die, die sie fragt.
 pub(crate) fn fehlt_im_bau(meldung: &str) -> bool {
+    // Eine Meldung fuer alles, was der Bau nicht hat (fehlt_meldung). Die
+    // alten Saetze ("noch nicht verfuegbar", "ist ohne das Feature", "hat
+    // das Netz-Feature nicht") erzeugt seit 2026.54 nichts mehr.
     meldung.contains("gibt es in dieser Laufzeit nicht")
-        || meldung.contains("noch nicht verfuegbar")
-        || meldung.contains("ist ohne das Feature")
-        || meldung.contains("das in diesem dhrt-Build fehlt")
-        || meldung.contains("hat das Netz-Feature nicht")
         || meldung.starts_with("Unbekannter Befehl")
 }
 
@@ -217,7 +216,7 @@ mod tests {
     #[test]
     fn die_meldung_wird_erkannt() {
         assert!(fehlt_im_bau(&fehlt_meldung("httpd_start", "net")));
-        assert!(fehlt_im_bau("httpd: dieser dhrt-Build hat das Netz-Feature nicht (neu bauen mit python rust/build_runtime.py)"));
+        assert!(!fehlt_im_bau("httpd: dieser dhrt-Build hat das Netz-Feature nicht"));
         assert!(!fehlt_im_bau("HTTPD_START: erwartet INTEGER (Arg 1), erhalten NIL"));
     }
 }

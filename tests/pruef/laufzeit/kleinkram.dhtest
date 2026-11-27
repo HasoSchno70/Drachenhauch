@@ -33,7 +33,7 @@ SCHREIBEN
 === enum name verlangt ein enum
 PRINT ENUM_NAME(5, 1)
 --- fehler
-ENUM_NAME: erwartet ein ENUM als erstes Argument, bekommen INTEGER
+ENUM_NAME: erwartet ein ENUM als erstes Argument, erhalten INTEGER
 
 === schritt auf variable
 DIM i AS INTEGER
@@ -100,3 +100,13 @@ PRINT j
 --- fehler
 Unerwartetes Token NEWLINE
 
+
+=== sleep nimmt eine kommazahl
+' Der Index versprach SLEEP(ms: Zahl), bis 2026.53 brach SLEEP(1.5) mit
+' "erwartet INTEGER, erhalten FLOAT" ab.
+DIM t0 AS INTEGER : t0 = MILLIS()
+SLEEP(1.5)
+SLEEP(0.25)
+PRINT "ok "; (MILLIS() - t0 >= 1)
+--- erwartet
+ok TRUE

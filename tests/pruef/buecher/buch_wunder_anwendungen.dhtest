@@ -502,9 +502,9 @@ e 15 5 0 0 0 0
 
 --- umgebung
 DHRT_FRAMES=40
-DHRT_ABSPIELEN=klick.txt
-DHRT_GUI_ZUSTAND=1
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=klick.txt
+DHRT_GUI_STATE=1
+DHRT_OFFSCREEN=1
 --- enthaelt
   label(2) "Bitte einen Titel eingeben."
 
@@ -521,9 +521,9 @@ e 15 5 0 0 0 0
 
 --- umgebung
 DHRT_FRAMES=40
-DHRT_ABSPIELEN=klick.txt
-DHRT_GUI_ZUSTAND=1
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=klick.txt
+DHRT_GUI_STATE=1
+DHRT_OFFSCREEN=1
 --- enthaelt
   label(2) "1 Titel in der Mediathek."
   label(3) "Momo"
@@ -544,9 +544,9 @@ e 30 5 0 0 0 0
 
 --- umgebung
 DHRT_FRAMES=50
-DHRT_ABSPIELEN=klick.txt
-DHRT_GUI_ZUSTAND=1
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=klick.txt
+DHRT_GUI_STATE=1
+DHRT_OFFSCREEN=1
 --- enthaelt
   label(2) "Momo steht schon in der Mediathek."
   label(3) "Momo"
@@ -567,9 +567,9 @@ e 30 5 0 0 0 0
 
 --- umgebung
 DHRT_FRAMES=50
-DHRT_ABSPIELEN=klick.txt
-DHRT_GUI_ZUSTAND=1
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=klick.txt
+DHRT_GUI_STATE=1
+DHRT_OFFSCREEN=1
 --- enthaelt
   label(2) "Die Mediathek ist leer."
   label(3) ""
@@ -590,7 +590,7 @@ DIM prMinW AS INTEGER : prMinW = GUI_LAYOUT_MIN_W(form)
 DIM prMinH AS INTEGER : prMinH = GUI_LAYOUT_MIN_H(form)
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- erwartet
 buendig TRUE
 rechts von der beschriftung TRUE
@@ -610,7 +610,7 @@ EXIT(0)
 --- programm ../../../buecher/anwendungen/code/loesungen/kap02_zwei_spalten.dh nach     GUI_UPDATE()
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- erwartet
 links buendig TRUE
 rechts buendig TRUE
@@ -622,7 +622,7 @@ eine hoehe TRUE
 --- programm ../../../buecher/anwendungen/code/loesungen/kap02_groesse.dh
 --- umgebung
 DHRT_FRAMES=3
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- inhalt _programm/mediathek.ini
 [fenster]
 breite=560
@@ -640,7 +640,7 @@ hoehe=360
 
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- erwartet
 fenster 700 360
 formular 700 360
@@ -668,7 +668,7 @@ TRIM$("Ronja Räubertochter")
 "1981"
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- erwartet
 11 11 10
 Ronja Räubertochter | Ronja Räubertochter | 1981
@@ -698,7 +698,7 @@ END IF
 DIM prBild AS INTEGER
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- erwartet
 2 entfernt, 8 Einträge
 gleich TRUE | Kind of Blue | Emil und die Detektive
@@ -720,9 +720,9 @@ e 16 7 600 500 0 0
 
 --- umgebung
 DHRT_FRAMES=30
-DHRT_ABSPIELEN=enter.txt
-DHRT_GUI_ZUSTAND=1
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=enter.txt
+DHRT_GUI_STATE=1
+DHRT_OFFSCREEN=1
 --- enthaelt
   label(5) "Tetris von Alexei Paschitnow (Spiel, 1984)"
 
@@ -740,7 +740,7 @@ TRIM$("Abbey Road")
 "Musik"
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- erwartet
 TRUE
 TRUE
@@ -770,7 +770,7 @@ END IF
 DIM prBild AS INTEGER
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- erwartet
 2 von 10 Einträgen
 Die unendliche Geschichte von Michael Ende (Buch, 1979)
@@ -806,7 +806,7 @@ TRIM$("Ronja Räubertochter")
 ""
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- nochmal
 danach
 --- erwartet
@@ -839,7 +839,7 @@ END IF
 DIM prBild AS INTEGER
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- erwartet
 Nichts entfernt: DB_EXEC: database is locked
 10 10
@@ -873,7 +873,7 @@ END IF
 DIM prBild AS INTEGER
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- nochmal
 zwei
 --- nochmal
@@ -911,8 +911,8 @@ e 31 7 600 30 0 0
 
 --- umgebung
 DHRT_FRAMES=60
-DHRT_ABSPIELEN=klicks.txt
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=klicks.txt
+DHRT_OFFSCREEN=1
 --- erwartet
 10 Wirklich?
 9 Entfernen Tetris
@@ -943,8 +943,8 @@ e 31 7 600 30 0 0
 
 --- umgebung
 DHRT_FRAMES=60
-DHRT_ABSPIELEN=klicks.txt
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=klicks.txt
+DHRT_OFFSCREEN=1
 --- erwartet
 10 Entfernen
 
@@ -969,7 +969,7 @@ END IF
 DIM prBild AS INTEGER
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- nochmal
 danach
 --- erwartet
@@ -994,7 +994,7 @@ END IF
 DIM prBild AS INTEGER
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- erwartet
 Ohne Titel geht es nicht. | 10
 Ein Jahr von 1450 bis 2100. | 10
@@ -1022,7 +1022,7 @@ END IF
 DIM prBild AS INTEGER
 --- umgebung
 DHRT_FRAMES=8
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- erwartet
 anfangs FALSE
 geaendert TRUE
@@ -1057,8 +1057,8 @@ e 18 7 600 30 0 0
 
 --- umgebung
 DHRT_FRAMES=40
-DHRT_ABSPIELEN=dk.txt
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=dk.txt
+DHRT_OFFSCREEN=1
 --- erwartet
 titel [Metropolis] fehler []
 
@@ -1082,7 +1082,7 @@ END IF
 DIM prBild AS INTEGER
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- erwartet
 TRUE FALSE FALSE
 Die Prüfziffer der ISBN stimmt nicht. | 10
@@ -1105,7 +1105,7 @@ END IF
 DIM prBild AS INTEGER
 --- umgebung
 DHRT_FRAMES=5
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- erwartet
 Ein Buch hat einen Autor. | 10
 [] | 11
@@ -1130,8 +1130,8 @@ e 10 1 341 0 0 0
 
 --- umgebung
 DHRT_FRAMES=40
-DHRT_ABSPIELEN=tasten.txt
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=tasten.txt
+DHRT_OFFSCREEN=1
 --- erwartet
 11 [] Gespeichert: Ronja
 
@@ -1161,8 +1161,8 @@ e 17 1 257 0 0 0
 
 --- umgebung
 DHRT_FRAMES=40
-DHRT_ABSPIELEN=tasten.txt
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=tasten.txt
+DHRT_OFFSCREEN=1
 --- erwartet
 dialog TRUE
 9 Tetris
@@ -1189,8 +1189,8 @@ e 17 1 256 0 0 0
 
 --- umgebung
 DHRT_FRAMES=40
-DHRT_ABSPIELEN=tasten.txt
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=tasten.txt
+DHRT_OFFSCREEN=1
 --- erwartet
 10 Metropolis -1
 
@@ -1215,8 +1215,8 @@ e 10 1 341 0 0 0
 
 --- umgebung
 DHRT_FRAMES=40
-DHRT_ABSPIELEN=tasten.txt
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=tasten.txt
+DHRT_OFFSCREEN=1
 --- erwartet
 beendet vor bild 30: TRUE
 
@@ -1247,8 +1247,8 @@ e 19 1 257 0 0 0
 
 --- umgebung
 DHRT_FRAMES=40
-DHRT_ABSPIELEN=tasten.txt
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=tasten.txt
+DHRT_OFFSCREEN=1
 --- erwartet
 frage TRUE
 beendet, 11 eintraege
@@ -1276,7 +1276,7 @@ END IF
 DIM prBild AS INTEGER
 --- umgebung
 DHRT_FRAMES=8
-DHRT_ABSEITS=1
+DHRT_OFFSCREEN=1
 --- erwartet
 anfangs frei FALSE
 8
@@ -1309,11 +1309,11 @@ e 20 7 600 500 0 0
 
 --- umgebung
 DHRT_FRAMES=40
-DHRT_ABSPIELEN=klicks.txt
-DHRT_ABSEITS=1
+DHRT_PLAYBACK=klicks.txt
+DHRT_OFFSCREEN=1
 --- erwartet
-TRUE 1.0
-FALSE 0.0
+TRUE 1
+FALSE 0
 
 === jedes buch mit docx und epub wird veroeffentlicht
 ' Ein Buch, das als .docx UND .epub im Repo liegt, ist fertig zum Lesen:

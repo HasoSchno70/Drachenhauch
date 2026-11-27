@@ -24,7 +24,9 @@ exactly the bridge this module closes.
 | Function | Effect |
 |---|---|
 | `MIDI_IN_COUNT()` → INTEGER | How many inputs there are |
+| `MIDI_IN_DEVICES()` → ARRAY OF STRING | the names of the inputs as an array; the index is the one for `MIDI_IN_OPEN` |
 | `MIDI_OUT_COUNT()` → INTEGER | How many outputs there are |
+| `MIDI_OUT_DEVICES()` → ARRAY OF STRING | the names of the outputs as an array; the index is the one for `MIDI_OUT_OPEN` |
 | `MIDI_IN_NAME$(i)` → STRING | Name of input `i` |
 | `MIDI_OUT_NAME$(i)` → STRING | Name of output `i` |
 
@@ -241,7 +243,7 @@ a frame is 16 ms, and you can hear that.
 
 | Function | Effect |
 |---|---|
-| `MIDI_NOTE_NAME$(note)` → STRING | `60` → `"C4"`, empty outside 0..127 |
+| `MIDI_NOTE_NAME$(note)` → STRING | `60` → `"C4"`, empty outside 0..127; German spelling: `71` → `"H4"` (English B4), `70` → `"A#4"` |
 | `MIDI_NOTE_FREQ(note)` → FLOAT | `69` → `440.0` Hz — the bridge to `AUDIO_TONE` |
 
 Octave numbering follows the common convention (note 60 = C4). Some

@@ -974,9 +974,7 @@ fn tls_konfig(pruefen: bool) -> Result<rustls::ClientConfig, String> {
         .with_safe_default_protocol_versions()
         .map_err(|e| format!("DB_OPEN: TLS liess sich nicht einrichten: {}", e))?;
     Ok(if pruefen {
-        let mut wurzeln = rustls::RootCertStore::empty();
-        wurzeln.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-        stufe.with_root_certificates(wurzeln).with_no_client_auth()
+        return crate::tls::konfig(crate::tls::wurzeln(None, "DB_OPEN")?, "DB_OPEN");
     } else {
         stufe.dangerous().with_custom_certificate_verifier(Arc::new(OhnePruefung(anbieter))).with_no_client_auth()
     })

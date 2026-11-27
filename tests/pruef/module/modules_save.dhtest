@@ -34,7 +34,7 @@ s = SAVE_LOAD_OR_NEW("kaputt.save")
 --- datei kaputt.save
 nicht echtes json
 --- fehler
-SAVE_LOAD: 'kaputt.save' ist kein gueltiges JSON (expected ident at line 1 column 2)
+SAVE_LOAD: 'kaputt.save': kein gueltiges JSON (Zeile 1, Spalte 2)
 
 === exists true for real file
 IMPORT "save"
@@ -133,7 +133,7 @@ DIM s AS SAVE_HANDLE
 s = SAVE_NEW()
 PRINT SAVE_GET_INT(s, "fehlt")
 --- fehler
-SAVE_GET_INT: Key 'fehlt' nicht im Save
+SAVE_GET_INT: Schluessel 'fehlt' nicht im Save
 
 === get wrong type raises
 IMPORT "save"
@@ -362,3 +362,15 @@ END TRY
 SAVE_GET_INT_OR: erwartet INTEGER, erhalten STRING
 SAVE_GET_BOOL_OR: erwartet BOOLEAN, erhalten STRING
 SAVE_GET_FLOAT_OR: erwartet STRING, erhalten INTEGER
+
+=== ein spielstand mit bom laedt
+' SAVE_LOAD liest jetzt wie jede Textdatei (text_lesen): eine BOM vorn bricht
+' das JSON nicht mehr. Bis 2026.53: "SAVE_LOAD: 'bom.sav' ist kein
+' gueltiges JSON (expected value at line 1 column 1)".
+IMPORT "save"
+DIM s AS SAVE_HANDLE : s = SAVE_LOAD("bom.sav")
+PRINT SAVE_GET_INT(s, "gold")
+--- datei bom.sav base64
+77u/eyJfdmVyc2lvbiI6IDEsICJkYXRhIjogeyJnb2xkIjogNDJ9fQ==
+--- erwartet
+42

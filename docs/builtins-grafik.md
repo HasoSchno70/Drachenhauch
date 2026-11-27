@@ -23,7 +23,7 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 |---|---|
 | `SCREEN(w, h[, title$[, scale]])` | öffnet Fenster mit logischer Größe `w × h`. `scale > 1` macht jeden logischen Pixel größer (Retro-Look). |
 | `FLIP()` | Frame an den Bildschirm ausgeben (synchronisiert auf 60 FPS) |
-| `CLS([color])` | Buffer mit `color` füllen (Default: schwarz) |
+| `CLS([color])` | Buffer mit `color` füllen (Default: schwarz); im transparenten Fenster (`SCREEN_TRANSPARENT`) zählt das oberste Byte wörtlich als Deckkraft, 0 = durchsichtig -- sonst heißt 0 deckend |
 | `SLEEP(ms)` | wartet ms Millisekunden, ohne dass das Fenster einfriert |
 | `QUITREQUESTED()` → BOOLEAN | TRUE wenn das Programm enden soll: Fenster-X / Alt+F4, das Bildlimit von `DHRT_FRAMES`/`--bilder` — **und per raylib-Default auch `ESC`**, AUSSER in einem Programm mit `gui`: dort gehoert `ESC` ab dem ersten `GUI_UPDATE` den Widgets (Dialog abbrechen, Klappliste schliessen), sonst beendete jedes Abbrechen das ganze Programm. `WINDOW_ESC_QUIT` setzt es ausdruecklich |
 | `WINDOW_CLOSE_REQUESTED()` → BOOLEAN | TRUE, wenn der NUTZER das Fenster schliessen will (Kreuz, Alt+F4, die Beenden-Taste) -- ohne das Bildlimit. Das Fenster bleibt dabei offen: ein Programm mit ungesicherter Arbeit fragt erst nach und endet dann selbst. Ein Ereignis, kein Zustand -- es gilt ein Bild lang |
@@ -59,7 +59,7 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `FILE_DROPPED(i)` → STRING | Pfad der `i`-ten davon |
 | `CLIPBOARD_GET()` → STRING | Text aus der Zwischenablage lesen; leer, wenn sie gerade ein anderes Programm hält |
 | `CLIPBOARD_SET(text$)` | Text in die Zwischenablage legen — **Fehler**, wenn das nicht gelingt |
-| `CLIPBOARD_SET_IMAGE(image)` → BOOLEAN | ein `IMAGE` in die Zwischenablage legen (andere Programme fügen es als Bild ein) — **Fehler**, wenn das nicht gelingt |
+| `CLIPBOARD_SET_IMAGE(image)` | ein `IMAGE` in die Zwischenablage legen (andere Programme fügen es als Bild ein) — **Fehler**, wenn das nicht gelingt |
 | `CLIPBOARD_GET_IMAGE()` → INTEGER | das Bild aus der Zwischenablage als neues `IMAGE`; `-1`, wenn keines darin ist |
 | `CLIPBOARD_HAS_IMAGE()` → BOOLEAN | liegt gerade ein Bild darin? |
 | `CLIPBOARD_SET_FILES(paths)` | Dateien (`ARRAY OF STRING`, relativ oder absolut) in die Zwischenablage legen — „Einfügen“ im Explorer/Finder kopiert sie |
@@ -144,7 +144,7 @@ END IF
 
 Ziehen hinaus gibt es bisher **nur unter Windows** (über die Shell, wie der
 Explorer selbst); unter macOS und Linux liefert es `""`. Mit
-`DHRT_ZWISCHENABLAGE=privat` (jedes Programm unter `dhrt test`) bleiben auch
+`DHRT_CLIPBOARD=privat` (jedes Programm unter `dhrt test`) bleiben auch
 Bilder und Dateilisten im Prozess.
 
 Klassischer Game-Loop:
@@ -303,6 +303,7 @@ Farbe wird als 24-Bit-INTEGER (`&HRRGGBB`) angegeben, am einfachsten via `RGB(r,
 | `ELLIPSE(x1, y1, x2, y2[, color])` | gefüllte Ellipse, eingepasst in die Bounding-Box |
 | `ELLIPSEOUTLINE(x1, y1, x2, y2[, color[, width]])` | Ellipse nur als Kontur |
 | `ARC(x1, y1, x2, y2, start_rad, end_rad[, color[, width]])` | Bogen-Segment in der Bounding-Box; Winkel in Radiant, gegen den Uhrzeigersinn. `width` (Float, optional) = Strichbreite; ohne Angabe 1px (zoom-unabhaengig), mit Angabe wie `LINEW`/`SPLINE` mit `CAMERA_SET`-Zoom skaliert |
+| `ARC_DEG(x1, y1, x2, y2, from_deg, to_deg[, color[, width]])` | derselbe Bogen in **Grad**, 0 = rechts, im Uhrzeigersinn -- wie `PIE` |
 | `TEXT(x, y, s$[, color])` | Text bei (x, y) |
 | `TEXTROT(x, y, s$, angle[, scale[, color]])` | Text **zentriert** auf (x, y), um das Zentrum gedreht (Grad, wie `DRAWIMAGEROT`) und skaliert — für Score-Popups, schräge Labels. Nutzt aktiven Font/Größe |
 
@@ -822,11 +823,11 @@ WEND
 | Funktion | Zweck |
 |---|---|
 | `LOADSOUND(path$)` → SOUND | Sample laden (kurze Effekte: WAV, OGG) |
-| `PLAYSOUND(s[, loops[, volume]])` | abspielen, default loops=0, volume=1.0 |
+| `PLAYSOUND(s[, loops[, volume]])` | abspielen: `loops` 0 einmal (Vorgabe), -1 endlos, n Wiederholungen wie bei `AUDIO_PLAY` (bis 2026.53 ging `loops` verloren); volume=1.0 |
 | `STOPSOUND(s)` | stoppen |
 | `UNLOADSOUND(s)` | Sound stoppen **und seinen Puffer freigeben** — gegen Puffer-Akkumulation bei vielen `AUDIO_TONE`/`AUDIO_SFX`/`AUDIO_NOISE`-Noten (langer Song). Der Handle bleibt gültig, erneutes Abspielen wirft einen Fehler |
 | `AUDIO_SOUND_COUNT()` → INTEGER | Anzahl lebender (nicht freigegebener) Sound-Slots — Diagnose gegen Sound-Lecks |
-| `PLAYMUSIC(path$[, loops[, volume]])` | längere Datei streamen (`.ogg`/`.mp3`/`.qoa` **+ Tracker-Module `.mod`/`.xm`** — echter Amiga-Sound), default loops=-1 (endlos) |
+| `PLAYMUSIC(path$[, loops[, volume]])` | längere Datei streamen (`.ogg`/`.mp3`/`.flac` **+ Tracker-Module `.mod`/`.xm`** — echter Amiga-Sound); `loops` n > 0 Wiederholungen, 0 und -1 endlos (die Vorgabe; 0 wie in alten Programmen) |
 | `STOPMUSIC()` | stoppen |
 
 ```basic
@@ -925,7 +926,7 @@ Sampler bliebe schwarz.
 
 | Funktion | Zweck |
 |---|---|
-| `KEYPRESSED(key)` → BOOLEAN | TRUE **solange** die Taste mit SDL-Code `code` gehalten wird — jedes Frame erneut. Für Bewegen/Lenken. |
+| `KEYPRESSED(key)` → BOOLEAN | TRUE **solange** die Taste `key` (eine `KEY_*`-Konstante oder ein Buchstabe) gehalten wird — jedes Frame erneut. Für Bewegen/Lenken. |
 | `KEYHIT(key)` → BOOLEAN | TRUE nur in **dem einen Frame**, in dem die Taste heruntergeht. Für Schießen, Springen, Umschalten. |
 | | *Buchstaben:* `KEY_A`…`KEY_Z` sind die klare Schreibweise. `ASC("s")` und `ASC("S")` meinen beide dieselbe Taste — bis 2026-08-31 traf die **große** Schreibweise still gar nichts, was wie ein vergessener Aufruf aussah. |
 | | *Lage oder Beschriftung:* ein Tastencode meint die **Lage** der Taste nach der US-Tastatur — `KEY_Z` ist auf einer deutschen Tastatur die Taste mit dem Y, auf einer französischen die mit dem W. Für WASD ist das richtig. Für Kürzel wie Strg+Z schreibt man den **Buchstaben als Text**: `KEYHIT("z")` meint die Taste, auf der das Z steht (auch für `KEYPRESSED`, `KEYRELEASED`, `KEYREPEAT`; Buchstaben, Ziffern und das Leerzeichen). |
@@ -952,7 +953,7 @@ Sampler bliebe schwarz.
 | `KEY_ANY_HIT()` → INTEGER | Code der zuletzt gedrückten Taste, `-1` = keine — fuer Belegungsdialoge |
 | `KEY_NAME$(code)` → STRING | Anzeigename einer Taste (`LEER`, `LINKS`, `UMSCHALT`, `F5` …) |
 | `INKEY$()` → STRING | zuletzt getipptes Zeichen oder `""` — wartet **nicht**, für Texteingabe im Spielablauf |
-| `WAITKEY()` → INTEGER | **hält an**, bis eine Taste kommt, und liefert ihren Code (`-1`, wenn das Fenster geschlossen wird) |
+| `WAITKEY()` → INTEGER | **hält an**, bis eine Taste kommt, und liefert ihren Code (`-1`, wenn das Fenster geschlossen wird): Sondertasten wie die Konstanten (`WAITKEY() = KEY_LEFT`), Buchstaben und Ziffern als ASCII-Großbuchstabe (`ASC("A")`) |
 
 **Ein Klick zwischen zwei Bildern geht nicht verloren.** Kommen Drücken und
 Loslassen an, bevor das nächste Bild beginnt (Tippen aufs Touchpad, ein
@@ -986,9 +987,9 @@ Verfügbare Konstanten:
 | Pfeile | `KEY_LEFT`, `KEY_RIGHT`, `KEY_UP`, `KEY_DOWN` |
 | Buchstaben/Ziffern | `KEY_A` bis `KEY_Z`, `KEY_0` bis `KEY_9` |
 | Funktionstasten | `KEY_F1` bis `KEY_F12` |
-| Modifier | `KEY_LSHIFT`, `KEY_RSHIFT`, `KEY_LCTRL`, `KEY_RCTRL`, `KEY_LALT`, `KEY_RALT`, `KEY_LSUPER`, `KEY_RSUPER`, `KEY_CAPSLOCK` |
-| Navigation | `KEY_INSERT`, `KEY_DELETE`, `KEY_HOME`, `KEY_END`, `KEY_PAGEUP`, `KEY_PAGEDOWN` |
-| Ziffernblock | `KEY_KP0` bis `KEY_KP9`, `KEY_KP_ENTER`, `KEY_KP_PLUS`, `KEY_KP_MINUS`, `KEY_KP_MULTIPLY`, `KEY_KP_DIVIDE`, `KEY_KP_PERIOD` |
+| Modifier | `KEY_LSHIFT`, `KEY_RSHIFT`, `KEY_LCTRL`, `KEY_RCTRL`, `KEY_LALT`, `KEY_RALT`, `KEY_LSUPER`, `KEY_RSUPER`, `KEY_CAPSLOCK` — auch `KEY_LEFT_SHIFT`, `KEY_RIGHT_SHIFT`, `KEY_LEFT_CTRL`, `KEY_RIGHT_CTRL`, `KEY_LEFT_ALT`, `KEY_RIGHT_ALT`, `KEY_LEFT_SUPER`, `KEY_RIGHT_SUPER`, `KEY_CAPS_LOCK` |
+| Navigation | `KEY_INSERT`, `KEY_DELETE`, `KEY_HOME`, `KEY_END`, `KEY_PAGEUP`/`KEY_PAGE_UP`, `KEY_PAGEDOWN`/`KEY_PAGE_DOWN`, `KEY_NUM_LOCK`, `KEY_SCROLL_LOCK`, `KEY_PRINT_SCREEN`, `KEY_PAUSE` |
+| Ziffernblock | `KEY_KP0` bis `KEY_KP9` (auch `KEY_KP_0` bis `KEY_KP_9`), `KEY_KP_ENTER`, `KEY_KP_PLUS`, `KEY_KP_MINUS`, `KEY_KP_MULTIPLY`, `KEY_KP_DIVIDE`, `KEY_KP_PERIOD` |
 
 Der Ziffernblock hat eigene Codes — eine Spielsteuerung darf ihn getrennt von
 der oberen Ziffernreihe belegen. Gamepad-Codes (`JOY_BUTTON_A`, `JOY_DPAD_UP`
@@ -1032,7 +1033,9 @@ gehalten" und „genau jetzt gedrückt".
 | `JOYSTICK_RUMBLE(idx, left, right, duration_s)` | Vibration; die beiden Motoren getrennt (je `0.0`–`1.0`) |
 | `JOYSTICK_MAPPINGS(sdl_db$)` → INTEGER | Belegungen aus der SDL-GameControllerDB nachladen — damit werden exotische Geräte richtig zugeordnet |
 
-Für die Knöpfe gibt es Konstanten (`JOY_BUTTON_A` … `JOY_BUTTON_Y`, `JOY_DPAD_*`).
+Für die Knöpfe gibt es Konstanten (`JOY_BUTTON_A` … `JOY_BUTTON_Y`, `JOY_DPAD_*`); sie gelten in
+`JOYSTICK_BUTTON` wie in `KEYPRESSED`, `KEYHIT`, `KEYRELEASED` und `KEYREPEAT` (dort an
+irgendeinem Pad).
 Wer lieber mit Aktionsnamen statt Nummern arbeitet, nimmt das Modul
 [`input`](module-input.md) — dort heißt es dann `INPUT_BIND("springen", KEY_SPACE,
 JOY_BUTTON_A)`.

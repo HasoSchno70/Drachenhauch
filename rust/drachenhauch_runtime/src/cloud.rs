@@ -1,15 +1,12 @@
 //! Modul `cloud`: Cloud-Save + Leaderboard gegen den mitgelieferten
-//! Referenz-Server (`cloudserver/server.dh`, REST+JSON). HTTP via `ureq`
-//! (wie html.rs), Feature `http`. Kein eigener State hier -- die VM haelt
+//! Referenz-Server (`cloudserver/server.dh`, REST+JSON). HTTP ueber
+//! `html::http_request`, Feature `http`. Kein eigener State hier -- die VM haelt
 //! Basis-URL/API-Key/letzte Fehlermeldung/Leaderboard-Ergebnisse
 //! (`vm.rs`, analog zu db_conns/db_results).
 
 #![cfg(feature = "http")]
 
-use std::io::Read;
-use std::time::Duration;
-
-const USER_AGENT: &str = "Drachenhauch-cloud/0.1";
+const USER_AGENT: &str = crate::html::USER_AGENT;
 const TIMEOUT_SECS: u64 = 10;
 
 pub struct CloudErr {
@@ -18,48 +15,47 @@ pub struct CloudErr {
     pub status: i64,
 }
 
-fn map_transport_err(e: ureq::Error, ctx: &str) -> CloudErr {
-    match e {
-        ureq::Error::Status(code, resp) => {
-            let body = resp.into_string().unwrap_or_default();
-            CloudErr { msg: format!("{}: HTTP {} - {}", ctx, code, body.trim()), status: code as i64 }
-        }
-        ureq::Error::Transport(t) => CloudErr { msg: format!("{}: {}", ctx, t), status: 0 },
-    }
-}
-
+/// Eine Anfrage an den Server, Antwort als JSON. Geht durch
+/// `html::http_request` -- denselben Weg wie `HTTP_REQUEST` (Pruefung der
+/// Kopfzeilen, Groessengrenze, Meldungen ohne Netz); bis 2026.53 baute
+/// `cloud` seine Anfragen mit ureq selbst (Bericht A15). Bei einem
+/// Fehlerstatus steht der Text des Servers in der Meldung.
 fn req_json(method: &str, url: &str, api_key: &str, body: Option<&serde_json::Value>, ctx: &str)
     -> Result<serde_json::Value, CloudErr>
 {
-    let mut req = match method {
-        "GET" => ureq::get(url),
-        "POST" => ureq::post(url),
-        _ => unreachable!(),
-    }
-    .set("User-Agent", USER_AGENT)
-    .timeout(Duration::from_secs(TIMEOUT_SECS));
+    let mut a = crate::html::Anfrage::neu(method, url);
+    a.timeout = TIMEOUT_SECS * 1000;
+    a.fehlerstatus_als_antwort = true;
+    a.header.push(("User-Agent".into(), USER_AGENT.into()));
     if !api_key.is_empty() {
-        req = req.set("X-Api-Key", api_key);
+        a.header.push(("X-Api-Key".into(), api_key.into()));
     }
-    let resp = match body {
-        Some(b) => req.set("Content-Type", "application/json").send_string(&b.to_string()),
-        None => req.call(),
-    };
-    let resp = resp.map_err(|e| map_transport_err(e, ctx))?;
-    let mut text = String::new();
-    resp.into_reader().read_to_string(&mut text).map_err(|e| CloudErr {
-        msg: format!("{}: Antwort nicht lesbar: {}", ctx, e),
-        status: 0,
-    })?;
+    if let Some(b) = body {
+        a.header.push(("Content-Type".into(), "application/json".into()));
+        a.body = b.to_string().into_bytes();
+    }
+    let r = crate::html::http_request(&a)
+        .map_err(|e| CloudErr { msg: format!("{}: {}", ctx, e.msg), status: e.status })?;
+    let text = String::from_utf8_lossy(&r.body).into_owned();
+    if r.status >= 400 {
+        return Err(CloudErr { msg: format!("{}: HTTP {} - {}", ctx, r.status, text.trim()), status: r.status });
+    }
     serde_json::from_str(&text).map_err(|e| CloudErr {
-        msg: format!("{}: Antwort ist kein gueltiges JSON: {}", ctx, e),
+        msg: format!("{}: Antwort ist kein gueltiges JSON: {}", ctx, crate::builtins::json_fehler_text(&e)),
         status: 0,
     })
 }
 
+/// Ein Pfadteil (Spieler, Bestenliste) kodiert: bis 2026.53 ging er
+/// ungeprueft in die URL -- CLOUD_SAVE("a?b", ...) speicherte unter "a"
+/// (der Rest war eine Abfrage), und ein "/" darin traf eine andere Route.
+fn teil(s: &str) -> String {
+    crate::html::url_encode(s)
+}
+
 /// POST /save/<player_id> {"data": data}. Ok(()) bei Erfolg.
 pub fn save_upload(base_url: &str, api_key: &str, player_id: &str, data: &str) -> Result<(), CloudErr> {
-    let url = format!("{}/save/{}", base_url.trim_end_matches('/'), player_id);
+    let url = format!("{}/save/{}", base_url.trim_end_matches('/'), teil(player_id));
     let body = serde_json::json!({ "data": data });
     req_json("POST", &url, api_key, Some(&body), "CLOUD_SAVE")?;
     Ok(())
@@ -67,7 +63,7 @@ pub fn save_upload(base_url: &str, api_key: &str, player_id: &str, data: &str) -
 
 /// GET /save/<player_id> -> Some(data) oder None (nicht gefunden, HTTP 404).
 pub fn save_download(base_url: &str, api_key: &str, player_id: &str) -> Result<Option<String>, CloudErr> {
-    let url = format!("{}/save/{}", base_url.trim_end_matches('/'), player_id);
+    let url = format!("{}/save/{}", base_url.trim_end_matches('/'), teil(player_id));
     match req_json("GET", &url, api_key, None, "CLOUD_LOAD") {
         Ok(v) => Ok(Some(v.get("data").and_then(|d| d.as_str()).unwrap_or("").to_string())),
         Err(e) if e.status == 404 => Ok(None),
@@ -79,7 +75,7 @@ pub fn save_download(base_url: &str, api_key: &str, player_id: &str) -> Result<O
 pub fn leaderboard_submit(base_url: &str, api_key: &str, board: &str, name: &str, score: f64, best_low: bool)
     -> Result<bool, CloudErr>
 {
-    let url = format!("{}/leaderboard/{}/submit", base_url.trim_end_matches('/'), board);
+    let url = format!("{}/leaderboard/{}/submit", base_url.trim_end_matches('/'), teil(board));
     let body = serde_json::json!({ "name": name, "score": score, "best": if best_low { "low" } else { "high" } });
     let v = req_json("POST", &url, api_key, Some(&body), "LEADERBOARD_SUBMIT")?;
     Ok(v.get("updated").and_then(|b| b.as_bool()).unwrap_or(false))
@@ -95,7 +91,7 @@ pub fn leaderboard_fetch(base_url: &str, api_key: &str, board: &str, n: i64, asc
     -> Result<Vec<LeaderboardEntry>, CloudErr>
 {
     let order = if ascending { "asc" } else { "desc" };
-    let url = format!("{}/leaderboard/{}/top?n={}&order={}", base_url.trim_end_matches('/'), board, n.max(1), order);
+    let url = format!("{}/leaderboard/{}/top?n={}&order={}", base_url.trim_end_matches('/'), teil(board), n.max(1), order);
     let v = req_json("GET", &url, api_key, None, "LEADERBOARD_FETCH")?;
     let entries = v.get("entries").and_then(|e| e.as_array()).cloned().unwrap_or_default();
     Ok(entries.into_iter().map(|e| LeaderboardEntry {

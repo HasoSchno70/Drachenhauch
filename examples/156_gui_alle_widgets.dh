@@ -521,10 +521,10 @@ WHILE NOT QUITREQUESTED()
 
     ' Die Kurve NACH GUI_DRAW in den Canvas-Bereich malen (Bildschirm-Koordinaten).
     IF GUI_ACTIVE_TAB(win) = 1 THEN
-        DIM cx AS INTEGER : cx = GUI_CANVAS_X(leinwand)
-        DIM cy AS INTEGER : cy = GUI_CANVAS_Y(leinwand)
-        DIM cw AS INTEGER : cw = GUI_CANVAS_W(leinwand)
-        DIM ch AS INTEGER : ch = GUI_CANVAS_H(leinwand)
+        DIM cx AS INTEGER : cx = GUI_CANVAS_SCREEN_X(leinwand)
+        DIM cy AS INTEGER : cy = GUI_CANVAS_SCREEN_Y(leinwand)
+        DIM cw AS INTEGER : cw = GUI_CANVAS_SCREEN_W(leinwand)
+        DIM ch AS INTEGER : ch = GUI_CANVAS_SCREEN_H(leinwand)
         DIM mitte AS INTEGER : mitte = cy + ch \ 2
         DIM zoom AS FLOAT : zoom = GUI_VALUE(sZoom)
         ' Die Welle soll IMMER gleich schnell ueber den Schirm wandern.

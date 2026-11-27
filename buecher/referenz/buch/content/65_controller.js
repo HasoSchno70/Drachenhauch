@@ -11,7 +11,7 @@ module.exports = (H) => [
       'DIM held AS CHAR_CONTROLLER',
       'held = CHAR_NEW(50.0, 100.0, 12.0, 14.0)',
     ]),
-  H.cmd("CHAR_SET_INPUT · CHAR_UPDATE", 'CHAR_SET_INPUT(c, achse_x, sprung_gedrückt, sprung_gehalten)   CHAR_UPDATE(c, map, layer)',
+  H.cmd("CHAR_SET_INPUT · CHAR_UPDATE", 'CHAR_SET_INPUT(c, achse_x, sprung_gedrückt, sprung_gehalten)   CHAR_UPDATE(c, map, layer[, dt])',
     "CHAR_SET_INPUT übergibt die Eingabe dieses Frames: achse_x ist -1/0/+1 (links/rechts), sprung_gedrückt das einmalige Drücken, sprung_gehalten das Halten (für variable Sprunghöhe). CHAR_UPDATE berechnet dann Geschwindigkeit, kollidiert mit der Karte und setzt die Position. Mehr braucht es pro Frame nicht.",
     [
       'INPUT_UPDATE()',

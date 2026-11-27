@@ -17,6 +17,23 @@ Seit diesem Bau haben sich nur `main.rs` und `jit.rs` geändert (Meldungen der
 Werkzeuge); die Befehle verhalten sich in HEAD gleich. „Code“ heißt: am
 Quelltext gelesen, nicht gelaufen. Am Code wurde nichts geändert.
 
+**Stand der Umsetzung (2026-11-27).** Alle Punkte A bis E und die
+Einzelfehler sind umgesetzt, auf den Zweigen `thema/argumente-einheitlich`,
+`thema/abstuerze-features-handles` und `thema/lesen-verbinden` (dort zuletzt
+C8 bis C10, D2, D4 bis D6, E2, E3, E5 und der Popover). Was sich für Programme
+ändert, sammelt `docs/intern/naechste-fassung.md`. Bewusst anders als
+vorgeschlagen:
+
+- Die Zeile `FEHL  Zeile …` von `dhrt test` bleibt deutsch: die IDE liest sie
+  (`ide/teile/projekt.dh`).
+- `builtin_familien.dhtest` misst Zeit; mit dem Bauprofil `--gegenprobe`
+  (ohne LTO) ist der letzte Befehl der Kette dreimal so teuer wie der erste,
+  im Release-Bau nicht. Er gilt nur am Release-Bau.
+- Die Warnungsfreiheit (C8) ist unter Windows und Linux (WSL) für alle
+  Feature-Kombinationen der Laufzeiten und der CI geprüft, macOS nicht.
+- Handles bleiben Nummern mit Art (`Value::Handle`), die Typtafel
+  (`typtafel.rs`) sagt je Typ Wert, Handle oder Zahl (D5).
+
 **Fundstellen** sind relativ zu `rust/drachenhauch_runtime/src/`, sofern nicht
 anders angegeben. Zeilennummern gelten für den genannten Commit.
 
@@ -1260,10 +1277,9 @@ Einzelbefunde. Darum stehen sie oben in der Rangliste.
 
 Diese sind keine Muster, aber sie brechen etwas und sind schnell behoben.
 
-**Stand 2026-11-25:** Auf dem Zweig `thema/argumente-einheitlich` sind 20 der
-21 behoben, je mit eigenem Commit, Prüffall und Gegenprobe (Spalte „Stand“).
-Offen ist nur der Popover; er ist größer als hier zuerst beschrieben (siehe
-seine Zeile).
+**Stand 2026-11-27:** Alle 21 behoben, je mit Prüffall und Gegenprobe (Spalte
+„Stand“); 20 auf `thema/argumente-einheitlich`, der Popover auf
+`thema/lesen-verbinden`.
 
 | Was | Wo | Beleg | Stand |
 |---|---|---|---|
@@ -1273,7 +1289,7 @@ seine Zeile).
 | `HTML_FIND_ALL` verschluckt Treffer bei `<` im Text (Fix von 2026.27 nur in `HTML_TEXT`) | `html.rs:429` | Lauf: 0 statt 2 | behoben |
 | Menükürzel mit Enter/Esc löst zusätzlich Standard-/Abbrechen-Knopf aus | `gui_eingabe.rs:848, 852` | Lauf: „menue bild 6 / ok bild 6“ | behoben |
 | Bildschirmleser liest „&Speichern“ (`w.text` statt `anzeige_text`) | `gui_a11y.rs:216-257` | Lauf über UI Automation | behoben, die Befehlspalette gleich mit |
-| Popover weicht an `schirm_b/h` aus statt an `grenze()` | `gui_ueber.rs:195, 211` | Lauf: ragt im nativen Fenster 96 px heraus | **offen**: Der eigentliche Fehler ist größer. Ein Popover wird immer auf der Hauptfläche gezeichnet (`gui_ueber.rs:768` `ueber_zeichnen`: „Ein Popover ist nie nativ“), auch wenn sein Widget in einem nativen Fenster steht, und `popup_rechtecke` kennt ihn nicht. Erst wenn er auf der Fläche seines Widgets liegt, ist `grenze()` die richtige Grenze; allein getauscht ändert es nichts Prüfbares. |
+| Popover weicht an `schirm_b/h` aus statt an `grenze()` | `gui_ueber.rs:195, 211` | Lauf: ragt im nativen Fenster 96 px heraus | behoben auf `thema/lesen-verbinden`: der Popover liegt auf der Fläche seines Widgets (`flaeche_von`), weicht an `grenze()` aus und bekommt ein Popup-Fenster wie die anderen Popups. Vorher: Der eigentliche Fehler ist größer. Ein Popover wird immer auf der Hauptfläche gezeichnet (`gui_ueber.rs:768` `ueber_zeichnen`: „Ein Popover ist nie nativ“), auch wenn sein Widget in einem nativen Fenster steht, und `popup_rechtecke` kennt ihn nicht. Erst wenn er auf der Fläche seines Widgets liegt, ist `grenze()` die richtige Grenze; allein getauscht ändert es nichts Prüfbares. |
 | GroupBox schätzt Titelbreite aus Zeichenzahl | `gui_zeichnen.rs:1984` | Lauf: Rahmenlinie läuft durch den Titel | behoben |
 | `FILETIME` eine Stunde daneben (Sommer/Winter) | `builtins.rs:3662` | Lauf (A10) | behoben |
 | `TIME_FROM_PARTS(2026, 13, 1)` = 2027-01-01 | `vm_system.rs:92` | Lauf | behoben: dieselben Grenzen wie `ZEIT_PARSE` |
@@ -1322,8 +1338,14 @@ Aufwand. Jeder Punkt hält `docs/stabilitaet.md` ein.
 4. **Eine Handle-Regel und ein `handle_get`** (A4, B5, D5). *Umgesetzt auf
    `thema/abstuerze-features-handles`: Regel in CLAUDE.md, `MODEL_FREE`, `FONT_FREE`,
    `SHADER_FREE`, `RENDERTARGET_FREE`, `ATLAS_FREE`, `SAMPLE_FREE`, Getter nennen den
-   Befehl, doppelt freigeben still. Offen: `_REMOVE`/`_DESTROY`/`_DISCONNECT` als
-   `_FREE`-Namen, `db_res_mut` nennt noch das Modul, getaggte Handles.*
+   Befehl, doppelt freigeben still. Auf `thema/lesen-verbinden` nachgezogen:
+   neue Namen `AUDIO_CLOCK/EMITTER/LISTENER/MOD_FREE`, `GUI_WIDGET_FREE`,
+   `GUI_WINDOW_FREE`, `PHYS2D/PHYS3D_BODY_FREE`, `BT_CLOSE`, `MQTT_CLOSE`
+   (`namen.rs`, die alten bleiben); die DB_RESULT-Meldungen nennen den Befehl
+   („DB_NEXT: das Ergebnis wurde mit DB_CLOSE_RESULT geschlossen“). Bewusst
+   nicht umbenannt: `ECS_DESTROY` (zerstört ein Wesen im Spiel, gibt kein
+   Handle frei) und `WIFI_DISCONNECT` (trennt den Adapter, kein Handle).
+   Offen: getaggte Handles.*
    - Ungültig ist ein Fehler mit Befehlsnamen, Freigeben ist idempotent und
      still, Laden scheitert laut (LOADMODEL, SHADER_LOAD).
    - Fehlende `_FREE` nachrüsten (Modell, Schrift, Shader, Render-Ziel, Atlas,
@@ -1340,33 +1362,53 @@ Aufwand. Jeder Punkt hält `docs/stabilitaet.md` ein.
    Compilers wird ein Fehler. Der URL-Dekodierer von httpd arbeitet auf Bytes
    (ein Dekodierer statt zwei). `.dhc` lädt mit `Result`. Ein Netzwerkpaket darf
    kein Programm beenden.
-6. **Zeit: eine Leitlinie und eine Uhr** (A5, B4 Teil).
+6. **Zeit: eine Leitlinie und eine Uhr** (A5, B4 Teil). *Umgesetzt auf `thema/lesen-verbinden`: Regel 9 in
+   `docs/builtins-namen.md`, `HTTP_SET_TIMEOUT`/`SERIAL_SET_TIMEOUT` in ms, `SMTP_`/`MODBUS_SET_TIMEOUT`,
+   gui-Fristen nach `takt`, `spieluhr.rs` für TWEEN/SHAKE/timer, SLEEP mit Komma,
+   PHYS*_STEP in Sekunden, `CHAR_UPDATE(…, dt)` in Sekunden (Geschwindigkeiten bleiben
+   Pixel je 1/60 s), `CHAR_SET_COYOTE_MS`/`CHAR_SET_JUMP_BUFFER_MS`.*
    - Zeitspannen und Timeouts in ms, Schritt-dt in Sekunden.
    - Neue `…_SET_TIMEOUT`-Namen; `HTTP_SET_TIMEOUT` als eigener Befehl in ms.
    - gui-Fristen auf `takt` statt `delta`: der Toast im Leerlauf.
    - Eine Spieluhr für TWEEN, SHAKE und timer, kein `get_time()` in der gui.
    - `SLEEP` nimmt FLOAT, `PHYS*_STEP` bekommt einen Schutz.
-7. **gui: nach außen logisch, innen eine Geometrie** (A6 Teil, A18, D4).
+7. **gui: nach außen logisch, innen eine Geometrie** (A6 Teil, A18, D4). *Teilweise umgesetzt auf
+   `thema/lesen-verbinden`: Splitter logisch, Reiterleiste, Panel-Kopf (`panel_kopf`),
+   GroupBox, Fenster-Rollbalken und Mausrad durch `sk`. Offen: Pixel-Abfragen mit
+   `_SCREEN_`-Namen (bräche Programme, eine Entscheidung), der Textbereich-Rand 5, die
+   Bausteine aus A18 und die Ordnung aus D4.*
    - Splitter-Wert mit `unsk`/`sk`.
    - Pixel-Abfragen bekommen `_SCREEN_`-Namen und logische Geschwister.
    - Alle festen Pixel laufen durch `sk`.
    - Ein Rollbalken, ein Radschritt, ein Kürzen, eine Popup-Liste.
    - Ein Schlüssel-Setter-Helfer mit englischen Zweitnamen und `GUI_<W>_GET`.
-8. **Ein Weg zum Lesen und Verbinden** (A11, A15).
+8. **Ein Weg zum Lesen und Verbinden** (A11, A15). *Umgesetzt auf `thema/lesen-verbinden`:
+   `verbinden.rs` (alle Adressen, NET/WS/MQTT/SMTP/Modbus, UDP nach Art des Sockets),
+   cloud kodiert die Pfadteile, COPYFILE/DIREXISTS/DIRLIST/ZIP_* über den Pfad-Helfer,
+   `datei_fehler`, ZIP_READ$/SAVE_LOAD/ANIM_FSM_LOAD wie READALL$. Offen (innen): ein
+   `tls.rs`, `html::Abrufe` → `hintergrund`, cloud über `http_request`, `MQTT_PENDING`.*
    - Alle lesenden Dateibefehle laufen über `resolve_asset_path` und
      `text_lesen` (JSON_LOAD mit BOM, ZIP_READ$, COPYFILE, SAVE_EXISTS).
    - Ein `datei_fehler` mit Pfad.
    - Ein `verbinden()`, das alle Adressen probiert (`localhost` bei
      NET/WS/MQTT/SMTP).
    - `HTTP_DOWNLOAD` und cloud über `http_request`, ein TLS-Aufbau.
-9. **Der Index als eine saubere Quelle** (B6, B10, E1, E2, E4).
+9. **Der Index als eine saubere Quelle** (B6, B10, E1, E2, E4). *Teilweise umgesetzt auf
+   `thema/lesen-verbinden`: `dhrt pruef parameter` prüft jeden Befehl einer Zeile (38 Funde
+   je Sprache nachgezogen), Zweitnamen für Parameter im Compiler, `RENAME(old, new)`, die
+   Signaturen aus E2. Offen: Rückgabetypen und eine Signaturform für alle Einträge (E1,
+   B10), Vorgaben nachtragen, Kurzhilfen aus dem Index erzeugen.*
    - Eine Signaturform, Rückgabetypen und Vorgaben nachtragen. Das macht
      benannte Argumente nutzbar und Regel 5 wahr.
    - `builtin_signature` streichen, Kurzhilfen aus dem Index erzeugen.
    - Der Compiler lernt **Zweitnamen für Parameter**: die einzige Möglichkeit,
      die uneinheitlichen Namen zu heilen, ohne die zugesagten zu brechen.
    - `dhrt pruef parameter` prüft jeden Befehl einer Zeile.
-10. **Ton aus einem Guss** (C1, C3, A8, A19).
+10. **Ton aus einem Guss** (C1, C3, A8, A19). *Teilweise umgesetzt auf `thema/lesen-verbinden`:
+    `DHRT_OHNE_AUDIO` rechnet stumm (`audio_backend.rs`, `AUDIO_IS_SILENT`), loops bei
+    PLAYSOUND/PLAYMUSIC, Loops/AUTOPAN/Warteschlange ohne FLIP, QUEUE prüft, QOA aus der
+    Doku. Offen: eine Pan-Skala und eine Lautstärke-Regel (neue Befehle, ein Entwurf),
+    `AUDIO_INIT`/`AUDIO_SET_NUM_CHANNELS` ohne Wirkung, ein WAV-Schreiber.*
     - `DH_OHNE_AUDIO` und „kein Gerät“ führen zu Kiras `MockBackend`.
     - `loops` durchreichen, endliche Loops ohne FLIP.
     - Eine Pan-Skala (-1..1) und eine Lautstärke-Regel über neue Befehle.

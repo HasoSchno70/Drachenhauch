@@ -206,7 +206,6 @@ FUNCTION probe$(n AS INTEGER) AS STRING
             CASE 4 : WRITEALL("kaputt.gif", "GIF89a nix") : DIM dd AS ARRAY OF INTEGER : dd = IMAGE_GIF_DELAYS("kaputt.gif")
             CASE 5 : MODEL_SAVE(MESH_CUBE(1, 1, 1), "w.stl")
             CASE 6 : DIM k AS IMAGE : k = IMAGE_CHANNEL(IMAGE_NEW(2, 2), 4)
-            CASE 7 : CAMERA3D_MOVE(1, 0, 0, 0)
             CASE 8 : DIM m AS IMAGE : m = IMAGE_TEXT("a", 24, RED, 9)
         END SELECT
         RETURN "kein fehler"
@@ -230,5 +229,12 @@ IMAGE_LOAD_GIF: Datei 'fehlt.gif' nicht gefunden
 IMAGE_GIF_DELAYS: 'kaputt.gif' ist
 MODEL_SAVE: geschrieben wird Wavefront-OBJ, der Name muss auf .obj enden
 IMAGE_CHANNEL: der Kanal ist 0 (rot), 1 (gruen), 2 (blau) oder 3 (Deckkraft), nicht 4
-CAMERA3D_MOVE: erwartet (vor, rechts, hoch, gieren, neigen[, zoom])
 IMAGE_TEXT: ungueltiges FONT-Handle 9
+
+=== eine falsche argumentzahl ist ein fehler beim uebersetzen
+' Seit 2026.54 haelt schon der Compiler an (vorher eine Warnung und der
+' Fehler erst, wenn die Zeile lief) -- mit der Aufrufform aus dem Index.
+IMPORT "g3d"
+CAMERA3D_MOVE(1, 0, 0, 0)
+--- fehler
+CAMERA3D_MOVE: erwartet 5 bis 6 Argumente, erhalten 4 -- Aufruf: CAMERA3D_MOVE(

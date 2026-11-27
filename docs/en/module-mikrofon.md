@@ -50,7 +50,7 @@ silent zero could not be told apart from "it is quiet".
 
 | Command | What it does |
 |---|---|
-| `MIC_LEVEL()` → FLOAT | highest peak since the last call, 0 to 1 — asked once per frame, that is a level meter that misses no click |
+| `MIC_LEVEL()` → FLOAT | highest peak since the last call, 0 to 1 — asked once per frame, that is a level meter that misses no click; new name `MIC_PEAK`, the same quantity as `AUDIO_PEAK` at the output |
 | `MIC_RMS()` → FLOAT | RMS of the last 50 ms — what you hear as loudness (a sine with peak 1 has 0.707) |
 | `MIC_PITCH()` → FLOAT | fundamental in Hz, 50 to 2000; 0 if it is quiet or no tone stands out (noise, speech between two syllables) |
 | `MIC_FFT(bands)` | fills an `ARRAY OF FLOAT` with band levels 0..1, spread logarithmically, with afterglow and its own gain — the same calculation as `AUDIO_FFT`, but from the input |
@@ -110,7 +110,7 @@ PLAYSOUND(s)
 
 ## Testing without a microphone
 
-`DHRT_MIKROFON=datei.wav` turns a WAV file into a microphone: it is then the
+`DHRT_MICROPHONE=datei.wav` turns a WAV file into a microphone: it is then the
 only device (`Datei: name.wav`) and is fed in real time and in a loop —
 through the same path as the values of a real device. That is how
 `tests/pruef/ton/mikrofon.dhtest` tests level, pitch, spectrum, waveform and

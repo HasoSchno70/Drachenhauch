@@ -11,7 +11,7 @@ DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
 DIM f AS INTEGER
 FOR f = 1 TO 2
     GUI_UPDATE()
-    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    PRINT "O " + STR$(GUI_CANVAS_SCREEN_X(nullpunkt)) + " " + STR$(GUI_CANVAS_SCREEN_Y(nullpunkt))
     GUI_DRAW()
     FLIP()
 NEXT
@@ -153,7 +153,7 @@ kacheln
 TRUE TRUE TRUE
 GUI_IMAGE_MODE: 'schief' ist kein Modus -- strecken, einpassen, fuellen, mitte oder kacheln
 GUI_TREE_ICON: ungueltige Knoten-id 7
-GUI_PROGRESS_SET: unbekannter Schluessel 'farbe' -- erwartet unbestimmt oder kreis
+GUI_PROGRESS_SET: unbekannter Schluessel 'farbe' -- moeglich sind unbestimmt/indeterminate, kreis/circle
 gezeichnet
 
 === panel rollt und klemmt
@@ -204,7 +204,7 @@ DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
 DIM f AS INTEGER
 FOR f = 1 TO 2
     GUI_UPDATE()
-    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    PRINT "O " + STR$(GUI_CANVAS_SCREEN_X(nullpunkt)) + " " + STR$(GUI_CANVAS_SCREEN_Y(nullpunkt))
     GUI_DRAW()
     FLIP()
 NEXT
@@ -266,7 +266,7 @@ DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
 DIM f AS INTEGER
 FOR f = 1 TO 2
     GUI_UPDATE()
-    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    PRINT "O " + STR$(GUI_CANVAS_SCREEN_X(nullpunkt)) + " " + STR$(GUI_CANVAS_SCREEN_Y(nullpunkt))
     GUI_DRAW()
     FLIP()
 NEXT
@@ -345,7 +345,7 @@ DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
 DIM f AS INTEGER
 FOR f = 1 TO 2
     GUI_UPDATE()
-    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    PRINT "O " + STR$(GUI_CANVAS_SCREEN_X(nullpunkt)) + " " + STR$(GUI_CANVAS_SCREEN_Y(nullpunkt))
     GUI_DRAW()
     FLIP()
 NEXT
@@ -424,7 +424,7 @@ DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
 DIM f AS INTEGER
 FOR f = 1 TO 2
     GUI_UPDATE()
-    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    PRINT "O " + STR$(GUI_CANVAS_SCREEN_X(nullpunkt)) + " " + STR$(GUI_CANVAS_SCREEN_Y(nullpunkt))
     GUI_DRAW()
     FLIP()
 NEXT
@@ -490,7 +490,7 @@ DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
 DIM f AS INTEGER
 FOR f = 1 TO 2
     GUI_UPDATE()
-    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    PRINT "O " + STR$(GUI_CANVAS_SCREEN_X(nullpunkt)) + " " + STR$(GUI_CANVAS_SCREEN_Y(nullpunkt))
     GUI_DRAW()
     FLIP()
 NEXT

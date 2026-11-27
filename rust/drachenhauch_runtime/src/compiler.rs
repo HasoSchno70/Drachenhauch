@@ -113,7 +113,7 @@ mod oc {
     /// unter dem Namen angelegten Eintrag auch in den globalen Platz haengen
     /// (dasselbe Objekt). Danach laufen alle Zugriffe ueber den Platz.
     pub const BIND_GLOBAL_SLOT: i64 = 122;
-    /// Nur mit `DHRT_TYPEN_PRUEFEN=1`: prueft, ob der Wert oben auf dem Stapel
+    /// Nur mit `DHRT_CHECK_TYPES=1`: prueft, ob der Wert oben auf dem Stapel
     /// den Typ hat, den `typ_von` ihm zuschreibt (Arg = Konstante mit der
     /// Angabe). Der Wert bleibt liegen.
     pub const TYP_PRUEFEN: i64 = 123;
@@ -437,7 +437,7 @@ struct FfiDecl {
 }
 
 pub struct Compiler {
-    /// `DHRT_TYPEN_PRUEFEN=1`: hinter jeden getypten Ausdruck eine Probe.
+    /// `DHRT_CHECK_TYPES=1`: hinter jeden getypten Ausdruck eine Probe.
     typen_pruefen: bool,
     /// `dhrt --typen`: (Zeile, Ausdruck, Typ) je uebersetztem Ausdruck.
     typen_liste: Option<Vec<(u32, String, String)>>,
@@ -514,6 +514,10 @@ pub struct Compiler {
     // Builtins, das dhrt gar nicht kennt (Tippfehler / nur Tree-Walker). Werden
     // von `--check` als severity:"warning" gemeldet, blockieren NICHT.
     warnings: Vec<(u32, String)>,
+    // Fehler, nach denen das Uebersetzen trotzdem weiterlaeuft (eine falsche
+    // Argumentzahl): am Ende ist der erste DER Fehler, `--check` zeigt alle
+    // (`weitere_fehler`). Ohne das saehe der Editor nur den ersten.
+    spaete_fehler: Vec<(u32, String)>,
     // Laufvariablen von FOR EACH ueber Structs, deren Schleife gerade
     // uebersetzt wird: sie halten eine KOPIE des Elements -- ein Feld
     // daran zu schreiben ginge ins Leere und ist darum eine Meldung.
@@ -543,24 +547,14 @@ pub struct Compiler {
 fn known_builtins() -> &'static std::collections::HashSet<String> {
     use std::sync::OnceLock;
     static SET: OnceLock<std::collections::HashSet<String>> = OnceLock::new();
-    SET.get_or_init(|| {
-        let raw = include_str!("../../../daten/builtin_index.json");
-        let mut s = std::collections::HashSet::new();
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
-            if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {
-                for e in arr {
-                    if let Some(n) = e.get("name").and_then(|n| n.as_str()) {
-                        s.insert(n.to_lowercase());
-                    }
-                }
-            }
-        }
-        s
-    })
+    SET.get_or_init(|| builtin_eintraege().iter().map(|(n, _, _)| n.to_lowercase()).collect())
 }
 
 /// Alle Eintraege des Index `(Name, Signatur, Modul)`, Name wie eingetragen
-/// (gross) -- fuer den Sprachserver (`lsp.rs`) und `dhrt doku`.
+/// (gross). Die EINE Stelle, die `builtin_index.json` liest -- bis 2026.53
+/// parsten ihn vier Funktionen je fuer sich (Bericht A20.2); Namen,
+/// Argumentzahl, Module, Handles (`handle.rs`), Sprachserver und `dhrt doku`
+/// gehen hierueber.
 pub(crate) fn builtin_eintraege() -> &'static Vec<(String, String, String)> {
     use std::sync::OnceLock;
     static V: OnceLock<Vec<(String, String, String)>> = OnceLock::new();
@@ -597,21 +591,9 @@ pub(crate) fn builtin_eintraege() -> &'static Vec<(String, String, String)> {
 fn builtin_arity() -> &'static std::collections::HashMap<String, (usize, usize)> {
     use std::sync::OnceLock;
     static MAP: OnceLock<std::collections::HashMap<String, (usize, usize)>> = OnceLock::new();
-    MAP.get_or_init(|| {
-        let raw = include_str!("../../../daten/builtin_index.json");
-        let mut m = std::collections::HashMap::new();
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
-            if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {
-                for e in arr {
-                    let (Some(n), Some(sig)) = (e.get("name").and_then(|n| n.as_str()),
-                                                e.get("signature").and_then(|s| s.as_str()))
-                    else { continue };
-                    if let Some(mm) = parse_arity(sig) { m.insert(n.to_lowercase(), mm); }
-                }
-            }
-        }
-        m
-    })
+    MAP.get_or_init(|| builtin_eintraege().iter()
+        .filter_map(|(n, sig, _)| parse_arity(sig).map(|mm| (n.to_lowercase(), mm)))
+        .collect())
 }
 
 /// Eine Signatur in (min, max) Argumente uebersetzen. `None` = nicht sicher
@@ -639,7 +621,7 @@ fn parse_arity(sig: &str) -> Option<(usize, usize)> {
     if inner.is_empty() { return Some((0, 0)); }
     if inner.contains('*') { return None; }             // *args
 
-    // "6..8 Argumente" / "7 Argumente"
+    // "6..8 Argumente" / "7 Argumente" (Signaturform im Index)
     if let Some(rest) = inner.strip_suffix("Argumente").or_else(|| inner.strip_suffix("Argument")) {
         let r = rest.trim();
         if let Some((a, b)) = r.split_once("..") {
@@ -795,7 +777,7 @@ fn builtin_params() -> &'static std::collections::HashMap<String, (Vec<BuiltinPa
         for (n, sig, _) in builtin_eintraege() {
             let Some(p) = signatur_params(sig) else { continue };
             let n = n.to_lowercase();
-            if let Some(alt) = crate::namen::bisher(&n) {
+            if let Some(alt) = crate::namen::kanonisch(&n) {
                 m.entry(alt.to_string()).or_insert_with(|| p.clone());
             }
             m.insert(n, p);
@@ -821,7 +803,8 @@ fn builtin_params_von(name: &str, kanonisch: &str) -> Option<&'static (Vec<Built
 }
 
 /// Herkunfts-Modul je Builtin (lowercase), aus `builtin_index.json`. `core`
-/// und `dhrt` bedeuten "kein IMPORT noetig" und stehen darum NICHT drin.
+/// heisst "kein IMPORT noetig" und steht darum NICHT drin (bis 2026.53 stand
+/// fuer dasselbe auch `dhrt` im Index, Bericht B7).
 ///
 /// Warum das ueberhaupt geprueft wird: dhrt kennt alle Module nativ, ein
 /// `IMPORT "vec2"` wird vom Preprocessor zu einem Kommentar. `VEC2_NEW(...)`
@@ -834,22 +817,10 @@ fn builtin_params_von(name: &str, kanonisch: &str) -> Option<&'static (Vec<Built
 fn builtin_modul() -> &'static std::collections::HashMap<String, String> {
     use std::sync::OnceLock;
     static MAP: OnceLock<std::collections::HashMap<String, String>> = OnceLock::new();
-    MAP.get_or_init(|| {
-        let raw = include_str!("../../../daten/builtin_index.json");
-        let mut m = std::collections::HashMap::new();
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
-            if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {
-                for e in arr {
-                    let (Some(n), Some(modul)) = (e.get("name").and_then(|n| n.as_str()),
-                                                  e.get("module").and_then(|s| s.as_str()))
-                    else { continue };
-                    if modul == "core" || modul == "dhrt" { continue; }
-                    m.insert(n.to_lowercase(), modul.to_lowercase());
-                }
-            }
-        }
-        m
-    })
+    MAP.get_or_init(|| builtin_eintraege().iter()
+        .filter(|(_, _, m)| m != "core")
+        .map(|(n, _, m)| (n.to_lowercase(), m.to_lowercase()))
+        .collect())
 }
 
 /// Das Modul eines Befehls laut Index (klein), ohne `core`/`dhrt` --
@@ -858,15 +829,69 @@ pub(crate) fn modul_von_builtin(name: &str) -> Option<String> {
     builtin_modul().get(&name.to_lowercase()).cloned()
 }
 
-/// "3", "3 bis 4" bzw. "mindestens 3" -- fuer lesbare Meldungen.
+/// Zweitnamen fuer Parameter von Befehlen (Rangliste Punkt 9, B6). Die
+/// Parameternamen im Index sind zugesagt (docs/stabilitaet.md) -- auch die
+/// uneinheitlichen: `FILE_EXISTS(p)` neben `FILE_SIZE(path)`, `ROUND(x,
+/// digits)` neben `NUMFMT$(x, decimals)`, `SQR(v)` neben `SQRT(number)`.
+/// Statt sie umzubenennen, nimmt ein benanntes Argument auch den anderen
+/// Namen derselben Gruppe -- aber nur, wenn der geschriebene Name selbst
+/// kein Parameter ist und genau einer der Gruppe passt.
+const PARAM_ZWEITNAMEN: &[&[&str]] = &[
+    &["path", "p"],
+    &["digits", "decimals"],
+    &["volume", "vol", "v"],
+    &["count", "n"],
+    &["number", "v"],
+    &["waveform", "wf"],
+    &["old", "alt"],
+    &["handler", "fn"],
+    &["on", "flag"],
+    &["bind_addr", "bind"],
+    &["widget", "wdg"],
+    // AUDIO_SFX hiess "atk, sus, dec, vib_d, vib_s" -- "sus" ist dort eine
+    // Zeit, bei AUDIO_NOTE ein Pegel (Bericht A8.6); die alten Namen bleiben.
+    &["attack_ms", "atk"],
+    &["sustain_ms", "sus"],
+    &["decay_ms", "dec"],
+    &["vib_depth", "vib_d"],
+    &["vib_speed", "vib_s"],
+    // PDF misst in Millimetern und sagt es im Namen; `x:` meint dasselbe.
+    &["x_mm", "x"],
+    &["y_mm", "y"],
+    // Handles: die kurzen Namen aelterer Befehle (Bericht B6.3).
+    &["handle", "h"],
+    &["conn", "c"],
+    &["result", "r"],
+    // GUI_TEXTAREA_SELECT hiess "z1, s1, z2, s2" (Zeile, Spalte).
+    &["line1", "z1"],
+    &["column1", "s1"],
+    &["line2", "z2"],
+    &["column2", "s2"],
+    // FONT_SET hiess "handle", SETFONT (der alte Name) schon immer "font".
+    &["font", "handle"],
+];
+
+/// Die Stelle des Parameters, den `key` ueber einen Zweitnamen meint.
+/// Ein Name darf in mehreren Gruppen stehen (`v` = volume oder number):
+/// gesucht wird in allen, und nur ein eindeutiger Treffer zaehlt.
+fn param_zweitname<'a>(namen: impl Iterator<Item = &'a str> + Clone, key: &str) -> Option<usize> {
+    let mut treffer = namen.enumerate().filter(|(_, n)| *n != key
+        && PARAM_ZWEITNAMEN.iter().any(|g| g.contains(&key) && g.contains(n)));
+    let erster = treffer.next()?;
+    if treffer.next().is_some() { return None; }
+    Some(erster.0)
+}
+
+/// "3 Argument(e)", "3 bis 4 Argumente" bzw. "mindestens 3 Argument(e)" --
+/// dieselben drei Formen wie die Meldungen der Laufzeit.
 ///
 /// Variadische Signaturen ("...") liefern `usize::MAX` als Obergrenze. Ohne den
 /// mittleren Zweig stand die dann ausgeschrieben in der Meldung:
 /// "erwartet werden 2 bis 18446744073709551615".
 fn arity_text(min: usize, max: usize) -> String {
-    if min == max { format!("{}", min) }
-    else if max == usize::MAX { format!("mindestens {}", min) }
-    else { format!("{} bis {}", min, max) }
+    if min == max { format!("{} Argument(e)", min) }
+    else if max == usize::MAX { format!("mindestens {} Argument(e)", min) }
+    else { format!("{} bis {} Argumente", min, max) }
 }
 
 /// Builtins, die laut Index Text liefern (`... AS STRING` / `-> STRING`).
@@ -893,14 +918,14 @@ fn builtin_liefert_text(name: &str) -> bool {
 ///   der keinen Text liefert (`LEN$`), bleibt ein Fehler.
 pub(crate) fn builtin_kanonisch(name: &str) -> String {
     let low = name.to_lowercase();
-    if let Some(b) = crate::namen::bisher(&low) { return b.to_string(); }
+    if let Some(b) = crate::namen::kanonisch(&low) { return b.to_string(); }
     if is_known_builtin(&low) { return name.to_string(); }
     if let Some(ohne) = low.strip_suffix('$') {
-        let ziel = crate::namen::bisher(ohne).map(str::to_string).unwrap_or_else(|| ohne.to_string());
+        let ziel = crate::namen::kanonisch(ohne).map(str::to_string).unwrap_or_else(|| ohne.to_string());
         if known_builtins().contains(&ziel) && builtin_liefert_text(&ziel) { return ziel; }
     } else {
         let mit = format!("{}$", low);
-        if let Some(b) = crate::namen::bisher(&mit) { return b.to_string(); }
+        if let Some(b) = crate::namen::kanonisch(&mit) { return b.to_string(); }
         if known_builtins().contains(&mit) { return mit; }
     }
     name.to_string()
@@ -930,8 +955,8 @@ impl Compiler {
     fn new(external_types: std::collections::HashSet<String>,
            builtin_aliases: Vec<(String, String)>,
            importierte_module: std::collections::HashSet<String>) -> Self {
-        Compiler { typen_pruefen: std::env::var_os("DHRT_TYPEN_PRUEFEN").is_some(),
-                   typen_liste: std::env::var_os("DHRT_TYPEN_LISTE").map(|_| Vec::new()),
+        Compiler { typen_pruefen: crate::umgebung::var_os("DHRT_CHECK_TYPES").is_some(),
+                   typen_liste: crate::umgebung::var_os("DHRT_TYPES_LIST").map(|_| Vec::new()),
                    bekannte_namen: std::collections::HashSet::new(),
                    offene_namen: Vec::new(),
                    // Platz 0 gehoert dem Hauptprogramm. Es hat keine
@@ -954,7 +979,7 @@ impl Compiler {
                    gemeldete_module: std::collections::HashSet::new(),
                    enum_decls: HashMap::new(), enum_werte: HashMap::new(), global_types: HashMap::new(), konst_werte: HashMap::new(),
                    ctx: Ctx::new(), err_line: 0, stmt_nr: 0,
-                   warnings: vec![], foreach_kopien: vec![] }
+                   warnings: vec![], spaete_fehler: vec![], foreach_kopien: vec![] }
     }
 
     /// Bekannter skalarer DIM-Typ: Werttyp ODER importierter externer Modul-Typ.
@@ -1497,12 +1522,11 @@ impl Compiler {
                 "DECLARE ... LIB gehoert auf die oberste Ebene des Programms, nicht in ein Unterprogramm oder einen Block".into()),
             Node::StructLayout { .. } => Err(
                 "STRUCT ... LAYOUT C gehoert auf die oberste Ebene des Programms, nicht in ein Unterprogramm oder einen Block".into()),
-            Node::FunctionDecl { .. } | Node::SubDecl { .. } | Node::ClassDecl { .. }
-            | Node::EnumDecl { .. } => Err(format!(
+            Node::FunctionDecl { .. } | Node::SubDecl { .. } | Node::ClassDecl { .. } => Err(format!(
                 "{} darf nicht innerhalb eines Unterprogramms oder Blocks stehen -- \
-                 SUB, FUNCTION, CLASS, STRUCT und ENUM gehoeren auf die oberste Ebene des Programms",
+                 SUB, FUNCTION, CLASS und STRUCT gehoeren auf die oberste Ebene des Programms",
                 other_name(s))),
-            other => Err(format!("Stufe 3e: Statement {} noch nicht unterstuetzt",
+            other => Err(format!("interner Fehler des Uebersetzers: die Anweisung {} kennt er nicht -- bitte als Fehler in dhrt melden",
                                  node_name(other))),
         }
     }
@@ -1559,11 +1583,10 @@ impl Compiler {
     }
 
     fn typ_klartext(t: &str) -> String {
-        // Gross geschrieben, weil der Compiler Typnamen klein ablegt, sie im
-        // Quelltext aber ueberall gross stehen (DIM x AS INTEGER).
-        if let Some(e) = t.strip_prefix("array:") { return format!("ARRAY OF {}", e.to_uppercase()); }
-        if let Some(e) = t.strip_prefix("map:") { return format!("MAP OF {}", e.to_uppercase()); }
-        t.to_uppercase()
+        // Dieselbe Schreibweise wie die Laufzeit (`vm_helfer::typ_lesbar`,
+        // rekursiv): bis 2026.53 sagte --check "ARRAY OF ARRAY:INTEGER", die
+        // Laufzeit "ARRAY OF ARRAY OF INTEGER" (Bericht A20.2).
+        crate::vm::typ_lesbar(t)
     }
 
     /// Zweites DIM desselben Namens mit ANDEREM Typ melden.
@@ -1668,7 +1691,7 @@ impl Compiler {
     /// Der Typ, den ein Ausdruck ZUR LAUFZEIT hat -- fuer den Code, nicht
     /// fuer Meldungen (M1, `docs/intern/entwurf-maschinencode.md`). Anders als
     /// `statischer_typ` muss hier jede Aussage stimmen; `Typ::Unbekannt` ist
-    /// immer erlaubt. Belegt wird das mit `DHRT_TYPEN_PRUEFEN=1`: dann steht
+    /// immer erlaubt. Belegt wird das mit `DHRT_CHECK_TYPES=1`: dann steht
     /// hinter jedem getypten Ausdruck eine Probe (`TYP_PRUEFEN`).
     ///
     /// Zwei Stellen, an denen `statischer_typ` fuer Warnungen bewusst
@@ -3557,6 +3580,7 @@ impl Compiler {
             }
             Node::IsTyp { wert, typ } => {
                 let t = typ.to_lowercase();
+                let t = crate::namen::typ(&t).map(str::to_string).unwrap_or(t);
                 if !self.is_typname_bekannt(&t) {
                     // Eine Variable rechts: gemeint ist meist "dasselbe Objekt",
                     // und das fragt `=` (Glutfaden, 2026-10-15 -- vorher hiess es
@@ -3600,7 +3624,7 @@ impl Compiler {
             }
             Node::DictComp { var, iterable, filter, key, value } =>
                 self.expr_dictcomp(var, iterable, filter, key, value),
-            other => Err(format!("Stufe 3e: Ausdruck {} noch nicht unterstuetzt",
+            other => Err(format!("interner Fehler des Uebersetzers: den Ausdruck {} kennt er nicht -- bitte als Fehler in dhrt melden",
                                  node_name(other))),
         }
     }
@@ -3798,7 +3822,8 @@ impl Compiler {
         for a in &args[n_pos..] {
             let Node::NamedArg { name: an, value } = a else { continue };
             let key = an.trim_end_matches('$').to_lowercase();
-            let Some(i) = params.iter().position(|p| p.name == key) else {
+            let Some(i) = params.iter().position(|p| p.name == key)
+                .or_else(|| param_zweitname(params.iter().map(|p| p.name.as_str()), &key)) else {
                 let hinweis = crate::aehnlich::hinweis_klein(&key, params.iter().map(|p| p.name.as_str()));
                 return Err(format!("{}: kein Parameter '{}'.{} Die Parameter heissen {}",
                     gross, an, hinweis, liste()));
@@ -4099,7 +4124,7 @@ impl Compiler {
             // Hier als nicht-fatale Warnung melden (--check zeigt es im Editor).
             if !is_known_builtin(&bname) {
                 self.warnings.push((self.ctx.cur_line, format!(
-                    "Unbekanntes Builtin '{}' -- dhrt kennt es nicht (Tippfehler? \
+                    "Unbekannter Befehl '{}' -- dhrt kennt ihn nicht (Tippfehler? \
                      oder veraltet/entfernt). Der Aufruf schlaegt sonst \
                      erst zur Laufzeit fehl.{}{}", bname.to_uppercase(),
                     match crate::umstieg::befehl(&bname.to_lowercase()) {
@@ -4131,7 +4156,7 @@ impl Compiler {
             // Compiler kann nicht wissen, welcher Fall vorliegt:
             //
             //   * die 661 Builtins in `builtins.rs` pruefen mit `arity!` und
-            //     BRECHEN AB ("MID$: erwartet 2..3 Argumente, erhalten 4"),
+            //     BRECHEN AB ("MID$: erwartet 2 bis 3 Argumente, erhalten 4"),
             //   * alles was ueber `try_*` in `vm.rs` laeuft (Grafik, gui, db,
             //     zeit, ...) greift seine Argumente per Index ab und
             //     IGNORIERT den Rest stillschweigend.
@@ -4145,17 +4170,33 @@ impl Compiler {
             // Ein Verhaltensbit im Index waere die genauere Variante -- aber
             // auch wieder eine von Hand gepflegte Liste neben dem Quelltext.
             else if let Some(&(min, max)) = builtin_arity().get(&bname) {
+                // Seit 2026.54 ein Fehler beim Uebersetzen (bis dahin eine
+                // Warnung): zu viele brachen bei zwei Dritteln der Builtins zur
+                // Laufzeit ab und wurden beim Rest still verworfen, zu wenige
+                // brachen immer ab -- beides erst, wenn die Zeile lief.
                 let n = args.len();
-                if n > max {
-                    self.warnings.push((self.ctx.cur_line, format!(
-                        "{}: {} Argumente uebergeben, erwartet werden {} -- die \
-                         ueberzaehligen weglassen (viele Builtins brechen sonst \
-                         zur Laufzeit ab).",
-                        anzeige, n, arity_text(min, max))));
-                } else if n < min {
-                    self.warnings.push((self.ctx.cur_line, format!(
-                        "{}: nur {} Argument(e) uebergeben, erwartet werden {}.",
-                        anzeige, n, arity_text(min, max))));
+                if n > max || n < min {
+                    // Mit der Aufrufform aus dem Index (wie die Laufzeit) und
+                    // dem Hinweis fuer Umsteiger (RGB("FF0000")).
+                    let mut m = crate::vm::mit_signatur(&format!("{}: erwartet {}, erhalten {}",
+                        anzeige.to_uppercase(), arity_text(min, max), n));
+                    if let Some(Node::StringLit(t)) = args.first() {
+                        m.push_str(&crate::umstieg::text_statt_zahl(&bname, t));
+                    }
+                    self.spaete_fehler.push((self.ctx.cur_line, m));
+                }
+            }
+            // Ein Handle an einem Parameter einer anderen Art (ein PDF an
+            // XLSX_*): die Laufzeit bricht dort ab (`handle.rs`); kennt der
+            // Compiler die Art der Variablen schon, sagt er es vorher.
+            if let Some(hb) = crate::handle::tafel().get(&bname) {
+                for &(stelle, soll) in &hb.nimmt {
+                    let Some(arg) = args.get(stelle) else { continue };
+                    let Some(ist) = self.statischer_typ(arg).and_then(|t| crate::handle::art(&t)) else { continue };
+                    if ist != soll {
+                        self.warnings.push((self.ctx.cur_line,
+                            crate::handle::verwechselt(&anzeige, stelle, soll, ist)));
+                    }
                 }
             }
             // Gehoert der Befehl zu einem Modul, das nicht importiert ist?
@@ -6763,7 +6804,7 @@ fn node_name(n: &Node) -> &'static str {
 /// fuer `IMPORT "json" AS j` (Builtin-Namen-Rueckabbildung). Beide aus
 /// preprocess::compile_env. Fehler bei nicht unterstuetzten Konstrukten.
 /// Uebersetzt ein Programm ins .dhc-JSON (fuer `--export`, `--dumpbc`, `--check`).
-pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<String>,
+pub fn compile_to_dhc(ast: &Node, external_types: &std::collections::HashSet<String>,
                       builtin_aliases: &[(String, String)],
                       importierte_module: &std::collections::HashSet<String>,
                       herkunft: &[crate::preprocess::Herkunft], haupt: &str)
@@ -6783,12 +6824,23 @@ pub fn compile_to_program(ast: &Node, external_types: &std::collections::HashSet
     Ok((c.finish_direkt(data), warnings))
 }
 
+thread_local! {
+    /// Die Fehler hinter dem ersten aus `spaete_fehler` -- `--check` holt sie
+    /// nach dem gescheiterten Uebersetzen ab (`weitere_fehler`).
+    static WEITERE_FEHLER: std::cell::RefCell<Vec<(u32, String)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+/// Die weiteren Fehler des letzten gescheiterten Uebersetzens (und leert sie).
+pub fn weitere_fehler() -> Vec<(u32, String)> {
+    WEITERE_FEHLER.with(|w| std::mem::take(&mut *w.borrow_mut()))
+}
+
 #[allow(clippy::type_complexity)]
 fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
                builtin_aliases: &[(String, String)],
                importierte_module: &std::collections::HashSet<String>,
                herkunft: &[crate::preprocess::Herkunft], haupt: &str)
     -> Result<(Compiler, Vec<Value>, Vec<(u32, String)>), (u32, String)> {
+    WEITERE_FEHLER.with(|w| w.borrow_mut().clear());
     let stmts = match ast {
         Node::Program { statements } => statements,
         _ => return Err((0, "Erwartet Program-Knoten".into())),
@@ -6985,6 +7037,16 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
         collect_data(stmts, &mut data)?;
         Ok(())
     })();
+    let outcome = match outcome {
+        Ok(()) if !c.spaete_fehler.is_empty() => {
+            let mut alle = std::mem::take(&mut c.spaete_fehler);
+            let erster = alle.remove(0);
+            WEITERE_FEHLER.with(|w| *w.borrow_mut() = alle);
+            c.err_line = erster.0;
+            Err(erster.1)
+        }
+        o => o,
+    };
     match outcome {
         Ok(()) => {
             // Erst JETZT -- vorher weiss niemand, ob ein Name weiter unten

@@ -53,7 +53,9 @@ impl Knoten {
 
     pub fn anzahl_kinder(&self) -> usize { self.kinder().count() }
 
-    /// Der unmittelbare Text dieses Elements (ohne den seiner Kinder).
+    /// Der unmittelbare Text dieses Elements (ohne den seiner Kinder) -- nur
+    /// fuer die Tests; die Befehle nehmen den ganzen Text.
+    #[cfg(test)]
     pub fn text(&self) -> String {
         self.teile.iter().filter_map(|t| match t { Teil::Text(s) => Some(s.as_str()), _ => None })
             .collect::<Vec<_>>().join("")

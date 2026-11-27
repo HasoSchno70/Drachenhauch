@@ -72,7 +72,7 @@ CATCH e2
 END TRY
 --- enthaelt
 blinkt TRUE
-'farbe blau' -- erwartet farbe #RRGGBB
+'farbe blau' -- erwartet farbe #RGB oder #RRGGBB
 'deckkraft halb' -- erwartet name zahl
 
 === im renderziel faerbt der ablauf den knopf und was danach kommt bleibt im ziel

@@ -48,7 +48,7 @@ importierenden Datei aus nach oben. Die genaue Reihenfolge steht in der
 
 1. neben der importierenden Datei (eine eigene Kopie gewinnt immer),
 2. `pakete/` von dort aus nach oben,
-3. `DH_PATH`, dann die Bibliothek im Benutzerordner.
+3. `DHRT_PATH`, dann die Bibliothek im Benutzerordner.
 
 ## Die zwei Dateien
 

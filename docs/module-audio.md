@@ -18,14 +18,13 @@ Programm einstellen koennte.
 | Funktion | Wirkung |
 |---|---|
 | `AUDIO_INIT([frequency[, channels[, buffer]]])` | stellt sicher, dass das Audio-System laeuft. **Nimmt Argumente entgegen und ignoriert sie** -- sie stammen aus der Mixer-Zeit und sind nur der Vertraeglichkeit halber geduldet |
-| `AUDIO_SET_NUM_CHANNELS(n)` | Anzahl gleichzeitiger Kanaele (Vorgabe **16**, hoch fuer Bullet-Hell) |
-| `AUDIO_NUM_CHANNELS()` → INTEGER | aktuelle Channel-Anzahl |
+| `AUDIO_SET_NUM_CHANNELS(n)` | merkt sich die Zahl für `AUDIO_NUM_CHANNELS` -- **begrenzt nichts**: Kira spielt so viele Klänge gleichzeitig, wie gestartet werden (ein Rest aus der Mixer-Zeit) |
+| `AUDIO_NUM_CHANNELS()` → INTEGER | die gemerkte Zahl (Vorgabe 16) |
 | `AUDIO_BUSY_CHANNELS()` → INTEGER | wie viele Channels gerade spielen |
 
-```basic
-AUDIO_INIT(48000, 2, 256)         ' niedrige Latenz fuer Action
-AUDIO_SET_NUM_CHANNELS(32)        ' 32 Sounds gleichzeitig moeglich
-```
+Latenz und Stimmenzahl stellt ein Programm also nicht ein; `AUDIO_INIT()`
+ohne Argumente startet den Ton vorab (sonst startet ihn der erste
+Ton-Befehl).
 
 ## Sound-Playback
 
@@ -38,6 +37,8 @@ Spielt einen SOUND ab und liefert einen Channel-Handle zurueck. Mit dem kann man
 | Funktion | Wirkung |
 |---|---|
 | `AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms[, easing$]]]])` → AUDIO_CHANNEL | Sound starten |
+| `AUDIO_PLAY_VOICE(sound[, volume[, loops]])` → AUDIO_CHANNEL | den Klang als weitere Stimme spielen -- eine laufende klingt weiter (`AUDIO_PLAY` schneidet sie ab); `AUDIO_STOP` stoppt alle |
+| `AUDIO_VOICE_COUNT(sound)` → INTEGER | wie viele Stimmen dieses Klangs gerade klingen |
 | `AUDIO_PAUSE(ch)` | Channel pausieren |
 | `AUDIO_RESUME(ch)` | wieder weiter |
 | `AUDIO_STOP(ch[, fade_out_ms[, easing$]])` | Channel stoppen, optional ausfaden |
@@ -45,7 +46,7 @@ Spielt einen SOUND ab und liefert einen Channel-Handle zurueck. Mit dem kann man
 | `AUDIO_IS_WAITING(sound)` → BOOLEAN | mit `AUDIO_PLAY_AT` geplant, aber die Uhr hat den Tick noch nicht erreicht |
 | `AUDIO_VOLUME(ch, volume)` | Lautstaerke 0..1 setzen |
 | `AUDIO_GET_VOLUME(ch)` → FLOAT | aktuelle Lautstaerke |
-| `AUDIO_PAN(ch, left, right)` | Stereo-Pan (beide 0..1) |
+| `AUDIO_PAN(ch, left, right)` | Pegel links und rechts (beide 0..1) -- setzt damit auch die Lautstärke (die größere der beiden); nur die Lage: `AUDIO_SET_PAN` |
 | `AUDIO_PITCH(ch, factor)` | Tonhoehe/Geschwindigkeit: 1.0 = normal, 2.0 = Oktave hoeher, 0.5 = tiefer |
 
 **Pause/Resume global:**
@@ -99,9 +100,12 @@ pro Frame (FLIP), nicht-blockierend:
 
 | Funktion | Wirkung |
 |---|---|
-| `AUDIO_PAN_POS(ch, p)` | Position direkt setzen (beendet eine laufende Animation) |
+| `AUDIO_PAN_POS(ch, p)` | Position direkt setzen, 0 = links .. 1 = rechts (beendet eine laufende Animation) |
+| `AUDIO_SET_PAN(ch, pan)` | Position in der Skala -1 (links) .. 0 (Mitte) .. 1 (rechts) wie `AUDIO_BUS_PAN` und `AUDIO_SOUND_MIX` |
 | `AUDIO_PAN_SLIDE(ch, from, to, duration_ms[, easing$])` | einmalige Wanderung von → nach; bleibt am Ziel stehen |
+| `AUDIO_SET_PAN_SLIDE(ch, from, to, duration_ms[, easing$])` | dieselbe Wanderung in der Skala -1..1 |
 | `AUDIO_AUTOPAN(ch, period_s[, depth])` | endloses Pendeln links↔rechts (startet links); `depth` 0..1 = Auslenkung um die Mitte, `period_s <= 0` schaltet ab |
+| `AUDIO_AUTOPAN_MS(ch, period_ms[, depth])` | wie `AUDIO_AUTOPAN`, die Periode in Millisekunden |
 
 ```basic
 DIM ton AS SOUND
@@ -154,7 +158,7 @@ Demo: [examples/160_musik_seek.dh](../examples/160_musik_seek.dh) — klickbarer
 
 * **MOD/XM können es nicht** und sagen es auch. Ihre Zeitachse sind Pattern und Zeilen, nicht Sekunden; wie lange bis zu einer Stelle vergeht, hängt an Tempowechseln im Stück selbst. `AUDIO_MUSIC_POSITION()` liefert für Module trotzdem Sekunden — mitzählen geht, anspringen nicht.
 
-**Formate:** `.ogg`, `.mp3`, `.qoa` — **und Tracker-Module `.mod` (ProTracker/Amiga) + `.xm` (FastTracker II)**. Module enthalten ihre eigenen Samples + Pattern-Daten und werden in **Echtzeit gestreamt**: ein eigener Kira-Sound (`ModuleSound` in `audio.rs`) treibt den reinen Rust-Player [`xmrs`/`xmrsplayer`](https://crates.io/crates/xmrs) auf dem Audio-Thread -- 4+ Kanaele, Sample-basiert, mit exaktem Endlos-Loopen. (Bis 2026-06-13 uebernahm das raylib; seit dem Wechsel auf Kira laeuft es ueber den eigenen Player.) Einfach ein `.mod`/`.xm` (z.B. von [modarchive.org](https://modarchive.org)) laden:
+**Formate:** `.ogg`, `.mp3`, `.flac` — **und Tracker-Module `.mod` (ProTracker/Amiga) + `.xm` (FastTracker II)**. Module enthalten ihre eigenen Samples + Pattern-Daten und werden in **Echtzeit gestreamt**: ein eigener Kira-Sound (`ModuleSound` in `audio.rs`) treibt den reinen Rust-Player [`xmrs`/`xmrsplayer`](https://crates.io/crates/xmrs) auf dem Audio-Thread -- 4+ Kanaele, Sample-basiert, mit exaktem Endlos-Loopen. (Bis 2026-06-13 uebernahm das raylib; seit dem Wechsel auf Kira laeuft es ueber den eigenen Player.) Einfach ein `.mod`/`.xm` (z.B. von [modarchive.org](https://modarchive.org)) laden:
 
 ```basic
 AUDIO_MUSIC_LOAD("song.mod")
@@ -366,13 +370,14 @@ Drum-Sample wird so ein ganzes Instrument.
 
 | Funktion | Wirkung |
 |---|---|
-| `SAMPLE_LOAD(path$)` → SAMPLE | WAV/OGG/QOA laden, auf Mono normalisiert |
+| `SAMPLE_LOAD(path$)` → SAMPLE | WAV/OGG laden, auf Mono normalisiert |
 | `SAMPLE_FREE(sample)` | die Daten des Samples freigeben — was schon klingt, klingt zu Ende; doppelt freigeben ist still |
 | `SAMPLE_FROM_BUFFER(buffer, sample_rate)` → SAMPLE | Sample aus rohem 16-Bit-PCM (little endian, vorzeichenbehaftet, mono) |
 | `SAMPLE_FROM_SOUND(sound)` → SAMPLE | ein SOUND (aus `SPEAK_SOUND`, `AUDIO_NOTE`, `LOADSOUND` ...) als Sample, Kanäle auf Mono gemittelt, Abtastrate übernommen |
-| `SAMPLE_PLAY(sample, semitones, vol[, dur_ms])` → AUDIO_CHANNEL | bei relativer Tonhoehe abspielen |
+| `SAMPLE_PLAY(sample, semitones[, vol[, dur_ms]])` → AUDIO_CHANNEL | bei relativer Tonhoehe abspielen |
 | `SAMPLE_NOTE(sample, semitones, duration_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_semitones])` → SOUND | eine Note als Klang bauen (nicht abspielen), Huellkurve wie `AUDIO_NOTE` |
 | `SAMPLE_SET_LOOP(sample, start, end[, kind$])` | Loop-Region in Frames (fuer gehaltene Noten), `kind$` = `vorwaerts` (Vorgabe) oder `pingpong` |
+| `SAMPLE_SET_LOOP_TIME(sample, start_s, end_s[, kind$])` | dieselbe Loop-Region in Sekunden (wie `SAMPLE_LEN`) statt Frames |
 | `SAMPLE_LEN(sample)` → FLOAT | Laenge in Sekunden bei Originaltonhoehe |
 
 `halbtoene` ist relativ zur Originaltonhoehe des Samples: `0` = wie aufgenommen,
@@ -475,6 +480,7 @@ unabhaengig von den Einzel-Lautstaerken (sie multiplizieren sich im Mixer).
 | Funktion | Wirkung |
 |---|---|
 | `AUDIO_BUS_VOLUME(bus$, vol)` | Master-Lautstaerke eines Busses (0..1) |
+| `AUDIO_IS_SILENT()` | läuft der Ton stumm? Mit `DHRT_NO_AUDIO=1` (alte Namen `DHRT_OHNE_AUDIO`, `DH_OHNE_AUDIO`) wird der Mix in Echtzeit gerechnet, aber nicht ausgegeben -- Positionen, Pegel und `AUDIO_SAVE_WAV` laufen wie mit Soundkarte |
 | `AUDIO_BUS_GET_VOLUME(bus$)` → FLOAT | aktuelle Bus-Lautstaerke |
 
 `bus$` ist `"sfx"`, `"music"`, `"master"` oder `"speech"` (case-insensitive;

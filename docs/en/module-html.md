@@ -7,32 +7,36 @@ HTTP client + URL helpers + HTML parser. All native in `dhrt` (Rust, HTTP via
 IMPORT "html"
 ```
 
+`IMPORT "http"` means the same module — the name `html` dates from the time
+when it only read pages.
+
 ## Overview
 
 | Area | Function | Returns | Meaning |
 |---|---|---|---|
-| HTTP | `HTTP_REQUEST(methode$, url$ [, rumpf [, kopfzeilen]])` | STRING (response body) | any HTTP method with its own body and headers |
+| HTTP | `HTTP_REQUEST(method$, url$ [, body [, headers]])` | STRING (response body) | any HTTP method with its own body and headers |
 | HTTP | `HTTP_GET(url$)` | STRING (response body) | fetch a page or file |
 | HTTP | `HTTP_POST(url$, body$)` | STRING | send data and read the response |
-| HTTP | `HTTP_DOWNLOAD(url$, pfad$)` | INTEGER (bytes) | download a file and save it |
+| HTTP | `HTTP_DOWNLOAD(url$, path$)` | INTEGER (bytes) | download a file and save it |
 | HTTP | `HTTP_STATUS()` | INTEGER (e.g. 200, 404) | status of the last request (200 = good, 404 = not there) |
 | HTTP | `HTTP_HEADER(name$)` | STRING (header of the response) | read a header of the last response |
 | HTTP | `HTTP_BYTES()` | BUFFER (raw body of the last response) |  |
-| HTTP | `HTTP_SET_HEADER(name$, wert$)` | — (applies to all following calls) |  |
+| HTTP | `HTTP_SET_HEADER(name$, value$)` | — (applies to all following calls) |  |
 | HTTP | `HTTP_CLEAR_HEADERS()` | — |  |
-| HTTP | `HTTP_TIMEOUT(sekunden)` | — |  |
-| HTTP (background) | `HTTP_REQUEST_START(methode$, url$ [, rumpf [, kopfzeilen]])` | INTEGER (request number) |  |
+| HTTP | `HTTP_TIMEOUT(seconds)` | — |  |
+| HTTP | `HTTP_SET_TIMEOUT(ms)` | — | the same time limit in milliseconds (1..600000) — like every time limit; `HTTP_TIMEOUT` counts seconds |
+| HTTP (background) | `HTTP_REQUEST_START(method$, url$ [, body [, headers]])` | INTEGER (request number) |  |
 | HTTP (background) | `HTTP_GET_START(url$)` | INTEGER (request number) |  |
-| HTTP (background) | `HTTP_READY(abruf)` | BOOLEAN |  |
-| HTTP (background) | `HTTP_RESULT(abruf)` | STRING (response body) |  |
-| HTTP (background) | `HTTP_CANCEL(abruf)` | — |  |
+| HTTP (background) | `HTTP_READY(request)` | BOOLEAN |  |
+| HTTP (background) | `HTTP_RESULT(request)` | STRING (response body) |  |
+| HTTP (background) | `HTTP_CANCEL(request)` | — |  |
 | HTTP (background) | `HTTP_PENDING()` | INTEGER (open requests) |  |
-| HTTP (background) | `HTTP_URL$(abruf)` | STRING |  |
+| HTTP (background) | `HTTP_URL$(request)` | STRING |  |
 | URL | `URL_ENCODE(s$)` | STRING | make text safe for a URL (spaces, umlauts, `&`) |
 | URL | `URL_DECODE(s$)` | STRING | the counterpart — turn encoded text back |
-| HTML | `HTML_TEXT(html$)` | STRING (tags removed, entities decoded) |  |
-| HTML | `HTML_FIND_ALL(html$, tag$)` | ARRAY OF STRING |  |
-| HTML | `HTML_GET_ATTR(tag_html$, attr$)` | STRING |  |
+| HTML | `HTML_TEXT(s$)` | STRING (tags removed, entities decoded) |  |
+| HTML | `HTML_FIND_ALL(s$, tag$)` | ARRAY OF STRING |  |
+| HTML | `HTML_GET_ATTR(s$, attr$)` | STRING |  |
 
 ## HTTP_REQUEST — for everything beyond GET and POST
 
@@ -165,7 +169,7 @@ For anything running in a loop there is therefore the same request for checking 
 |---|---|
 | `HTTP_REQUEST_START(method$, url$ [, body [, headers]])` → INTEGER | starts **any** request in the background |
 | `HTTP_GET_START(url$)` → INTEGER | short form of it for GET |
-| `HTTP_READY(request)` → BOOLEAN | is the response there? (checks, does not wait) |
+| `HTTP_READY(request)` → BOOLEAN | is the response there? (checks, does not wait; unknown number = error) |
 | `HTTP_RESULT(request)` → STRING | collects the body and frees the slot |
 | `HTTP_CANCEL(request)` | discard a request (unknown number = no-op) |
 | `HTTP_PENDING()` → INTEGER | how many requests are still open |
@@ -210,6 +214,7 @@ After `HTTP_RESULT`, `HTTP_STATUS()` and `HTTP_HEADER()` are ready exactly as af
 - **`HTTP_RESULT` before `HTTP_READY`** aborts with a plain-language message instead of blocking — otherwise the advantage would be thrown away again.
 - **Several requests really run at the same time.** Two requests of 300 ms each are done after ~300 ms, not after 600.
 - **Numbers stay stable** (tombstones as with `timer`): a collected or cancelled number is not handed out again. So a program cannot accidentally refer an old number to someone else's request.
+- **A number that does not exist (any more)** — never started, already collected or cancelled — is an error for `HTTP_READY` and `HTTP_RESULT` (up to 2026.53 `HTTP_READY` returned FALSE, and `WHILE NOT HTTP_READY(n)` ran forever). `HTTP_CANCEL` accepts it silently, `HTTP_URL$` returns "".
 - **The first number is 0** (as with `timer`). To remember "no request in flight", use -1 -- a fresh `DIM abruf AS INTEGER` is 0 and thus already the number of the first request.
 - **Cancelling does not stop the request in mid-network** — it runs to the end, and its result is discarded. The program does not wait for anything.
 - **Any method.** `HTTP_GET_START` is the short form for GET; `HTTP_REQUEST_START` takes any method together with body and headers (see the table). There is no `HTTP_DOWNLOAD` in the background -- for that use `HTTP_GET_START` and, after `HTTP_RESULT`, save the raw body from `HTTP_BYTES()` with `WRITEALL_BYTES`.

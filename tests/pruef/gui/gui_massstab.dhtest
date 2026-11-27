@@ -258,3 +258,18 @@ PRINT GUI_GET_X(b); " "; GUI_GET_W(b)
 --- erwartet
 15 80
 
+=== die dhform liest #rgb wie die stildatei
+' Ein Leser fuer Hex-Farben (farbraum::hex_lesen): bis 2026.53 las die
+' .dhform #FFF als 0x000FFF.
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+DIM c AS GUI_WIDGET : c = GUI_COLORPICKER(w, 10, 10, 200, 150)
+GUI_SET_PICKED_COLOR(c, &H123456)
+DIM j AS STRING : j = GUI_TO_JSON(w)
+PRINT INSTR(j, "#123456") >= 0
+j = REPLACE$(j, "#123456", "#FFF")
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+PRINT HEX$(GUI_PICKED_COLOR(GUI_WINDOW_WIDGET(w2, 0)))
+--- erwartet
+TRUE
+FFFFFF

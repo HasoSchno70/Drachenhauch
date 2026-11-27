@@ -1,8 +1,7 @@
-//! Pure/deterministische Builtins fuer die Rust-VM (Schritt 3).
-//!
-//! Semantik 1:1 aus `drachenhauch/interpreter.py` (BUILTINS). Nicht-determi-
-//! nistische (RND/MILLIS/TIME$/…) und Grafik-Builtins sind NICHT hier --
-//! sie liefern einen klaren Fehler (Grafik = Schritt 4).
+//! Die reinen Builtins: alles, was ohne VM- und Fensterzustand auskommt
+//! (Text, Zahlen, Felder, Dateien, JSON, Zeit, Zufall ...). Was Zustand
+//! braucht, steht in den `try_*`-Familien der VM (`vm_*.rs`); die letzte
+//! Familie ruft hier herein (`Vm::familie_rufen`).
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -55,11 +54,23 @@ pub fn datei_da(pfad: &str, befehl: &str) -> Result<(), String> {
     Err(format!("{}: Datei '{}' nicht gefunden (gesucht relativ zu {})", befehl, pfad, ort))
 }
 
+/// Ein Dateifehler mit Pfad: fehlt die Datei, derselbe Satz wie `datei_da`
+/// (mit dem Ort, an dem gesucht wurde), sonst der Grund des Systems hinter
+/// dem Pfad. Bis 2026.53 meldete COPYFILE nur "Das System kann die
+/// angegebene Datei nicht finden. (os error 2)" -- welche, stand nirgends.
+pub fn datei_fehler(befehl: &str, pfad: &str, e: &std::io::Error) -> String {
+    if e.kind() == std::io::ErrorKind::NotFound {
+        if let Err(m) = datei_da(pfad, befehl) { return m; }
+    }
+    format!("{}: '{}': {}", befehl, pfad, e)
+}
+
 /// Warum sich eine Datei, die es gibt, nicht als Bild lesen liess. raylib
 /// sagt nur "image data is null, either the file doesnt exist or the image
 /// type is unsupported" -- ohne Dateinamen, und "doesnt exist" fuehrt in
 /// die Irre (gefunden mit dem Buch "Kleine Wunder", Kapitel 23: drei kaputte
 /// Dateien in einer Diaschau gaben drei gleiche Zeilen).
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub fn bild_unlesbar(pfad: &str, befehl: &str) -> String {
     use std::io::Read;
     let laenge = std::fs::metadata(pfad).map(|m| m.len()).unwrap_or(0);
@@ -68,6 +79,7 @@ pub fn bild_unlesbar(pfad: &str, befehl: &str) -> String {
     bild_unlesbar_aus(pfad, befehl, laenge, &kopf[..n])
 }
 
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 fn bild_unlesbar_aus(pfad: &str, befehl: &str, laenge: u64, kopf: &[u8]) -> String {
     if laenge == 0 {
         return format!("{}: '{}' ist leer (0 Byte)", befehl, pfad);
@@ -208,6 +220,9 @@ fn programm_args() -> &'static [String] {
 }
 
 fn seit_start() -> std::time::Duration { programmstart().elapsed() }
+
+/// Die Wanduhr seit dem Programmstart in ms (fuer die Spieluhr).
+pub(crate) fn seit_start_ms() -> f64 { seit_start().as_secs_f64() * 1000.0 }
 fn next_rand() -> u64 {
     RNG.with(|s| {
         let mut x = s.get();
@@ -446,6 +461,20 @@ fn dt_ms(v: &Value, fn_: &str) -> Result<i64, String> {
     Ok(dt)
 }
 
+/// Der Schritt einer Physik-Welt in SEKUNDEN (wie DELTA()) -- das
+/// Gegenstueck zu `dt_ms`. Eine Zahl ab 1 ist fast sicher eine Angabe in
+/// Millisekunden (PHYS2D_STEP(w, 16)); bis 2026.53 wurde sie still auf
+/// 0,05 s geklemmt, und die Welt lief dreimal zu langsam.
+#[cfg_attr(not(feature = "physik"), allow(dead_code))]
+fn physik_dt(v: &Value, fn_: &str) -> Result<f64, String> {
+    let dt = need_num(v, fn_)?;
+    if dt >= 1.0 {
+        return Err(format!("{}: dt {} ist in Sekunden gemeint (DELTA() liefert Sekunden) -- fuer Millisekunden durch 1000 teilen", fn_, dt));
+    }
+    if !(dt >= 0.0) { return Err(format!("{}: dt muss >= 0 sein", fn_)); }
+    Ok(dt)
+}
+
 fn need_int_gerundet(v: &Value, fn_: &str) -> Result<i64, String> {
     crate::argument::int_gerundet(v, fn_, None)
 }
@@ -534,49 +563,34 @@ fn type_default(t: &str) -> Value {
 
 /// Parst einen String robust zu INTEGER (ganzzahlig, kein '.'/'e') oder FLOAT,
 /// sonst None. Basis fuer ISNUMERIC (.is_some()) und TRYVAL (.unwrap_or(default)).
+/// Ist der GANZE Text eine Zahl (ISNUMERIC, TRYVAL)? Dieselben Schreibweisen
+/// wie VAL -- auch `&HFF`, `&O17`, `&B101`, `0x`, `0b` --, aber keine
+/// "inf"/"NaN" (Rusts f64-Leser nahm sie bis 2026.53 an, VAL nicht).
 fn parse_number(s: &str) -> Option<Value> {
     let t = s.trim();
     if t.is_empty() { return None; }
+    let (neg, rest) = match t.as_bytes()[0] { b'-' => (true, &t[1..]), b'+' => (false, &t[1..]), _ => (false, t) };
+    let klein = rest.to_ascii_lowercase();
+    for (vor, basis) in [("&h", 16), ("0x", 16), ("&o", 8), ("&b", 2), ("0b", 2)] {
+        if let Some(z) = klein.strip_prefix(vor) {
+            let z: String = z.chars().filter(|c| *c != '_').collect();
+            if z.is_empty() { return None; }
+            return i64::from_str_radix(&z, basis).ok().map(|n| Value::Int(if neg { -n } else { n }));
+        }
+    }
     if !t.contains('.') && !t.contains('e') && !t.contains('E') {
         if let Ok(i) = t.parse::<i64>() { return Some(Value::Int(i)); }
     }
-    t.parse::<f64>().ok().map(Value::Float)
+    if rest.chars().any(|c| c.is_alphabetic() && c != 'e' && c != 'E') { return None; }
+    t.parse::<f64>().ok().filter(|f| f.is_finite()).map(Value::Float)
 }
 
-/// Element-Coercion fuer Array-Schreibzugriffe (ARRAY_FILL/PUSH/INSERT/REDIM).
-/// Identisch zur `coerce`-Logik der VM (vm.rs): INTEGER nimmt Int oder
-/// ganzzahligen Float, FLOAT nimmt Float/Int, beides lehnt Bool ab; Referenz-/
-/// sonstige Typen werden durchgereicht.
+/// Element-Coercion fuer Array-Schreibzugriffe (ARRAY_FILL/PUSH/INSERT/REDIM)
+/// -- dieselbe `coerce` wie die VM. Bis 2026.53 eine eigene Kopie: sie liess
+/// `ARRAY_PUSH(a, 1e19)` still auf i64::MAX saettigen und nahm eine Zahl in
+/// ein ARRAY OF GELD.
 fn coerce_elem(value: Value, target: &str, ctx: &str) -> R {
-    match target {
-        "integer" => match value {
-            Value::Int(_) => Ok(value),
-            Value::Float(f) => {
-                if f.fract() == 0.0 { Ok(Value::Int(f as i64)) }
-                else { Err(format!("{}: FLOAT {} kann nicht ohne Verlust nach INTEGER (nutze INT())", ctx, f)) }
-            }
-            Value::Bool(_) => Err(format!("{}: Erwartet INTEGER, erhalten BOOLEAN", ctx)),
-            _ => Err(format!("{}: Erwartet INTEGER, erhalten {}", ctx, value.type_name())),
-        },
-        "float" => match value {
-            Value::Float(_) => Ok(value),
-            Value::Int(i) => Ok(Value::Float(i as f64)),
-            Value::Bool(_) => Err(format!("{}: Erwartet FLOAT, erhalten BOOLEAN", ctx)),
-            _ => Err(format!("{}: Erwartet FLOAT, erhalten {}", ctx, value.type_name())),
-        },
-        "string" => match value {
-            Value::Str(_) => Ok(value),
-            _ => Err(format!("{}: Erwartet STRING, erhalten {}", ctx, value.type_name())),
-        },
-        "boolean" => match value {
-            Value::Bool(_) => Ok(value),
-            _ => Err(format!("{}: Erwartet BOOLEAN, erhalten {}", ctx, value.type_name())),
-        },
-        _ => {
-            crate::value::klasse_pruefen(&value, target, ctx)?;
-            Ok(value)
-        }
-    }
+    crate::vm::coerce(value, target, ctx)
 }
 
 /// STR$-Semantik (`_b_str`). `pub(crate)`, damit `EPRINT` (vm.rs `try_os`)
@@ -704,7 +718,7 @@ fn csv_aus_array(v: &Value, fn_: &str) -> Result<Vec<Vec<String>>, String> {
                 .map(|r| (0..cols).map(|c| text(arr.cells.get(r * cols + c))).collect())
                 .collect())
         }
-        n => Err(format!("{}: erwartet ein 1D- oder 2D-ARRAY, bekommen {}D", fn_, n)),
+        n => Err(format!("{}: erwartet ein 1D- oder 2D-ARRAY, erhalten {}D", fn_, n)),
     }
 }
 
@@ -719,6 +733,9 @@ pub(crate) fn str_array(v: &Value, fn_: &str) -> Result<Vec<String>, String> {
     }
 }
 
+/// `ARRAY OF STRING` aus einer Rust-Liste -- der EINE Bauer (bis 2026.53
+/// standen daneben `new_string_array` und `text_feld` mit derselben Arbeit,
+/// Bericht D3).
 pub(crate) fn new_str_array(items: Vec<String>) -> Value {
     let n = items.len() as i64;
     let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
@@ -756,6 +773,7 @@ pub fn new_geld_array(items: Vec<i64>) -> Value {
 
 /// 1D `ARRAY OF INTEGER` aus einer Zahlenliste (Gegenstueck zu new_str_array).
 /// `ARRAY OF FLOAT` aus einer Rust-Liste (Gegenstueck zu `new_int_array`).
+#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
 pub fn new_float_array(items: Vec<f64>) -> Value {
     let n = items.len() as i64;
     let mut arr = DhArray::new("float".to_string(), vec![n], || Value::Float(0.0));
@@ -765,15 +783,6 @@ pub fn new_float_array(items: Vec<f64>) -> Value {
     Value::Array(Rc::new(RefCell::new(arr)))
 }
 
-/// `ARRAY OF STRING` aus einer Rust-Liste.
-pub fn new_string_array(items: Vec<String>) -> Value {
-    let n = items.len() as i64;
-    let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
-    for (i, v) in items.into_iter().enumerate() {
-        arr.cells.set(i, Value::str_rc(&v));
-    }
-    Value::Array(Rc::new(RefCell::new(arr)))
-}
 
 pub fn new_int_array(items: Vec<i64>) -> Value {
     let n = items.len() as i64;
@@ -1205,51 +1214,21 @@ pub fn call_builtin(name: &str, args: &[Value]) -> Option<R> {
     Some(call_inner(name, args))
 }
 
-/// Aufruf-Signatur fuer Builtins, deren Argumentform man sonst raten muss --
-/// wird an die Aritaets-Fehlermeldung angehaengt ("... -- Aufruf: NAME(...)").
-/// Bewusst fokussiert auf Zufalls-/Kurven-/Game-Math; die Tabelle darf wachsen.
-/// Schluessel = der intern kleingeschriebene Builtin-Name (wie im match unten).
-fn builtin_signature(name: &str) -> Option<&'static str> {
-    Some(match name {
-        "randint"            => "RANDINT(lo, hi)",
-        "randf"              => "RANDF(min, max)",
-        "choice"             => "CHOICE(array)",
-        "shuffle"           => "SHUFFLE(array)",
-        "curve_lerp"         => "CURVE_LERP(a, b, t)",
-        "curve_smoothstep"   => "CURVE_SMOOTHSTEP(edge0, edge1, x)",
-        "curve_smootherstep" => "CURVE_SMOOTHERSTEP(edge0, edge1, x)",
-        "curve_bezier"       => "CURVE_BEZIER(t, p0, p1, p2, p3)",
-        "curve_bezier2"      => "CURVE_BEZIER2(t, x0,y0, x1,y1, x2,y2, x3,y3)",
-        "curve_catmull"      => "CURVE_CATMULL(t, p0, p1, p2, p3)",
-        "curve_bspline"      => "CURVE_BSPLINE(t, p0, p1, p2, p3)",
-        "curve_bspline2"     => "CURVE_BSPLINE2(t, x0,y0, x1,y1, x2,y2, x3,y3)",
-        "curve_catmull2"     => "CURVE_CATMULL2(t, x0,y0, x1,y1, x2,y2, x3,y3)",
-        "curve_hermite"      => "CURVE_HERMITE(t, p0, p1, m0, m1)",
-        "numfmt$" | "numfmt" => "NUMFMT$(zahl[, nachkommastellen])",
-        _ => return None,
-    })
-}
-
 fn call_inner(name: &str, a: &[Value]) -> R {
     macro_rules! arity {
         ($n:expr) => {
             if a.len() != $n {
-                let base = format!("{}: erwartet {} Argument(e), erhalten {}", name.to_uppercase(), $n, a.len());
-                return err(match builtin_signature(name) {
-                    Some(sig) => format!("{} -- Aufruf: {}", base, sig),
-                    None => base,
-                });
+                // Die Aufrufform haengt mit_signatur aus dem Index an (bis
+                // 2026.53 eine zweite, eigene Tabelle builtin_signature --
+                // die Meldung trug sie dann doppelt).
+                return err(format!("{}: erwartet {} Argument(e), erhalten {}", name.to_uppercase(), $n, a.len()));
             }
         };
         // Spanne, fuer Builtins mit optionalen Argumenten.
         ($lo:expr, $hi:expr) => {
-            if a.len() < $lo || a.len() > $hi {
-                let base = format!("{}: erwartet {} bis {} Argument(e), erhalten {}",
-                                   name.to_uppercase(), $lo, $hi, a.len());
-                return err(match builtin_signature(name) {
-                    Some(sig) => format!("{} -- Aufruf: {}", base, sig),
-                    None => base,
-                });
+            if !($lo..=$hi).contains(&a.len()) {
+                return err(format!("{}: erwartet {} bis {} Argumente, erhalten {}",
+                                   name.to_uppercase(), $lo, $hi, a.len()));
             }
         };
     }
@@ -1266,9 +1245,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // FLT(x): Int/Float -> Float (Gegenstueck zu INT). Im Tree-Walker laengst
         // vorhanden; hier nachgezogen, damit `FLT(...)` auch nativ laeuft.
         "flt" => { arity!(1); Ok(Value::Float(need_num(&a[0], "FLT")?)) }
-        "numfmt$" | "numfmt" => {
+        "numfmt$" => {
             if a.is_empty() || a.len() > 2 {
-                return err(format!("NUMFMT$: erwartet 1 oder 2 Argument(e), erhalten {} -- Aufruf: NUMFMT$(zahl[, nachkommastellen])", a.len()));
+                return err(format!("NUMFMT$: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
             }
             let n = need_num(&a[0], "NUMFMT$")?;
             let dec = if a.len() == 2 { need_int(&a[1], "NUMFMT$")? } else { 2 };
@@ -1413,7 +1392,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     if st == 0 { return err("RANGE: step darf nicht 0 sein".to_string()); }
                     (need_int(&a[0], "RANGE")?, need_int(&a[1], "RANGE")?, st)
                 }
-                _ => return err("RANGE: 1..3 Argumente".to_string()),
+                _ => return err(format!("RANGE: erwartet 1 bis 3 Argumente, erhalten {}", a.len())),
             };
             // Wie viele es werden, vorher -- sonst hing RANGE(2147483648).
             let anzahl = if step > 0 { (stop as i128 - start as i128 + step as i128 - 1) / step as i128 }
@@ -1487,8 +1466,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "lbound" | "ubound" => {
             let gross = name.to_uppercase();
             if a.is_empty() || a.len() > 2 {
-                return err(format!("{}: erwartet 1 oder 2 Argumente, erhalten {} -- Aufruf: {}(feld [, dimension])",
-                                   gross, a.len(), gross));
+                return err(format!("{}: erwartet 1 bis 2 Argumente, erhalten {}",
+                                   gross, a.len()));
             }
             let Value::Array(arr) = &a[0] else {
                 return err(format!("{}: erwartet ARRAY, erhalten {}", gross, a[0].type_name()));
@@ -1510,6 +1489,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             match &a[0] {
                 Value::Str(s) => { text_anmelden(&a[0]); Ok(Value::Int(zeichen_zahl(s) as i64)) }
                 Value::Tuple(t) => Ok(Value::Int(t.len() as i64)),
+                // Die Bytes eines BUFFER, wie BUFFER_LEN (Bericht B5).
+                Value::Buffer(b) => Ok(Value::Int(b.borrow().len() as i64)),
                 Value::Array(arr) => {
                     let arr = arr.borrow();
                     Ok(Value::Int(if arr.dims.is_empty() { 0 } else { arr.dims[0] }))
@@ -1554,7 +1535,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "sqr" | "sqrt" => {   // SQRT = BASIC-Alias fuer SQR
             arity!(1);
             let x = need_num(&a[0], "SQR")?;
-            if x < 0.0 { return err("SQR von negativer Zahl".to_string()); }
+            if x < 0.0 { return err(format!("SQR: erwartet eine Zahl >= 0, erhalten {}", x)); }
             Ok(Value::Float(x.sqrt()))
         }
         "upper$" | "upper" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "UPPER$")?.to_uppercase())) }
@@ -1580,7 +1561,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(3);
             let (r, g, b) = (need_int_gerundet(&a[0], "RGB")?, need_int_gerundet(&a[1], "RGB")?,
                              need_int_gerundet(&a[2], "RGB")?);
-            for v in [r, g, b] { if v < 0 || v > 255 { return err("RGB-Werte muessen 0..255 sein".to_string()); } }
+            for v in [r, g, b] { if v < 0 || v > 255 { return err(format!("RGB: die Werte muessen 0..255 sein, erhalten {}", v)); } }
             Ok(Value::Int((r << 16) | (g << 8) | b))
         }
         "rgba" => {
@@ -1603,7 +1584,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // `&H`-Literale gibt es nur im Quelltext, nicht zur Laufzeit. Ohne
         // diese beiden kann ein Programm also weder eine Farbe aus einer
         // Einstellungsdatei lesen noch eine eingetippte uebernehmen.
-        "color_hex$" | "color_hex" => {
+        "color_hex$" => {
             arity!(1);
             let c = need_int_gerundet(&a[0], "COLOR_HEX$")?;
             let a8 = (c >> 24) & 0xFF;
@@ -1626,15 +1607,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 return err(std::format!(
                     "COLOR_FROM_HEX: '{}' ist keine Farbe -- erwartet #RGB, #RRGGBB oder #AARRGGBB", t));
             }
-            // Die Kurzform verdoppelt jede Ziffer, wie im Web: #F80 = #FF8800.
-            let voll = match ziffern.len() {
-                3 => ziffern.chars().flat_map(|c| [c, c]).collect::<String>(),
-                6 | 8 => ziffern.clone(),
-                n => return err(std::format!(
-                    "COLOR_FROM_HEX: '{}' hat {} Stellen -- erlaubt sind 3, 6 oder 8", t, n)),
-            };
-            let v = i64::from_str_radix(&voll, 16)
-                .map_err(|_| std::format!("COLOR_FROM_HEX: '{}' liess sich nicht lesen", t))?;
+            // Die Kurzform verdoppelt jede Ziffer, wie im Web: #F80 = #FF8800
+            // (farbraum::hex_lesen, derselbe Leser wie Stildatei und .dhform).
+            if ![3, 6, 8].contains(&ziffern.len()) {
+                return err(std::format!(
+                    "COLOR_FROM_HEX: '{}' hat {} Stellen -- erlaubt sind 3, 6 oder 8", t, ziffern.len()));
+            }
+            let v = crate::farbraum::hex_lesen(&ziffern)
+                .ok_or_else(|| std::format!("COLOR_FROM_HEX: '{}' liess sich nicht lesen", t))?;
             Ok(Value::Int(v))
         }
         "sin" => { arity!(1); Ok(Value::Float(need_num(&a[0], "SIN")?.sin())) }
@@ -1658,7 +1638,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let s = format!("{:.*}", n.min(1100) as usize, x);
                 Ok(Value::Float(s.parse::<f64>().unwrap_or(x)))
             } else {
-                err(format!("ROUND: erwartet 1 oder 2 Argument(e), erhalten {}", a.len()))
+                err(format!("ROUND: erwartet 1 bis 2 Argumente, erhalten {}", a.len()))
             }
         }
         // --- Geld: siehe den Block "Geld" weiter oben ---
@@ -1678,7 +1658,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // nur ueber EURO$ mit ganzen Cent, und NUMFMT$ schreibt "1.2K".
         "zahl$" => {
             if a.is_empty() || a.len() > 2 {
-                return err(format!("ZAHL$: erwartet 1..2 Argument(e), erhalten {}", a.len()));
+                return err(format!("ZAHL$: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
             }
             let stellen = match a.get(1) {
                 None => None,
@@ -1694,7 +1674,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "euro$" => {
             if a.is_empty() || a.len() > 2 {
-                return err(format!("EURO$: erwartet 1..2 Argument(e), erhalten {}", a.len()));
+                return err(format!("EURO$: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
             }
             // Bewusst KEIN FLOAT: wer EURO$(19.99) schreibt, hat den Punkt
             // verfehlt, um den es hier geht -- also sagen wir es ihm.
@@ -1718,7 +1698,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "round_half_up" => {
             if a.is_empty() || a.len() > 2 {
-                return err(format!("ROUND_HALF_UP: erwartet 1..2 Argument(e), erhalten {}", a.len()));
+                return err(format!("ROUND_HALF_UP: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
             }
             let x = need_num(&a[0], "ROUND_HALF_UP")?;
             let n = if a.len() == 2 {
@@ -1745,7 +1725,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // direkt und paniked (statt "LOG: erwartet ..."), LOG(x,y,z)
             // wurde stillschweigend akzeptiert (Extra-Argument ignoriert).
             if a.is_empty() || a.len() > 2 {
-                return err(format!("LOG: erwartet 1..2 Argument(e), erhalten {}", a.len()));
+                return err(format!("LOG: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
             }
             let x = need_num(&a[0], "LOG")?;
             if x <= 0.0 { return err("LOG: Argument muss > 0 sein".to_string()); }
@@ -1780,7 +1760,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
         }
         "min" | "max" => {
-            if a.is_empty() { return err(format!("{}: mind. 1 Argument", name.to_uppercase())); }
+            if a.is_empty() { return err(format!("{}: erwartet mindestens 1 Argument(e), erhalten 0", name.to_uppercase())); }
             for v in a { if !is_num(v) { return err(format!("{}: erwartet Zahl", name.to_uppercase())); } }
             let want_min = name == "min";
             let mut best = a[0].clone();
@@ -1874,7 +1854,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "approx" => {
             // APPROX(a, b [, eps]): True, wenn |a-b| <= eps (Default 1e-6).
-            if a.len() != 2 && a.len() != 3 { return err("APPROX: erwartet 2 oder 3 Argumente".to_string()); }
+            if a.len() != 2 && a.len() != 3 { return err(format!("APPROX: erwartet 2 bis 3 Argumente, erhalten {}", a.len())); }
             let (x, y) = (need_num(&a[0], "APPROX")?, need_num(&a[1], "APPROX")?);
             let eps = if a.len() == 3 { need_num(&a[2], "APPROX")? } else { 1e-6 };
             Ok(Value::Bool((x - y).abs() <= eps))
@@ -1927,12 +1907,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let ns = match &a[0] {
                 Value::Namespace(n) => n.clone(),
                 v => return err(format!(
-                    "ENUM_NAME: erwartet ein ENUM als erstes Argument, bekommen {}", v.type_name())),
+                    "ENUM_NAME: erwartet ein ENUM als erstes Argument, erhalten {}", v.type_name())),
             };
             let gesucht = match &a[1] {
                 Value::Int(i) => *i,
                 v => return err(format!(
-                    "ENUM_NAME: erwartet INTEGER als Wert, bekommen {}", v.type_name())),
+                    "ENUM_NAME: erwartet INTEGER als Wert, erhalten {}", v.type_name())),
             };
             let mut treffer: Vec<&String> = ns.members.iter()
                 .filter(|(_, v)| matches!(v, Value::Int(i) if *i == gesucht))
@@ -1987,7 +1967,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Int(crate::rechtschreibung::system(need_str(&a[0], "SPELL_SYSTEM")?)?))
         }
         "spell_languages" => { arity!(0); Ok(new_str_array(crate::rechtschreibung::sprachen())) }
-        "spell_language$" | "spell_language" => {
+        "spell_language$" => {
             arity!(1);
             Ok(Value::str_rc(crate::rechtschreibung::sprache(need_int(&a[0], "SPELL_LANGUAGE$")?)?))
         }
@@ -2027,8 +2007,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // Alpha-Anteil einer Farbe. Oberes Byte; 0 == deckend -> 255
             // (passend zur Zeichen-Semantik, siehe col() in graphics.rs).
             arity!(1);
-            let a0 = (need_int(&a[0], "ALPHA")? >> 24) & 0xFF;
-            Ok(Value::Int(if a0 == 0 { 255 } else { a0 }))
+            Ok(Value::Int(crate::farbraum::rgba(need_int(&a[0], "ALPHA")?)[3] as i64))
         }
         "color_lerp" => {
             arity!(3);
@@ -2068,18 +2047,18 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // Count durchlaufen -> capacity-overflow-Panic beim Allozieren).
             // Jedes andere PAD-artige Builtin in dieser Datei (REPEAT$,
             // SPACE$, LEFT$, RIGHT$) clampt bereits mit `.max(0)`.
+            let fn_ = if name.starts_with("padl") { "PADL$" } else { "PADR$" };
             if a.len() < 2 || a.len() > 3 {
-                return err(format!("PAD: erwartet 2..3 Argument(e), erhalten {}", a.len()));
+                return err(format!("{}: erwartet 2 bis 3 Argumente, erhalten {}", fn_, a.len()));
             }
-            let s = need_str(&a[0], "PAD")?;
-            let n = need_int(&a[1], "PAD")?.max(0) as usize;
+            let s = need_str(&a[0], fn_)?;
+            let n = need_int(&a[1], fn_)?.max(0) as usize;
             let fill = if a.len() == 3 {
-                let f = need_str(&a[2], "PAD")?;
+                let f = need_str(&a[2], fn_)?;
                 f.chars().next().unwrap_or(' ')
             } else { ' ' };
             let count = s.chars().count();
             if count >= n { return Ok(Value::str_rc(s)); }
-            let fn_ = if name.starts_with("padl") { "PADL$" } else { "PADR$" };
             text_laenge_pruefen(fn_, (n - count).checked_mul(fill.len_utf8()).and_then(|p| p.checked_add(s.len())))?;
             let pad: String = std::iter::repeat(fill).take(n - count).collect();
             let left = name.starts_with("padl");
@@ -2109,7 +2088,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(3);
             if let Value::Map(m) = &a[0] {
                 let k = need_str(&a[1], "MAPPUT")?;
-                let v = coerce_map_value(&a[2], &m.borrow().value_type)?;
+                let v = coerce_map_value(&a[2], &m.borrow().value_type, "MAPPUT")?;
                 m.borrow_mut().put_str(k, v);
                 Ok(Value::Nil)
             } else { err("MAPPUT: erwartet MAP".to_string()) }
@@ -2203,7 +2182,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // SORT(arr, comparator-FUNCREF) wird vorher in vm.rs abgefangen
             // (braucht die VM, um die User-Funktion zu rufen).
             if a.is_empty() || a.len() > 2 {
-                return err(format!("SORT: erwartet 1 oder 2 Argument(e), erhalten {}", a.len()));
+                return err(format!("SORT: erwartet 1 bis 2 Argumente, erhalten {}", a.len()));
             }
             let desc = match a.get(1) {
                 None => false,
@@ -2423,7 +2402,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::str_stueck(&s[zeichen_stelle(s, anzahl - n)..]))
         }
         "mid$" | "mid" => {
-            if a.len() < 2 || a.len() > 3 { return err(format!("MID$: erwartet 2..3 Argumente, erhalten {}", a.len())); }
+            if a.len() < 2 || a.len() > 3 { return err(format!("MID$: erwartet 2 bis 3 Argumente, erhalten {}", a.len())); }
             let s = need_str(&a[0], "MID$")?;
             let start = need_int(&a[1], "MID$")?.max(0) as usize;
             text_anmelden(&a[0]);
@@ -2438,7 +2417,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
         }
         "instr" => {
-            if a.len() < 2 || a.len() > 3 { return err(format!("INSTR: erwartet 2..3 Argumente, erhalten {}", a.len())); }
+            if a.len() < 2 || a.len() > 3 { return err(format!("INSTR: erwartet 2 bis 3 Argumente, erhalten {}", a.len())); }
             if a.len() == 3 && matches!(a[0], Value::Int(_)) && matches!(a[1], Value::Str(_)) {
                 return err("INSTR: die Startstelle steht in Drachenhauch HINTEN -- INSTR(text, suche, start), und gezaehlt wird ab 0 (nicht gefunden = -1)".to_string());
             }
@@ -2467,7 +2446,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // Pythons str.rfind). Gemeldet beim Dogfooding (2026-10-09):
             // ohne den Befehl brauchte ein Umbruch an der letzten Wortgrenze
             // eine eigene Schleife.
-            if a.len() < 2 || a.len() > 3 { return err(format!("INSTRREV: erwartet 2..3 Argumente, erhalten {}", a.len())); }
+            if a.len() < 2 || a.len() > 3 { return err(format!("INSTRREV: erwartet 2 bis 3 Argumente, erhalten {}", a.len())); }
             let hay = need_str(&a[0], "INSTRREV")?;
             let needle = need_str(&a[1], "INSTRREV")?;
             text_anmelden(&a[0]);
@@ -2587,11 +2566,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             };
             Ok(Value::str_rc(out))
         }
-        "between$" | "between" => {
+        "between$" => {
             // BETWEEN$(text$, links$, rechts$ [, ab]) -> was zwischen dem ersten
             // `links` (ab Zeichen `ab`, 0-basiert wie MID$) und dem naechsten
             // `rechts` danach steht; "" wenn eins fehlt.
-            if a.len() < 3 || a.len() > 4 { return Err("BETWEEN$: erwartet (text$, links$, rechts$[, ab])".into()); }
+            if a.len() < 3 || a.len() > 4 { return Err(crate::vm::falsche_argumente("BETWEEN$", a.len())); }
             let s = need_str(&a[0], "BETWEEN$")?;
             let (l, r) = (need_str(&a[1], "BETWEEN$")?, need_str(&a[2], "BETWEEN$")?);
             if l.is_empty() || r.is_empty() { return Err("BETWEEN$: die Markierungen duerfen nicht leer sein".into()); }
@@ -2603,7 +2582,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 None => "",
             }))
         }
-        "replace_between$" | "replace_between" => {
+        "replace_between$" => {
             // REPLACE_BETWEEN$(text$, links$, rechts$, neu$) -> jedes Stueck
             // zwischen links und rechts ersetzt; die Markierungen bleiben.
             arity!(4);
@@ -2622,7 +2601,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             out.push_str(&s[pos..]);
             Ok(Value::str_rc(out))
         }
-        "nospaces$" | "nospaces" => {
+        "nospaces$" => {
             // NOSPACES$(s$) -> ohne jeden Leerraum (Leerzeichen, Tabulator,
             // Umbruch) -- fuer Eingaben wie "12 34 56" oder "DE89 3704 ...".
             arity!(1);
@@ -3005,7 +2984,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys3d_step" => {
             arity!(2);
-            phys3d_h(&a[0], "PHYS3D_STEP")?.borrow_mut().step(need_num(&a[1], "PHYS3D_STEP")? as f32);
+            phys3d_h(&a[0], "PHYS3D_STEP")?.borrow_mut().step(physik_dt(&a[1], "PHYS3D_STEP")? as f32);
             Ok(Value::Nil)
         }
         #[cfg(feature = "physik")]
@@ -3068,7 +3047,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys3d_sleep" => {
             if a.len() != 2 && a.len() != 3 {
-                return Err("PHYS3D_SLEEP: erwartet 2 oder 3 Argumente (welt, koerper [, schlafen])".into());
+                return Err(format!("PHYS3D_SLEEP: erwartet 2 bis 3 Argumente, erhalten {}", a.len()));
             }
             let an = if a.len() == 3 { need_flag(&a[2], "PHYS3D_SLEEP")? } else { true };
             let mut w = phys3d_h(&a[0], "PHYS3D_SLEEP")?.borrow_mut();
@@ -3123,7 +3102,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys2d_step" => {
             arity!(2);
-            phys2d_h(&a[0], "PHYS2D_STEP")?.borrow_mut().step(need_num(&a[1], "PHYS2D_STEP")? as f32);
+            phys2d_h(&a[0], "PHYS2D_STEP")?.borrow_mut().step(physik_dt(&a[1], "PHYS2D_STEP")? as f32);
             Ok(Value::Nil)
         }
         // Jeder Befehl, der einen Koerper meint, prueft seine Nummer
@@ -3136,6 +3115,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let w = phys2d_h(&a[0], f)?.borrow();
             let p = w.pos(phys2d_koerper(&w, &a[1], f)?);
             Ok(Value::Float((if name == "phys2d_body_x" { p.0 } else { p.1 }) as f64))
+        }
+        #[cfg(feature = "physik")]
+        // In Grad, wie DRAWIMAGEROT sie nimmt (positiv = im Uhrzeigersinn auf
+        // dem Schirm) -- PHYS2D_BODY_ANGLE liefert Bogenmass (Regel 10).
+        "phys2d_body_angle_deg" => {
+            arity!(2);
+            let w = phys2d_h(&a[0], "PHYS2D_BODY_ANGLE_DEG")?.borrow();
+            Ok(Value::Float((w.angle(phys2d_koerper(&w, &a[1], "PHYS2D_BODY_ANGLE_DEG")?) as f64).to_degrees()))
         }
         #[cfg(feature = "physik")]
         "phys2d_body_angle" => {
@@ -3193,7 +3180,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         #[cfg(feature = "physik")]
         "phys2d_sleep" => {
             if a.len() != 2 && a.len() != 3 {
-                return Err("PHYS2D_SLEEP: erwartet 2 oder 3 Argumente (welt, koerper [, schlafen])".into());
+                return Err(format!("PHYS2D_SLEEP: erwartet 2 bis 3 Argumente, erhalten {}", a.len()));
             }
             let an = if a.len() == 3 { need_flag(&a[2], "PHYS2D_SLEEP")? } else { true };
             let mut w = phys2d_h(&a[0], "PHYS2D_SLEEP")?.borrow_mut();
@@ -3289,7 +3276,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "sprite_tint" => {
             arity!(2); let c = need_int(&a[1], "SPRITE_TINT")?;
-            if c < 0 || c > 0xFFFFFF { return err("SPRITE_TINT: Farbe muss 0..0xFFFFFF sein"); }
+            // Mit Deckkraft wie jede Farbe (bis 2026.53 nur 0..0xFFFFFF).
+            if !(0..=0xFFFF_FFFF).contains(&c) { return err("SPRITE_TINT: Farbe muss 0..&HFFFFFFFF sein"); }
             spr(&a[0], "SPRITE_TINT")?.borrow_mut().tint = Some(c); Ok(Value::Nil)
         }
         "sprite_tint_clear" => { arity!(1); spr(&a[0], "SPRITE_TINT_CLEAR")?.borrow_mut().tint = None; Ok(Value::Nil) }
@@ -3318,20 +3306,27 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(2); let dt = dt_ms(&a[1], "SPRITE_UPDATE")?;
             spr(&a[0], "SPRITE_UPDATE")?.borrow_mut().update(dt); Ok(Value::Nil)
         }
-        "sprite_collides" | "sprite_collide" => {
-            arity!(2); let a0 = spr(&a[0], "SPRITE_COLLIDES")?.borrow(); let b0 = spr(&a[1], "SPRITE_COLLIDES")?.borrow();
-            Ok(Value::Bool(a0.x < b0.x + b0.frame_w as f64 && a0.x + a0.frame_w as f64 > b0.x
-                && a0.y < b0.y + b0.frame_h as f64 && a0.y + a0.frame_h as f64 > b0.y))
+        // Treffer rechnen mit dem Kasten, den SPRITE_DRAW zeichnet: ab (x, y),
+        // Bildgroesse mal SPRITE_SET_SCALE. Bis 2026.53 ohne Skala -- ein
+        // dreifach gross gezeichneter Sprite traf nur in seiner linken oberen
+        // Ecke (Bericht A6.6).
+        "sprite_collides" => {
+            arity!(2);
+            let (ax, ay, aw, ah) = sprite_kasten(&spr(&a[0], "SPRITE_COLLIDES")?.borrow());
+            let (bx, by, bw, bh) = sprite_kasten(&spr(&a[1], "SPRITE_COLLIDES")?.borrow());
+            Ok(Value::Bool(ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by))
         }
         "sprite_hit_box" => {
-            arity!(5); let s = spr(&a[0], "SPRITE_HIT_BOX")?.borrow();
+            arity!(5);
+            let (sx, sy, sw, sh) = sprite_kasten(&spr(&a[0], "SPRITE_HIT_BOX")?.borrow());
             let (x, y, w, h) = (need_num(&a[1], "SPRITE_HIT_BOX")?, need_num(&a[2], "SPRITE_HIT_BOX")?, need_num(&a[3], "SPRITE_HIT_BOX")?, need_num(&a[4], "SPRITE_HIT_BOX")?);
-            Ok(Value::Bool(s.x < x + w && s.x + s.frame_w as f64 > x && s.y < y + h && s.y + s.frame_h as f64 > y))
+            Ok(Value::Bool(sx < x + w && sx + sw > x && sy < y + h && sy + sh > y))
         }
         "sprite_hit_point" => {
-            arity!(3); let s = spr(&a[0], "SPRITE_HIT_POINT")?.borrow();
+            arity!(3);
+            let (sx, sy, sw, sh) = sprite_kasten(&spr(&a[0], "SPRITE_HIT_POINT")?.borrow());
             let (x, y) = (need_num(&a[1], "SPRITE_HIT_POINT")?, need_num(&a[2], "SPRITE_HIT_POINT")?);
-            Ok(Value::Bool(s.x <= x && x < s.x + s.frame_w as f64 && s.y <= y && y < s.y + s.frame_h as f64))
+            Ok(Value::Bool(sx <= x && x < sx + sw && sy <= y && y < sy + sh))
         }
 
         // ===== Modul: animfsm (Animations-State-Machine, datengetrieben) =====
@@ -3339,10 +3334,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(1);
             let path = need_str(&a[0], "ANIM_FSM_LOAD")?;
             let resolved = resolve_asset_path(path);
-            let text = std::fs::read_to_string(&resolved)
-                .map_err(|e| format!("ANIM_FSM_LOAD: Lesefehler '{}': {}", resolved, e))?;
+            let text = text_lesen(&resolved, None, "ANIM_FSM_LOAD")?;
             let data: serde_json::Value = serde_json::from_str(&text)
-                .map_err(|e| format!("ANIM_FSM_LOAD: Parse-Fehler '{}': {}", resolved, e))?;
+                .map_err(|e| format!("ANIM_FSM_LOAD: '{}': {}", resolved, json_fehler_text(&e)))?;
             let fsm = crate::animfsm::AnimFsmObj::from_json(&data)?;
             Ok(Value::AnimFsm(std::rc::Rc::new(std::cell::RefCell::new(fsm))))
         }
@@ -3425,7 +3419,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // PATHJOIN/MKDIR/DIREXISTS weiter unten -- KEINE Duplikate anlegen!).
         "copyfile" => {
             arity!(2);
-            std::fs::copy(need_str(&a[0], "COPYFILE")?, need_str(&a[1], "COPYFILE")?).map_err(|e| format!("COPYFILE: {}", e))?;
+            // Die Quelle wie jede gelesene Datei (resolve_asset_path) -- bis
+            // 2026.53 fand FILEEXISTS sie, COPYFILE nicht.
+            let quelle = resolve_asset_path(need_str(&a[0], "COPYFILE")?);
+            let ziel = need_str(&a[1], "COPYFILE")?;
+            std::fs::copy(&quelle, ziel).map_err(|e| {
+                if !std::path::Path::new(&quelle).is_file() { datei_fehler("COPYFILE", &quelle, &e) }
+                else { format!("COPYFILE: '{}' -> '{}': {}", quelle, ziel, e) }
+            })?;
             Ok(Value::Nil)
         }
         "appendfile" => {
@@ -3451,7 +3452,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let dir = std::path::Path::new(p).parent().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
             Ok(Value::str_rc(&dir))
         }
-        "realpath$" | "realpath" => {
+        "realpath$" => {
             // REALPATH$(pfad$) -> der volle, bereinigte Pfad: absolut, `.`/`..`
             // aufgeloest, Verknuepfungen verfolgt, die Schreibweise der Platte.
             // Gibt es die Datei nicht, wird nur absolut gemacht und bereinigt.
@@ -3502,20 +3503,6 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             f.borrow_mut().h = FileH::Closed;
             Ok(Value::Nil)
         }
-        "eof" => {
-            // Am Ende der Datei? READLINE liefert dort "", genau wie bei einer
-            // leeren Zeile -- ohne EOF liess sich beides nicht unterscheiden.
-            arity!(1);
-            let f = file_h(&a[0], "EOF")?;
-            let mut f = f.borrow_mut();
-            match f.leser() {
-                Some(r) => {
-                    let leer = r.fill_buf().map_err(|e| format!("EOF: {}", e))?.is_empty();
-                    Ok(Value::Bool(leer))
-                }
-                None => err("EOF: Datei wurde nicht im Lese-Modus geoeffnet"),
-            }
-        }
         "readline" => {
             arity!(1);
             let f = file_h(&a[0], "READLINE")?;
@@ -3553,7 +3540,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 return Ok(Value::str_rc(text_lesen(pfad, kod, "READALL$")?));
             }
             if a.len() > 1 {
-                return err("READALL$: die Kodierung einer offenen Datei steht schon bei OPENFILE(pfad, modus, kodierung)");
+                return err("READALL$: die Kodierung einer offenen Datei steht schon bei FILE_OPEN(pfad, modus, kodierung)");
             }
             let f = file_h(&a[0], "READALL$")?;
             let mut f = f.borrow_mut();
@@ -3573,6 +3560,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "endoffile" => {
             arity!(1);
             let f = file_h(&a[0], "ENDOFFILE")?;
+            // EOF ist derselbe Befehl (namen::GLEICH); die Meldung nennt den
+            // geschriebenen Namen (Vm::fehler_benennen).
             let mut f = f.borrow_mut();
             match f.leser() {
                 // fill_buf blockiert an einer Pipe, bis entweder Daten da sind
@@ -3581,7 +3570,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 // Schleife `WHILE NOT ENDOFFILE(f)` auch an der
                 // Standardeingabe.
                 Some(r) => Ok(Value::Bool(r.fill_buf().map_err(|e| format!("ENDOFFILE: {}", e))?.is_empty())),
-                None => err("ENDOFFILE: erwartet Lese-FILE"),
+                None => err("ENDOFFILE: Datei wurde nicht im Lese-Modus geoeffnet"),
             }
         }
         "writeline" | "write" => {
@@ -3594,7 +3583,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             match &mut f.h {
                 FileH::Write(w) => {
                     let payload = if name == "writeline" { format!("{}\n", text) } else { text };
-                    let bytes = crate::kodierung::kodieren(&payload, kod, "WRITE")?;
+                    let bytes = crate::kodierung::kodieren(&payload, kod, &ruf)?;
                     // utf8bom: das BOM gehoert vor die leere Datei, nicht vor jede Zeile.
                     let bom = crate::kodierung::bom_vorn(kod);
                     if !bom.is_empty() && w.metadata().map(|m| m.len() == 0).unwrap_or(false) {
@@ -3607,15 +3596,16 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
         }
         // --- Datei/Verzeichnis (WP3, pfadbasiert -- kein FILE-Handle) ---
-        "direxists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(need_str(&a[0], "DIREXISTS")?).is_dir())) }
+        "direxists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(&resolve_asset_path(need_str(&a[0], "DIREXISTS")?)).is_dir())) }
         "dirlist" => {
             // DIR_LIST(pfad [, muster [, recursive]]) -- mit recursive = TRUE
             // wie DIR_LIST_REC. Ein leeres Muster heisst "alles", damit
             // `DIR_LIST(p, recursive: TRUE)` ohne Muster geht.
             arity!(1, 3);
-            let path = need_str(&a[0], "DIRLIST")?;
+            let path_r = resolve_asset_path(need_str(&a[0], "DIRLIST")?);
+            let path = path_r.as_str();
             let muster = if a.len() > 1 { Some(need_str(&a[1], "DIRLIST")?).filter(|m| !m.is_empty()) } else { None };
-            if a.len() > 2 && a[2].truthy() {
+            if a.len() > 2 && crate::argument::a_schalter(a, 2, "DIRLIST")? {
                 let mut raus: Vec<String> = Vec::new();
                 baum_lesen(std::path::Path::new(path), "", muster, &mut raus, "DIRLIST")?;
                 return Ok(new_str_array(raus));
@@ -3626,7 +3616,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // Rekursiv -- liefert DATEIEN (keine Ordner) als Pfade relativ
             // zum Startordner, immer mit `/` getrennt.
             arity!(1, 2);
-            let path = need_str(&a[0], "DIRLIST_REC")?;
+            let path_r = resolve_asset_path(need_str(&a[0], "DIRLIST_REC")?);
+            let path = path_r.as_str();
             // Ein leeres Muster heisst "alles" wie bei DIRLIST -- bis 2026.53
             // passte es hier auf nichts (eine leere Filtervariable lieferte
             // still ein leeres Feld).
@@ -3678,11 +3669,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // von heute: eine Datei vom Juli stand im Winter eine Stunde frueh.
             Ok(Value::Int(crate::zeit::aus_unix_mit(utc, lokaler_versatz)))
         }
-        "tempdir$" | "tempdir" => {
+        "tempdir$" => {
             arity!(0);
             Ok(Value::str_rc(std::env::temp_dir().to_string_lossy()))
         }
-        "dir_user_data$" | "dir_user_data" => {
+        "dir_user_data$" => {
             // DIR_USER_DATA$(app$) -- der Ordner, in dem ein Programm die Daten
             // seines Benutzers ablegt, angelegt, wenn es ihn noch nicht gibt.
             // Ein Programm unter "Programme" darf neben sich nichts schreiben
@@ -3699,7 +3690,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             std::fs::create_dir_all(&ordner).map_err(|e| format!("DIR_USER_DATA$: {}: {}", ordner.display(), e))?;
             Ok(Value::str_rc(ordner.to_string_lossy()))
         }
-        "tempfile$" | "tempfile" => {
+        "tempfile$" => {
             // TEMPFILE$([praefix$ [, endung$]]) -- ein noch nicht vergebener
             // Name im Temp-Ordner. Die Datei wird LEER ANGELEGT: sonst
             // koennte zwischen "Name ausgedacht" und "Datei geschrieben" ein
@@ -3730,14 +3721,19 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             std::fs::create_dir_all(need_str(&a[0], "MKDIR")?).map_err(|e| format!("MKDIR: {}", e))?;
             Ok(Value::Nil)
         }
+        // Derselbe Pfad wie beim Lesen (resolve_asset_path) und dieselbe
+        // Meldung mit Pfad und Suchort (datei_fehler) -- bis 2026.53 sagten
+        // beide nur "os error 2" ohne Datei (Bericht A11.1).
         "deletefile" => {
             arity!(1);
-            std::fs::remove_file(need_str(&a[0], "DELETEFILE")?).map_err(|e| format!("DELETEFILE: {}", e))?;
+            let pfad = resolve_asset_path(need_str(&a[0], "DELETEFILE")?);
+            std::fs::remove_file(&pfad).map_err(|e| datei_fehler("DELETEFILE", &pfad, &e))?;
             Ok(Value::Nil)
         }
         "rename" => {
             arity!(2);
-            std::fs::rename(need_str(&a[0], "RENAME")?, need_str(&a[1], "RENAME")?).map_err(|e| format!("RENAME: {}", e))?;
+            let von = resolve_asset_path(need_str(&a[0], "RENAME")?);
+            std::fs::rename(&von, need_str(&a[1], "RENAME")?).map_err(|e| datei_fehler("RENAME", &von, &e))?;
             Ok(Value::Nil)
         }
         "writeall" => {
@@ -3771,7 +3767,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Int(m.len() as i64))
         }
         "pathjoin" => {
-            if a.len() < 2 { return err(format!("PATHJOIN: erwartet mind. 2 Argumente, erhalten {}", a.len())); }
+            if a.len() < 2 { return err(format!("PATHJOIN: erwartet mindestens 2 Argument(e), erhalten {}", a.len())); }
             // Mit '/' verbinden (deterministisch, plattformuebergreifend; raylib/
             // std akzeptieren '/' auch auf Windows). Erstes Teil behaelt fuehrendes
             // '/', folgende werden beidseitig getrimmt.
@@ -3855,29 +3851,37 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // (siehe zipdatei.rs) -- ein Archiv darf `../../autoexec.bat` heissen.
         "zip_list" => {
             arity!(1);
-            let pfad = need_str(&a[0], "ZIP_LIST")?;
-            Ok(new_str_array(crate::zipdatei::liste(std::path::Path::new(pfad))?))
+            let pfad = resolve_asset_path(need_str(&a[0], "ZIP_LIST")?);
+            Ok(new_str_array(crate::zipdatei::liste(std::path::Path::new(&pfad))?))
         }
         "zip_read" => {
             arity!(2);
-            let pfad = need_str(&a[0], "ZIP_READ")?;
+            let pfad = resolve_asset_path(need_str(&a[0], "ZIP_READ")?);
             let name = need_str(&a[1], "ZIP_READ")?;
-            let daten = crate::zipdatei::lies(std::path::Path::new(pfad), name)?;
+            let daten = crate::zipdatei::lies(std::path::Path::new(&pfad), name)?;
             Ok(Value::Buffer(Rc::new(RefCell::new(daten))))
         }
         "zip_read$" => {
-            arity!(2);
-            let pfad = need_str(&a[0], "ZIP_READ$")?;
+            // ZIP_READ$(archiv$, name$ [, kodierung$]) -- liest wie READALL$:
+            // BOM weg, eine andere Kodierung als UTF-8 hinten. Bis 2026.53
+            // wurde ungueltiges UTF-8 still zu U+FFFD ("caf\u{fffd}").
+            arity!(2, 3);
+            let pfad = resolve_asset_path(need_str(&a[0], "ZIP_READ$")?);
             let name = need_str(&a[1], "ZIP_READ$")?;
-            let daten = crate::zipdatei::lies(std::path::Path::new(pfad), name)?;
-            Ok(Value::str_rc(String::from_utf8_lossy(&daten).into_owned()))
+            let k = match a.get(2) {
+                Some(v) => crate::kodierung::aus_name(need_str(v, "ZIP_READ$")?, "ZIP_READ$")?,
+                None => crate::kodierung::Kodierung::Utf8,
+            };
+            let daten = crate::zipdatei::lies(std::path::Path::new(&pfad), name)?;
+            let text = crate::kodierung::ohne_bom(crate::kodierung::dekodieren(&daten, k, "ZIP_READ$", name)?);
+            Ok(Value::str_rc(text))
         }
         "zip_extract" => {
             arity!(2);
-            let pfad = need_str(&a[0], "ZIP_EXTRACT")?;
+            let pfad = resolve_asset_path(need_str(&a[0], "ZIP_EXTRACT")?);
             let ziel = need_str(&a[1], "ZIP_EXTRACT")?;
             Ok(Value::Int(crate::zipdatei::entpacke(
-                std::path::Path::new(pfad), std::path::Path::new(ziel))?))
+                std::path::Path::new(&pfad), std::path::Path::new(ziel))?))
         }
         "zip_create" => {
             arity!(2);
@@ -3947,7 +3951,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let text = text_lesen(pfad, kod, "CSV_LOAD")?;
             Ok(csv_tabelle(crate::csv::lesen(&text, t)))
         }
-        "csv_format$" | "csv_format" => {
+        "csv_format$" => {
             arity!(1, 2);
             let t = crate::csv::trenner_aus(
                 if a.len() > 1 { Some(need_str(&a[1], "CSV_FORMAT$")?) } else { None },
@@ -3966,7 +3970,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             text_schreiben(pfad, &crate::csv::schreiben(&zeilen, t), kod, "CSV_SAVE", false)?;
             Ok(Value::Nil)
         }
-        "csv_row$" | "csv_row" => {
+        "csv_row$" => {
             arity!(1, 2);
             let t = crate::csv::trenner_aus(
                 if a.len() > 1 { Some(need_str(&a[1], "CSV_ROW$")?) } else { None },
@@ -3980,7 +3984,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // CRC32/HASH (weiter oben) sind zum WIEDERERKENNEN da -- sie sagen
         // "vermutlich dieselben Daten". Die hier sind fuer Faelle, in denen
         // jemand die Antwort faelschen KOENNTE: Signaturen, Tokens, Belege.
-        "sha256$" | "sha256" | "sha1$" | "sha1" | "md5$" | "md5" => {
+        "sha256$" | "sha256" | "sha1$" | "sha1" | "md5$" => {
             arity!(1);
             let anz = name.to_uppercase();
             let daten = need_daten(&a[0], &anz)?;
@@ -3993,14 +3997,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 _ => hex_string(&md5::Md5::digest(&daten)),
             }))
         }
-        "sha256_file$" | "sha256_file" | "sha1_file$" | "sha1_file" | "md5_file$" | "md5_file" => {
+        "sha256_file$" | "sha1_file$" | "md5_file$" => {
             arity!(1);
             let anz = name.to_uppercase();
             let pfad = need_str(&a[0], &anz)?;
             let algo = name.trim_end_matches('$').trim_end_matches("_file");
             Ok(Value::str_rc(datei_hash(pfad, algo, &anz)?))
         }
-        "hmac_sha256$" | "hmac_sha256" => {
+        "hmac_sha256$" => {
             // HMAC_SHA256$(schluessel, daten) -- der Standard fuer signierte
             // Web-Aufrufe (Webhooks, S3, viele APIs).
             arity!(2);
@@ -4034,7 +4038,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             for i in 0..x.len() { diff |= x[i] ^ y[i]; }
             Ok(Value::Bool(diff == 0))
         }
-        "uuid4$" | "uuid4" => {
+        "uuid4$" => {
             arity!(0);
             Ok(Value::str_rc(&uuid::Uuid::new_v4().to_string()))
         }
@@ -4128,7 +4132,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "buffer_indexof" => {
             // BUFFER_INDEXOF(heu, nadel [, ab]) -> Position oder -1.
-            if a.len() < 2 || a.len() > 3 { return err(format!("BUFFER_INDEXOF: erwartet 2..3 Argumente, erhalten {}", a.len())); }
+            if a.len() < 2 || a.len() > 3 { return err(format!("BUFFER_INDEXOF: erwartet 2 bis 3 Argumente, erhalten {}", a.len())); }
             let heu = buf_h(&a[0], "BUFFER_INDEXOF")?;
             let nadel = buf_h(&a[1], "BUFFER_INDEXOF")?;
             let ab = if a.len() == 3 { need_int(&a[2], "BUFFER_INDEXOF")?.max(0) as usize } else { 0 };
@@ -4144,7 +4148,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(1);
             Ok(neuer_buffer(need_str(&a[0], "BUFFER_FROM_STRING")?.as_bytes().to_vec()))
         }
-        "buffer_to_string$" | "buffer_to_string" => {
+        "buffer_to_string$" => {
             arity!(1);
             let b = buf_h(&a[0], "BUFFER_TO_STRING$")?.borrow();
             // STRENG, nicht ersetzend: bei Bytes, die kein UTF-8 sind, ist ein
@@ -4158,7 +4162,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                      enthaelt keinen Text (fuer Binaerdaten BUFFER_TO_HEX$ nehmen)", e.valid_up_to())),
             }
         }
-        "buffer_to_hex$" | "buffer_to_hex" => {
+        "buffer_to_hex$" => {
             arity!(1);
             let b = buf_h(&a[0], "BUFFER_TO_HEX$")?.borrow();
             let mut s = String::with_capacity(b.len() * 2);
@@ -4182,7 +4186,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
             Ok(neuer_buffer(out))
         }
-        "buffer_to_base64$" | "buffer_to_base64" => {
+        "buffer_to_base64$" => {
             arity!(1);
             Ok(Value::str_rc(b64_encode(&buf_h(&a[0], "BUFFER_TO_BASE64$")?.borrow())))
         }
@@ -4200,7 +4204,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "buffer_deflate" | "buffer_inflate" => {
             let gross = name.to_uppercase();
             if a.is_empty() || a.len() > 2 {
-                return err(format!("{}: erwartet 1..2 Argumente (puffer [, \"zlib\"/\"roh\"]), erhalten {}", gross, a.len()));
+                return err(format!("{}: erwartet 1 bis 2 Argumente, erhalten {}", gross, a.len()));
             }
             let zlib = if a.len() == 2 {
                 match need_str(&a[1], &gross)?.to_lowercase().as_str() {
@@ -4231,7 +4235,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "buffer_get_i16" | "buffer_get_u16" | "buffer_get_i32" | "buffer_get_u32"
         | "buffer_get_i64" | "buffer_get_f32" | "buffer_get_f64" => {
             if a.len() < 2 || a.len() > 3 {
-                return err(format!("{}: erwartet 2..3 Argumente (puffer, position [, \"le\"/\"be\"]), erhalten {}",
+                return err(format!("{}: erwartet 2 bis 3 Argumente, erhalten {}",
                                    name.to_uppercase(), a.len()));
             }
             let anz = name.to_uppercase();
@@ -4259,7 +4263,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "buffer_set_i16" | "buffer_set_u16" | "buffer_set_i32" | "buffer_set_u32"
         | "buffer_set_i64" | "buffer_set_f32" | "buffer_set_f64" => {
             if a.len() < 3 || a.len() > 4 {
-                return err(format!("{}: erwartet 3..4 Argumente (puffer, position, wert [, \"le\"/\"be\"]), erhalten {}",
+                return err(format!("{}: erwartet 3 bis 4 Argumente, erhalten {}",
                                    name.to_uppercase(), a.len()));
             }
             let anz = name.to_uppercase();
@@ -4389,7 +4393,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // EXIT/EPRINT/SHELL brauchen VM-Zustand (Ausgabe-Puffer, Abbruch) und
         // stehen darum in vm.rs `try_os` -- hier nur die zustandsfreien.
         "argc" => { arity!(0); Ok(Value::Int(programm_args().len() as i64)) }
-        "arg$" | "arg" => {
+        "arg$" => {
             arity!(1);
             let i = need_int(&a[0], "ARG$")?;
             let args = programm_args();
@@ -4404,11 +4408,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // Bilder und Klaenge gefunden werden) -- ein relativer Pfad, den der
         // Nutzer aus SEINEM Ordner angibt, zeigte dann ins Leere. Auch
         // examples/172_filter.dh als Exe fand `daten/obst.txt` nicht.
-        "startdir$" | "startdir" => {
+        "startdir$" => {
             arity!(0);
             Ok(Value::str_rc(startort().map_err(|e| format!("STARTDIR$: {}", e))?))
         }
-        "argpath$" | "argpath" => {
+        "argpath$" => {
             arity!(1);
             let i = need_int(&a[0], "ARGPATH$")?;
             let args = programm_args();
@@ -4425,10 +4429,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // und die, in der die Laufzeit gerade spricht (`"de"`/`"en"`:
         // DHRT_LANG, sonst das System). IDE und Studio nehmen die zweite als
         // Vorgabe; ein Programm kann mit der ersten seine Texte waehlen.
-        "system_language$" | "system_language" => { arity!(0); Ok(Value::str_rc(crate::meldung::systemsprache())) }
-        "runtime_language$" | "runtime_language" => { arity!(0); Ok(Value::str_rc(crate::meldung::sprache().to_string())) }
-        "getenv$" | "getenv" => {
-            if a.is_empty() || a.len() > 2 { return err(format!("GETENV$: erwartet 1..2 Argumente, erhalten {}", a.len())); }
+        "system_language$" => { arity!(0); Ok(Value::str_rc(crate::meldung::systemsprache())) }
+        "runtime_language$" => { arity!(0); Ok(Value::str_rc(crate::meldung::sprache().to_string())) }
+        "getenv$" => {
+            if a.is_empty() || a.len() > 2 { return err(format!("GETENV$: erwartet 1 bis 2 Argumente, erhalten {}", a.len())); }
             let name_ = need_str(&a[0], "GETENV$")?;
             let vorgabe = if a.len() == 2 { need_str(&a[1], "GETENV$")? } else { "" };
             // `var_os` + lossy: eine Umgebungsvariable mit ungueltigem UTF-8
@@ -4451,7 +4455,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             std::env::set_var(name_, wert);
             Ok(Value::Nil)
         }
-        "cwd$" | "cwd" => {
+        "cwd$" => {
             arity!(0);
             let p = std::env::current_dir().map_err(|e| format!("CWD$: {}", e))?;
             Ok(Value::str_rc(p.to_string_lossy().into_owned()))
@@ -4462,7 +4466,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             std::env::set_current_dir(p).map_err(|e| format!("CHDIR: {} ({})", e, p))?;
             Ok(Value::Nil)
         }
-        "exepath$" | "exepath" => {
+        "exepath$" => {
             arity!(0);
             // Die Datei, die gerade LAEUFT: unter `dhrt run x.dh` die Laufzeit,
             // in einem exportierten Spiel dessen eigene Exe. Ein Programm hatte
@@ -4486,10 +4490,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
 
         // ===== Modul: tween (zeitbasiert -> nicht deterministisch) =====
         "tween_new" | "tween_new_loop" | "tween_new_pingpong" => {
-            if a.len() < 3 || a.len() > 4 { return err(format!("{}: 3..4 Argumente", name.to_uppercase())); }
-            let start = need_num(&a[0], "TWEEN")?;
-            let end = need_num(&a[1], "TWEEN")?;
-            let duration = need_int(&a[2], "TWEEN")?;
+            if a.len() < 3 || a.len() > 4 { return err(format!("{}: erwartet 3 bis 4 Argumente, erhalten {}", name.to_uppercase(), a.len())); }
+            let fn_ = match name { "tween_new_loop" => "TWEEN_NEW_LOOP", "tween_new_pingpong" => "TWEEN_NEW_PINGPONG", _ => "TWEEN_NEW" };
+            let start = need_num(&a[0], fn_)?;
+            let end = need_num(&a[1], fn_)?;
+            let duration = need_int(&a[2], fn_)?;
             if duration < 0 { return err("TWEEN: dauer_ms muss >= 0 sein"); }
             let mode = match name { "tween_new_loop" => "loop", "tween_new_pingpong" => "pingpong", _ => "once" };
             if (mode == "loop" || mode == "pingpong") && duration == 0 { return err("TWEEN: dauer_ms muss > 0 sein"); }
@@ -4549,12 +4554,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Err(e) => err(format!("XML_LOAD: {}: Zeile {}: {}", pfad, e.zeile, e.was)),
             }
         }
-        "xml_escape$" | "xml_escape" => {
+        "xml_escape$" => {
             arity!(1);
             Ok(Value::str_rc(crate::xml::entity_zu(need_str(&a[0], "XML_ESCAPE$")?)))
         }
-        "xml_name$" | "xml_name" => { arity!(1); Ok(Value::str_rc(&xml_h(&a[0], "XML_NAME$")?.name)) }
-        "xml_text$" | "xml_text" => {
+        "xml_name$" => { arity!(1); Ok(Value::str_rc(&xml_h(&a[0], "XML_NAME$")?.name)) }
+        "xml_text$" => {
             arity!(1, 2);
             let k = xml_h(&a[0], "XML_TEXT$")?;
             let ziel = match a.get(1) {
@@ -4566,7 +4571,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // XML_CHILD den genauen Knoten.
             Ok(Value::str_rc(ziel.text_tief().trim()))
         }
-        "xml_attr$" | "xml_attr" => {
+        "xml_attr$" => {
             arity!(2, 3);
             let k = xml_h(&a[0], "XML_ATTR$")?;
             let name = need_str(&a[1], "XML_ATTR$")?;
@@ -4638,7 +4643,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let text = text_lesen(pfad, kod, "INI_LOAD")?;
             Ok(ini_map(crate::ini::lesen(&text)))
         }
-        "ini_text$" | "ini_text" => {
+        "ini_text$" => {
             arity!(1);
             Ok(Value::str_rc(crate::ini::schreiben(&ini_paare(&a[0], "INI_TEXT$")?)))
         }
@@ -4655,7 +4660,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "json_parse" => {
             arity!(1);
             let s = need_str(&a[0], "JSON_PARSE")?;
-            let v: serde_json::Value = serde_json::from_str(s).map_err(|e| format!("JSON_PARSE: {}", e))?;
+            let v: serde_json::Value = serde_json::from_str(s).map_err(|e| format!("JSON_PARSE: {}", json_fehler_text(&e)))?;
             Ok(json_wert(v))
         }
         "json_load" => {
@@ -4667,14 +4672,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let path = need_str(&a[0], "JSON_LOAD")?;
             let kod = match a.get(1) { Some(v) => Some(need_str(v, "JSON_LOAD")?), None => None };
             let text = text_lesen(path, kod, "JSON_LOAD")?;
-            let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("JSON_LOAD: {}: {}", path, e))?;
+            let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("JSON_LOAD: {}: {}", path, json_fehler_text(&e)))?;
             Ok(json_wert(v))
         }
         "json_stringify" => { arity!(1); Ok(Value::str_rc(serde_json::to_string(&*json_h(&a[0], "JSON_STRINGIFY")?.borrow()).unwrap_or_default())) }
         "json_pretty" => { arity!(1); Ok(Value::str_rc(serde_json::to_string_pretty(&*json_h(&a[0], "JSON_PRETTY")?.borrow()).unwrap_or_default())) }
         "json_get_string" => {
             arity!(2); let h = json_h(&a[0], "JSON_GET_STRING")?.borrow(); let v = json_resolve(&h, need_str(&a[1], "JSON_GET_STRING")?, "JSON_GET_STRING")?;
-            v.as_str().map(Value::str_rc).ok_or_else(|| format!("JSON_GET_STRING: Pfad '{}' ist kein String", need_str(&a[1], "x").unwrap_or("")))
+            v.as_str().map(Value::str_rc).ok_or_else(|| format!("JSON_GET_STRING: Pfad '{}' ist kein String", need_str(&a[1], "JSON_GET_STRING").unwrap_or("")))
         }
         "json_get_int" => {
             arity!(2); let h = json_h(&a[0], "JSON_GET_INT")?.borrow(); let v = json_resolve(&h, need_str(&a[1], "JSON_GET_INT")?, "JSON_GET_INT")?;
@@ -4868,10 +4873,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "save_set_float" => { arity!(3); let k = need_str(&a[1], "SAVE_SET_FLOAT")?.to_string(); let v = Value::Float(need_num(&a[2], "SAVE_SET_FLOAT")?); save_h(&a[0], "SAVE_SET_FLOAT")?.borrow_mut().set(k, v); Ok(Value::Nil) }
         "save_set_string" => { arity!(3); let k = need_str(&a[1], "SAVE_SET_STRING")?.to_string(); let v = Value::str_rc(need_str(&a[2], "SAVE_SET_STRING")?); save_h(&a[0], "SAVE_SET_STRING")?.borrow_mut().set(k, v); Ok(Value::Nil) }
         "save_set_bool" => { arity!(3); let k = need_str(&a[1], "SAVE_SET_BOOL")?.to_string(); let v = Value::Bool(need_bool(&a[2], "SAVE_SET_BOOL")?); save_h(&a[0], "SAVE_SET_BOOL")?.borrow_mut().set(k, v); Ok(Value::Nil) }
-        "save_get_int" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_INT")?.borrow(); let k = need_str(&a[1], "SAVE_GET_INT")?; match s.get(k) { Some(Value::Int(i)) => Ok(Value::Int(*i)), Some(Value::Float(f)) if f.fract() == 0.0 => Ok(Value::Int(*f as i64)), Some(_) => err("SAVE_GET_INT: kein INTEGER"), None => err(format!("SAVE_GET_INT: Key '{}' nicht im Save", k)) } }
-        "save_get_float" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_FLOAT")?.borrow(); let k = need_str(&a[1], "SAVE_GET_FLOAT")?; match s.get(k) { Some(v) if is_num(v) => Ok(Value::Float(as_f64(v))), Some(_) => err("SAVE_GET_FLOAT: keine Zahl"), None => err(format!("SAVE_GET_FLOAT: Key '{}' nicht im Save", k)) } }
-        "save_get_string" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_STRING")?.borrow(); let k = need_str(&a[1], "SAVE_GET_STRING")?; match s.get(k) { Some(Value::Str(st)) => Ok(Value::Str(st.clone())), Some(_) => err("SAVE_GET_STRING: kein STRING"), None => err(format!("SAVE_GET_STRING: Key '{}' nicht im Save", k)) } }
-        "save_get_bool" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_BOOL")?.borrow(); let k = need_str(&a[1], "SAVE_GET_BOOL")?; match s.get(k) { Some(Value::Bool(b)) => Ok(Value::Bool(*b)), Some(_) => err("SAVE_GET_BOOL: kein BOOLEAN"), None => err(format!("SAVE_GET_BOOL: Key '{}' nicht im Save", k)) } }
+        "save_get_int" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_INT")?.borrow(); let k = need_str(&a[1], "SAVE_GET_INT")?; match s.get(k) { Some(Value::Int(i)) => Ok(Value::Int(*i)), Some(Value::Float(f)) if f.fract() == 0.0 => Ok(Value::Int(*f as i64)), Some(_) => err("SAVE_GET_INT: kein INTEGER"), None => err(format!("SAVE_GET_INT: Schluessel '{}' nicht im Save", k)) } }
+        "save_get_float" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_FLOAT")?.borrow(); let k = need_str(&a[1], "SAVE_GET_FLOAT")?; match s.get(k) { Some(v) if is_num(v) => Ok(Value::Float(as_f64(v))), Some(_) => err("SAVE_GET_FLOAT: keine Zahl"), None => err(format!("SAVE_GET_FLOAT: Schluessel '{}' nicht im Save", k)) } }
+        "save_get_string" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_STRING")?.borrow(); let k = need_str(&a[1], "SAVE_GET_STRING")?; match s.get(k) { Some(Value::Str(st)) => Ok(Value::Str(st.clone())), Some(_) => err("SAVE_GET_STRING: kein STRING"), None => err(format!("SAVE_GET_STRING: Schluessel '{}' nicht im Save", k)) } }
+        "save_get_bool" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_BOOL")?.borrow(); let k = need_str(&a[1], "SAVE_GET_BOOL")?; match s.get(k) { Some(Value::Bool(b)) => Ok(Value::Bool(*b)), Some(_) => err("SAVE_GET_BOOL: kein BOOLEAN"), None => err(format!("SAVE_GET_BOOL: Schluessel '{}' nicht im Save", k)) } }
         // Die Vorgabe hat den Typ des Getters -- bis 2026.53 pruefte das nur
         // FLOAT_OR; SAVE_GET_INT_OR(s, k, "kein int") lieferte den Text aus
         // einem INT-Getter. Dazu nannten die Meldungen "S" statt des Befehls.
@@ -4880,8 +4885,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "save_get_string_or" => { arity!(3); const F: &str = "SAVE_GET_STRING_OR"; let vorgabe = need_str(&a[2], F)?.to_string(); let s = save_h(&a[0], F)?.borrow(); match s.get(need_str(&a[1], F)?) { Some(Value::Str(st)) => Ok(Value::Str(st.clone())), _ => Ok(Value::str_rc(&vorgabe)) } }
         "save_get_bool_or" => { arity!(3); const F: &str = "SAVE_GET_BOOL_OR"; let vorgabe = need_bool(&a[2], F)?; let s = save_h(&a[0], F)?.borrow(); match s.get(need_str(&a[1], F)?) { Some(Value::Bool(b)) => Ok(Value::Bool(*b)), _ => Ok(Value::Bool(vorgabe)) } }
         "save_has" => { arity!(2); Ok(Value::Bool(save_h(&a[0], "SAVE_HAS")?.borrow().get(need_str(&a[1], "SAVE_HAS")?).is_some())) }
-        "save_delete" => { arity!(2); let k = need_str(&a[1], "SAVE_DELETE")?.to_string(); save_h(&a[0], "SAVE_DELETE")?.borrow_mut().remove(&k); Ok(Value::Nil) }
+        // TRUE, wenn es den Schluessel gab -- wie die _REMOVE-Befehle (bis
+        // 2026.53 NIL, Bericht B5).
+        "save_delete" => { arity!(2); let k = need_str(&a[1], "SAVE_DELETE")?.to_string(); Ok(Value::Bool(save_h(&a[0], "SAVE_DELETE")?.borrow_mut().remove(&k))) }
         "save_clear" => { arity!(1); save_h(&a[0], "SAVE_CLEAR")?.borrow_mut().data.clear(); Ok(Value::Nil) }
+        // Die Schluessel als Feld, sortiert -- wie MAP_KEYS und JSON_KEYS.
+        // SAVE_KEYS liefert sie als einen Text "a, b" (Bericht B5).
+        "save_get_keys" => { arity!(1); let s = save_h(&a[0], "SAVE_GET_KEYS")?.borrow(); let mut keys: Vec<String> = s.data.iter().map(|(k, _)| k.clone()).collect(); keys.sort(); Ok(new_str_array(keys)) }
         "save_keys" => { arity!(1); let s = save_h(&a[0], "SAVE_KEYS")?.borrow(); let mut keys: Vec<String> = s.data.iter().map(|(k, _)| k.clone()).collect(); keys.sort(); Ok(Value::str_rc(&keys.join(", "))) }
 
         // ===== Modul: astar =====
@@ -4909,9 +4919,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "astar_clear" => { arity!(1); astar_h(&a[0], "ASTAR_CLEAR")?.borrow_mut().clear(); Ok(Value::Nil) }
         "astar_width" => { arity!(1); Ok(Value::Int(astar_h(&a[0], "ASTAR_WIDTH")?.borrow().w as i64)) }
         "astar_height" => { arity!(1); Ok(Value::Int(astar_h(&a[0], "ASTAR_HEIGHT")?.borrow().h as i64)) }
-        "astar_set_wall" => { arity!(3); let g = astar_h(&a[0], "ASTAR_SET_WALL")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_SET_WALL")?; let (x, y) = (need_int(&a[1], "S")? as i32, need_int(&a[2], "S")? as i32); g.borrow_mut().set_wall(x, y); Ok(Value::Nil) }
-        "astar_set_passable" => { arity!(3); let g = astar_h(&a[0], "ASTAR_SET_PASSABLE")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_SET_PASSABLE")?; let (x, y) = (need_int(&a[1], "S")? as i32, need_int(&a[2], "S")? as i32); g.borrow_mut().set_passable(x, y); Ok(Value::Nil) }
-        "astar_is_wall" => { arity!(3); let g = astar_h(&a[0], "ASTAR_IS_WALL")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_IS_WALL")?; Ok(Value::Bool(g.borrow().is_wall(need_int(&a[1], "S")? as i32, need_int(&a[2], "S")? as i32))) }
+        "astar_set_wall" => { arity!(3); let g = astar_h(&a[0], "ASTAR_SET_WALL")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_SET_WALL")?; let (x, y) = (need_int(&a[1], "ASTAR_SET_WALL")? as i32, need_int(&a[2], "ASTAR_SET_WALL")? as i32); g.borrow_mut().set_wall(x, y); Ok(Value::Nil) }
+        "astar_set_passable" => { arity!(3); let g = astar_h(&a[0], "ASTAR_SET_PASSABLE")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_SET_PASSABLE")?; let (x, y) = (need_int(&a[1], "ASTAR_SET_PASSABLE")? as i32, need_int(&a[2], "ASTAR_SET_PASSABLE")? as i32); g.borrow_mut().set_passable(x, y); Ok(Value::Nil) }
+        "astar_is_wall" => { arity!(3); let g = astar_h(&a[0], "ASTAR_IS_WALL")?; astar_xy(&g.borrow(), &a[1], &a[2], "ASTAR_IS_WALL")?; Ok(Value::Bool(g.borrow().is_wall(need_int(&a[1], "ASTAR_IS_WALL")? as i32, need_int(&a[2], "ASTAR_IS_WALL")? as i32))) }
         "astar_set_diagonal" => { arity!(2); let allow = need_flag(&a[1], "ASTAR_SET_DIAGONAL")?; astar_h(&a[0], "ASTAR_SET_DIAGONAL")?.borrow_mut().set_diagonal(allow); Ok(Value::Nil) }
         "astar_set_heuristic" => {
             arity!(2); let key = need_str(&a[1], "ASTAR_SET_HEURISTIC")?.to_lowercase();
@@ -4922,7 +4932,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "astar_find" => {
             arity!(5); let g = astar_h(&a[0], "ASTAR_FIND")?;
             { let gb = g.borrow(); astar_xy(&gb, &a[1], &a[2], "ASTAR_FIND")?; astar_xy(&gb, &a[3], &a[4], "ASTAR_FIND")?; }
-            let (sx, sy, ex, ey) = (need_int(&a[1], "S")? as i32, need_int(&a[2], "S")? as i32, need_int(&a[3], "S")? as i32, need_int(&a[4], "S")? as i32);
+            let (sx, sy, ex, ey) = (need_int(&a[1], "ASTAR_FIND")? as i32, need_int(&a[2], "ASTAR_FIND")? as i32, need_int(&a[3], "ASTAR_FIND")? as i32, need_int(&a[4], "ASTAR_FIND")? as i32);
             Ok(Value::Bool(g.borrow_mut().find(sx, sy, ex, ey)))
         }
         "astar_path_len" => { arity!(1); Ok(Value::Int(astar_h(&a[0], "ASTAR_PATH_LEN")?.borrow().path_len() as i64)) }
@@ -4958,14 +4968,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         "chart_series" => {
-            if a.len() < 2 || a.len() > 3 { return err("CHART_SERIES: erwartet 2 bis 3 Argumente -- Aufruf: CHART_SERIES(diagramm, name [, farbe])"); }
+            if a.len() < 2 || a.len() > 3 { return err(format!("CHART_SERIES: erwartet 2 bis 3 Argumente, erhalten {}", a.len())); }
             let farbe = match a.get(2) { Some(v) => need_int(v, "CHART_SERIES")?, None => -1 };
             let c = chart_h(&a[0], "CHART_SERIES")?;
             let name = need_str(&a[1], "CHART_SERIES")?.to_string();
             Ok(Value::Int(c.borrow_mut().add_series(&name, farbe)))
         }
         "chart_add" => {
-            if a.len() < 3 || a.len() > 4 { return err("CHART_ADD: erwartet 3 bis 4 Argumente -- Aufruf: CHART_ADD(diagramm, name, wert [, farbe])"); }
+            if a.len() < 3 || a.len() > 4 { return err(format!("CHART_ADD: erwartet 3 bis 4 Argumente, erhalten {}", a.len())); }
             let farbe = match a.get(3) { Some(v) => need_int(v, "CHART_ADD")?, None => -1 };
             let c = chart_h(&a[0], "CHART_ADD")?;
             let label = need_str(&a[1], "CHART_ADD")?.to_string();
@@ -5098,7 +5108,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         "chart_zone" => {
-            if a.len() < 4 || a.len() > 5 { return err("CHART_ZONE: erwartet 4 bis 5 Argumente -- Aufruf: CHART_ZONE(diagramm, von, bis, farbe [, name])"); }
+            if a.len() < 4 || a.len() > 5 { return err(format!("CHART_ZONE: erwartet 4 bis 5 Argumente, erhalten {}", a.len())); }
             let name = match a.get(4) { Some(v) => need_str(v, "CHART_ZONE")?.to_string(), None => String::new() };
             let c = chart_h(&a[0], "CHART_ZONE")?;
             let von = need_num(&a[1], "CHART_ZONE")?;
@@ -5119,7 +5129,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // --- Interaktion: von CHART_DRAW gefuellt, hier nur ausgelesen ---
         "chart_hover" => { arity!(1); Ok(Value::Int(chart_h(&a[0], "CHART_HOVER")?.borrow().hover as i64)) }
         "chart_hover_series" => { arity!(1); Ok(Value::Int(chart_h(&a[0], "CHART_HOVER_SERIES")?.borrow().hover_serie as i64)) }
-        "chart_hover_label$" | "chart_hover_label" => {
+        "chart_hover_label$" => {
             arity!(1);
             Ok(Value::str_rc(chart_h(&a[0], "CHART_HOVER_LABEL$")?.borrow().hover_label()))
         }
@@ -5142,12 +5152,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
 
         // ===== Modul: particles (RNG-Emit -> nicht deterministisch) =====
         "particle_system_new" => { arity!(2); Ok(Value::Particles(Rc::new(RefCell::new(ParticleSys::new(need_num(&a[0], "PARTICLE_SYSTEM_NEW")?, need_num(&a[1], "PARTICLE_SYSTEM_NEW")?))))) }
-        "particle_set_pos" => { arity!(3); let s = psys(&a[0], "PARTICLE_SET_POS")?; let mut s = s.borrow_mut(); s.x = need_num(&a[1], "S")?; s.y = need_num(&a[2], "S")?; Ok(Value::Nil) }
+        "particle_set_pos" => { arity!(3); let s = psys(&a[0], "PARTICLE_SET_POS")?; let mut s = s.borrow_mut(); s.x = need_num(&a[1], "PARTICLE_SET_POS")?; s.y = need_num(&a[2], "PARTICLE_SET_POS")?; Ok(Value::Nil) }
         "particle_count" => { arity!(1); Ok(Value::Int(psys(&a[0], "PARTICLE_COUNT")?.borrow().particles.len() as i64)) }
         "particle_clear" => { arity!(1); psys(&a[0], "PARTICLE_CLEAR")?.borrow_mut().particles.clear(); Ok(Value::Nil) }
         "particle_set_velocity" => {
             arity!(5); let s = psys(&a[0], "PARTICLE_SET_VELOCITY")?; let mut s = s.borrow_mut();
-            s.vx_min = need_num(&a[1], "S")?; s.vx_max = need_num(&a[2], "S")?; s.vy_min = need_num(&a[3], "S")?; s.vy_max = need_num(&a[4], "S")?;
+            s.vx_min = need_num(&a[1], "PARTICLE_SET_VELOCITY")?; s.vx_max = need_num(&a[2], "PARTICLE_SET_VELOCITY")?; s.vy_min = need_num(&a[3], "PARTICLE_SET_VELOCITY")?; s.vy_max = need_num(&a[4], "PARTICLE_SET_VELOCITY")?;
             if s.vx_max < s.vx_min || s.vy_max < s.vy_min { return err("PARTICLE_SET_VELOCITY: max muss >= min sein"); }
             Ok(Value::Nil)
         }
@@ -5156,8 +5166,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if mi < 0 || ma < mi { return err("PARTICLE_SET_LIFETIME: ms_min >= 0 und ms_max >= ms_min noetig"); }
             let s = psys(&a[0], "PARTICLE_SET_LIFETIME")?; let mut s = s.borrow_mut(); s.lifetime_min = mi; s.lifetime_max = ma; Ok(Value::Nil)
         }
-        "particle_set_gravity" => { arity!(3); let s = psys(&a[0], "PARTICLE_SET_GRAVITY")?; let mut s = s.borrow_mut(); s.gravity_x = need_num(&a[1], "S")?; s.gravity_y = need_num(&a[2], "S")?; Ok(Value::Nil) }
-        "particle_set_color" => { arity!(2); let c = need_int(&a[1], "PARTICLE_SET_COLOR")?; if c < 0 || c > 0xFFFFFF { return err("PARTICLE_SET_COLOR: Farbe muss 0..0xFFFFFF sein"); } psys(&a[0], "PARTICLE_SET_COLOR")?.borrow_mut().color = c; Ok(Value::Nil) }
+        "particle_set_gravity" => { arity!(3); let s = psys(&a[0], "PARTICLE_SET_GRAVITY")?; let mut s = s.borrow_mut(); s.gravity_x = need_num(&a[1], "PARTICLE_SET_GRAVITY")?; s.gravity_y = need_num(&a[2], "PARTICLE_SET_GRAVITY")?; Ok(Value::Nil) }
+        "particle_set_color" => { arity!(2); let c = need_int(&a[1], "PARTICLE_SET_COLOR")?; if !(0..=0xFFFF_FFFF).contains(&c) { return err("PARTICLE_SET_COLOR: Farbe muss 0..&HFFFFFFFF sein"); } psys(&a[0], "PARTICLE_SET_COLOR")?.borrow_mut().color = c; Ok(Value::Nil) }
         "particle_set_size" => {
             arity!(3); let (mi, ma) = (need_int_gerundet(&a[1], "PARTICLE_SET_SIZE")? as i32, need_int_gerundet(&a[2], "PARTICLE_SET_SIZE")? as i32);
             if mi < 1 || ma < mi { return err("PARTICLE_SET_SIZE: min >= 1 und max >= min noetig"); }
@@ -5169,7 +5179,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if !matches!(m.as_str(), "circle" | "pixel" | "square" | "streak" | "glow") { return err(format!("PARTICLE_SET_MODE: unbekannter Modus '{}'", m)); }
             psys(&a[0], "PARTICLE_SET_MODE")?.borrow_mut().mode = m; Ok(Value::Nil)
         }
-        "particle_set_color_end" => { arity!(2); let c = need_int(&a[1], "PARTICLE_SET_COLOR_END")?; if c < 0 || c > 0xFFFFFF { return err("PARTICLE_SET_COLOR_END: Farbe muss 0..0xFFFFFF sein"); } let s = psys(&a[0], "PARTICLE_SET_COLOR_END")?; let mut s = s.borrow_mut(); s.color_end = c; s.has_color_end = true; Ok(Value::Nil) }
+        "particle_set_color_end" => { arity!(2); let c = need_int(&a[1], "PARTICLE_SET_COLOR_END")?; if !(0..=0xFFFF_FFFF).contains(&c) { return err("PARTICLE_SET_COLOR_END: Farbe muss 0..&HFFFFFFFF sein"); } let s = psys(&a[0], "PARTICLE_SET_COLOR_END")?; let mut s = s.borrow_mut(); s.color_end = c; s.has_color_end = true; Ok(Value::Nil) }
         "particle_emit" => {
             arity!(2); let count = need_int_gerundet(&a[1], "PARTICLE_EMIT")?;
             if count < 0 { return err("PARTICLE_EMIT: count muss >= 0 sein"); }
@@ -5215,7 +5225,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "ecs_query3" => { arity!(4); Ok(int_array(ecs_h(&a[0], "ECS_QUERY3")?.borrow().query(&[need_str(&a[1], "Q")?, need_str(&a[2], "Q")?, need_str(&a[3], "Q")?]))) }
         "ecs_integrate_float" => { arity!(3); Ok(Value::Int(ecs_h(&a[0], "ECS_INTEGRATE_FLOAT")?.borrow_mut().integrate_float(need_str(&a[1], "I")?, need_str(&a[2], "I")?))) }
         "ecs_integrate_int" => { arity!(3); Ok(Value::Int(ecs_h(&a[0], "ECS_INTEGRATE_INT")?.borrow_mut().integrate_int(need_str(&a[1], "I")?, need_str(&a[2], "I")?))) }
-        "ecs_scale_float" => { arity!(3); Ok(Value::Int(ecs_h(&a[0], "ECS_SCALE_FLOAT")?.borrow_mut().scale_float(need_str(&a[1], "S")?, need_num(&a[2], "ECS_SCALE_FLOAT")?))) }
+        "ecs_scale_float" => { arity!(3); Ok(Value::Int(ecs_h(&a[0], "ECS_SCALE_FLOAT")?.borrow_mut().scale_float(need_str(&a[1], "ECS_SCALE_FLOAT")?, need_num(&a[2], "ECS_SCALE_FLOAT")?))) }
         "ecs_fill_float" => { arity!(3); Ok(Value::Int(ecs_h(&a[0], "ECS_FILL_FLOAT")?.borrow_mut().fill_float(need_str(&a[1], "F")?, need_num(&a[2], "ECS_FILL_FLOAT")?))) }
         "ecs_fill_int" => { arity!(3); Ok(Value::Int(ecs_h(&a[0], "ECS_FILL_INT")?.borrow_mut().fill_int(need_str(&a[1], "F")?, need_int(&a[2], "ECS_FILL_INT")?))) }
         "ecs_clamp_float" => { arity!(4); let n = ecs_h(&a[0], "ECS_CLAMP_FLOAT")?.borrow_mut().clamp_float(need_str(&a[1], "C")?, need_num(&a[2], "C")?, need_num(&a[3], "C")?)?; Ok(Value::Int(n)) }
@@ -5435,7 +5445,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(7);
             let m = tiled_h(&a[0], "TILED_FILL_RECT")?; let mut mb = m.borrow_mut();
             let li = tile_layer_idx(&mb, need_int(&a[1], "TILED_FILL_RECT")?, "TILED_FILL_RECT")?;
-            let (tx, ty, w, h, gid) = (need_int(&a[2], "T")?, need_int(&a[3], "T")?, need_int(&a[4], "T")?, need_int(&a[5], "T")?, need_int(&a[6], "T")?);
+            let (tx, ty, w, h, gid) = (need_int(&a[2], "TILED_FILL_RECT")?, need_int(&a[3], "TILED_FILL_RECT")?, need_int(&a[4], "TILED_FILL_RECT")?, need_int(&a[5], "TILED_FILL_RECT")?, need_int(&a[6], "TILED_FILL_RECT")?);
             let layer = &mut mb.layers[li];
             let (lw, lh) = (layer.width, layer.height);
             let (x0, y0) = (tx.max(0), ty.max(0));
@@ -5470,7 +5480,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(5);
             let m = tiled_h(&a[0], "TILED_FLOOD_FILL")?; let mut mb = m.borrow_mut();
             let li = tile_layer_idx(&mb, need_int(&a[1], "TILED_FLOOD_FILL")?, "TILED_FLOOD_FILL")?;
-            let (tx, ty, gid) = (need_int(&a[2], "T")?, need_int(&a[3], "T")?, need_int(&a[4], "T")?);
+            let (tx, ty, gid) = (need_int(&a[2], "TILED_FLOOD_FILL")?, need_int(&a[3], "TILED_FLOOD_FILL")?, need_int(&a[4], "TILED_FLOOD_FILL")?);
             let layer = &mut mb.layers[li];
             let (w, h) = (layer.width, layer.height);
             Ok(Value::Int(crate::tiled::flood_fill(&mut layer.tiles, w, h, tx, ty, gid)))
@@ -5478,27 +5488,27 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "tiled_tile_prop_bool" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_TILE_PROP_BOOL")?; let mb = m.borrow();
-            Ok(Value::Bool(mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).map(|p| p.as_bool()).unwrap_or(false)))
+            Ok(Value::Bool(mb.tile_property(need_int(&a[1], "TILED_TILE_PROP_BOOL")?, need_str(&a[2], "TILED_TILE_PROP_BOOL")?).map(|p| p.as_bool()).unwrap_or(false)))
         }
         "tiled_tile_prop_int" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_TILE_PROP_INT")?; let mb = m.borrow();
-            Ok(Value::Int(mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).map(|p| p.as_int()).unwrap_or(0)))
+            Ok(Value::Int(mb.tile_property(need_int(&a[1], "TILED_TILE_PROP_INT")?, need_str(&a[2], "TILED_TILE_PROP_INT")?).map(|p| p.as_int()).unwrap_or(0)))
         }
         "tiled_tile_prop_float" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_TILE_PROP_FLOAT")?; let mb = m.borrow();
-            Ok(Value::Float(mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).map(|p| p.as_float()).unwrap_or(0.0)))
+            Ok(Value::Float(mb.tile_property(need_int(&a[1], "TILED_TILE_PROP_FLOAT")?, need_str(&a[2], "TILED_TILE_PROP_FLOAT")?).map(|p| p.as_float()).unwrap_or(0.0)))
         }
         "tiled_tile_prop_string" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_TILE_PROP_STRING")?; let mb = m.borrow();
-            Ok(Value::str_rc(&mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).map(|p| p.as_string()).unwrap_or_default()))
+            Ok(Value::str_rc(&mb.tile_property(need_int(&a[1], "TILED_TILE_PROP_STRING")?, need_str(&a[2], "TILED_TILE_PROP_STRING")?).map(|p| p.as_string()).unwrap_or_default()))
         }
         "tiled_tile_has_prop" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_TILE_HAS_PROP")?; let mb = m.borrow();
-            Ok(Value::Bool(mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).is_some()))
+            Ok(Value::Bool(mb.tile_property(need_int(&a[1], "TILED_TILE_HAS_PROP")?, need_str(&a[2], "TILED_TILE_HAS_PROP")?).is_some()))
         }
         // Die Schluessel einer Kachel bzw. eines Objekts. Ohne sie liesse
         // sich nicht ANZEIGEN, was ein Tile hat -- `TILED_TILE_HAS_PROP`
@@ -5542,56 +5552,56 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "tiled_object_name" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_OBJECT_NAME")?; let mb = m.borrow();
-            Ok(Value::str_rc(&get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_NAME")?.name))
+            Ok(Value::str_rc(&get_obj(&mb, need_str(&a[1], "TILED_OBJECT_NAME")?, need_int(&a[2], "TILED_OBJECT_NAME")?, "TILED_OBJECT_NAME")?.name))
         }
         "tiled_object_type" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_OBJECT_TYPE")?; let mb = m.borrow();
-            Ok(Value::str_rc(&get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_TYPE")?.type_))
+            Ok(Value::str_rc(&get_obj(&mb, need_str(&a[1], "TILED_OBJECT_TYPE")?, need_int(&a[2], "TILED_OBJECT_TYPE")?, "TILED_OBJECT_TYPE")?.type_))
         }
         "tiled_object_x" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_OBJECT_X")?; let mb = m.borrow();
-            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_X")?.x))
+            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "TILED_OBJECT_X")?, need_int(&a[2], "TILED_OBJECT_X")?, "TILED_OBJECT_X")?.x))
         }
         "tiled_object_y" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_OBJECT_Y")?; let mb = m.borrow();
-            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_Y")?.y))
+            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "TILED_OBJECT_Y")?, need_int(&a[2], "TILED_OBJECT_Y")?, "TILED_OBJECT_Y")?.y))
         }
         "tiled_object_width" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_OBJECT_WIDTH")?; let mb = m.borrow();
-            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_WIDTH")?.width))
+            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "TILED_OBJECT_WIDTH")?, need_int(&a[2], "TILED_OBJECT_WIDTH")?, "TILED_OBJECT_WIDTH")?.width))
         }
         "tiled_object_height" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_OBJECT_HEIGHT")?; let mb = m.borrow();
-            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_HEIGHT")?.height))
+            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "TILED_OBJECT_HEIGHT")?, need_int(&a[2], "TILED_OBJECT_HEIGHT")?, "TILED_OBJECT_HEIGHT")?.height))
         }
         "tiled_object_prop_bool" => {
             arity!(4);
             let m = tiled_h(&a[0], "TILED_OBJECT_PROP_BOOL")?; let mb = m.borrow();
-            let o = get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_PROP_BOOL")?;
-            Ok(Value::Bool(o.properties.get(need_str(&a[3], "T")?).map(|p| p.as_bool()).unwrap_or(false)))
+            let o = get_obj(&mb, need_str(&a[1], "TILED_OBJECT_PROP_BOOL")?, need_int(&a[2], "TILED_OBJECT_PROP_BOOL")?, "TILED_OBJECT_PROP_BOOL")?;
+            Ok(Value::Bool(o.properties.get(need_str(&a[3], "TILED_OBJECT_PROP_BOOL")?).map(|p| p.as_bool()).unwrap_or(false)))
         }
         "tiled_object_prop_int" => {
             arity!(4);
             let m = tiled_h(&a[0], "TILED_OBJECT_PROP_INT")?; let mb = m.borrow();
-            let o = get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_PROP_INT")?;
-            Ok(Value::Int(o.properties.get(need_str(&a[3], "T")?).map(|p| p.as_int()).unwrap_or(0)))
+            let o = get_obj(&mb, need_str(&a[1], "TILED_OBJECT_PROP_INT")?, need_int(&a[2], "TILED_OBJECT_PROP_INT")?, "TILED_OBJECT_PROP_INT")?;
+            Ok(Value::Int(o.properties.get(need_str(&a[3], "TILED_OBJECT_PROP_INT")?).map(|p| p.as_int()).unwrap_or(0)))
         }
         "tiled_object_prop_float" => {
             arity!(4);
             let m = tiled_h(&a[0], "TILED_OBJECT_PROP_FLOAT")?; let mb = m.borrow();
-            let o = get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_PROP_FLOAT")?;
-            Ok(Value::Float(o.properties.get(need_str(&a[3], "T")?).map(|p| p.as_float()).unwrap_or(0.0)))
+            let o = get_obj(&mb, need_str(&a[1], "TILED_OBJECT_PROP_FLOAT")?, need_int(&a[2], "TILED_OBJECT_PROP_FLOAT")?, "TILED_OBJECT_PROP_FLOAT")?;
+            Ok(Value::Float(o.properties.get(need_str(&a[3], "TILED_OBJECT_PROP_FLOAT")?).map(|p| p.as_float()).unwrap_or(0.0)))
         }
         "tiled_object_prop_string" => {
             arity!(4);
             let m = tiled_h(&a[0], "TILED_OBJECT_PROP_STRING")?; let mb = m.borrow();
-            let o = get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_PROP_STRING")?;
-            Ok(Value::str_rc(&o.properties.get(need_str(&a[3], "T")?).map(|p| p.as_string()).unwrap_or_default()))
+            let o = get_obj(&mb, need_str(&a[1], "TILED_OBJECT_PROP_STRING")?, need_int(&a[2], "TILED_OBJECT_PROP_STRING")?, "TILED_OBJECT_PROP_STRING")?;
+            Ok(Value::str_rc(&o.properties.get(need_str(&a[3], "TILED_OBJECT_PROP_STRING")?).map(|p| p.as_string()).unwrap_or_default()))
         }
         "tiled_tileset_count" => { arity!(1); Ok(Value::Int(tiled_h(&a[0], "TILED_TILESET_COUNT")?.borrow().tilesets.len() as i64)) }
         "tiled_tileset_image" => {
@@ -5659,13 +5669,27 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "char_set_coyote_time" => {
             arity!(2);
             let c = char_h(&a[0], "CHAR_SET_COYOTE_TIME")?;
-            c.borrow_mut().coyote_max = need_int(&a[1], "CHAR_SET_COYOTE_TIME")?.max(0);
+            c.borrow_mut().coyote_max = need_int(&a[1], "CHAR_SET_COYOTE_TIME")?.max(0) as f64;
+            Ok(Value::Nil)
+        }
+        // Dieselben Fristen in ms (Leitlinie: Dauern in ms, Regel 9 in
+        // docs/builtins-namen.md); die alten zaehlen Bilder zu 1/60 s.
+        "char_set_coyote_ms" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_COYOTE_MS")?;
+            c.borrow_mut().coyote_max = need_num(&a[1], "CHAR_SET_COYOTE_MS")?.max(0.0) * 0.06;
+            Ok(Value::Nil)
+        }
+        "char_set_jump_buffer_ms" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_JUMP_BUFFER_MS")?;
+            c.borrow_mut().jump_buffer_max = need_num(&a[1], "CHAR_SET_JUMP_BUFFER_MS")?.max(0.0) * 0.06;
             Ok(Value::Nil)
         }
         "char_set_jump_buffer" => {
             arity!(2);
             let c = char_h(&a[0], "CHAR_SET_JUMP_BUFFER")?;
-            c.borrow_mut().jump_buffer_max = need_int(&a[1], "CHAR_SET_JUMP_BUFFER")?.max(0);
+            c.borrow_mut().jump_buffer_max = need_int(&a[1], "CHAR_SET_JUMP_BUFFER")?.max(0) as f64;
             Ok(Value::Nil)
         }
         "char_set_variable_jump" => {
@@ -5690,11 +5714,32 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         "char_update" => {
-            arity!(3);
+            // Optional dt in Sekunden (wie DELTA); ohne ein Schritt je Bild.
+            // Ein dt ueber 0.1 s wird geteilt, damit ein Ruckler die Figur
+            // nicht durch duenne Boeden traegt (wie PHYS*_STEP).
+            if a.len() != 3 && a.len() != 4 {
+                return Err(format!("CHAR_UPDATE: erwartet 3 bis 4 Argumente, erhalten {}", a.len()));
+            }
             let c = char_h(&a[0], "CHAR_UPDATE")?;
             let m = tiled_h(&a[1], "CHAR_UPDATE")?; let mb = m.borrow();
             let li = tile_layer_idx(&mb, need_int(&a[2], "CHAR_UPDATE")?, "CHAR_UPDATE")?;
-            c.borrow_mut().update(&mb, &mb.layers[li]);
+            if a.len() == 4 {
+                let dt = need_num(&a[3], "CHAR_UPDATE")?;
+                if !dt.is_finite() || dt < 0.0 {
+                    return Err(format!("CHAR_UPDATE: dt muss eine Zahl >= 0 sein (Sekunden), erhalten {}", dt));
+                }
+                if dt > 1.0 {
+                    return Err(format!("CHAR_UPDATE: dt ist in Sekunden (wie DELTA) -- {} sieht nach Millisekunden aus", dt));
+                }
+                let mut rest = dt * 60.0;
+                while rest > 1e-9 {
+                    let s = rest.min(6.0);
+                    c.borrow_mut().update(&mb, &mb.layers[li], s);
+                    rest -= s;
+                }
+            } else {
+                c.borrow_mut().update(&mb, &mb.layers[li], 1.0);
+            }
             Ok(Value::Nil)
         }
         "char_x" => { arity!(1); Ok(Value::Float(char_h(&a[0], "CHAR_X")?.borrow().x)) }
@@ -5823,7 +5868,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // Suchbeginn fuer eine Wortgrenze.
         "regex_find_pos" => {
             if a.len() < 2 || a.len() > 3 {
-                return err("REGEX_FIND_POS: erwartet (text, pattern [, ab])".to_string());
+                return err(crate::vm::falsche_argumente("REGEX_FIND_POS", a.len()));
             }
             let t = need_str(&a[0], "REGEX_FIND_POS")?;
             let re = regex_compile(need_str(&a[1], "REGEX_FIND_POS")?)?;
@@ -5847,7 +5892,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // Text als Muster, das nur sich selbst trifft -- fuer eine Suche, die
         // wahlweise woertlich oder als Ausdruck laeuft und dafuer EINEN Weg
         // nehmen will.
-        "regex_escape$" | "regex_escape" => {
+        "regex_escape$" => {
             arity!(1);
             Ok(Value::str_rc(regex::escape(need_str(&a[0], "REGEX_ESCAPE$")?)))
         }
@@ -6088,10 +6133,10 @@ fn json_to_val(j: &serde_json::Value) -> Value {
 }
 
 fn save_load(path: &str) -> R {
-    let text = std::fs::read_to_string(resolve_asset_path(path)).map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound { format!("SAVE_LOAD: Datei '{}' nicht gefunden", path) } else { format!("SAVE_LOAD: {}", e) }
-    })?;
-    let raw: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("SAVE_LOAD: '{}' ist kein gueltiges JSON ({})", path, e))?;
+    // Wie jede gelesene Textdatei (text_lesen): eine BOM vorn bricht das
+    // JSON nicht mehr (ein Spielstand, den ein Editor mit BOM speicherte).
+    let text = text_lesen(path, None, "SAVE_LOAD")?;
+    let raw: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("SAVE_LOAD: '{}': {}", path, json_fehler_text(&e)))?;
     let obj = raw.as_object().ok_or("SAVE_LOAD: Save-Datei muss ein JSON-Objekt sein")?;
     let version = obj.get("_version").and_then(|v| v.as_i64()).unwrap_or(1);
     let mut data = Vec::new();
@@ -6298,8 +6343,8 @@ fn text_lesen(pfad: &str, kodierung: Option<&str>, fn_: &str) -> Result<String, 
         Some(n) => crate::kodierung::aus_name(n, fn_)?,
         None => crate::kodierung::Kodierung::Utf8,
     };
-    let bytes = std::fs::read(resolve_asset_path(pfad))
-        .map_err(|e| format!("{}: {}: {}", fn_, pfad, e))?;
+    let gefunden = resolve_asset_path(pfad);
+    let bytes = std::fs::read(&gefunden).map_err(|e| datei_fehler(fn_, &gefunden, &e))?;
     Ok(crate::kodierung::ohne_bom(crate::kodierung::dekodieren(&bytes, k, fn_, pfad)?))
 }
 
@@ -6494,9 +6539,9 @@ fn file_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<DhFile>>, String
         // OPENFILE eins liefert. Ohne diesen Zweig stand da "WRITE erwartet
         // FILE", und die Datei war ja als FILE deklariert.
         Value::Nil => Err(format!(
-            concat!("{}: die Datei ist nicht geoeffnet -- f = OPENFILE(\"name.txt\", \"w\") ",
+            concat!("{}: die Datei ist nicht geoeffnet -- f = FILE_OPEN(\"name.txt\", \"w\") ",
                     "(\"r\" zum Lesen, \"a\" zum Anhaengen) muss davor stehen"), fn_)),
-        v => Err(format!("{}: erwartet eine Datei aus OPENFILE, erhalten {}", fn_, v.type_name())),
+        v => Err(format!("{}: erwartet eine Datei aus FILE_OPEN, erhalten {}", fn_, v.type_name())),
     }
 }
 
@@ -6650,7 +6695,8 @@ fn tween_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<TweenObj>>, Str
 
 /// Zeitbasis der Tweens -- dieselbe monotone Uhr wie MILLIS. Mit der
 /// Systemuhr wuerde eine Animation bei einer Zeitumstellung springen.
-fn now_ms() -> i64 { seit_start().as_millis() as i64 }
+/// TWEEN laeuft nach der Spieluhr (spieluhr.rs): im Testlauf mit den Bildern.
+fn now_ms() -> i64 { crate::spieluhr::jetzt_ms() as i64 }
 
 fn elapsed(t: &TweenObj) -> i64 {
     t.paused_at.unwrap_or_else(|| now_ms() - t.start_ms)
@@ -6992,7 +7038,7 @@ fn m3_quat_rotate_vec3(q: (f32, f32, f32, f32), v: (f32, f32, f32)) -> (f32, f32
 
 fn nums(a: &[Value], fn_: &str) -> Result<Vec<f64>, String> {
     let mut v = Vec::with_capacity(a.len());
-    for (i, x) in a.iter().enumerate() { v.push(need_num(x, fn_).map_err(|_| format!("{}: Arg {} muss Zahl sein", fn_, i + 1))?); }
+    for (i, x) in a.iter().enumerate() { v.push(crate::argument::num(x, fn_, Some(i + 1))?); }
     Ok(v)
 }
 
@@ -7147,22 +7193,10 @@ pub(crate) fn val_lesen(text: &str) -> Value {
     }
 }
 
-pub(crate) fn coerce_map_value(v: &Value, vt: &str) -> R {
-    match vt {
-        "integer" => match v {
-            Value::Int(_) => Ok(v.clone()),
-            // Ganzzahliges FLOAT akzeptieren (wie ARRAY OF INTEGER / Skalar).
-            Value::Float(f) if f.fract() == 0.0 => Ok(Value::Int(*f as i64)),
-            _ => err(format!("Map-Wert: Erwartet INTEGER, erhalten {}", v.type_name())),
-        },
-        "float" => match v { Value::Float(_) => Ok(v.clone()), Value::Int(i) => Ok(Value::Float(*i as f64)), _ => err("Map-Wert: Erwartet FLOAT".to_string()) },
-        "string" => match v { Value::Str(_) => Ok(v.clone()), _ => err("Map-Wert: Erwartet STRING".to_string()) },
-        "boolean" => match v { Value::Bool(_) => Ok(v.clone()), _ => err("Map-Wert: Erwartet BOOLEAN".to_string()) },
-        _ => {
-            crate::value::klasse_pruefen(v, vt, "Map-Wert")?;
-            Ok(v.clone())
-        }
-    }
+pub(crate) fn coerce_map_value(v: &Value, vt: &str, ctx: &str) -> R {
+    // Dieselbe `coerce` wie Variablen und Felder (bis 2026.53 eine Kopie
+    // ohne Ueberlaufpruefung, die als "Map-Wert" meldete).
+    crate::vm::coerce(v.clone(), vt, ctx)
 }
 
 /// Ordering fuer SORT (homogene Arrays).
@@ -7175,6 +7209,27 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
     } else {
         Equal
     }
+}
+
+
+
+/// Der Kasten eines Sprites, wie SPRITE_DRAW ihn zeichnet: (x, y, Breite,
+/// Hoehe) mit der Skala (Betrag -- eine negative Skala spiegelt nur).
+fn sprite_kasten(s: &crate::value::SpriteObj) -> (f64, f64, f64, f64) {
+    (s.x, s.y, s.frame_w as f64 * s.scale_x.abs(), s.frame_h as f64 * s.scale_y.abs())
+}
+/// Ein JSON-Lesefehler auf Deutsch mit Zeile und Spalte -- serde nennt ihn
+/// englisch ("expected value at line 1 column 1"), und das stand bis 2026.53
+/// so in JSON_PARSE/JSON_LOAD/SAVE_LOAD.
+pub(crate) fn json_fehler_text(e: &serde_json::Error) -> String {
+    use serde_json::error::Category;
+    let was = match e.classify() {
+        Category::Eof => "der Text endet mitten im JSON",
+        Category::Syntax => "kein gueltiges JSON",
+        Category::Data => "unpassende Daten",
+        Category::Io => "Lesefehler",
+    };
+    format!("{} (Zeile {}, Spalte {})", was, e.line(), e.column())
 }
 
 #[cfg(test)]

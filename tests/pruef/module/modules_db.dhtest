@@ -197,7 +197,7 @@ r = DB_QUERY(c, "SELECT 1")
 DB_CLOSE_RESULT(r)
 PRINT DB_NEXT(r)
 --- fehler
-DB: Result wurde bereits geschlossen
+DB_NEXT: das Ergebnis wurde mit DB_CLOSE_RESULT geschlossen
 
 
 === get buffer reads a blob byte for byte

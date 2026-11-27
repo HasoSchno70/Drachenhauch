@@ -405,7 +405,7 @@ TRUE 0 % Österreich
 19 %
 -1
 0
-GUI_LISTBOX_SET_DATA: das Widget ist keine Liste und keine Klappliste
+GUI_LISTBOX_SET_DATA: das Widget ist kein GUI_LISTBOX oder GUI_DROPDOWN
 
 === ein leeres zahlenfeld speichert null und laedt leer
 ' Ein Zahlenfeld ohne Eingabe ist "kein Wert": GUI_FORM_SAVE schreibt

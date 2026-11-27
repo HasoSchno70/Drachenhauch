@@ -42,13 +42,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -159,13 +159,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -288,13 +288,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -338,7 +338,7 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, 320 + zell() * 2, GUI_CANVAS_Y(leinwand) + 6 + zell() * 2)
+    prKlick(3, 320 + zell() * 2, GUI_CANVAS_SCREEN_Y(leinwand) + 6 + zell() * 2)
     prKlick(10, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
 END SUB
@@ -417,13 +417,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -593,13 +593,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -771,13 +771,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -953,13 +953,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -1135,13 +1135,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -1317,13 +1317,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -1499,13 +1499,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -1681,13 +1681,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -1863,13 +1863,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -2044,13 +2044,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -2228,13 +2228,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -2278,7 +2278,7 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    prKlick(3, GUI_CANVAS_X(palette) + 48, GUI_CANVAS_Y(palette) + 16)
+    prKlick(3, GUI_CANVAS_SCREEN_X(palette) + 48, GUI_CANVAS_SCREEN_Y(palette) + 16)
     prKlick(9, GUI_GET_X(bPropSetz) + 50, prOy() + GUI_GET_Y(bPropSetz) + 14)
     prKlick(15, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
@@ -2415,13 +2415,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -2528,13 +2528,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -2641,13 +2641,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -2829,13 +2829,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -3014,13 +3014,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -3129,13 +3129,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -3245,13 +3245,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -3431,13 +3431,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -3539,13 +3539,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -3646,13 +3646,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -3698,7 +3698,7 @@ END SUB
 SUB prFall()
     prKlick(3, prKx(16), prKy(16))
     prKlick(9, GUI_GET_X(bTsNeu) + 16, prOy() + GUI_GET_Y(bTsNeu) + 13)
-    prKlick(18, GUI_CANVAS_X(palette) + 48, GUI_CANVAS_Y(palette) + 16)
+    prKlick(18, GUI_CANVAS_SCREEN_X(palette) + 48, GUI_CANVAS_SCREEN_Y(palette) + 16)
     prKlick(24, prKx(80), prKy(16))
     prKlick(30, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
@@ -3830,13 +3830,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -3944,13 +3944,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -3996,7 +3996,7 @@ END SUB
 SUB prFall()
     prKlick(3, prKx(16), prKy(16))
     prKlick(9, GUI_GET_X(bTsNeu) + 16, prOy() + GUI_GET_Y(bTsNeu) + 13)
-    prKlick(18, GUI_CANVAS_X(palette) + 48, GUI_CANVAS_Y(palette) + 16)
+    prKlick(18, GUI_CANVAS_SCREEN_X(palette) + 48, GUI_CANVAS_SCREEN_Y(palette) + 16)
     prKlick(24, prKx(80), prKy(16))
     prKlick(30, GUI_TOOLBAR_ITEM_X(tb, tbCode) + 20, prOy() + GUI_GET_Y(tb) + 23)
     prAbspielen()
@@ -4090,13 +4090,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -4141,10 +4141,10 @@ SUB prSchreib(z AS STRING)
 END SUB
 SUB prFall()
     prKlick(3, GUI_GET_X(bTsNeu) + 16, prOy() + GUI_GET_Y(bTsNeu) + 13)
-    prE(10, 7, GUI_CANVAS_X(palette) + 8, GUI_CANVAS_Y(palette) + 8)
+    prE(10, 7, GUI_CANVAS_SCREEN_X(palette) + 8, GUI_CANVAS_SCREEN_Y(palette) + 8)
     prE(12, 8, 0, -1)
     prE(14, 8, 0, -1)
-    prKlick(18, GUI_CANVAS_X(palette) + 8, GUI_CANVAS_Y(palette) + 8)
+    prKlick(18, GUI_CANVAS_SCREEN_X(palette) + 8, GUI_CANVAS_SCREEN_Y(palette) + 8)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -4206,13 +4206,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -4257,14 +4257,14 @@ SUB prSchreib(z AS STRING)
 END SUB
 SUB prFall()
     prKlick(3, GUI_GET_X(bTsNeu) + 16, prOy() + GUI_GET_Y(bTsNeu) + 13)
-    prE(10, 7, GUI_CANVAS_X(palette) + 8, GUI_CANVAS_Y(palette) + 8)
+    prE(10, 7, GUI_CANVAS_SCREEN_X(palette) + 8, GUI_CANVAS_SCREEN_Y(palette) + 8)
     prE(12, 2, 340, 0)
     prE(14, 2, 340, 0)
     prE(16, 2, 340, 0)
     prE(14, 8, 0, -1)
     prE(16, 8, 0, -1)
     prE(18, 1, 340, 0)
-    prKlick(22, GUI_CANVAS_X(palette) + 8, GUI_CANVAS_Y(palette) + 8)
+    prKlick(22, GUI_CANVAS_SCREEN_X(palette) + 8, GUI_CANVAS_SCREEN_Y(palette) + 8)
     prAbspielen()
 END SUB
 SUB prProbe()
@@ -4325,13 +4325,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -4504,13 +4504,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -4684,13 +4684,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -4864,13 +4864,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -5050,13 +5050,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -5168,13 +5168,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -5289,13 +5289,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -5339,8 +5339,8 @@ SUB prSchreib(z AS STRING)
     END IF
 END SUB
 SUB prFall()
-    DIM px AS INTEGER : px = GUI_CANVAS_X(palette)
-    DIM py AS INTEGER : py = GUI_CANVAS_Y(palette)
+    DIM px AS INTEGER : px = GUI_CANVAS_SCREEN_X(palette)
+    DIM py AS INTEGER : py = GUI_CANVAS_SCREEN_Y(palette)
     prZiehen(3, px + 16, py + 16, px + 2 * 32 + 16, py + 32 + 16)
     prKlick(14, prKx(4 * 16 + 8), prKy(4 * 16 + 8))
     prAbspielen()
@@ -5407,13 +5407,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -5511,13 +5511,13 @@ SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS IN
 END SUB
 ' Widget-Lagen zaehlen ab dem Inhalt unter der Menueleiste.
 FUNCTION prOy() AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) - GUI_GET_Y(leinwand)
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) - GUI_GET_Y(leinwand)
 END FUNCTION
 FUNCTION prKx(px AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+    RETURN GUI_CANVAS_SCREEN_X(leinwand) + px * zoom
 END FUNCTION
 FUNCTION prKy(py AS INTEGER) AS INTEGER
-    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+    RETURN GUI_CANVAS_SCREEN_Y(leinwand) + py * zoom
 END FUNCTION
 SUB prAbspielen()
     ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
@@ -5568,7 +5568,7 @@ END SUB
 SUB prProbe()
     IF prBild - prStart = 4 AND NOT FILEEXISTS("ev.txt") THEN
         DIM mox AS INTEGER : DIM moy AS INTEGER : DIM mm AS INTEGER
-        (mox, moy, mm) = miniLage(GUI_CANVAS_X(leinwand), GUI_CANVAS_Y(leinwand), GUI_CANVAS_W(leinwand), GUI_CANVAS_H(leinwand))
+        (mox, moy, mm) = miniLage(GUI_CANVAS_SCREEN_X(leinwand), GUI_CANVAS_SCREEN_Y(leinwand), GUI_CANVAS_SCREEN_W(leinwand), GUI_CANVAS_SCREEN_H(leinwand))
         prF = [] : prZ = []
         prKlick(1, mox + 60 * mm, moy + 50 * mm)
         prAbspielen()

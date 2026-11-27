@@ -1,7 +1,6 @@
 //! Spinner und Bedienung: Tasten je Widget, Klicks (`handle_press`).
 //!
-//! Teil von `gui.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `gui.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
@@ -49,9 +48,9 @@ impl Gui {
             let n = chars.len() as i32;
             self.spin_edit = Some((wi, i, chars, n, 0, wert, wert));
         }
-        if g.key_pressed(KEY_UP) || g.key_pressed(KEY_DOWN) {
+        if g.key_repeat(KEY_UP) || g.key_repeat(KEY_DOWN) {
             self.spin_fertig();
-            self.spinner_step(wi, i, if g.key_pressed(KEY_UP) { 1 } else { -1 });
+            self.spinner_step(wi, i, if g.key_repeat(KEY_UP) { 1 } else { -1 });
             return;
         }
         if g.key_pressed(KEY_ENTER) {
@@ -463,34 +462,21 @@ impl Gui {
     /// ist sie leer, zaehlen die Buchstaben- und Zifferntasten selbst (die
     /// Wiedergabe einer Aufnahme fuellt nur Tasten, keine Zeichen).
     pub(super) fn liste_tippen(&mut self, wi: usize, i: usize, g: &mut Graphics) {
-        let mut s = g.pop_text_input();
-        s.retain(|c| !c.is_control() && c != ' ');
-        if s.is_empty() && !g.key_ctrl() {
-            for c in (b'a'..=b'z').chain(b'0'..=b'9') {
-                if g.key_pressed(c as i64) { s.push(c as char); }
-            }
-        }
+        let s = super::bausteine::getippt(g);
         if s.is_empty() { return; }
-        let jetzt = g.get_time();
+        let jetzt = g.uhr_jetzt();
         let (tipp, wahl, sel) = {
             let w = &mut self.windows[wi].widgets[i];
             let n = w.items.len();
             let l = w.list.get_or_insert_with(|| Box::new(ListState { anker: -1, ..Default::default() }));
             l.sync(n);
-            if jetzt - l.tipp_zeit > 1.0 { l.tipp.clear(); }
-            l.tipp_zeit = jetzt;
-            l.tipp.push_str(&s.to_lowercase());
+            let tipp = super::bausteine::tipp_merken(&mut l.tipp, &mut l.tipp_zeit, jetzt, &s);
             let wahl: Vec<usize> = liste_ansicht(&w.items, Some(l)).into_iter().filter(|&k| l.waehlbar(k)).collect();
-            (l.tipp.clone(), wahl, w.sel)
+            (tipp, wahl, w.sel)
         };
         if wahl.is_empty() { return; }
-        let erster = tipp.chars().next().unwrap();
-        let wiederholt = tipp.chars().all(|c| c == erster);
-        let such: String = if wiederholt { erster.to_string() } else { tipp };
-        let pos = wahl.iter().position(|&k| k as i32 == sel);
-        // Ein neues Wort sucht ab der AKTUELLEN Zeile (sie passt vielleicht
-        // schon), ein wiederholter Buchstabe ab der naechsten.
-        let start = match pos { Some(p) if wiederholt => p + 1, Some(p) => p, None => 0 };
+        let (such, wiederholt) = tipp;
+        let start = super::bausteine::tipp_start(wahl.iter().position(|&k| k as i32 == sel), wiederholt);
         let items = &self.windows[wi].widgets[i].items;
         let treffer = (0..wahl.len()).map(|d| wahl[(start + d) % wahl.len()])
             .find(|&k| items[k].to_lowercase().starts_with(&such));
@@ -503,8 +489,8 @@ impl Gui {
     pub(super) fn widget_keys(&mut self, wi: usize, i: usize, kind: Kind, g: &mut Graphics) {
         let (leertaste, enter) = (g.key_pressed(KEY_SPACE), g.key_pressed(KEY_ENTER));
         let ausloesen = leertaste || enter;
-        let (auf, ab) = (g.key_pressed(KEY_UP), g.key_pressed(KEY_DOWN));
-        let (links, rechts) = (g.key_pressed(KEY_LEFT), g.key_pressed(KEY_RIGHT));
+        let (auf, ab) = (g.key_repeat(KEY_UP), g.key_repeat(KEY_DOWN));
+        let (links, rechts) = (g.key_repeat(KEY_LEFT), g.key_repeat(KEY_RIGHT));
         match kind {
             Kind::Eigen => {
                 // Die Tasten dieses Bildes merkt sich das Widget, Enter und
@@ -610,8 +596,8 @@ impl Gui {
                     let m = self.dd_mark.max(-1);
                     let neu = if ab { Some(m + 1) }
                         else if auf { Some(if m < 0 { 0 } else { m - 1 }) }
-                        else if g.key_pressed(KEY_PAGEDOWN) { Some(m + rows) }
-                        else if g.key_pressed(KEY_PAGEUP) { Some(m - rows) }
+                        else if g.key_repeat(KEY_PAGEDOWN) { Some(m + rows) }
+                        else if g.key_repeat(KEY_PAGEUP) { Some(m - rows) }
                         else if g.key_pressed(KEY_HOME) { Some(0) }
                         else if g.key_pressed(KEY_END) { Some(n - 1) }
                         else { None };
@@ -651,8 +637,8 @@ impl Gui {
                 }
                 let seite = (self.windows[wi].widgets[i].h / self.list_zeile_h(&self.windows[wi].widgets[i])).max(1) - 1;
                 let mut d = ab as i32 - auf as i32;
-                if g.key_pressed(KEY_PAGEDOWN) { d += seite.max(1); }
-                if g.key_pressed(KEY_PAGEUP) { d -= seite.max(1); }
+                if g.key_repeat(KEY_PAGEDOWN) { d += seite.max(1); }
+                if g.key_repeat(KEY_PAGEUP) { d -= seite.max(1); }
                 if d != 0 { self.liste_bewegen(wi, i, d); self.liste_sichtbar(wi, i); }
                 // Enter ist der Doppelklick der Tastatur -- "oeffnen" soll ohne
                 // Maus gehen, und das Programm fragt dafuer schon GUI_DOUBLE_CLICKED.
@@ -689,8 +675,8 @@ impl Gui {
                 if links { wd.hsv[1] = (wd.hsv[1] - schritt).max(0.0); }
                 if auf { wd.hsv[2] = (wd.hsv[2] + schritt).min(1.0); }
                 if ab { wd.hsv[2] = (wd.hsv[2] - schritt).max(0.0); }
-                if g.key_pressed(KEY_PAGEUP) { wd.hsv[0] = (wd.hsv[0] - 10.0).rem_euclid(360.0); }
-                if g.key_pressed(KEY_PAGEDOWN) { wd.hsv[0] = (wd.hsv[0] + 10.0).rem_euclid(360.0); }
+                if g.key_repeat(KEY_PAGEUP) { wd.hsv[0] = (wd.hsv[0] - 10.0).rem_euclid(360.0); }
+                if g.key_repeat(KEY_PAGEDOWN) { wd.hsv[0] = (wd.hsv[0] + 10.0).rem_euclid(360.0); }
                 // Deckkraft mit Pos1/Ende -- nur wenn der Streifen ueberhaupt
                 // da ist, sonst verstellte man etwas Unsichtbares.
                 if wd.alpha_an {
@@ -723,8 +709,8 @@ impl Gui {
                             neu = [j, m, t];
                         }
                         let weite = if g.key_shift() { 12 } else { 1 };
-                        if g.key_pressed(KEY_PAGEUP) { neu = self.dp_monat(neu, -weite); }
-                        if g.key_pressed(KEY_PAGEDOWN) { neu = self.dp_monat(neu, weite); }
+                        if g.key_repeat(KEY_PAGEUP) { neu = self.dp_monat(neu, -weite); }
+                        if g.key_repeat(KEY_PAGEDOWN) { neu = self.dp_monat(neu, weite); }
                         self.datum_zeigt = neu;
                         return;
                     }
@@ -742,8 +728,8 @@ impl Gui {
                 }
                 // Mit Umschalt springt es ein JAHR statt einen Monat.
                 let weite = if g.key_shift() { 12 } else { 1 };
-                if g.key_pressed(KEY_PAGEUP) { neu = self.dp_monat(neu, -weite); }
-                if g.key_pressed(KEY_PAGEDOWN) { neu = self.dp_monat(neu, weite); }
+                if g.key_repeat(KEY_PAGEUP) { neu = self.dp_monat(neu, -weite); }
+                if g.key_repeat(KEY_PAGEDOWN) { neu = self.dp_monat(neu, weite); }
                 if Self::dp_erlaubt(&self.windows[wi].widgets[i], neu) {
                     self.dp_setze(wi, i, neu);
                 }
@@ -855,8 +841,8 @@ impl Gui {
                 let p0 = pos.map(|p| p as i32).unwrap_or(0);
                 let spring = if g.key_pressed(KEY_HOME) { Some(0) }
                     else if g.key_pressed(KEY_END) { Some(vis.len() as i32 - 1) }
-                    else if g.key_pressed(KEY_PAGEDOWN) { Some(p0 + seite) }
-                    else if g.key_pressed(KEY_PAGEUP) { Some(p0 - seite) }
+                    else if g.key_repeat(KEY_PAGEDOWN) { Some(p0 + seite) }
+                    else if g.key_repeat(KEY_PAGEUP) { Some(p0 - seite) }
                     else { None };
                 if let Some(p) = spring {
                     let p = p.clamp(0, vis.len() as i32 - 1) as usize;
@@ -980,27 +966,15 @@ impl Gui {
     /// Tippen springt: der naechste Eintrag, der so anfaengt -- dieselbe Regel
     /// wie bei der Liste. Offen bewegt es die Markierung, zu waehlt es gleich.
     pub(super) fn dd_tippen(&mut self, wi: usize, idx: usize, offen: bool, g: &mut Graphics) -> bool {
-        let mut s = g.pop_text_input();
-        s.retain(|c| !c.is_control() && c != ' ');
-        if s.is_empty() && !g.key_ctrl() {
-            for c in (b'a'..=b'z').chain(b'0'..=b'9') {
-                if g.key_pressed(c as i64) { s.push(c as char); }
-            }
-        }
+        let s = super::bausteine::getippt(g);
         if s.is_empty() { return false; }
-        let jetzt = g.get_time();
-        if jetzt - self.dd_tipp_zeit > 1.0 { self.dd_tipp.clear(); }
-        self.dd_tipp_zeit = jetzt;
-        self.dd_tipp.push_str(&s.to_lowercase());
-        let tipp = self.dd_tipp.clone();
-        let erster = tipp.chars().next().unwrap();
-        let wiederholt = tipp.chars().all(|c| c == erster);
-        let such: String = if wiederholt { erster.to_string() } else { tipp };
+        let jetzt = g.uhr_jetzt();
+        let (such, wiederholt) = super::bausteine::tipp_merken(&mut self.dd_tipp, &mut self.dd_tipp_zeit, jetzt, &s);
         let items = &self.windows[wi].widgets[idx].items;
         let n = items.len();
         if n == 0 { return true; }
         let von = if offen { self.dd_mark } else { self.windows[wi].widgets[idx].sel };
-        let start = if von >= 0 { if wiederholt { von as usize + 1 } else { von as usize } } else { 0 };
+        let start = super::bausteine::tipp_start(if von >= 0 { Some(von as usize) } else { None }, wiederholt);
         let treffer = (0..n).map(|d| (start + d) % n).find(|&k| items[k].to_lowercase().starts_with(&such));
         if let Some(k) = treffer {
             if offen { self.dd_mark = k as i32; self.dd_mark_zeigen(wi, idx); }
@@ -1012,9 +986,9 @@ impl Gui {
     /// Feld darf getippt werden, auch etwas, das nicht in der Liste steht.
     pub fn dropdown_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_DROPDOWN_SET")?;
-        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_SET: Widget ist keine Klappliste (GUI_DROPDOWN)".into()); }
-        match key.to_lowercase().as_str() {
-            "bearbeitbar" | "editable" => {
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_SET: das Widget ist kein GUI_DROPDOWN".into()); }
+        match super::einstellungen::schluessel("GUI_DROPDOWN_SET", key, super::einstellungen::DROPDOWN)? {
+            "bearbeitbar" => {
                 let an = wert != 0.0;
                 if an && !w.frei {
                     w.frei = true;
@@ -1023,14 +997,8 @@ impl Gui {
                 }
                 if !an { w.frei = false; }
             }
-            k => return Err(format!("GUI_DROPDOWN_SET: unbekannter Schluessel '{}' (bekannt: bearbeitbar)", k)),
+            _ => unreachable!("Tafel und Arme laufen auseinander"),
         }
-        Ok(())
-    }
-    pub fn dropdown_placeholder(&mut self, h: i64, text: String) -> Result<(), String> {
-        let w = self.wdg_mut(h, "GUI_DROPDOWN_PLACEHOLDER")?;
-        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_PLACEHOLDER: Widget ist keine Klappliste (GUI_DROPDOWN)".into()); }
-        w.placeholder = text;
         Ok(())
     }
 
@@ -1108,7 +1076,7 @@ impl Gui {
                     let n = self.windows[dw].widgets[di].items.len() as i32;
                     let rows = ph / self.sk(DROPDOWN_ITEM_H).max(1);
                     // Klick in den Rollbalken: rollen, nicht waehlen -- und offen bleiben.
-                    let bw = self.sk(8);
+                    let bw = self.rollbalken_w();
                     if n > rows && mx >= px + pw - 1 - bw {
                         let rel = ((my - py) as f64 / ph.max(1) as f64).clamp(0.0, 1.0);
                         self.dd_scroll = ((rel * n as f64) as i32 - rows / 2).clamp(0, (n - rows).max(0));

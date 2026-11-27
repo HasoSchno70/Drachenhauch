@@ -1,12 +1,11 @@
-//! AST-Knoten fuer Drachenhauch -- Rust-Port von `drachenhauch/ast_nodes.py`.
-//! Stufe 2 der Front-End-Portierung (siehe docs/intern/rust-frontend-port.md).
+//! AST-Knoten fuer Drachenhauch.
 //!
-//! `to_json()` emittiert exakt die Struktur, die der Python-Test aus den
-//! Dataclass-Feldern baut (`{"_": NodeName, feld: ...}`), damit der Parser
-//! gegen Python verifiziert werden kann (`dhrt --ast`). Tupel (z.B.
-//! `If.elseif_branches`) werden als JSON-Arrays serialisiert -- wie Pythons
-//! Tuple→list. `line` ist in Python KEIN Dataclass-Feld (dynamisch gesetzt)
-//! und wird daher hier nicht getrackt/serialisiert.
+//! `to_json()` legt einen Knoten als `{"_": Knotenname, feld: ...}` ab. Das
+//! ist zweierlei: die Ausgabe von `dhrt --ast` (Fehlersuche am Parser) und
+//! ein Durchgang ueber ALLE Kinder eines Knotens, ohne fuer jede Knotenart
+//! eine Liste der Kinder pflegen zu muessen -- die Lambda-Analyse, der
+//! Aufrufgraph und `erwaehnt` im Compiler laufen darueber, und ein neues
+//! Feld ist dort sofort mit dabei. Die Zeile (`line`) gehoert nicht dazu.
 
 use serde_json::{json, Map, Value};
 

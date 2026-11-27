@@ -24,7 +24,9 @@ Keyboard etwas davon ansteuern. Genau diese Brücke schließt das Modul.
 | Funktion | Wirkung |
 |---|---|
 | `MIDI_IN_COUNT()` → INTEGER | Wie viele Eingänge es gibt |
+| `MIDI_IN_DEVICES()` → ARRAY OF STRING | die Namen der Eingänge als Feld; der Index ist der für `MIDI_IN_OPEN` |
 | `MIDI_OUT_COUNT()` → INTEGER | Wie viele Ausgänge es gibt |
+| `MIDI_OUT_DEVICES()` → ARRAY OF STRING | die Namen der Ausgänge als Feld; der Index ist der für `MIDI_OUT_OPEN` |
 | `MIDI_IN_NAME$(i)` → STRING | Name des Eingangs `i` |
 | `MIDI_OUT_NAME$(i)` → STRING | Name des Ausgangs `i` |
 
@@ -243,7 +245,7 @@ Bildschleife — ein Bild sind 16 ms, und das hört man.
 
 | Funktion | Wirkung |
 |---|---|
-| `MIDI_NOTE_NAME$(note)` → STRING | `60` → `"C4"`, leer außerhalb 0..127 |
+| `MIDI_NOTE_NAME$(note)` → STRING | `60` → `"C4"`, leer außerhalb 0..127; deutsche Schreibweise: `71` → `"H4"` (englisch B4), `70` → `"A#4"` |
 | `MIDI_NOTE_FREQ(note)` → FLOAT | `69` → `440.0` Hz — die Brücke zu `AUDIO_TONE` |
 
 Die Oktavzählung folgt der verbreiteten Konvention (Note 60 = C4). Manche

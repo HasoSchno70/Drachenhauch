@@ -80,7 +80,7 @@ einem Ordner, in den es nicht schreiben darf.
 ## Ein Plugin schreiben
 
 Die Bibliothek `dh_plugin.dh` liegt neben der IDE; die IDE legt ihren
-Ordner in `DH_PATH`, ein Plugin schreibt also einfach `IMPORT
+Ordner in `DHRT_PATH`, ein Plugin schreibt also einfach `IMPORT
 "dh_plugin.dh"`. Das Programm meldet an, was es kann, und wartet dann auf
 Ereignisse:
 
@@ -185,7 +185,7 @@ PROBE_ENDE()
 
 Die mitgelieferten Plugins sind so geprüft (`tests/pruef/werkzeugkette/plugin_probe.dhtest`).
 Ein Plugin aus der Vorlage bringt seine Prüfung schon mit: `test.dhtest`
-neben der `plugin.dh`, mit `DH_PATH` auf den Ordner der IDE (dort liegen
+neben der `plugin.dh`, mit `DHRT_PATH` auf den Ordner der IDE (dort liegen
 `dh_plugin.dh` und die Probe). Laufen lässt man sie mit Strg+Alt+F5, wenn
 sie vorn ist, oder mit `dhrt test <plugin-ordner>`.
 

@@ -492,7 +492,7 @@ CLOSEFILE(f)
 --- datei g.txt base64
 S/Zsbg==
 --- erwartet
-READALL$: die Kodierung einer offenen Datei steht schon bei OPENFILE(pfad, modus, kodierung)
+READALL$: die Kodierung einer offenen Datei steht schon bei FILE_OPEN(pfad, modus, kodierung)
 
 === bom faellt weg
 ' Excel schreibt ihn -- sonst hiesse die erste Spalte fuer immer

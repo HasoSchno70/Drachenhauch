@@ -212,7 +212,7 @@ GELD_TEILEN: die Anzahl muss groesser als 0 sein
 IMPORT "geld"
 PRINT GELD_NEU("1,00") + 1.0
 --- fehler
-+ : GELD und eine gewoehnliche Zahl mischen sich nicht -- genau dafuer gibt es den Typ. Entweder GELD_NEU(zahl) daraus machen oder mit GELD_ZAHL(betrag) bewusst herausgehen.
++ : GELD und eine gewoehnliche Zahl mischen sich nicht -- genau dafuer gibt es den Typ. Entweder MONEY_NEW(zahl) daraus machen oder mit GELD_ZAHL(betrag) bewusst herausgehen.
 
 === euro mal euro
 IMPORT "geld"
@@ -226,13 +226,13 @@ IMPORT "geld"
 DIM x AS GELD
 x = 5
 --- fehler
-Zuweisung an 'x': Erwartet GELD, erhalten INTEGER -- mit GELD_NEU(5) einen Betrag daraus machen
+Zuweisung an 'x': Erwartet GELD, erhalten INTEGER -- mit MONEY_NEW(5) einen Betrag daraus machen
 
 === builtin will wirklich geld
 IMPORT "geld"
 PRINT GELD_CENT(5)
 --- fehler
-GELD_CENT: erwartet GELD, erhalten INTEGER -- mit GELD_NEU() einen Betrag daraus machen
+GELD_CENT: erwartet GELD, erhalten INTEGER -- mit MONEY_NEW() einen Betrag daraus machen
 
 === text ohne betrag
 IMPORT "geld"
@@ -265,25 +265,9 @@ TRUE
 === ohne betrag ein fehler statt einer panik
 ' Bis 2026.53 griff try_geld ungeprueft auf das erste Argument zu: GELD_CENT()
 ' & Co. beendeten die Laufzeit mit einer Rust-Panik, die kein TRY fing.
+'
+' Seit 2026.54 haelt schon der Compiler an.
 IMPORT "geld"
-TRY
-    PRINT GELD_CENT()
-CATCH e
-    PRINT e
-END TRY
-TRY
-    PRINT GELD_ABS()
-CATCH e
-    PRINT e
-END TRY
-TRY
-    PRINT GELD_TEXT$()
-CATCH e
-    PRINT e
-END TRY
-PRINT "lebt"
---- erwartet
-GELD_CENT: fehlendes Argument 1
-GELD_ABS: fehlendes Argument 1
-GELD_TEXT$: fehlendes Argument 1
-lebt
+PRINT GELD_CENT()
+--- fehler
+GELD_CENT: erwartet 1 Argument(e), erhalten 0

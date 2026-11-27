@@ -259,7 +259,7 @@ END TRY
 --- umgebung
 DHRT_FRAMES=1
 --- enthaelt
-keine Liste
+kein GUI_LISTBOX
 Eintrag 5 gibt es nicht
 
 === der leer-hinweis bricht um, statt aus der liste zu laufen
@@ -383,17 +383,17 @@ DIM y AS INTEGER
 DIM b AS INTEGER
 DIM h AS INTEGER
 DIM y0 AS INTEGER
-(x, y0, b, h) = GUI_LISTBOX_ITEM_RECT(lb, 0)
-(x, y, b, h) = GUI_LISTBOX_ITEM_RECT(lb, 3)
+(x, y0, b, h) = GUI_LISTBOX_ITEM_SCREEN_RECT(lb, 0)
+(x, y, b, h) = GUI_LISTBOX_ITEM_SCREEN_RECT(lb, 3)
 PRINT "zeile 3 drei zeilen tiefer "; y - y0 = 3 * h; " hoehe nach stildatei "; h > 30
 GUI_LISTBOX_FILTER(lb, "B")
 GUI_UPDATE()
 DIM fy AS INTEGER
-(x, fy, b, h) = GUI_LISTBOX_ITEM_RECT(lb, 3)
+(x, fy, b, h) = GUI_LISTBOX_ITEM_SCREEN_RECT(lb, 3)
 PRINT "banane rueckt auf "; fy - y0 = h
-(x, y, b, h) = GUI_LISTBOX_ITEM_RECT(lb, 0)
+(x, y, b, h) = GUI_LISTBOX_ITEM_SCREEN_RECT(lb, 0)
 PRINT "apfel weg "; x = 0 AND y = 0 AND b = 0 AND h = 0
-(x, y, b, h) = GUI_LISTBOX_ITEM_RECT(lb, 3)
+(x, y, b, h) = GUI_LISTBOX_ITEM_SCREEN_RECT(lb, 3)
 WRITEALL("ev.txt", "c 4" + CHR$(10) + "e 0 7 " + STR$(x + b \ 2) + " " + STR$(y + h \ 2) + " 0 0" + CHR$(10) + "e 1 7 " + STR$(x + b \ 2) + " " + STR$(y + h \ 2) + " 0 0" + CHR$(10) + "e 3 6 0 0 0 0" + CHR$(10) + "e 5 5 0 0 0 0" + CHR$(10))
 AUTOMATION_PLAY("ev.txt")
 DIM i AS INTEGER
@@ -405,7 +405,7 @@ FOR i = 1 TO 12
 NEXT
 PRINT "gewaehlt "; GUI_LISTBOX_SELECTED(lb)
 TRY
-    (x, y, b, h) = GUI_LISTBOX_ITEM_RECT(lb, 9)
+    (x, y, b, h) = GUI_LISTBOX_ITEM_SCREEN_RECT(lb, 9)
 CATCH e
     PRINT e
 END TRY
@@ -414,7 +414,7 @@ zeile 3 drei zeilen tiefer TRUE hoehe nach stildatei TRUE
 banane rueckt auf TRUE
 apfel weg TRUE
 gewaehlt 3
-GUI_LISTBOX_ITEM_RECT: Eintrag 9 ausserhalb [0..4]
+GUI_LISTBOX_ITEM_SCREEN_RECT: Eintrag 9 ausserhalb [0..4]
 
 === der hinweis der leeren liste laesst sich abfragen
 IMPORT "gui"

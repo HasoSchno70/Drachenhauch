@@ -95,8 +95,7 @@ Runtime error in p.dh:1: BUFFER_NEW: size -1 is negative
 Runtime error in p.dh:1: MAPGET: key 'x' is not in the map
 Runtime error in p.dh:1: ARRAY_POP: the array is empty
 Runtime error in p.dh:1: FORMAT$: unknown specifier %q
-p.dh:1: Warning: REPEAT$: only 1 argument(s) given, 2 expected.
-Runtime error in p.dh:1: REPEAT$: expected 2 argument(s), got 1 -- usage: REPEAT$(s, n)
+p.dh:1: Compile error: REPEAT$: expected 2 argument(s), got 1 -- usage: REPEAT$(s, n)
 
 === meldungen der gui, beispiele und zusammengesetzte (runde 3)
 ' Die dritte Runde: gui, Grafik, Ton. Dazu zwei Funde: ein Beispiel mit
@@ -132,7 +131,7 @@ IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 Runtime error in p.dh:2: GUI_SCALE: the factor must be between 0.5 and 4.0 -- usage: GUI_SCALE(factor)
 Runtime error in p.dh:2: GUI_TEXTAREA_SET: the widget is not a GUI_TEXTAREA
-Runtime error in p.dh:2: GUI_TABLE_SORT: widget is not a table
+Runtime error in p.dh:2: GUI_TABLE_SORT: the widget is not a GUI_TABLE
 p.dh:1: Parse error (13): There is no PRINT USING -- PRINT FORMAT$(value, "%6.2f") or f"{value:.2f}"
 Runtime error in p.dh:2: Access to a global variable that has not been set yet. Is this running as a task (`dhrt call` / TASK_START)? Then that is expected: the main program does NOT run then, so no global is set -- not even a CONST whose value is only known at run time (one with a fixed value like `CONST WIDTH = 640` is inserted by the compiler). Pass the function what it needs as parameters. In a normal run this means: the DIM of 'g' has not run yet -- is it further down in the program than the place that uses it?
 
@@ -311,7 +310,7 @@ export 0
 TRUE
 
 === die bilanz des maschinencodes auf englisch
-' DHRT_JIT_BILANZ=1 zaehlt beim Beenden, was der Maschinencode getan hat;
+' DHRT_JIT_STATS=1 zaehlt beim Beenden, was der Maschinencode getan hat;
 ' Kleine Wunder zitiert daraus. Bis 2026-11-24 blieben diese Zeilen auch
 ' mit DHRT_LANG=en deutsch.
 SUB rechne(t AS TUPLE)
@@ -328,7 +327,7 @@ rechne(("a", "b", "c", "d"))
 --- umgebung
 DHRT_LANG=en
 DHRT_JIT=immer
-DHRT_JIT_BILANZ=1
+DHRT_JIT_STATS=1
 --- erwartet
 a,b,c,d,
 --- stderr
@@ -353,3 +352,14 @@ IMPORT "{sammlung}/../_hilfen/dhrtlauf.dh"
 --- erwartet
 ueber 400 vorlagen TRUE
 rueckgabe 0
+
+=== tastennamen folgen der sprache
+' KEY_NAME$ war auch mit DHRT_LANG=en deutsch ("LEER", "LINKS"); die
+' eingebauten Texte folgen jetzt der Sprache (Bericht A14.5).
+SCREEN(100, 100, "t", 1)
+PRINT KEY_NAME$(KEY_SPACE); " "; KEY_NAME$(KEY_LEFT)
+--- umgebung
+DHRT_FRAMES=1
+DHRT_LANG=en
+--- erwartet
+SPACE LEFT

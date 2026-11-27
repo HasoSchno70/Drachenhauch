@@ -144,7 +144,7 @@ einer Reiterseite im Hintergrund), mit der Fläche als Schnittrechteck und in
 der Schrift der Oberfläche: der eigenen der gui (`GUI_FONT`), sonst der
 eingebauten Sans in der Textgröße des Programms -- nicht in der
 Pixelschrift, die `TEXT` sonst nimmt. Was `Zeichnen` an Schrift, Größe und
-Stil ändert, gilt nur dort (wie `GFX_PUSH`/`GFX_POP`). Gezeichnet wird in Bildschirmpunkten ab `GUI_CANVAS_X/Y`. Maus, Rad und
+Stil ändert, gilt nur dort (wie `GFX_PUSH`/`GFX_POP`). Gezeichnet wird in Bildschirmpunkten ab `GUI_CANVAS_SCREEN_X/Y`. Maus, Rad und
 Ziehen kommen nicht, solange ein modales Fenster vor der Fläche steht.
 
 Ein **Diagramm** (Bibliothek, Gruppe Zeichnen) ist eine Zeichenfläche mit

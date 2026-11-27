@@ -1,6 +1,6 @@
 ' Eine Zeichenflaeche und ein Timer: der Timer bewegt den Ball, das Ereignis
 ' Zeichnen malt ihn (jedes Bild), Ziehen auf der Flaeche setzt ihn dorthin.
-' Gezeichnet wird in Bildschirmlage -- GUI_CANVAS_X/Y sagen, wo die Flaeche
+' Gezeichnet wird in Bildschirmlage -- GUI_CANVAS_SCREEN_X/Y sagen, wo die Flaeche
 ' liegt, und sie waechst mit dem Fenster.
 CONST RADIUS = 12
 
@@ -19,8 +19,8 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
     END SUB
 
     SUB takt_Aktion()
-        DIM b AS INTEGER : b = GUI_CANVAS_W(Self.flaeche)
-        DIM h AS INTEGER : h = GUI_CANVAS_H(Self.flaeche)
+        DIM b AS INTEGER : b = GUI_CANVAS_SCREEN_W(Self.flaeche)
+        DIM h AS INTEGER : h = GUI_CANVAS_SCREEN_H(Self.flaeche)
         Self.x = Self.x + Self.vx
         Self.y = Self.y + Self.vy
         IF Self.x < RADIUS OR Self.x > b - RADIUS THEN
@@ -37,9 +37,9 @@ CLASS Hauptfenster EXTENDS Hauptfenster_Basis
     END SUB
 
     SUB flaeche_Zeichnen()
-        DIM ox AS INTEGER : ox = GUI_CANVAS_X(Self.flaeche)
-        DIM oy AS INTEGER : oy = GUI_CANVAS_Y(Self.flaeche)
-        BOX(ox, oy, ox + GUI_CANVAS_W(Self.flaeche) - 1, oy + GUI_CANVAS_H(Self.flaeche) - 1, RGB(22, 28, 42))
+        DIM ox AS INTEGER : ox = GUI_CANVAS_SCREEN_X(Self.flaeche)
+        DIM oy AS INTEGER : oy = GUI_CANVAS_SCREEN_Y(Self.flaeche)
+        BOX(ox, oy, ox + GUI_CANVAS_SCREEN_W(Self.flaeche) - 1, oy + GUI_CANVAS_SCREEN_H(Self.flaeche) - 1, RGB(22, 28, 42))
         CIRCLE(ox + INT(Self.x), oy + INT(Self.y), RADIUS, RGB(255, 170, 40))
     END SUB
 
