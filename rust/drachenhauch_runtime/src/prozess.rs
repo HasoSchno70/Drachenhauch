@@ -107,6 +107,12 @@ pub(crate) fn befehl(programm: &str, args: &[String], fn_: &str) -> Result<Comma
 }
 
 impl Prozess {
+    /// Ohne zusaetzliche Umgebung -- nur fuer die Tests.
+    #[cfg(test)]
+    pub fn starten(programm: &str, args: &[String]) -> Result<Prozess, String> {
+        Self::starten_mit(programm, args, &[])
+    }
+
     /// Ein Kind mit Leitungen fuer Ein- und Ausgabe starten; `umgebung` gilt nur fuer dieses Kind.
     pub fn starten_mit(programm: &str, args: &[String], umgebung: &[(String, String)]) -> Result<Prozess, String> {
         let mut cmd = befehl(programm, args, "PROCESS_START")?;

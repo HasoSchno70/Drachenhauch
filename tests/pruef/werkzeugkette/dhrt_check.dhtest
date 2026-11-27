@@ -38,7 +38,7 @@ FOR i = 0 TO JSON_LEN(d, "d") - 1
     DIM w AS STRING : w = "d." + STR$(i)
     DIM datei AS STRING : datei = "haupt"
     IF JSON_HAS(d, w + ".file") THEN datei = BASENAME(JSON_GET_STRING(d, w + ".file"))
-    PRINT datei; " Zeile "; JSON_GET_INT(d, w + ".line"); " "; LEFT$(JSON_GET_STRING(d, w + ".message"), 32)
+    PRINT datei; " Zeile "; JSON_GET_INT(d, w + ".line"); " "; LEFT$(JSON_GET_STRING(d, w + ".message"), 31)
 NEXT
 WRITEALL("teil.dh", !"SUB g()\n    PRINT 1 +\nEND SUB\n")
 d = dlCheck(!"' eins\n' zwei\nIMPORT \"teil.dh\"\n")

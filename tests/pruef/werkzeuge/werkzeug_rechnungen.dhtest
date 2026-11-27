@@ -1920,7 +1920,7 @@ WEND
 PRINT "meldung " ; TRIM$(zeile)
 PRINT "laeuft mit eltern " ; PROCESS_RUNNING(pc)
 NET_CLOSE(sock)
-NET_CLOSE(lst)
+NET_CLOSE_LISTENER(lst)
 bis = MILLIS() + 10000
 WHILE PROCESS_RUNNING(pc) AND MILLIS() < bis
     SLEEP(50)

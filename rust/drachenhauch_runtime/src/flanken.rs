@@ -21,6 +21,9 @@
 //! `currentKeyState`), darum ein zweiter Satz Zaehler je GLFW-Tastencode und
 //! ein zweiter Rueckruf. Getippte ZEICHEN sind nicht betroffen, sie laufen
 //! ueber eine eigene Warteschlange.
+// Ohne Grafik uebersetzt nur der Rust-Test (die Rechnung `weiter`); die
+// Rueckrufe haengen an GLFW.
+#![cfg_attr(not(feature = "graphics"), allow(dead_code))]
 
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 

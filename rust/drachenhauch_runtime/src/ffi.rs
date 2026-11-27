@@ -2097,7 +2097,7 @@ mod tests {
             }
             let mut bauer = uebergang::Bauer::neu().unwrap();
             let z = bauer.rueckruf(&[Art::I8, Art::U16, Art::F32, Art::F64, Art::I64], Art::I32, 77,
-                                   test_eingang as usize).unwrap();
+                                   test_eingang as *const () as usize).unwrap();
             std::mem::forget(bauer);
             let f: extern "C" fn(i8, u16, f32, f64, i64) -> i32 = unsafe { std::mem::transmute(z) };
             assert_eq!(f(-5, 60000, 1.5, -2.25, 1 << 40), -12345);
@@ -2331,7 +2331,7 @@ mod tests {
                     schreib(r, P2f { x: a.y * k as f32, y: a.x });
                 }
             }
-            let z = rr_einstieg(&format!("{}{}l", p2f, p2f), e1 as usize);
+            let z = rr_einstieg(&format!("{}{}l", p2f, p2f), e1 as *const () as usize);
             let f: extern "C" fn(P2f, i32) -> P2f = unsafe { std::mem::transmute(z) };
             assert_eq!(f(P2f { x: 1.5, y: -2.0 }, 3), P2f { x: -6.0, y: 1.5 });
 
@@ -2344,7 +2344,7 @@ mod tests {
                     schreib(r, I3 { v: [x.v[2] + m.i, x.v[1] * 2, x.v[0] + m.d as i64] });
                 }
             }
-            let z = rr_einstieg(&format!("{}{}{}", i3, mix, i3), e2 as usize);
+            let z = rr_einstieg(&format!("{}{}{}", i3, mix, i3), e2 as *const () as usize);
             let f: extern "C" fn(Mix, I3) -> I3 = unsafe { std::mem::transmute(z) };
             assert_eq!(f(Mix { d: 7.0, i: 100 }, I3 { v: [1, 2, 3] }), I3 { v: [103, 4, 8] });
 
@@ -2360,7 +2360,7 @@ mod tests {
                     schreib(r, Ganz8 { a: s as i32, f: f.v.iter().sum::<f32>() + d.v.iter().sum::<f64>() as f32 });
                 }
             }
-            let z = rr_einstieg(&format!("{}{}q{}{}", g8, b3, f3, d4), e3 as usize);
+            let z = rr_einstieg(&format!("{}{}q{}{}", g8, b3, f3, d4), e3 as *const () as usize);
             let f: extern "C" fn(B3, i64, F3, D4) -> Ganz8 = unsafe { std::mem::transmute(z) };
             assert_eq!(f(B3 { a: 1, b: 2, c: -3 }, 4, F3 { v: [0.5, 1.0, 1.5] }, D4 { v: [1.0, 2.0, 3.0, 4.0] }),
                        Ganz8 { a: 1 + 20 - 300 + 4000, f: 13.0 });
@@ -2376,7 +2376,7 @@ mod tests {
                     *r = s as u64;
                 }
             }
-            let z = rr_einstieg("qqqqqq{z2;16;8;i8*2@0}q", e4 as usize);
+            let z = rr_einstieg("qqqqqq{z2;16;8;i8*2@0}q", e4 as *const () as usize);
             let f: extern "C" fn(i64, i64, i64, i64, i64, Z2, i64) -> i64 = unsafe { std::mem::transmute(z) };
             assert_eq!(f(1, 2, 3, 4, 5, Z2 { a: 2, b: 3 }, 4), 15 + 200 + 3000 + 40000);
 
@@ -2385,20 +2385,20 @@ mod tests {
             extern "C" fn e5(_: u64, p: *const u64, r: *mut u64) {
                 unsafe { let m: Mix = lies(p, 0); schreib(r, Mix { d: m.d * 2.0, i: m.i - 1 }); }
             }
-            let z = rr_einstieg(&format!("{}{}", mix, mix), e5 as usize);
+            let z = rr_einstieg(&format!("{}{}", mix, mix), e5 as *const () as usize);
             let f: extern "C" fn(Mix) -> Mix = unsafe { std::mem::transmute(z) };
             assert_eq!(f(Mix { d: 1.25, i: 1 << 40 }), Mix { d: 2.5, i: (1 << 40) - 1 });
             extern "C" fn e6(_: u64, p: *const u64, r: *mut u64) {
                 unsafe { let d: D4 = lies(p, 0); schreib(r, D4 { v: [d.v[3], d.v[2], d.v[1], d.v[0]] }); }
             }
-            let z = rr_einstieg(&format!("{}{}", d4, d4), e6 as usize);
+            let z = rr_einstieg(&format!("{}{}", d4, d4), e6 as *const () as usize);
             let f: extern "C" fn(D4) -> D4 = unsafe { std::mem::transmute(z) };
             assert_eq!(f(D4 { v: [1.0, 2.0, 3.0, 4.0] }), D4 { v: [4.0, 3.0, 2.0, 1.0] });
             // Drei Bytes zurueck: nicht mehr als drei werden geschrieben.
             extern "C" fn e7(_: u64, p: *const u64, r: *mut u64) {
                 unsafe { let b: B3 = lies(p, 0); schreib(r, B3 { a: b.c, b: b.a, c: b.b }); }
             }
-            let z = rr_einstieg(&format!("{}{}", b3, b3), e7 as usize);
+            let z = rr_einstieg(&format!("{}{}", b3, b3), e7 as *const () as usize);
             let f: extern "C" fn(B3) -> B3 = unsafe { std::mem::transmute(z) };
             assert_eq!(f(B3 { a: 1, b: 2, c: 3 }), B3 { a: 3, b: 1, c: 2 });
         }
