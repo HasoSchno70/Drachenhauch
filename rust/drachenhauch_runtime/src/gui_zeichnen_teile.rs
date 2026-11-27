@@ -1,7 +1,6 @@
 //! Zeichnen der grossen Widgets: Richtext, Baum, Regler, Karte, Bild, Popups, Tabelle und Zellen.
 //!
-//! Teil von `gui.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `gui.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 

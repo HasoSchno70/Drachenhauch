@@ -257,8 +257,9 @@ Einzelheiten stehen in der Geschichte des Bereichs.
 - Behälter (Layout, rollendes Panel, Reiterwerk, Akkordeon, Assistent) sind
   Luft für Klicks ihrer Kinder (`luft_fuer_kinder`).
 - Eine Taste, die ein Widget, ein Menü oder ein Kürzel genommen hat, ist
-  verbraucht (`liste_taste`, `kuerzel_gefeuert`, `widget_nimmt_taste`) -- sonst
-  drückt ESC zusätzlich den Abbrechen-Knopf.
+  verbraucht (`liste_taste`: nicht mehr für die Knöpfe, `kuerzel_gefeuert`:
+  für niemanden; die Knöpfe fragen `taste_fuer_knoepfe_genommen`;
+  `widget_nimmt_taste`) -- sonst drückt ESC zusätzlich den Abbrechen-Knopf.
 - Ein Fenster über einer Zeichenfläche braucht `GUI_DRAW_WINDOW` (Tooltips und
   Kontextmenüs: `GUI_DRAW_TOP`).
 - Was die gui in die `.dhform` schreibt, liest sie auch zurück (Test als

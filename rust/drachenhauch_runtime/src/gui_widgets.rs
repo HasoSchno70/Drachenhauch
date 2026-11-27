@@ -1,7 +1,6 @@
 //! Formular-Widgets: Radio, Dropdown, Fortschritt, Statusleiste, Pfadleiste, Listen samt Ausbau, Knopfarten.
 //!
-//! Teil von `gui.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `gui.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
@@ -1328,12 +1327,28 @@ impl Gui {
     }
     /// Wo der Text einer Listenzeile beginnt: hinter Kaestchen und Sinnbild.
     pub(super) fn list_text_x(&self, w: &Widget, ax: i32) -> i32 {
-        let box_w = self.list_box_w(w);
-        let ih = self.list_zeile_h(w);
         let hat_icon = w.list.as_ref().map(|l| l.icons.iter().any(|&i| i >= 0)).unwrap_or(false);
-        let mut tx = if box_w > 0 { ax + box_w } else { ax + self.w_pad(w) };
-        if hat_icon { tx += ih + 2; }
-        tx
+        self.list_icon_x(w, ax) + if hat_icon { self.list_zeile_h(w) + 2 } else { 0 }
+    }
+    /// Wo das Sinnbild einer Listenzeile beginnt: hinter dem Kaestchen,
+    /// sonst nach dem Innenabstand des Widgets.
+    pub(super) fn list_icon_x(&self, w: &Widget, ax: i32) -> i32 {
+        let box_w = self.list_box_w(w);
+        if box_w > 0 { ax + box_w } else { ax + self.w_pad(w) }
+    }
+    /// Wo der Text einer Listenzeile enden muss und wo ihr Zusatztext
+    /// beginnt (relativ zum linken Rand; `wz` = Breite ohne Rollbalken).
+    /// Zusammen mit `list_text_x` EINE Rechnung fuer Zeichnen und Tooltip --
+    /// bis 2026.53 rechnete der Tooltip mit dem Vorgabe-Innenabstand statt
+    /// dem der Stildatei.
+    pub(super) fn liste_rechts(&self, g: &Graphics, w: &Widget, wz: i32, k: usize) -> (i32, Option<i32>) {
+        match w.list.as_deref().and_then(|l| l.details.get(k)).filter(|d| !d.is_empty()) {
+            Some(d) => {
+                let dx = wz - self.w_pad(w) - self.wtext_width(g, w, d);
+                (dx - self.sk(10), Some(dx))
+            }
+            None => (wz - 2, None),
+        }
     }
     /// Rechtsklick auf einen Knoten waehlt ihn -- wie bei Liste und Tabelle;
     /// eine Mehrfachauswahl bleibt, wenn der Knoten dazugehoert.

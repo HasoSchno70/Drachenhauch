@@ -17,6 +17,23 @@ Seit diesem Bau haben sich nur `main.rs` und `jit.rs` geändert (Meldungen der
 Werkzeuge); die Befehle verhalten sich in HEAD gleich. „Code“ heißt: am
 Quelltext gelesen, nicht gelaufen. Am Code wurde nichts geändert.
 
+**Stand der Umsetzung (2026-11-27).** Alle Punkte A bis E und die
+Einzelfehler sind umgesetzt, auf den Zweigen `thema/argumente-einheitlich`,
+`thema/abstuerze-features-handles` und `thema/lesen-verbinden` (dort zuletzt
+C8 bis C10, D2, D4 bis D6, E2, E3, E5 und der Popover). Was sich für Programme
+ändert, sammelt `docs/intern/naechste-fassung.md`. Bewusst anders als
+vorgeschlagen:
+
+- Die Zeile `FEHL  Zeile …` von `dhrt test` bleibt deutsch: die IDE liest sie
+  (`ide/teile/projekt.dh`).
+- `builtin_familien.dhtest` misst Zeit; mit dem Bauprofil `--gegenprobe`
+  (ohne LTO) ist der letzte Befehl der Kette dreimal so teuer wie der erste,
+  im Release-Bau nicht. Er gilt nur am Release-Bau.
+- Die Warnungsfreiheit (C8) ist unter Windows und Linux (WSL) für alle
+  Feature-Kombinationen der Laufzeiten und der CI geprüft, macOS nicht.
+- Handles bleiben Nummern mit Art (`Value::Handle`), die Typtafel
+  (`typtafel.rs`) sagt je Typ Wert, Handle oder Zahl (D5).
+
 **Fundstellen** sind relativ zu `rust/drachenhauch_runtime/src/`, sofern nicht
 anders angegeben. Zeilennummern gelten für den genannten Commit.
 
@@ -1260,10 +1277,9 @@ Einzelbefunde. Darum stehen sie oben in der Rangliste.
 
 Diese sind keine Muster, aber sie brechen etwas und sind schnell behoben.
 
-**Stand 2026-11-25:** Auf dem Zweig `thema/argumente-einheitlich` sind 20 der
-21 behoben, je mit eigenem Commit, Prüffall und Gegenprobe (Spalte „Stand“).
-Offen ist nur der Popover; er ist größer als hier zuerst beschrieben (siehe
-seine Zeile).
+**Stand 2026-11-27:** Alle 21 behoben, je mit Prüffall und Gegenprobe (Spalte
+„Stand“); 20 auf `thema/argumente-einheitlich`, der Popover auf
+`thema/lesen-verbinden`.
 
 | Was | Wo | Beleg | Stand |
 |---|---|---|---|
@@ -1273,7 +1289,7 @@ seine Zeile).
 | `HTML_FIND_ALL` verschluckt Treffer bei `<` im Text (Fix von 2026.27 nur in `HTML_TEXT`) | `html.rs:429` | Lauf: 0 statt 2 | behoben |
 | Menükürzel mit Enter/Esc löst zusätzlich Standard-/Abbrechen-Knopf aus | `gui_eingabe.rs:848, 852` | Lauf: „menue bild 6 / ok bild 6“ | behoben |
 | Bildschirmleser liest „&Speichern“ (`w.text` statt `anzeige_text`) | `gui_a11y.rs:216-257` | Lauf über UI Automation | behoben, die Befehlspalette gleich mit |
-| Popover weicht an `schirm_b/h` aus statt an `grenze()` | `gui_ueber.rs:195, 211` | Lauf: ragt im nativen Fenster 96 px heraus | **offen**: Der eigentliche Fehler ist größer. Ein Popover wird immer auf der Hauptfläche gezeichnet (`gui_ueber.rs:768` `ueber_zeichnen`: „Ein Popover ist nie nativ“), auch wenn sein Widget in einem nativen Fenster steht, und `popup_rechtecke` kennt ihn nicht. Erst wenn er auf der Fläche seines Widgets liegt, ist `grenze()` die richtige Grenze; allein getauscht ändert es nichts Prüfbares. |
+| Popover weicht an `schirm_b/h` aus statt an `grenze()` | `gui_ueber.rs:195, 211` | Lauf: ragt im nativen Fenster 96 px heraus | behoben auf `thema/lesen-verbinden`: der Popover liegt auf der Fläche seines Widgets (`flaeche_von`), weicht an `grenze()` aus und bekommt ein Popup-Fenster wie die anderen Popups. Vorher: Der eigentliche Fehler ist größer. Ein Popover wird immer auf der Hauptfläche gezeichnet (`gui_ueber.rs:768` `ueber_zeichnen`: „Ein Popover ist nie nativ“), auch wenn sein Widget in einem nativen Fenster steht, und `popup_rechtecke` kennt ihn nicht. Erst wenn er auf der Fläche seines Widgets liegt, ist `grenze()` die richtige Grenze; allein getauscht ändert es nichts Prüfbares. |
 | GroupBox schätzt Titelbreite aus Zeichenzahl | `gui_zeichnen.rs:1984` | Lauf: Rahmenlinie läuft durch den Titel | behoben |
 | `FILETIME` eine Stunde daneben (Sommer/Winter) | `builtins.rs:3662` | Lauf (A10) | behoben |
 | `TIME_FROM_PARTS(2026, 13, 1)` = 2027-01-01 | `vm_system.rs:92` | Lauf | behoben: dieselben Grenzen wie `ZEIT_PARSE` |

@@ -200,7 +200,7 @@ impl Dokument {
         if k == "symbol" || k == "zapfdingbats" {
             return Err(format!(
                 "die Schrift '{}' gibt es nicht mehr -- seit die Schriften eingebettet werden, \
-                 hat 'sans' griechische Buchstaben und Zeichen wie \u{2713} \u{2717} \u{2605} selbst", name));
+                 hat 'sans' griechische Buchstaben und Zeichen wie ✓ ✗ ★ selbst", name));
         }
         Err(format!("Schrift '{}' gibt es nicht. Eingebaut sind {} (helvetica, times und courier \
                      meinen sans, serif und mono); eine eigene laedt PDF_FONT_LOAD", name, self.schriftliste()))

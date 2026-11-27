@@ -82,6 +82,11 @@ impl Gui {
             for i in 0..w.widgets.len() {
                 if let Some((x, y, b, h, _, _)) = self.vorschlag_rect(wi, i) { out.push((x, y, b, h)); }
             }
+            // Ein Popover samt Pfeil und Schatten.
+            if self.ist_offener_pop(wi) {
+                let r = self.sk(super::ueber::POP_PFEIL) + self.sk(8);
+                out.push((w.x - r, w.y - r, w.w + 2 * r, w.h + 2 * r));
+            }
         }
         out
     }
@@ -96,7 +101,7 @@ impl Gui {
         eigner.extend(self.datum_auf.map(|d| d.0));
         eigner.extend(self.rs_fenster());
         for (wi, w) in self.windows.iter().enumerate() {
-            if w.alive && self.vorschlaege_offen(wi) { eigner.push(wi); }
+            if w.alive && (self.vorschlaege_offen(wi) || self.ist_offener_pop(wi)) { eigner.push(wi); }
         }
         let mut out: Vec<u32> = Vec::new();
         for wi in eigner {

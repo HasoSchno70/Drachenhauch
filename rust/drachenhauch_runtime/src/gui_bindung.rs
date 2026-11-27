@@ -1,7 +1,6 @@
 //! Datenbindung, Formularpruefung, Sinnbilder im Baum, rollendes Panel, Ziehen zwischen Widgets, Bedienung ohne Maus.
 //!
-//! Teil von `gui.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `gui.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 

@@ -504,36 +504,6 @@ fn ui_flaeche(g: &mut crate::graphics::Graphics, p: UiPlastik, x: i32, y: i32, w
     }
 }
 
-impl UiState {
-    fn new() -> Self {
-        UiState {
-            checkbox: HashMap::new(), slider: HashMap::new(), radio: HashMap::new(),
-            text: HashMap::new(), focused: None, prev_backspace: false,
-            offset_x: 0, offset_y: 0, input_blocked: false,
-            windows: HashMap::new(), win_stack: Vec::new(), drag_win: None,
-            drag_off: (0, 0), active_win: None, hover_win: None,
-            was_mouse_down: false, click_origin: None, frame_count: 0,
-            theme: DEFAULT_UI_THEME.iter().map(|(k, v)| (k.to_string(), *v)).collect(),
-            metrics: DEFAULT_UI_METRICS.iter().map(|(k, v)| (k.to_string(), *v)).collect(),
-            tables: HashMap::new(),
-        }
-    }
-    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
-    fn th(&self, key: &str) -> i64 { *self.theme.get(key).unwrap_or(&0xFFFFFF) }
-    #[cfg_attr(not(feature = "graphics"), allow(dead_code))]
-    fn metric(&self, key: &str) -> i64 { *self.metrics.get(key).unwrap_or(&14) }
-    /// Plastik-Werte gebuendelt (siehe `UiPlastik`).
-    #[cfg(feature = "graphics")]
-    fn plastik(&self) -> UiPlastik {
-        UiPlastik {
-            rad: *self.metrics.get("corner_radius").unwrap_or(&0) as i32,
-            grad: *self.metrics.get("gradient").unwrap_or(&0) as i32,
-            gloss: *self.metrics.get("gloss").unwrap_or(&0) as i32,
-            bevel: *self.metrics.get("bevel").unwrap_or(&0) as i32,
-        }
-    }
-}
-
 /// Theme-Presets (UI_THEME_PRESET). Nur Farben (keine Metriken).
 #[cfg(feature = "graphics")]
 fn ui_preset(name: &str) -> Option<Vec<(&'static str, i64)>> {
@@ -585,18 +555,6 @@ fn ui_preset(name: &str) -> Option<Vec<(&'static str, i64)>> {
         _ => return None,
     };
     Some(p)
-}
-
-/// Metrik-Profil eines Presets. Nur die "glas_*"-Themen bringen Plastik mit;
-/// alle anderen bleiben flach, damit bestehende Programme unveraendert
-/// aussehen.
-#[cfg_attr(not(feature = "graphics"), allow(dead_code))]
-fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
-    if name.starts_with("glas") {
-        vec![("corner_radius", 5), ("gradient", 16), ("gloss", 26), ("bevel", 1)]
-    } else {
-        vec![("corner_radius", 0), ("gradient", 0), ("gloss", 0), ("bevel", 0)]
-    }
 }
 
 /// Befehle, die die Zeile ihres Aufrufs brauchen, ohne abzubrechen: ASSERT
@@ -784,45 +742,6 @@ fn ausgabe_terminal() -> bool {
     use std::io::IsTerminal;
     static T: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *T.get_or_init(|| std::io::stdout().is_terminal())
-}
-
-/// Ein JSON-Event als Zeile auf stdout schreiben + flushen.
-fn dbg_emit(ev: &serde_json::Value) {
-    use std::io::Write;
-    let stdout = std::io::stdout();
-    let mut h = stdout.lock();
-    let _ = writeln!(h, "{}", serde_json::to_string(ev).unwrap_or_default());
-    let _ = h.flush();
-}
-
-/// Wert fuer die Variablen-Anzeige formatieren (gekappt wie debugger._fmt_value).
-fn dbg_short(v: &Value) -> String {
-    let s = v.fmt();
-    if s.chars().count() > 200 {
-        let t: String = s.chars().take(200).collect();
-        format!("{}...", t)
-    } else { s }
-}
-
-/// Binaerer Operator fuer den Debugger-Mini-Evaluator: dieselben Regeln wie
-/// die Befehle der VM (`vm_helfer::cmp`, `wert_rechnen`), keine zweite
-/// Rechnung (CLAUDE.md). Bis 2026.53 rechnete der Debugger selbst -- ueber
-/// f64: `"apfel" < "birne"` war FALSE, `2^53 + 1` verlor die letzte Stelle,
-/// und ein Ueberlauf saettigte (Bericht A20.1).
-fn dbg_binop(op: &str, a: &Value, b: &Value) -> R<Value> {
-    let vergleich = |o: char| cmp(a, b, o).map(Value::Bool).map_err(|e| format!("eval: {}", e));
-    match op {
-        "=" => Ok(Value::Bool(value_eq(a, b))),
-        "<>" => Ok(Value::Bool(!value_eq(a, b))),
-        "and" => Ok(Value::Bool(a.truthy() && b.truthy())),
-        "or" => Ok(Value::Bool(a.truthy() || b.truthy())),
-        "<" => vergleich('<'),
-        ">" => vergleich('>'),
-        "<=" => vergleich('l'),
-        ">=" => vergleich('g'),
-        _ => wert_rechnen(op, a, b)
-            .ok_or_else(|| format!("eval: Operator '{}' geht mit diesen Werten nicht", op)),
-    }
 }
 
 /// Ein laufender Aufruf auf dem Rahmenstapel (siehe `Vm::rahmen`): der
@@ -1131,6 +1050,9 @@ const GLOBAL_UNGESETZT: &str = concat!(
 // Zustand, der Lauf (exec, dispatch, Koroutinen), OOP und die Rueckrufe.
 #[path = "vm_debug.rs"]
 mod debug;
+use debug::dbg_emit;
+#[path = "vm_spiel.rs"]
+mod spiel;
 #[path = "vm_dienste.rs"]
 mod dienste;
 #[path = "vm_geraete.rs"]
@@ -1141,6 +1063,9 @@ mod system;
 mod gui_befehle;
 #[path = "vm_grafik.rs"]
 mod grafik;
+#[cfg(feature = "graphics")]
+#[path = "vm_ton.rs"]
+mod ton;
 #[path = "vm_helfer.rs"]
 mod helfer;
 pub(crate) use helfer::*;

@@ -1,7 +1,6 @@
 //! Spinner und Bedienung: Tasten je Widget, Klicks (`handle_press`).
 //!
-//! Teil von `gui.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `gui.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 

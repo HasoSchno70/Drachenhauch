@@ -1,7 +1,6 @@
 //! Befehle des gui-Moduls (Retained-Mode) und der Immediate-Mode-Tabelle `ui`.
 //!
-//! Teil von `vm.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `vm.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 

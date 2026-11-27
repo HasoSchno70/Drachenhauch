@@ -1,7 +1,6 @@
 //! Baeume und Behaelter: Tree, Dateibaum, Reiter, Akkordeon, Assistent, Baum mit Spalten, Uhrzeit.
 //!
-//! Teil von `gui.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `gui.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
@@ -1524,5 +1523,45 @@ impl Gui {
         // Obere Haelfte hoch, untere runter -- dieselbe Geste wie am Zahlenfeld.
         let hoch = my < ay + h / 2;
         self.tp_dreh(wi, i, teil, if hoch { 1 } else { -1 });
+    }
+
+    /// Dateibaeume mit eingestelltem Takt neu von der Platte lesen. Ohne das
+    /// zeigt ein Baum eine frisch angelegte Datei erst, wenn ihn jemand von
+    /// Hand auffrischt -- und darauf zu kommen ist niemandes Aufgabe.
+    pub(super) fn dateibaeume_auffrischen(&mut self, jetzt: f64) {
+        let mut bedarf = f64::INFINITY;
+        for win in self.windows.iter_mut() {
+            if !win.alive || !win.visible { continue; }
+            for wdg in win.widgets.iter_mut() {
+                let Some(t) = wdg.tree.as_mut() else { continue };
+                let takt = match t.datei.as_ref() {
+                    Some(d) if d.auffrischen > 0.0 && jetzt >= d.naechste => d.auffrischen,
+                    Some(d) if d.auffrischen > 0.0 => { bedarf = bedarf.min(d.naechste - jetzt); continue; }
+                    _ => continue,
+                };
+                t.datei.as_mut().unwrap().naechste = jetzt + takt;
+                bedarf = bedarf.min(takt);
+                dateibaum_neu(t);
+            }
+        }
+        self.bild_in(bedarf);
+    }
+
+    /// Lage und Groesse des Kaestchens in einer Baumzeile -- EINE Quelle fuer
+    /// Zeichnen und Treffertest; laufen sie auseinander, kippt der Haken neben
+    /// dem, was man anklickt.
+    pub(super) fn tree_kast(&self, ax: i32, level: i32) -> (i32, i32) {
+        (ax + 2 + level * self.sk(TREE_INDENT), (self.sk(TREE_ROW_H) - 6).max(8))
+    }
+
+    /// Wie viel Platz die Kaestchen-Spalte wegnimmt (0, wenn es keine gibt).
+    ///
+    /// Sie steht GANZ LINKS, vor dem Auf-/Zuklapp-Dreieck. Zwischen Dreieck
+    /// und Namen lag sie genau dort, wo man eine Zeile anklickt, um sie zu
+    /// oeffnen -- ein Klick auf den Namen setzte dann einen Haken statt die
+    /// Datei aufzumachen. Aufgefallen ist es an einem Test aus Stand 24, der
+    /// eine Datei im Unterordner oeffnet.
+    pub(super) fn tree_kast_w(&self, t: &TreeState) -> i32 {
+        if t.kaestchen { (self.sk(TREE_ROW_H) - 6).max(8) + 4 } else { 0 }
     }
 }

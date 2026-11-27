@@ -59,6 +59,8 @@ mod richtext;
 mod menues;
 #[path = "gui_layout.rs"]
 mod layout;
+#[path = "gui_form.rs"]
+mod form;
 #[path = "gui_geometrie.rs"]
 mod geometrie;
 #[path = "gui_eingabe.rs"]
@@ -469,6 +471,16 @@ impl Kind {
             Kind::Label | Kind::Panel | Kind::Separator | Kind::GroupBox
             | Kind::Toolbar | Kind::Progress | Kind::Image | Kind::Canvas | Kind::Layout
             | Kind::StatusBar | Kind::Breadcrumb)
+    }
+
+    /// Braucht das Widget einen Namen und eine greifbare Groesse
+    /// (GUI_A11Y_CHECK$)? Alles, was den Fokus nimmt -- ausser den Behaeltern
+    /// und Ansichten, deren Teile (Reiter, Abschnitte, Seiten, der Text
+    /// selbst) die Namen tragen. Bis 2026.53 eine zweite, eigene Liste in
+    /// gui_pruefen.rs.
+    fn braucht_namen(self) -> bool {
+        self.fokussierbar()
+            && !matches!(self, Kind::Splitter | Kind::TabControl | Kind::RichText | Kind::Accordion | Kind::Wizard)
     }
 
     /// Widgets, die Text entgegennehmen -- dort darf die Leertaste NICHT
@@ -4052,9 +4064,12 @@ pub struct Gui {
     listbar_zug: Option<(usize, usize, i32)>,
     /// Dasselbe fuer den Rollbalken eines Textbereichs.
     tabar_zug: Option<(usize, usize, i32)>,
-    /// Enter oder ESC hat in DIESEM Bild ein Umbenennen beendet -- dann
-    /// gehoert die Taste nicht mehr dem Standard-/Abbrechen-Knopf, obwohl
-    /// die Liste danach nicht mehr bearbeitet wird.
+    /// Enter oder ESC hat in DIESEM Bild ein Umbenennen beendet oder eine
+    /// Klappliste geschlossen -- dann gehoert die Taste nicht mehr dem
+    /// Standard-/Abbrechen-Knopf. Das Feld selbst darf sie noch melden
+    /// (GUI_ENTERED einer bearbeitbaren Klappliste); anders als
+    /// `kuerzel_gefeuert`, nach dem niemand sonst die Taste bekommt. Wer
+    /// beides fragt, nimmt `taste_fuer_knoepfe_genommen`.
     liste_taste: bool,
     /// Ein Drehfeld, in das gerade getippt wird: (Fenster, Widget, Zeichen,
     /// Schreibmarke, Anker, der Wert, zu dem der Text zuletzt passte, der Wert
@@ -4073,8 +4088,9 @@ pub struct Gui {
     rs_menue: Option<rechtschreibung::RsMenue>,
     // Strg/Umschalt zum Zeitpunkt des Drucks -- handle_press hat kein `g`.
     tasten_mod: (bool, bool),
-    // Hat in diesem Bild ein Menue-Kuerzel gefeuert? Dann gehoert die Taste
-    // dem Menue -- und NICHT zusaetzlich der Navigation im Textfeld.
+    // Hat in diesem Bild ein Menue-Kuerzel gefeuert (oder die Palette ist
+    // offen)? Dann gehoert die Taste dem Menue -- und NICHT zusaetzlich der
+    // Navigation im Textfeld.
     kuerzel_gefeuert: bool,
     // Offene Untermenues unter dem offenen Wurzelmenue: (Menue-Index, x, y)
     // je Ebene. Leer, wenn keine Kette offen ist.
@@ -5618,8 +5634,24 @@ impl Gui {
         if let Some((pw, f)) = self.teil_druck { if pw == wi { return f; } }
         match self.leihe.as_ref().filter(|l| l.wi == wi) {
             Some(l) => l.nativ,
-            None => self.windows.get(wi).map(|w| w.nativ).unwrap_or(0),
+            None => self.flaeche_von(wi),
         }
+    }
+    /// Die Flaeche, auf der ein Fenster liegt: sein natives Fenster (0 =
+    /// Hauptfenster) -- beim Popover die Flaeche des Widgets, an dem er
+    /// haengt; ein Popover ist nie selbst nativ. Bis 2026.53 lag er immer auf
+    /// dem Hauptfenster, auch wenn sein Widget in einem nativen Fenster stand:
+    /// gezeichnet an der falschen Stelle, nicht anzuklicken (Bericht EF.1).
+    pub(super) fn flaeche_von(&self, wi: usize) -> u32 {
+        let mut wi = wi;
+        for _ in 0..8 {
+            let Some(w) = self.windows.get(wi) else { return 0 };
+            match w.pop.as_ref() {
+                Some(p) => wi = Self::dec_widget(p.anker).0,
+                None => return w.nativ,
+            }
+        }
+        0
     }
     /// Ein natives Fenster (Weg E) in sein Render-Ziel zeichnen, mit dem
     /// Zeiger in seiner Sicht; der Hilfetext gehoert hinein, wenn er zu

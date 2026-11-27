@@ -2107,7 +2107,7 @@ SCROLL: verschiebt in Drachenhauch nichts -- jedes Bild wird neu gezeichnet; zum
 dhrt {}: es fehlt, was der Befehl braucht	dhrt {}: the command is missing what it needs
 # ---------------------------------------------------------------- Nachtrag 2026-11-27
 # Die Meldungen, die `dhrt pruef meldungen --offen` noch deutsch fand.
-{a} und {b} teilen sich {x}	{} and {} share {}
+{} und {} teilen sich {}	{} and {} share {}
 Bilder in der Zwischenablage gibt es in diesem Bau nicht	images in the clipboard are not available in this build
 Dateien in der Zwischenablage gibt es in diesem Bau nicht	files in the clipboard are not available in this build
 zu viele gleichzeitige Klaenge oder Objekte (Grenze erreicht)	too many simultaneous sounds or objects (limit reached)
@@ -2124,7 +2124,7 @@ gibt es in dieser Laufzeit nicht	does not exist in this runtime
 Unbekannter Befehl	Unknown command
 {}: dt {} ist in Sekunden gemeint (DELTA() liefert Sekunden) -- fuer Millisekunden durch 1000 teilen	{}: dt {} is meant in seconds (DELTA() returns seconds) -- divide by 1000 for milliseconds
 erwartet eine Zahl, erhalten {}	expected a number, got {}
-FORMAT$: die Maske {:?} hat keinen Platzhalter -- der Wert kaeme nicht vor. FORMAT$ arbeitet im printf-Stil ("%.2f", "%05d"); Tausenderpunkte und Dezimalkomma schreibt ZAHL$(wert, stellen)	FORMAT$: the mask {} has no placeholder -- the value would not appear. FORMAT$ works printf-style ("%.2f", "%05d"); thousands separators and a decimal comma are written by ZAHL$(wert, stellen)
+FORMAT$: die Maske {} hat keinen Platzhalter -- der Wert kaeme nicht vor. FORMAT$ arbeitet im printf-Stil ("%.2f", "%05d"); Tausenderpunkte und Dezimalkomma schreibt ZAHL$(wert, stellen)	FORMAT$: the mask {} has no placeholder -- the value would not appear. FORMAT$ works printf-style ("%.2f", "%05d"); thousands separators and a decimal comma are written by ZAHL$(wert, stellen)
 ZIP_WRITE: Inhalt {} ist {} -- erwartet wird ein Text oder ein BUFFER	ZIP_WRITE: content {} is {} -- expected a text or a BUFFER
 ZIP_WRITE: erwartet ein ARRAY OF STRING oder ARRAY OF BUFFER	ZIP_WRITE: expected an ARRAY OF STRING or ARRAY OF BUFFER
 ("r" zum Lesen, "a" zum Anhaengen) muss davor stehen	("r" for reading, "a" for appending) must come before it
@@ -2168,7 +2168,7 @@ TEXT (UTF-8, const char*) oder WTEXT (wchar_t*)	TEXT (UTF-8, const char*) or WTE
 {}: Font {} hat keine Schriftdatei (Masse haben nur Fonts, die LOADFONT aus einer TrueType-/OpenType-Datei geladen hat)	{}: font {} has no font file (only fonts that LOADFONT loaded from a TrueType/OpenType file have metrics)
 FONT_BASELINE: Schrift nicht lesbar: {}	FONT_BASELINE: font not readable: {}
 FONT_GLYPH_BOX: Schrift nicht lesbar: {}	FONT_GLYPH_BOX: font not readable: {}
-FONT_GLYPH_BOX: die Schrift hat kein Zeichen '{}' (U+{:04X})	FONT_GLYPH_BOX: the font has no character '{}' (U+{})
+FONT_GLYPH_BOX: die Schrift hat kein Zeichen '{}' (U+{})	FONT_GLYPH_BOX: the font has no character '{}' (U+{})
 AUTOMATION_STOP: '{}' nicht schreibbar: {}	AUTOMATION_STOP: '{}' not writable: {}
 POSTFX: der Massstab muss zwischen 0.25 und 1 liegen, nicht {}	POSTFX: the scale must be between 0.25 and 1, not {}
 Tafel und Arme laufen auseinander	table and match arms are out of sync
@@ -2284,7 +2284,7 @@ DECLARE-Vorgabe ist keine Zahl	DECLARE default is not a number
 {} fehlt im Lookup	{} missing from the lookup
 Unbekannte Escape-Folge '\q'	Unknown escape sequence '\q'
 NUMBER war kein Int	NUMBER was not an Int
-LSP-Nachricht mit ungueltigem Content-Length: {:?}	LSP message with invalid Content-Length: {}
+LSP-Nachricht mit ungueltigem Content-Length: {}	LSP message with invalid Content-Length: {}
 Methode '{}' in {} ueberschreibt '{}' aus {} -- Gross-/Kleinschreibung zaehlt nicht, es ist derselbe Name. Jeder Aufruf von '{}' landet jetzt hier. Ist eine eigene Methode gemeint, einen anderen Namen vergeben; soll sie ersetzen, genauso schreiben wie dort.	Method '{}' in {} overrides '{}' from {} -- upper/lower case does not count, it is the same name. Every call of '{}' now lands here. If a separate method is meant, choose a different name; if it is meant to replace the other one, write it the same way as there.
 Befehle und SUBs bekommen ihre Werte in Klammern	Commands and SUBs get their values in parentheses
  erwartet, Programmende erreicht	 expected, reached the end of the program
@@ -2317,7 +2317,7 @@ Befehl {} ist kein [op, arg]: {}	instruction {} is not [op, arg]: {}
 eine Klasse ist kein Objekt: {}	a class is not an object: {}
 ein Feld ist kein Objekt: {}	a field is not an object: {}
 Top-Level ist kein Objekt	top level is not an object
-Unbekanntes Format: {:?}	Unknown format: {}
+Unbekanntes Format: {}	Unknown format: {}
 Diese .dhc stammt aus dhrt {}, diese Laufzeit ist {} -- die Quelle mit dieser Fassung neu uebersetzen	This .dhc comes from dhrt {}, this runtime is {} -- compile the source again with this version
 sieht dessen Globals nicht -- reiche den Wert als Parameter 	does not see its globals -- pass the value 
 herein oder deklariere ihn in der Datei selbst.	in as a parameter or declare it in the file itself.
@@ -2339,7 +2339,7 @@ paket.json nennt keine Pakete	paket.json names no packages
 '{}' gibt es in diesem Projekt nicht	'{}' does not exist in this project
 hier gibt es keine paket.json	there is no paket.json here
   -- fehlt, dhrt paket hole	  -- missing, dhrt paket hole
-die Schrift '{}' gibt es nicht mehr -- seit die Schriften eingebettet werden, hat 'sans' griechische Buchstaben und Zeichen wie u{2713} u{2717} u{2605} selbst	the font '{}' no longer exists -- since the fonts are embedded, 'sans' itself has Greek letters and characters like u{2713} u{2717} u{2605}
+die Schrift '{}' gibt es nicht mehr -- seit die Schriften eingebettet werden, hat 'sans' griechische Buchstaben und Zeichen wie ✓ ✗ ★ selbst	the font '{}' no longer exists -- since the fonts are embedded, 'sans' itself has Greek letters and characters like ✓ ✗ ★
 die Deckkraft geht von 0 bis 1, nicht {}	the opacity goes from 0 to 1, not {}
 der Radius muss groesser als 0 sein, nicht {}	the radius must be greater than 0, not {}
 ein Vieleck braucht mindestens drei Punkte, nicht {}	a polygon needs at least three points, not {}
@@ -2351,7 +2351,7 @@ UEBERSPRINGEN: dbus-daemon fehlt	UEBERSPRINGEN: dbus-daemon is missing
 dbus-daemon nennt keine Adresse	dbus-daemon names no address
 die Argumente: ARGC() und ARG$(n) (ab 0) -- einen Pfad vom Ort des Aufrufs aus liefert ARGPATH$(n)	the arguments: ARGC() and ARG$(n) (from 0) -- ARGPATH$(n) gives a path as seen from where the program was called
 heisst in Drachenhauch DIR_CURRENT$() -- der Ordner, aus dem das Programm aufgerufen wurde, ist STARTDIR$()	is called DIR_CURRENT$() in Drachenhauch -- the folder the program was called from is STARTDIR$()
- -- ein Dateiname ist noch kein {art}: erst `x = {lader}("{text}")`, dann `{}(x, ...)`	 -- a file name is not a {} yet: first `x = {}("{}")`, then `{}(x, ...)`
+ -- ein Dateiname ist noch kein {}: erst `x = {}("{}")`, dann `{}(x, ...)`	 -- a file name is not a {} yet: first `x = {}("{}")`, then `{}(x, ...)`
 Zugriff auf eine globale Variable, die noch nicht gesetzt ist. 	Access to a global variable that has not been set yet. 
 Laeuft das hier als Auftrag (`dhrt call` / TASK_START)? Dann ist das 	Is this running as a task (`dhrt call` / TASK_START)? Then that is 
 erwartet: das Hauptprogramm laeuft dabei NICHT, also ist kein Global 	expected: the main program does NOT run then, so no global is 
@@ -2368,8 +2368,8 @@ ungueltige/freigegebene MIDI_FILE	invalid/freed MIDI_FILE
 {}: das Feld fehlt	{}: the array is missing
 {}: erwartet ein Feld, nicht {}	{}: expected an array, not {}
 {}: an Stelle {} steht keine ganze Zahl ({})	{}: there is no whole number at position {} ({})
-MDNS_BROWSE: ein Diensttyp sieht aus wie "_http._tcp", nicht {:?}	MDNS_BROWSE: a service type looks like "_http._tcp", not {}
-{}: ein Diensttyp sieht aus wie "_http._tcp", nicht {:?}	{}: a service type looks like "_http._tcp", not {}
+MDNS_BROWSE: ein Diensttyp sieht aus wie "_http._tcp", nicht {}	MDNS_BROWSE: a service type looks like "_http._tcp", not {}
+{}: ein Diensttyp sieht aus wie "_http._tcp", nicht {}	{}: a service type looks like "_http._tcp", not {}
 WEBCAM: kein Bild ohne Grafik	WEBCAM: no image without graphics
 WEBCAM_OPEN: kein Bild ohne Grafik	WEBCAM_OPEN: no image without graphics
 ungueltiger/geschlossener GPIO_CHIP	invalid/closed GPIO_CHIP

@@ -1,7 +1,6 @@
 //! Der Debugger der VM (`dhrt debug`): Haltepunkte, Schritte, Variablen als JSON, Ausdruecke auswerten.
 //!
-//! Teil von `vm.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `vm.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
@@ -644,5 +643,44 @@ impl<'p> Vm<'p> {
             }
             _ => Err("eval: Ausdruck nicht unterstuetzt (nur Namen, Literale, Operatoren, Felder und Indizes -- keine Aufrufe)".into()),
         }
+    }
+}
+
+/// Ein JSON-Event als Zeile auf stdout schreiben + flushen.
+pub(super) fn dbg_emit(ev: &serde_json::Value) {
+    use std::io::Write;
+    let stdout = std::io::stdout();
+    let mut h = stdout.lock();
+    let _ = writeln!(h, "{}", serde_json::to_string(ev).unwrap_or_default());
+    let _ = h.flush();
+}
+
+/// Wert fuer die Variablen-Anzeige formatieren (gekappt wie debugger._fmt_value).
+pub(super) fn dbg_short(v: &Value) -> String {
+    let s = v.fmt();
+    if s.chars().count() > 200 {
+        let t: String = s.chars().take(200).collect();
+        format!("{}...", t)
+    } else { s }
+}
+
+/// Binaerer Operator fuer den Debugger-Mini-Evaluator: dieselben Regeln wie
+/// die Befehle der VM (`vm_helfer::cmp`, `wert_rechnen`), keine zweite
+/// Rechnung (CLAUDE.md). Bis 2026.53 rechnete der Debugger selbst -- ueber
+/// f64: `"apfel" < "birne"` war FALSE, `2^53 + 1` verlor die letzte Stelle,
+/// und ein Ueberlauf saettigte (Bericht A20.1).
+pub(super) fn dbg_binop(op: &str, a: &Value, b: &Value) -> R<Value> {
+    let vergleich = |o: char| cmp(a, b, o).map(Value::Bool).map_err(|e| format!("eval: {}", e));
+    match op {
+        "=" => Ok(Value::Bool(value_eq(a, b))),
+        "<>" => Ok(Value::Bool(!value_eq(a, b))),
+        "and" => Ok(Value::Bool(a.truthy() && b.truthy())),
+        "or" => Ok(Value::Bool(a.truthy() || b.truthy())),
+        "<" => vergleich('<'),
+        ">" => vergleich('>'),
+        "<=" => vergleich('l'),
+        ">=" => vergleich('g'),
+        _ => wert_rechnen(op, a, b)
+            .ok_or_else(|| format!("eval: Operator '{}' geht mit diesen Werten nicht", op)),
     }
 }

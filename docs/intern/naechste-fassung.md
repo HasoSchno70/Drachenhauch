@@ -195,6 +195,11 @@ die Reste aus `docs/intern/inkonsistenzen-runtime.md`, Zweig
 * `CLIPBOARD_SET_IMAGE` liefert nichts mehr (vorher immer TRUE) -- wie
   `CLIPBOARD_SET` ist ein Misserfolg ein Fehler. `IF CLIPBOARD_SET_IMAGE(b)`
   wird zu `CLIPBOARD_SET_IMAGE(b)`.
+* Ein Popover (`GUI_POPOVER`) an einem Widget in einem nativen Fenster
+  (`GUI_WINDOW_NATIVE`) steht jetzt in diesem Fenster und nimmt Klicks; bis
+  2026.53 wurde er ins Hauptfenster gezeichnet und war nicht zu bedienen.
+* Der Tooltip mit dem ganzen Text eines Listeneintrags rechnet mit dem
+  Innenabstand der Stildatei wie das Zeichnen (vorher mit der Vorgabe).
 * Die Zahlenfelder der gui (`GUI_TEXTAREA_SPANS`, `_MARKS`, `_HINTS`,
   `_LINE_COLORS`, `_FOLDABLE`, `_SWATCHES`, `GUI_LISTBOX_SPANS`) nehmen nur
   ganze Zahlen; `2.0` geht, `2.5` ist ein Fehler (vorher still 2). Ein BUFFER

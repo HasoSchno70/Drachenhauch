@@ -30,25 +30,22 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::OnceLock;
 
-/// Die Handle-Arten. Die Stelle in der Liste ist die Art im Wert (`u16`) --
-/// nur fuer diesen Lauf, gespeichert wird sie nirgends.
-pub const ARTEN: &[&str] = &[
-    "IMAGE", "SOUND", "SPRITE_ATLAS",
-    "AUDIO_CLOCK", "AUDIO_EMITTER", "AUDIO_LISTENER", "AUDIO_MOD", "SAMPLE",
-    "BT_HANDLE", "DB_CONN", "DB_RESULT", "FIRMATA_HANDLE", "GPIO_CHIP", "I2C_BUS", "SPI_DEVICE",
-    "GUI_WIDGET", "GUI_WINDOW", "HTTPD", "MIDI_FILE", "MIDI_IN", "MIDI_OUT", "MODBUS",
-    "MQTT_HANDLE", "NET_LISTENER", "NET_SOCKET", "NET_UDP", "OSC", "PDF", "SERIAL_HANDLE",
-    "SMTP", "USB_HANDLE", "VIDEO", "WEBCAM", "WEBSOCKET", "WS_SERVER", "XLSX",
-];
+/// Die Handle-Arten, aus der Typtafel (`typtafel::TYPEN`, Art Handle). Die
+/// Stelle in der Liste ist die Art im Wert (`u16`) -- nur fuer diesen Lauf,
+/// gespeichert wird sie nirgends.
+pub fn arten() -> &'static [&'static str] {
+    static A: OnceLock<Vec<&'static str>> = OnceLock::new();
+    A.get_or_init(|| crate::typtafel::der_art(crate::typtafel::Art::Handle).map(|t| t.name).collect())
+}
 
 /// Der Name einer Art (`TYPEOF`, Meldungen).
 pub fn name(art: u16) -> &'static str {
-    ARTEN.get(art as usize).copied().unwrap_or("HANDLE")
+    arten().get(art as usize).copied().unwrap_or("HANDLE")
 }
 
 /// Die Art zu einem Typnamen (jede Schreibweise), sonst `None`.
 pub fn art(typ: &str) -> Option<u16> {
-    ARTEN.iter().position(|a| a.eq_ignore_ascii_case(typ)).map(|i| i as u16)
+    arten().iter().position(|a| a.eq_ignore_ascii_case(typ)).map(|i| i as u16)
 }
 
 /// Was der Index ueber die Handles eines Befehls sagt.
@@ -177,14 +174,15 @@ mod tests {
     fn jede_art_ist_ein_typ() {
         // Jede Art muss als Typ deklarierbar sein (DIM x AS PDF) -- sonst
         // liefert TYPEOF einen Namen, den das Programm nicht schreiben kann.
-        for a in ARTEN {
+        for a in arten() {
             let t = a.to_lowercase();
             let bekannt = crate::preprocess::modul_typen().any(|m| m == t)
                 || matches!(t.as_str(), "image" | "sound" | "sprite_atlas");
             assert!(bekannt, "{} ist kein Typ", a);
             assert!(crate::value::wert_typ(&t).is_none(), "{} ist ein Werttyp", a);
         }
-        assert!(ARTEN.len() < u16::MAX as usize);
+        assert!(arten().len() < u16::MAX as usize);
+        assert_eq!(arten().len(), 36, "eine Art mehr oder weniger -- gewollt?");
         // AUDIO_CHANNEL ist keine eigene Art: ein Kanal IST die Nummer seines
         // Klangs (`audio::ch_play`), beide Namen meinen dasselbe Ding.
         assert!(art("audio_channel").is_none());

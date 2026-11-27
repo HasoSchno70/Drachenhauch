@@ -451,7 +451,7 @@ END TRY
 --- umgebung
 DHRT_FRAMES=1
 --- erwartet
-GUI_TEXTINPUT_SET: unbekannter Schluessel 'farbe' -- passwort, nur_lesen, maxlaenge, zahlen, suche
+GUI_TEXTINPUT_SET: unbekannter Schluessel 'farbe' -- moeglich sind passwort/password, nur_lesen/readonly, maxlaenge/maxlen, zahlen/numeric, suche/search
 
 === enter meldet sich ein bild lang und ruft den handler
 IMPORT "gui"

@@ -1,7 +1,6 @@
 //! Zeichnen: Fenster, Leisten, Popups und jedes Widget.
 //!
-//! Teil von `gui.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `gui.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 
@@ -212,7 +211,7 @@ impl Gui {
         // Reiter-Leiste (unter Titel/Menue), falls Tabs vorhanden.
         let tboff = self.tabbar_h(wi);
         if tboff > 0 {
-            let by = y + toff + mboff;
+            let by = self.tabbar_y(wi);
             g.box_fill(x + 1, by, x + w - 2, by + tboff - 1, self.th("win_bg"));
             g.line(x + 1, by + tboff - 1, x + w - 2, by + tboff - 1, self.th("win_border"));
             for (ti, x0, x1) in self.tab_slots(g, wi) {
@@ -1699,8 +1698,6 @@ impl Gui {
                 let ih = self.list_zeile_h(wdg);
                 let box_w = self.list_box_w(wdg);
                 let l = wdg.list.as_deref();
-                let hat_icon = l.map(|l| l.icons.iter().any(|&i| i >= 0)).unwrap_or(false);
-                let icon_w = if hat_icon { ih } else { 0 };
                 let ansicht = liste_ansicht(&wdg.items, l);
                 // Mit Rollbalken enden die Zeilen vor ihm -- sonst laege der
                 // Zusatztext rechts unter dem Griff.
@@ -1754,7 +1751,6 @@ impl Gui {
                         let a = wdg.zeile_b.anteil(k as i32);
                         g.box_fill(sx1, iy, sx2, iy + ih - 1, deckkraft(shade(self.wcol(wdg, "bg", "widget_bg"), 22), a));
                     }
-                    let mut tx = ax + pad;
                     if box_w > 0 {
                         // Kaestchen wie das Checkbox-Widget: Rahmen, gefuellt mit Haken.
                         let cs = (ih - 8).max(8);
@@ -1765,13 +1761,12 @@ impl Gui {
                         if an {
                             g.box_fill(bx + 2, by + 2, bx + cs - 3, by + cs - 3, acc);
                         }
-                        tx = ax + box_w;
                     }
                     if let Some(ic) = l.and_then(|l| l.icons.get(k).copied()).filter(|&i| i >= 0) {
                         let isz = ih - 4;
-                        g.draw_image_rect(ic, blk(tx, isz), iy + 2, isz, isz);
+                        g.draw_image_rect(ic, blk(self.list_icon_x(wdg, ax), isz), iy + 2, isz, isz);
                     }
-                    tx += icon_w + if icon_w > 0 { 2 } else { 0 };
+                    let tx = self.list_text_x(wdg, ax);
                     // Auf der Auswahl folgt die Schrift dem GRUND: im hellen Thema
                     // stand dunkle Schrift auf dunkelblauer Zeile, und die gewaehlte
                     // Zeile war die einzige, die man nicht lesen konnte.
@@ -1780,16 +1775,12 @@ impl Gui {
                     let ty = iy + (ih - self.wsize(g, wdg)).max(0) / 2;
                     // Zusatztext rechtsbuendig; der Haupttext endet vor ihm,
                     // statt darunter weiterzulaufen.
-                    let detail = l.and_then(|l| l.details.get(k)).filter(|d| !d.is_empty());
-                    let rechts = match detail {
-                        Some(d) => {
-                            let dw = self.wtext_width(g, wdg, d);
-                            let dx = ax + wz - pad - dw;
-                            self.wtext(g, wdg, blk(dx, dw), ty, d.clone(), if gewaehlt { mischen(fg, muted, 0.4) } else { muted });
-                            dx - self.sk(10)
-                        }
-                        None => ax + wz - 2,
-                    };
+                    let (rechts, detail_x) = self.liste_rechts(g, wdg, wz, k);
+                    let rechts = ax + rechts;
+                    if let (Some(d), Some(dx)) = (l.and_then(|l| l.details.get(k)), detail_x) {
+                        let dw = self.wtext_width(g, wdg, d);
+                        self.wtext(g, wdg, blk(ax + dx, dw), ty, d.clone(), if gewaehlt { mischen(fg, muted, 0.4) } else { muted });
+                    }
                     g.push_clip(blk(tx, (rechts - tx).max(0)), iy, (rechts - tx).max(0), ih);
                     let spans = l.and_then(|l| l.spans.get(k)).filter(|s| !s.is_empty());
                     match spans {
@@ -2206,20 +2197,9 @@ impl Gui {
     /// Gebraucht fuer den Tooltip mit dem ganzen Text.
     pub(super) fn liste_textplatz(&self, g: &Graphics, wi: usize, idx: usize, k: usize) -> i32 {
         let wdg = &self.windows[wi].widgets[idx];
-        let pad = self.m("pad");
-        let ih = self.list_zeile_h(wdg);
-        let box_w = self.list_box_w(wdg);
-        let l = wdg.list.as_deref();
-        let hat_icon = l.map(|l| l.icons.iter().any(|&i| i >= 0)).unwrap_or(false);
-        let icon_w = if hat_icon { ih } else { 0 };
         let (_, _, w, _) = self.abs_rect(wi, wdg);
         let wz = if self.list_bar_geom(wi, idx).is_some() { w - self.sk(8) - 2 } else { w };
-        let tx = if box_w > 0 { box_w } else { pad } + icon_w + if icon_w > 0 { 2 } else { 0 };
-        let rechts = match l.and_then(|l| l.details.get(k)).filter(|d| !d.is_empty()) {
-            Some(d) => wz - pad - self.wtext_width(g, wdg, d) - self.sk(10),
-            None => wz - 2,
-        };
-        rechts - tx
+        self.liste_rechts(g, wdg, wz, k).0 - self.list_text_x(wdg, 0)
     }
 
     /// Text auf eine Breite kuerzen: passt er nicht, endet er mit "..." --

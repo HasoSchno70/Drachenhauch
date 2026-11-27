@@ -33,14 +33,6 @@ const GROSSE_SCHRIFT: i32 = 24;
 const ZIEL: i32 = 24;
 
 impl Gui {
-    /// Ist das Widget etwas, das man bedient (und das darum einen Namen
-    /// und eine greifbare Groesse braucht)?
-    fn bedienbar(w: &Widget) -> bool {
-        matches!(w.kind, Kind::Button | Kind::Card | Kind::Checkbox | Kind::Toggle | Kind::Radio | Kind::Eigen
-            | Kind::TextInput | Kind::TextArea | Kind::Dropdown | Kind::Spinner | Kind::Slider | Kind::Knob
-            | Kind::ListBox | Kind::Table | Kind::Tree | Kind::ColorPicker | Kind::DatePicker | Kind::TimePicker)
-    }
-
     /// Hat das Widget einen Namen fuer den Bildschirmleser? Dieselbe Regel
     /// wie `a11y_widget`: eigener Text, sonst die Beschriftung daneben,
     /// sonst der Hilfetext.
@@ -128,7 +120,7 @@ impl Gui {
                 }
             }
         }
-        if Self::bedienbar(w) {
+        if w.kind.braucht_namen() {
             if !self.a11y_hat_namen(wi, i) {
                 b.push("kein Name fuer den Bildschirmleser -- Text, eine Beschriftung davor (GUI_LABEL) oder GUI_TOOLTIP".into());
             }
@@ -157,7 +149,7 @@ impl Gui {
     /// Die Rechtecke aller sichtbaren, bedienbaren Widgets eines Fensters.
     pub(super) fn a11y_ziele(&self, wi: usize) -> Vec<(usize, (i32, i32, i32, i32))> {
         self.windows[wi].widgets.iter().enumerate()
-            .filter(|(_, w)| w.alive && w.enabled && Self::bedienbar(w) && self.widget_shown(wi, w))
+            .filter(|(_, w)| w.alive && w.enabled && w.kind.braucht_namen() && self.widget_shown(wi, w))
             .map(|(k, w)| (k, self.abs_rect(wi, w)))
             .collect()
     }

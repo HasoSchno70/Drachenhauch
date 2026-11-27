@@ -1,6 +1,6 @@
 //! Freie Helfer der VM: Meldungen, Index und Scheiben, Rechnen (`konstant_rechnen`, `cmp`, `div` ...), Wandeln (`coerce`), Felder anhaengen.
 //!
-//! Teil von `vm.rs`, herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `vm.rs` (dort die Typen); `vm.rs` reicht diese Helfer weiter (`pub(crate) use helfer::*`).
 
 use super::*;
 

@@ -15,7 +15,7 @@
 use super::*;
 
 /// So weit steht ein Popover vom Widget ab -- die Spitze seines Pfeils.
-const POP_PFEIL: i32 = 8;
+pub(super) const POP_PFEIL: i32 = 8;
 /// Breite eines Sinnbild-Platzes im Textfeld.
 const FELD_SYMBOL_B: i32 = 22;
 /// So lange (Sekunden) wartet ein Suchfeld nach dem letzten Anschlag, bis es
@@ -192,11 +192,16 @@ impl Gui {
         let (rx, ry, rw, rh) = self.abs_rect(aw, &self.windows[aw].widgets[ai]);
         let (w, h) = (self.windows[wi].w, self.windows[wi].h);
         let pf = self.sk(POP_PFEIL);
-        let (sb, sh) = (self.schirm_b, self.schirm_h);
-        let passt_unten = sh <= 0 || ry + rh + pf + h <= sh;
-        let passt_oben = ry - pf - h >= 0;
-        let passt_rechts = sb <= 0 || rx + rw + pf + w <= sb;
-        let passt_links = rx - pf - w >= 0;
+        // Die Grenze der Flaeche, auf der das Widget liegt (`grenze`): im
+        // Hauptfenster dessen Rand, im nativen der Arbeitsbereich des
+        // Schirms (dann bekommt der Popover ein Popup-Fenster) -- bis 2026.53
+        // der Rand des Hauptfensters, auch fuer ein natives Fenster.
+        let (gx0, gy0, gx1, gy1) = self.grenze(aw);
+        let offen = gx1 <= gx0 || gy1 <= gy0;
+        let passt_unten = offen || ry + rh + pf + h <= gy1;
+        let passt_oben = ry - pf - h >= gy0;
+        let passt_rechts = offen || rx + rw + pf + w <= gx1;
+        let passt_links = rx - pf - w >= gx0;
         let nach = match p.seite {
             0 => if !passt_unten && passt_oben { 1 } else { 0 },
             1 => if !passt_oben && passt_unten { 0 } else { 1 },
@@ -210,8 +215,10 @@ impl Gui {
             _ => (rx - pf - w, ry + rh / 2 - h / 2),
         };
         let rand = self.sk(4);
-        if sb > 0 { x = x.min(sb - w - rand).max(rand); }
-        if sh > 0 { y = y.min(sh - h - rand).max(rand); }
+        if !offen {
+            x = x.min(gx1 - w - rand).max(gx0 + rand);
+            y = y.min(gy1 - h - rand).max(gy0 + rand);
+        }
         let rad = self.m("corner_radius").min(8);
         let pfeil = if nach <= 1 { (rx + rw / 2).clamp(x + rad + pf, (x + w - rad - pf).max(x + rad + pf)) }
                     else { (ry + rh / 2).clamp(y + rad + pf, (y + h - rad - pf).max(y + rad + pf)) };
@@ -762,11 +769,10 @@ impl Gui {
     /// Schicht, vor Kontextmenue und Tooltip.
     /// `f`: die Oberflaeche (Weg E) -- nur, was zu ihren Fenstern gehoert.
     pub(super) fn ueber_zeichnen(&self, g: &mut Graphics, f: u32) {
-        // Ein Popover ist nie nativ (window_native lehnt ab).
-        if f == 0 {
-            for &wi in self.z_order.iter() {
-                if self.ist_offener_pop(wi) { self.pop_zeichnen(g, wi); }
-            }
+        // Ein Popover ist nie selbst nativ (window_native lehnt ab); er liegt
+        // auf der Flaeche seines Widgets (`flaeche_von`).
+        for &wi in self.z_order.iter() {
+            if self.ist_offener_pop(wi) && self.flaeche_von(wi) == f { self.pop_zeichnen(g, wi); }
         }
         for &wi in self.z_order.iter() {
             let win = &self.windows[wi];

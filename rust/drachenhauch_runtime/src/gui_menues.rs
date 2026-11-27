@@ -1,7 +1,6 @@
 //! Abfragen und Setzer, Menues, Stil je Widget, Geometrie und Lebenslauf zur Laufzeit, Text- und Formularbefehle.
 //!
-//! Teil von `gui.rs`: dort stehen die Typen; hier nur Methoden,
-//! herausgeloest ohne Aenderung am Inhalt.
+//! Teil von `gui.rs`: dort stehen die Typen, hier die Methoden dieses Themas.
 
 use super::*;
 

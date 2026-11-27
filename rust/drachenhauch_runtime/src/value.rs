@@ -734,17 +734,11 @@ pub(crate) fn klasse_erbt(kind: &str, basis: &str) -> bool {
 /// `AS Tier` nahm ein `Auto` und eine Parameter `AS Datei` die Zahl 5, und
 /// der Fehler kam erst beim ersten Methodenaufruf, weit weg von der Stelle
 /// (docs/intern/entwurf-schnittstellen.md, Weg B).
-/// Die Modultypen, deren Werte echte Werte sind (keine Handle-Nummer) --
-/// so, wie `Value::type_name` sie nennt. EINE Tafel fuer `coerce` (und
-/// `IS`): ein neuer Werttyp gehoert hierher.
-pub(crate) const WERT_TYPEN: &[&str] = &["VEC2", "VEC3", "VEC4", "QUAT", "MAT4", "SPRITE",
-    "FILE", "BUFFER", "TWEEN", "JSON_HANDLE", "XML_HANDLE", "SAVE_HANDLE", "ASTAR_GRID",
-    "PARTICLE_SYSTEM", "ECS_WORLD", "TILED_MAP", "CHAR_CONTROLLER", "PHYSICS_BROAD",
-    "PHYS_WORLD", "PHYS2D_WORLD", "ANIM_FSM", "CHART"];
-
-/// Ist `target` (klein, wie im Typ-String) ein Werttyp? Dann sein Name.
+/// Ist `target` (klein, wie im Typ-String) ein Typ, dessen Werte echte
+/// Werte sind (keine Handle-Nummer)? Dann sein Name, so wie
+/// `Value::type_name` ihn nennt. Aus der Typtafel (`typtafel::TYPEN`).
 pub(crate) fn wert_typ(target: &str) -> Option<&'static str> {
-    WERT_TYPEN.iter().copied().find(|t| t.eq_ignore_ascii_case(target))
+    crate::typtafel::typ(target).filter(|t| t.art == crate::typtafel::Art::Wert).map(|t| t.name)
 }
 
 pub(crate) fn klasse_pruefen(value: &Value, target: &str, ctx: &str) -> Result<(), String> {

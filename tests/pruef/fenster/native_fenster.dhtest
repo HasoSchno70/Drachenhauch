@@ -1280,3 +1280,42 @@ PRINT "druck auf der flaeche "; gedrueckt
 240,140 #18222E
 nativ TRUE
 druck auf der flaeche 49,29
+
+=== ein popover an einem widget im nativen fenster steht in ihm und nimmt klicks
+' Bis 2026.53 lag ein Popover immer auf dem Hauptfenster, auch wenn sein
+' Widget in einem nativen Fenster stand: gezeichnet an der Stelle, die er im
+' nativen gehabt haette, und kein Klick erreichte ihn (Bericht EF.1). Der
+' Knopf "Mehr" liegt bei (100..200, 20..50), der Popover (160 x 80) darunter
+' ab (70, 58), sein Knopf "Los" bei (20, 20) darin -- (140, 93) trifft ihn.
+' 6094988 = 93 * 65536 + 140.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "probe.dh", "roh:512:0:6094988;roh:513:1:6094988;roh:514:0:6094988", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/../_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/../_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei probe.dh
+IMPORT "gui"
+DIM kennung AS STRING : kennung = ARG$(0)
+SCREEN(200, 150, "Haupt-" + kennung, 1)
+DIM p AS GUI_WINDOW : p = GUI_WINDOW(kennung, 40, 40, 300, 200)
+DIM mehr AS GUI_WIDGET : mehr = GUI_BUTTON(p, "Mehr", 100, 20, 100, 30)
+DIM pop AS GUI_WINDOW : pop = GUI_POPOVER(mehr, 160, 80, "unten")
+DIM los AS GUI_WIDGET : los = GUI_BUTTON(pop, "Los", 20, 20, 100, 30)
+DIM nativ AS BOOLEAN : nativ = GUI_WINDOW_NATIVE(p, TRUE)
+GUI_POPOVER_SHOW(pop)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 6000
+    GUI_UPDATE()
+    IF GUI_CLICKED(los) THEN n = n + 1
+    CLS(&H202830) : GUI_DRAW() : FLIP()
+WEND
+PRINT "nativ "; nativ
+PRINT "popover offen "; NOT GUI_POPOVER_CLOSED(pop); " los "; n
+--- system windows
+--- erwartet
+gesendet
+nativ TRUE
+popover offen TRUE los 1
